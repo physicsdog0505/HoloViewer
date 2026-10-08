@@ -34,6 +34,10 @@ class FakeStatement {
   }
   async all() {
     if (!this.sql.startsWith("SELECT cursor")) throw new Error("unexpected all SQL");
+    if (this.sql.includes("ORDER BY cursor DESC")) {
+      const [aid,limit]=this.args;
+      return {results:this.db.rows.filter((row)=>row.aid===aid).sort((a,b)=>b.cursor-a.cursor).slice(0,limit)};
+    }
     const [aid,after,limit]=this.args;
     return {results:this.db.rows.filter((row)=>row.aid===aid&&row.cursor>after).sort((a,b)=>a.cursor-b.cursor).slice(0,limit)};
   }
@@ -96,6 +100,17 @@ assert.equal(page.pushes[0].content,"hello");
 
 response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=1&limit=200"),env);
 assert.equal((await response.json()).pushes.length,0);
+
+
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=0&limit=2&tail=1"),env);
+assert.equal(response.status,200);
+const tailPage=await response.json();
+assert.equal(tailPage.has_more,false);
+assert.deepEqual(tailPage.pushes.map((item)=>item.cursor),[2,3]);
+assert.equal(tailPage.next_cursor,3);
+
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=1&limit=2&tail=1"),env);
+assert.equal(response.status,400);
 
 
 // D1 batch failure must not persist an earlier insert from the same publish request.
