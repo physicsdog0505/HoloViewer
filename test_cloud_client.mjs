@@ -168,3 +168,15 @@ const liveHtml = fs.readFileSync(new URL("./custom-view/session/index.html", imp
 assert.ok(liveHtml.includes("data-live-relay-status"));
 assert.ok(liveSyncBody.includes('document.querySelector("[data-live-relay-status]")'));
 assert.ok(liveSyncBody.includes("status(relayMessage, kind, text)"));
+
+
+assert.equal(
+  checkedConfig.sources.ptt,
+  "live/ptt.json",
+  "public preview must use the live PTT bootstrap artifact",
+);
+const livePttBootstrap = JSON.parse(fs.readFileSync(new URL("./public-data/live/ptt.json", import.meta.url), "utf8"));
+assert.equal(livePttBootstrap.articles[0].aid, "1gntGd6b");
+assert.equal(livePttBootstrap.articles[0].pushes.length, 0);
+assert.equal(livePttBootstrap.completeness, "partial");
+assert.ok(readerBody.includes("bootstrapTail: article.pushes.length === 0"));
