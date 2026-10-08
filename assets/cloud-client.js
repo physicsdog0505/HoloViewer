@@ -517,11 +517,12 @@
         if (sequence !== activeArticle) return;
         // Snapshot rows are already visible; only genuinely new relay rows queue.
         const known = new Set([...visibleIds, ...pending]);
-        const newPushes = pushes.filter((push) => !known.has(push.pushId)).sort(pushOrder);
-        for (const push of newPushes) {
-          pending.push(push.pushId);
+        const newPushes = pushes.filter((push) => {
+          if (known.has(push.pushId)) return false;
           known.add(push.pushId);
-        }
+          return true;
+        }).sort(pushOrder);
+        for (const push of newPushes) pending.push(push.pushId);
         const byId = new Map(pushes.map((push) => [push.pushId, push]));
         pending.sort((a, b) => pushOrder(byId.get(a), byId.get(b)));
         const previousScroll = window.scrollY;
