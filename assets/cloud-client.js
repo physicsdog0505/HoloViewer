@@ -478,6 +478,7 @@
     const form = document.querySelector("[data-live-sync-form]");
     const frame = document.querySelector("[data-live-player]");
     const message = document.querySelector("[data-live-status]");
+    const relayMessage = document.querySelector("[data-live-relay-status]");
     const pushes = document.querySelector("[data-live-pushes]");
     const params = new URLSearchParams(location.search);
     const input = form?.querySelector("input[name=stream]");
@@ -499,14 +500,14 @@
       try {
         if (stopRelay) stopRelay();
         if (validRelayAid) {
-          const state = { cursor: 0, pushes: new Map(), relayStatus: () => {}, timer: null, bootstrapTail: true };
+          const state = { cursor: 0, pushes: new Map(), relayStatus: (kind, text) => status(relayMessage, kind, text), timer: null, bootstrapTail: true };
           renderPushes(pushes, []);
           stopRelay = await pollRelay(config, validRelayAid, state, (items) => renderPushes(pushes, items));
         } else {
           const artifact = await loadPttArtifact(config.ptt);
           const article = artifact.articles[0];
           if (article) {
-            const state = { cursor: 0, pushes: new Map(article.pushes.map((push) => [push.pushId, push])), relayStatus: () => {}, timer: null };
+            const state = { cursor: 0, pushes: new Map(article.pushes.map((push) => [push.pushId, push])), relayStatus: (kind, text) => status(relayMessage, kind, text), timer: null };
             renderPushes(pushes, [...state.pushes.values()]);
             stopRelay = await pollRelay(config, article.aid, state, (items) => renderPushes(pushes, items));
           }
