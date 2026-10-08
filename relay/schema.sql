@@ -15,3 +15,9 @@ CREATE TABLE IF NOT EXISTS ptt_pushes (
 
 CREATE INDEX IF NOT EXISTS idx_ptt_pushes_aid_cursor
 ON ptt_pushes(aid, cursor);
+
+-- Highest purged global cursor per article (AID). Persistent across subsequent trims.
+CREATE TABLE IF NOT EXISTS ptt_retention_watermark (
+  aid TEXT PRIMARY KEY,
+  purged_through_cursor INTEGER NOT NULL
+);
