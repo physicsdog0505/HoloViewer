@@ -22,6 +22,11 @@ assert.throws(
   "legacy push_id rejected"
 );
 assert.equal(window.HoloViewerCloud.validateRelayPage({...page,history_gap:true,purged_through_cursor:1},0).historyGap,true);
+assert.throws(
+  () => window.HoloViewerCloud.validateRelayPage({...page,history_gap:false,purged_through_cursor:1},0),
+  /retention gap/,
+  "inconsistent retention gap rejected"
+);
 assert.throws(()=>window.HoloViewerCloud.validateRelayPage({...page,history_gap:"yes"},0));
 assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, items:page.pushes}, 0));
 assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, pushes:[{...push, secret:"no"}]}, 0));
