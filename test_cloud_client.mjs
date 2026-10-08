@@ -32,6 +32,8 @@ assert.throws(() => window.HoloViewerCloud.validateTranscriptArtifact({...transc
 const source = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 const relayBody = source.slice(source.indexOf("async function pollRelay("), source.indexOf("async function startPtt("));
 assert.ok(relayBody.includes("const pendingPushes = new Map()"));
+assert.ok(relayBody.includes('url.searchParams.set("tail", "1")'));
+assert.ok(relayBody.includes("state.bootstrapTail = false"));
 assert.ok(relayBody.includes("for (const push of pendingPushes.values()) state.pushes.set(push.pushId, push);"));
 assert.ok(relayBody.indexOf("if (pageNumber === RELAY_MAX_PAGES_PER_POLL - 1) throw") < relayBody.indexOf("state.cursor = nextCursor"));
 assert.ok(relayBody.indexOf("if (stopped) return;", relayBody.indexOf("const pendingPushes")) < relayBody.indexOf("state.cursor = nextCursor"));
@@ -158,3 +160,4 @@ const liveSyncBody = source.slice(source.indexOf("async function startCustomView
 assert.ok(liveSyncBody.includes('const relayAid = params.get("aid")'));
 assert.ok(liveSyncBody.includes("if (validRelayAid)"));
 assert.ok(liveSyncBody.includes("pollRelay(config, validRelayAid"));
+assert.ok(liveSyncBody.includes("bootstrapTail: true"));
