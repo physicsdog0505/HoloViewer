@@ -48,3 +48,16 @@ The Mac mini remains outbound-only; no public inbound connection is required.
 ## Retention-gap contract (review required before live deployment)
 
 The D1 schema now includes `ptt_retention_watermark`, recording the highest purged cursor for each article AID. The Worker records watermarks and purges rows in the same D1 batch transaction, and the public GET adds `history_gap` (boolean) and `purged_through_cursor` (integer). The Pages reader displays an explicit incomplete-data warning if a requested cursor is older than the purge watermark. This **detects** lost relay history but does not automatically recover it; recovery requires a separately refreshed historical projection/snapshot. The v1 response has been extended in lockstep with its Pages validator; upgrade Worker and browser together. Run `relay/schema.sql` migration before starting this Worker version. Retention, concurrent publishing and actual Cloudflare D1 migration must still be integration-tested before enabling real relay traffic.
+
+
+## Fresh-client tail bootstrap
+
+A browser that has no historical cursor must not walk the entire retained relay window before it can show live data.
+
+Use:
+
+`GET /v1/ptt?aid=<aid>&after_cursor=0&limit=<n>&tail=1`
+
+The relay returns the newest bounded rows for that AID in ascending cursor order, sets `has_more=false`, and returns `next_cursor` at the newest visible row. Subsequent polls must omit `tail` and continue with normal `after_cursor=<next_cursor>` semantics.
+
+`tail=1` is valid only with `after_cursor=0`. Invalid tail values fail closed.
