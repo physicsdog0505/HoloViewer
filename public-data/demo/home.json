@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "snapshot_id": "demo-home-v1",
+  "generated_at": "2026-10-08T00:00:00Z",
+  "completeness": "partial",
+  "streams": [
+    {
+      "stream_id": "youtube:dQw4w9WgXcQ",
+      "video_id": "dQw4w9WgXcQ",
+      "title": "Public preview fixture — replace after approved publish",
+      "channel_name": "HoloViewer Preview",
+      "group": "Hololive",
+      "lifecycle": "unknown",
+      "scheduled_start_at": null,
+      "thumbnail_url": null,
+      "avatar_url": null
+    }
+  ]
+}

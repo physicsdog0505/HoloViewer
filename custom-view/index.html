@@ -105,7 +105,7 @@ body.viewer-wide .viewer-frame iframe{height:calc(100vh - 126px);min-height:720p
       <button id="add" class="subtle-action" type="button">加入網址</button>
     </div>
     
-    <div class="builder-note">目前第一版先從網址加入；之後可接今日直播搜尋與「加入自訂觀看」。跨日期組合不會猜測共用 PTT。</div>
+    <div class="builder-note">Public v1 先支援單支 YouTube 影片＋唯讀 PTT 時間軸。多人連動與自動 follower playback 尚未開放。</div>
     <div class="surface" style="padding:20px">
       <span class="eyebrow">選擇來源</span>
       <h2 style="margin:7px 0 6px;font-size:21px">自由加入任意直播或 VOD</h2>
@@ -170,7 +170,7 @@ function render(){
   });
 }
 document.getElementById('add').onclick=()=>{
-  const value=input.value.trim();if(!value)return;items.push(value);input.value='';render();input.focus();
+  const value=input.value.trim();if(!value)return;items.splice(0,items.length,value);input.value='';render();input.focus();
 };
 input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();document.getElementById('add').click();}});
 document.getElementById('start').onclick=()=>{

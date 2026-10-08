@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "environment": "preview-fixture",
+  "generated_at": "2026-10-08T00:00:00Z",
+  "sources": {
+    "homepage": "demo/home.json",
+    "ptt": "demo/ptt.json",
+    "watchalong": "demo/watchalong.json",
+    "live_relay": null
+  },
+  "watchalong_policy": {
+    "automatic_follower_playback": false
+  }
+}

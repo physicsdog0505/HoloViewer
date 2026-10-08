@@ -8,6 +8,9 @@ on:
       - 'custom-view/**'
       - 'watchalong/**'
       - 'ptt-today/**'
+      - 'assets/**'
+      - 'public-data/**'
+      - 'docs/PUBLIC_DATA_CLIENT_V1.md'
       - 'test_pages_poc.py'
       - 'test_public_smoke.py'
       - '.github/workflows/pages-poc.yml'
@@ -37,7 +40,7 @@ jobs:
         run: |
           mkdir -p /tmp/pages
           cp index.html /tmp/pages/
-          cp -R custom-view watchalong ptt-today /tmp/pages/
+          cp -R custom-view watchalong ptt-today assets public-data /tmp/pages/
           printf '' > /tmp/pages/.nojekyll
           test ! -e /tmp/pages/app.py
       - uses: actions/upload-artifact@v4
