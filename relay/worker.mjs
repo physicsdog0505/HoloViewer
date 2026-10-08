@@ -182,6 +182,11 @@ export async function handleRequest(request, env) {
   try {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, {status: 204, headers: publicHeaders(env)});
+    if (url.pathname === "/healthz" && request.method === "GET") {
+      if (!env.DB) throw new RelayError("relay database is not configured", 503);
+      await env.DB.prepare("SELECT 1 AS ok").first();
+      return json({status: "ok", schema_version: SCHEMA_VERSION}, 200, publicHeaders(env));
+    }
     if (url.pathname === "/v1/ptt/publish" && request.method === "POST") return await publish(request, env);
     if (url.pathname === "/v1/ptt" && request.method === "GET") return await read(request, env);
     return json({error: "not found"}, 404, request.method === "GET" ? publicHeaders(env) : {});
