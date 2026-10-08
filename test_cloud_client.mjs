@@ -36,6 +36,11 @@ assert.ok(relayBody.includes("for (const push of pendingPushes.values()) state.p
 assert.ok(relayBody.indexOf("if (pageNumber === RELAY_MAX_PAGES_PER_POLL - 1) throw") < relayBody.indexOf("state.cursor = nextCursor"));
 assert.ok(relayBody.indexOf("if (stopped) return;", relayBody.indexOf("const pendingPushes")) < relayBody.indexOf("state.cursor = nextCursor"));
 
+// Atomic gap bookkeeping: a failed second page must not apply a first-page
+// history_gap flag before its batch, cursor and rows can be committed.
+assert.ok(!relayBody.includes("if (page.historyGap) state.historyIncomplete = true;"));
+assert.ok(relayBody.indexOf("if (historyGap) state.historyIncomplete = true;") > relayBody.indexOf("state.cursor = nextCursor;"));
+
 // Offline producer/consumer boundary checks against #302 public PTT exporter limits.
 const pttSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 assert.match(pttSource, /articleId: boundedString\(raw\.article_id, "article_id", 320, true\)/);
@@ -127,6 +132,47 @@ try {
   assert.equal(actual.completeness,"partial");
 } finally {globalThis.fetch=oldFetchForContract;}
 
+// Cancelled in-flight relay failures must not clobber a newly selected article status.
+// This structural guard complements the browser race test pending owner acceptance.
+const cancelledPollSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
+const cancelledPollBody = cancelledPollSource.slice(cancelledPollSource.indexOf("async function pollRelay("), cancelledPollSource.indexOf("async function startPtt("));
+assert.ok(cancelledPollBody.includes('if (!stopped) state.relayStatus("stale"'), "cancelled poll must not write an obsolete stale status");
+
+// Behavioral race: an old article's in-flight fetch fails after the poll was cancelled.
+// Prior test re-exposed loadPttArtifact only; re-expose pollRelay within this VM.
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { pollRelay, "));
+// The cancelled old poll must never write over the new article's status.
+{
+  const previousFetch = globalThis.fetch;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  let rejectOldRequest;
+  const statuses = [];
+  globalThis.setTimeout = () => 1;
+  globalThis.clearTimeout = () => {};
+  globalThis.fetch = () => new Promise((resolve, reject) => { rejectOldRequest = reject; });
+  try {
+    const oldState = {
+      cursor: 0, pushes: new Map(), timer: null,
+      relayStatus: (kind) => statuses.push(kind),
+    };
+    const stopOld = await window.HoloViewerCloud.pollRelay(
+      {liveRelay:new URL("https://relay.example/v1/ptt"),ptt:null},
+      "old-article", oldState, () => { throw new Error("cancelled poll updated DOM"); }
+    );
+    assert.equal(typeof rejectOldRequest, "function", "old request must be in flight");
+    stopOld();
+    rejectOldRequest(new Error("old request failed after switch"));
+    for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(statuses, [], "cancelled old request must not update status");
+    assert.equal(oldState.cursor, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
+}
+
 // Idle relay polls must preserve DOM and reading position, including long articles.
 const liveSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 const livePoll = liveSource.slice(liveSource.indexOf("async function pollRelay("), liveSource.indexOf("async function startPtt("));
@@ -141,6 +187,26 @@ assert.ok(readerBody.includes('speedSelect.addEventListener("change", resetReadi
 assert.ok(readerBody.includes('speedSelect.value = "0";\n      stopReading();'));
 assert.ok(readerBody.includes('if (followInput.checked && nearBottom) goLatest()'));
 assert.ok(readerBody.includes('if (sequence !== activeArticle) return'));
+
+// Behavioral complexity guard: long articles must not linearly scan every row
+// at each automatic-reading tick. Execute the actual reader search snippet.
+{
+  const from = readerSource.indexOf("        const rows = list.children;");
+  const to = readerSource.indexOf("        if (!next) {", from);
+  assert.ok(from >= 0 && to > from);
+  const snippet = readerSource.slice(from, to);
+  const rowCount = 2623;
+  let geometryReads = 0;
+  const rows = Array.from({length:rowCount}, (_,i) => ({
+    getBoundingClientRect() { geometryReads++; return {top: i * 24 - 800}; },
+  }));
+  const list = {children:rows};
+  const viewport = {scrollY:800};
+  const selectNext = new Function("list", "window", snippet + "return next;");
+  const next = selectNext(list, viewport);
+  assert.equal(next, rows[38], "reader advances from first row below scroll threshold");
+  assert.ok(geometryReads <= 13, "2,623-row reader lookup must use logarithmic geometry reads");
+}
 
 console.log("cloud-client contract tests: pass");
 
