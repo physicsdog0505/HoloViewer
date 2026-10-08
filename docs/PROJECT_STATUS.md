@@ -99,3 +99,14 @@ Read-only GitHub source comparison:
 Public PR #12 `test_relay_worker.mjs` uses `FakeDB` where duplicate `INSERT OR IGNORE` returns `{meta:{changes:0}}` *before* incrementing `this.db.cursor`. Real SQLite `INTEGER PRIMARY KEY AUTOINCREMENT` may advance its sequence on failed unique inserts. Therefore tests asserting `accepted=0` and `rows.length` unchanged **do not reproduce the observed ~174020 cursor vs 601 surviving rows or measure provider-billed writes**.
 Worker triggers watermark UPSERT and DELETE on every POST and bases retention on max cursor; current fake retention tests use dense sequential cursors, not duplicate-induced gaps.
 Needed before approved restart: focused offline SQLite (actual engine) reproduction of failed-insert cursor gaps and retention behavior, plus separately Cloudflare D1 query-level billed-write attribution, and effective deployed Worker SHA. No production D1 tests/commands done here.
+
+## 2026-10-09 VERIFIED SQLite reproduction: duplicate inserts prematurely prune data
+
+Isolated temporary SQLite with exact schema style `cursor INTEGER PRIMARY KEY AUTOINCREMENT, push_id UNIQUE`, no production resources:
+- insert push A; run 5,000 `INSERT OR IGNORE` of duplicate A; insert new push B.
+- observed **2 actual rows**, cursors **1 and 5002**, `sqlite_sequence=5002`.
+- apply current Worker algorithm `threshold=MAX(cursor)-1000`, watermark UPSERT and DELETE `cursor<=threshold`.
+- observed threshold **4002**, retained only push B (1 row), deleted push A **despite only 2 actual rows existing**, watermark for AID A = 1.
+- CONFIRMED: real SQLite AUTOINCREMENT+ignored duplicates creates artificial gaps; max-cursor-based retention can prematurely delete real data. This is a demonstrated *logical safety defect*, separate from unverified Cloudflare D1 per-query billed Rows Written.
+- Critical: prevent restart/merge on current Public Worker and integrated Publisher; minimum repair must decouple retention from sparse cursor values and suppress duplicate mutation attempts. Do not touch operational D1; offline test only.
+- This one reproduction did not run a complete Worker e2e or measure D1 billing. Preserve user 8501 functionality and 4174 UI.
