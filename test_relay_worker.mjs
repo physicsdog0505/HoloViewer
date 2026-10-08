@@ -122,4 +122,33 @@ assert.equal(gapPage.history_gap,true);
 assert.equal(gapPage.purged_through_cursor,1);
 response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=1&limit=200"),env);
 assert.equal((await response.json()).history_gap,false);
+
+// Exercise actual retention pruning, rather than manually setting a watermark.
+// The cursor is global across articles; gap detection must remain per AID.
+const retentionDB = new FakeDB();
+retentionDB.rows = Array.from({length:1002}, (_,i) => ({
+  ...push, cursor:i+1, push_id:`ptt:retention:${i+1}`,
+  aid:i%2===0 ? "M.123.A.1" : "M.123.A.2",
+  source_line:i+1, floor:i+1,
+}));
+retentionDB.cursor = 1002;
+const retentionEnv = {...env, DB:retentionDB};
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[{...push,push_id:"ptt:retention:1003",source_line:1003,floor:1003}]})}),retentionEnv);
+assert.equal(response.status,200);
+assert.equal(retentionDB.rows.length,1000);
+assert.equal(retentionDB.watermarks.get("M.123.A.1"),3);
+assert.equal(retentionDB.watermarks.get("M.123.A.2"),2);
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=0&limit=200"),retentionEnv);
+assert.equal(response.status,200);
+const retainedPage=await response.json();
+assert.equal(retainedPage.history_gap,true);
+assert.equal(retainedPage.purged_through_cursor,3);
+assert.equal(retainedPage.pushes[0].cursor,5);
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.2&after_cursor=2&limit=200"),retentionEnv);
+assert.equal((await response.json()).history_gap,false);
+// Duplicate publish cannot resurrect purged history or regress watermarks.
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[{...push,push_id:"ptt:retention:1003",source_line:1003,floor:1003}]})}),retentionEnv);
+assert.equal((await response.json()).accepted,0);
+assert.equal(retentionDB.watermarks.get("M.123.A.1"),3);
+
 console.log("relay worker adapter tests: pass");
