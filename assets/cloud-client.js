@@ -312,6 +312,7 @@
       return;
     }
     let stopped = false;
+    let lastRebaseAttempt = 0;
     const run = async () => {
       if (stopped) return;
       try {
@@ -336,6 +337,22 @@
         if (stopped) return;
         for (const push of pendingPushes.values()) state.pushes.set(push.pushId, push);
         state.cursor = nextCursor;
+        // Retention loss requires a fresh slow-lane baseline, not a cursor reset.
+        // Never declare completeness solely because the snapshot fetch succeeded.
+        if (historyGap && config.ptt && Date.now() - lastRebaseAttempt >= 60000) {
+          lastRebaseAttempt = Date.now();
+          try {
+            const refreshed = await loadPttArtifact(config.ptt);
+            if (stopped) return;
+            const matching = refreshed.articles.find((item) => item.aid === aid);
+            if (matching) {
+              for (const push of matching.pushes) state.pushes.set(push.pushId, push);
+            }
+          } catch (_) {
+            // Keep the live cursor and previous baseline; partial status below remains.
+          }
+        }
+        if (stopped) return;
         onUpdate([...state.pushes.values()]);
         const stale = !checkedAt || Date.now() - new Date(checkedAt).getTime() > RELAY_STALE_MS;
         state.relayStatus(historyGap ? "partial" : stale ? "stale" : "fresh", historyGap ? "即時 relay 部分舊推文已超出保留期限；目前資料不完整，需以新的歷史快照回補。" : stale ? "即時 relay 已過期，保留最後資料。" : "即時 relay 已連線。", historyGap || stale);
