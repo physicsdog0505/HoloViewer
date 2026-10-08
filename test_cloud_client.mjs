@@ -127,6 +127,11 @@ try {
   assert.equal(actual.completeness,"partial");
 } finally {globalThis.fetch=oldFetchForContract;}
 
+// Idle relay polls must preserve DOM and reading position, including long articles.
+const liveSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
+const livePoll = liveSource.slice(liveSource.indexOf("async function pollRelay("), liveSource.indexOf("async function startPtt("));
+assert.ok(livePoll.includes("if (pendingPushes.size || historyGap) onUpdate("));
+
 // Reader parity: speed control is locally bounded and cannot overwrite live data.
 const readerSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 const readerBody = readerSource.slice(readerSource.indexOf("async function startPtt("), readerSource.indexOf("async function startCustomView("));
