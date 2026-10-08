@@ -119,9 +119,17 @@ async function publish(request, env) {
   const results = statements.length ? await env.DB.batch(statements) : [];
   const accepted = results.reduce((total, result) => total + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0);
   const keep = Number.isSafeInteger(Number(env.RETENTION_ROWS)) ? Math.max(1000, Number(env.RETENTION_ROWS)) : DEFAULT_RETENTION_ROWS;
-  await env.DB.prepare(
-    "DELETE FROM ptt_pushes WHERE cursor <= COALESCE((SELECT MAX(cursor) FROM ptt_pushes),0) - ?"
-  ).bind(keep).run();
+  // The watermark and prune must commit together, or history gaps become invisible.
+  const threshold = Math.max(0, await env.DB.prepare("SELECT COALESCE(MAX(cursor),0) AS max_cursor FROM ptt_pushes").first().then((row) => Number(row?.max_cursor || 0)) - keep);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO ptt_retention_watermark (aid, purged_through_cursor)
+       SELECT aid, MAX(cursor) FROM ptt_pushes WHERE cursor <= ? GROUP BY aid
+       ON CONFLICT(aid) DO UPDATE SET purged_through_cursor =
+         MAX(ptt_retention_watermark.purged_through_cursor, excluded.purged_through_cursor)`
+    ).bind(threshold),
+    env.DB.prepare("DELETE FROM ptt_pushes WHERE cursor <= ?").bind(threshold),
+  ]);
   return json({schema_version: 1, accepted, received: batch.pushes.length});
 }
 
@@ -135,6 +143,11 @@ async function read(request, env) {
   if (!Number.isSafeInteger(after) || after < 0) throw new RelayError("invalid after_cursor");
   if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1) throw new RelayError("invalid limit");
   const limit = Math.min(requestedLimit, MAX_READ_PUSHES);
+  const watermark = await env.DB.prepare(
+    "SELECT purged_through_cursor FROM ptt_retention_watermark WHERE aid = ?"
+  ).bind(aid).first();
+  const purgedThrough = Number(watermark?.purged_through_cursor || 0);
+  const historyGap = after < purgedThrough;
   const result = await env.DB.prepare(
     `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
      FROM ptt_pushes WHERE aid = ? AND cursor > ? ORDER BY cursor ASC LIMIT ?`
@@ -159,6 +172,8 @@ async function read(request, env) {
     next_cursor: next,
     has_more: hasMore,
     checked_at: new Date().toISOString(),
+    history_gap: historyGap,
+    purged_through_cursor: purgedThrough,
     pushes: visible,
   }, 200, publicHeaders(env));
 }
