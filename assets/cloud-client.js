@@ -191,9 +191,9 @@
   }
 
   function validateRelayPage(value, afterCursor) {
-    const fields = ["schema_version", "next_cursor", "has_more", "checked_at", "pushes"];
+    const fields = ["schema_version", "next_cursor", "has_more", "checked_at", "history_gap", "purged_through_cursor", "pushes"];
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== fields.sort().join()) throw new PublicDataError("relay page fields mismatch v1 contract");
-    if (value.schema_version !== 1 || typeof value.has_more !== "boolean") throw new PublicDataError("relay page schema is incompatible");
+    if (value.schema_version !== 1 || typeof value.has_more !== "boolean" || typeof value.history_gap !== "boolean" || !Number.isSafeInteger(value.purged_through_cursor) || value.purged_through_cursor < 0) throw new PublicDataError("relay page schema is incompatible");
     const next = Number(value.next_cursor);
     if (!Number.isSafeInteger(next) || next < afterCursor || !Array.isArray(value.pushes) || value.pushes.length > 500) throw new PublicDataError("relay page cursor/list is invalid");
     const checkedAt = isoTime(value.checked_at, "relay checked_at");
@@ -208,7 +208,7 @@
       previous = push.cursor;
     }
     if (pushes.length && next < previous) throw new PublicDataError("relay next_cursor precedes returned pushes");
-    return { nextCursor: next, hasMore: value.has_more, checkedAt, pushes };
+    return { nextCursor: next, hasMore: value.has_more, checkedAt, pushes, historyGap: value.history_gap, purgedThrough: value.purged_through_cursor };
   }
 
   async function loadPttArtifact(url) {
@@ -317,6 +317,7 @@
       try {
         let checkedAt = null;
         let nextCursor = state.cursor;
+        let historyGap = false;
         const pendingPushes = new Map();
         for (let pageNumber = 0; pageNumber < RELAY_MAX_PAGES_PER_POLL; pageNumber += 1) {
           const requestedCursor = nextCursor;
@@ -326,6 +327,7 @@
           url.searchParams.set("limit", String(RELAY_LIMIT));
           const page = validateRelayPage(await fetchJson(url, 512 * 1024), requestedCursor);
           checkedAt = page.checkedAt;
+          historyGap = historyGap || page.historyGap;
           for (const push of page.pushes) pendingPushes.set(push.pushId, push);
           nextCursor = page.nextCursor;
           if (!page.hasMore) break;
@@ -336,7 +338,7 @@
         state.cursor = nextCursor;
         onUpdate([...state.pushes.values()]);
         const stale = !checkedAt || Date.now() - new Date(checkedAt).getTime() > RELAY_STALE_MS;
-        state.relayStatus(stale ? "stale" : "fresh", stale ? "即時 relay 已過期，保留最後資料。" : "即時 relay 已連線。", stale);
+        state.relayStatus(historyGap ? "partial" : stale ? "stale" : "fresh", historyGap ? "即時 relay 部分舊推文已超出保留期限；目前資料不完整，需以新的歷史快照回補。" : stale ? "即時 relay 已過期，保留最後資料。" : "即時 relay 已連線。", historyGap || stale);
       } catch (error) {
         state.relayStatus("stale", `即時 relay 暫時不可用（${error.name}）；保留最後資料。`, true);
       } finally {
