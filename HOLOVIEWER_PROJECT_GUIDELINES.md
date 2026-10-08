@@ -4,9 +4,10 @@ Last updated: 2026-10-09. Applies to **both** `physicsdog0505/Hololive-PTT-Viewe
 ## 0. Read before acting (mandatory)
 1. Read THIS file **from the current GitHub repository revision**, not a pasted historical copy. Read the counterpart file in the other repository when work crosses repository boundaries. The two copies must stay synchronized.
 2. Read this repository's `AGENTS.md`, the relevant Issue/PR and comments, current code, and (for the private repo) `docs/DEVELOPMENT_CHECKLIST.md`, `docs/PROCESS_REVIEW.md`, `docs/LESSONS_LEARNED.md`, architecture and runbooks where relevant.
-3. Confirm repo, branch, HEAD SHA, task capability (INVESTIGATE / IMPLEMENT / HIGH_RISK), acceptance criteria, protected resources, and what is **actually deployed**. If a file cannot be read, state this and STOP risky work. Never pretend to have read it.
-4. In the **first substantive reply**, explicitly report: guideline revision/link read; repo/branch/HEAD; task scope; permitted actions; prohibited actions; evidence gaps. Do not mistake reading a file or CI passing for compliance or user acceptance.
-5. A task prompt without this preflight is incomplete. The agent must run this preflight itself even if the initiating chat forgot to include it.
+3. Read [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) and the task handoff using [docs/HANDOFF_TEMPLATE.md](docs/HANDOFF_TEMPLATE.md). Refresh actual GitHub and deployed state; report any stale status rather than blindly continuing.
+4. Confirm repo, branch, HEAD SHA, task capability (INVESTIGATE / IMPLEMENT / HIGH_RISK), acceptance criteria, protected resources, and what is **actually deployed**. If a file cannot be read, state this and STOP risky work. Never pretend to have read it.
+5. In the **first substantive reply**, explicitly report: guideline revision/link read; repo/branch/HEAD; task scope; permitted actions; prohibited actions; evidence gaps. Do not mistake reading a file or CI passing for compliance or user acceptance.
+6. A task prompt without this preflight is incomplete. The agent must run this preflight itself even if the initiating chat forgot to include it.
 
 ## 1. Two authoritative product baselines (user decision, 2026-10-09)
 - Running **port 8501** interface: authoritative functional behavior, interaction flows, controls, playback, synchronization, data behavior.
@@ -46,8 +47,8 @@ Copy this at the **very beginning** of any prompt sent to another development wi
 Repositories:
 - Private: https://github.com/physicsdog0505/Hololive-PTT-Viewer
 - Public: https://github.com/physicsdog0505/HoloViewer
-FIRST read HOLOVIEWER_PROJECT_GUIDELINES.md from the CURRENT GitHub default branch of the target repository; for cross-repository work read BOTH copies. Then read AGENTS.md and relevant docs/Issues/PRs/current code.
-In your first substantive reply report file link + revision actually read, repository/branch/HEAD, VERIFIED facts versus UNKNOWNs, 8501 functionality and 4174 UI boundaries, active freeze, permissions and stop conditions. If you cannot read the files, STOP: do not guess.
+FIRST read HOLOVIEWER_PROJECT_GUIDELINES.md from the CURRENT GitHub default branch of the target repository; for cross-repository work read BOTH copies. Then read AGENTS.md, docs/PROJECT_STATUS.md, the task handoff prepared using docs/HANDOFF_TEMPLATE.md, and relevant docs/Issues/PRs/current code.
+In your first substantive reply report file link + revision actually read, the PROJECT_STATUS checkpoint and any discrepancies with current evidence, repository/branch/HEAD, VERIFIED facts versus UNKNOWNs, 8501 functionality and 4174 UI boundaries, active freeze, permissions and stop conditions. If you cannot read the files, STOP: do not guess.
 NO unapproved feature/UI/behavior changes. Conflict between 8501 function and 4174 UI -> STOP and ASK USER. No merge, deployment, live DB writes, D1 Publisher restart, destructive changes or new development dispatch while freeze is active.
 TASK: <explicit task and acceptance criteria>
 CAPABILITY: <INVESTIGATE | DOCUMENTATION ONLY | IMPLEMENT | HIGH_RISK>
