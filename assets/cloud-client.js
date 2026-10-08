@@ -419,6 +419,9 @@
     const saveCheckpoint = (pushId) => {
       try { if (checkpointKey) sessionStorage.setItem(checkpointKey, pushId); } catch (_) {}
     };
+    const loadCheckpoint = () => {
+      try { return checkpointKey ? sessionStorage.getItem(checkpointKey) : null; } catch (_) { return null; }
+    };
     const rebuildRows = (pushes) => {
       renderPushes(list, pushes, visibleIds);
       currentRows = new Map(Array.from(list.children, (row) => [row.dataset.pushId, row]));
@@ -498,25 +501,37 @@
       checkpointKey = "holoviewer-ptt-reveal:" + article.articleId;
       visibleIds = new Set(article.pushes.map((push) => push.pushId));
       const initial = [...state.pushes.values()];
+      const previousCheckpoint = loadCheckpoint();
+      // A restored checkpoint is meaningful only when it exists in this baseline;
+      // never advance beyond unseen live rows simply because a page refreshed.
+      const checkpointInBaseline = initial.some((push) => push.pushId === previousCheckpoint);
       rebuildRows(initial);
-      if (initial.length) saveCheckpoint(initial[initial.length - 1].pushId);
+      if (initial.length && (!previousCheckpoint || checkpointInBaseline)) {
+        saveCheckpoint(initial[initial.length - 1].pushId);
+      }
       // A newly selected article starts at its newest push, as in the desktop viewer.
       goLatest();
       const incomplete = artifact.completeness !== "complete" || article.completeness !== "complete";
       status(pageStatus, incomplete ? "partial" : "complete", incomplete ? "歷史資料不完整；未出現的推文不可解讀為 0。" : "歷史資料完整。 ");
-      stopRelay = await pollRelay(config, article.aid, state, (pushes) => {
+      const stopCurrentRelay = await pollRelay(config, article.aid, state, (pushes) => {
         if (sequence !== activeArticle) return;
         // Snapshot rows are already visible; only genuinely new relay rows queue.
-        const newPushes = pushes.filter((push) =>
-          !visibleIds.has(push.pushId) && !pending.includes(push.pushId)
-        ).sort(pushOrder);
-        for (const push of newPushes) pending.push(push.pushId);
+        const known = new Set([...visibleIds, ...pending]);
+        const newPushes = pushes.filter((push) => !known.has(push.pushId)).sort(pushOrder);
+        for (const push of newPushes) {
+          pending.push(push.pushId);
+          known.add(push.pushId);
+        }
+        const byId = new Map(pushes.map((push) => [push.pushId, push]));
+        pending.sort((a, b) => pushOrder(byId.get(a), byId.get(b)));
         const previousScroll = window.scrollY;
         rebuildRows(pushes);
         // DOM rebuilds must never steal a user-controlled history position.
         window.scrollTo({ top: previousScroll, behavior: "instant" });
         scheduleReveal();
       });
+      if (sequence !== activeArticle) stopCurrentRelay?.();
+      else stopRelay = stopCurrentRelay || null;
     };
     select.addEventListener("change", show);
     await show();
