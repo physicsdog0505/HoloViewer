@@ -46,7 +46,7 @@ assert.match(pttSource, /aid: boundedString\(raw\.aid, "article.aid", 128, true\
 assert.ok(relayBody.includes("const refreshed = await loadPttArtifact(config.ptt)"));
 assert.ok(relayBody.includes("refreshed.articles.find((item) => item.aid === aid)"));
 assert.ok(relayBody.includes("state.pushes.set(push.pushId, push)"));
-assert.ok(relayBody.includes('historyGap ? "partial"'));
+assert.ok(relayBody.includes('state.historyIncomplete ? "partial"'));
 assert.ok(relayBody.includes("Date.now() - lastRebaseAttempt >= 60000"));
 
 // Behavioral integration: gap -> fetch slow snapshot -> preserve cursor -> dedupe -> partial warning.
@@ -57,6 +57,7 @@ const originalSetTimeout = globalThis.setTimeout;
 const originalClearTimeout = globalThis.clearTimeout;
 const pendingTimers = [];
 const requested = [];
+let relayReadCount = 0;
 const relayPush = {...push, content:"relay", cursor:1};
 const baseline = JSON.parse(fs.readFileSync(new URL("./public-data/demo/ptt.json", import.meta.url), "utf8"));
 baseline.articles[0].aid = "M.123.A.1";
@@ -64,7 +65,7 @@ baseline.articles[0].pushes = [{push_id:push.push_id, floor:1, source_line:1, ki
 globalThis.fetch = async (url) => {
   const u = String(url);
   requested.push(u);
-  const body = u.includes("/v1/ptt") ? {...page, history_gap:true, purged_through_cursor:1, checked_at:new Date().toISOString(), pushes:[relayPush]} : baseline;
+  const body = u.includes("/v1/ptt") ? (++relayReadCount === 1 ? {...page, history_gap:true, purged_through_cursor:1, checked_at:new Date().toISOString(), pushes:[relayPush]} : {...page, next_cursor:1, history_gap:false, purged_through_cursor:1, checked_at:new Date().toISOString(), pushes:[]}) : baseline;
   return new Response(JSON.stringify(body), {status:200, headers:{"content-type":"application/json"}});
 };
 globalThis.setTimeout = (callback, ms) => { pendingTimers.push({callback,ms}); return pendingTimers.length; };
@@ -82,6 +83,13 @@ try {
   assert.equal(rendered.length,1);
   assert.equal(state.status?.kind,"partial", "a re-fetched snapshot is not completeness proof");
   assert.ok(requested.some(u=>u.includes("/public-data/demo/ptt.json")), "gap triggers snapshot refresh");
+  const nextPoll = pendingTimers.find(item=>item.ms===5000);
+  assert.ok(nextPoll, "next relay poll scheduled");
+  nextPoll.callback();
+  for(let i=0;i<40 && relayReadCount<2;i++) await new Promise(resolve=>setImmediate(resolve));
+  for(let i=0;i<10;i++) await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(state.status?.kind,"partial","subsequent healthy relay page does not erase historical uncertainty");
+  assert.equal(state.cursor,1);
   stop();
 } finally {
   globalThis.fetch=originalFetch;
