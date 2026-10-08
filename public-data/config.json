@@ -4,7 +4,7 @@
   "generated_at": "2026-10-09T00:00:00Z",
   "sources": {
     "homepage": "demo/home.json",
-    "ptt": "demo/ptt.json",
+    "ptt": "live/ptt.json",
     "watchalong": "demo/watchalong.json",
     "transcripts": "demo/transcripts.json",
     "live_relay": "https://holoviewer-ptt-relay.singlebagel.workers.dev/v1/ptt"
