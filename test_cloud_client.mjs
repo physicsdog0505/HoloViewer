@@ -60,6 +60,9 @@ const requested = [];
 let relayReadCount = 0;
 const relayPush = {...push, content:"relay", cursor:1};
 const baseline = JSON.parse(fs.readFileSync(new URL("./public-data/demo/ptt.json", import.meta.url), "utf8"));
+baseline.completeness = "complete";
+baseline.articles[0].completeness = "complete";
+baseline.generated_at = new Date().toISOString();
 baseline.articles[0].aid = "M.123.A.1";
 baseline.articles[0].pushes = [{push_id:push.push_id, floor:1, source_line:1, kind:"推", author:"fixture", content:"snapshot", occurred_at:push.occurred_at}];
 globalThis.fetch = async (url) => {
@@ -81,7 +84,7 @@ try {
   assert.equal(state.cursor,1, "relay cursor advances after complete valid page");
   assert.equal(state.pushes.size,1, "same push_id deduplicated across both planes");
   assert.equal(rendered.length,1);
-  assert.equal(state.status?.kind,"partial", "a re-fetched snapshot is not completeness proof");
+  assert.equal(state.status?.kind,"partial", "even a newer complete-labelled snapshot is not a publisher-ledger coverage proof");
   assert.ok(requested.some(u=>u.includes("/public-data/demo/ptt.json")), "gap triggers snapshot refresh");
   const nextPoll = pendingTimers.find(item=>item.ms===5000);
   assert.ok(nextPoll, "next relay poll scheduled");
