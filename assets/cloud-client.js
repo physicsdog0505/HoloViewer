@@ -379,9 +379,30 @@
       status(pageStatus, "unavailable", "公開 PTT 快照目前沒有文章。影片功能不受影響。 ");
       return;
     }
+    // Reader controls are local UI state; the public PTT client remains read-only.
+    const controls = document.createElement("div");
+    controls.className = "ptt-reader-actions";
+    controls.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;margin:12px 0;align-items:center";
+    const latestButton = element("button", "subtle-action", "跳到最新");
+    latestButton.type = "button";
+    const followLabel = element("label", "", "");
+    followLabel.style.cssText = "display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer";
+    const followInput = document.createElement("input");
+    followInput.type = "checkbox";
+    followInput.checked = true;
+    followLabel.append(followInput, document.createTextNode("有新推文時自動跟隨"));
+    controls.append(latestButton, followLabel);
+    list.before(controls);
+    const goLatest = () => {
+      const last = list.lastElementChild;
+      if (last) last.scrollIntoView({ block: "end", behavior: "auto" });
+    };
+    latestButton.addEventListener("click", goLatest);
     let stopRelay = null;
+    let activeArticle = 0;
     const show = async () => {
       if (stopRelay) stopRelay();
+      const sequence = ++activeArticle;
       const article = artifact.articles.find((item) => item.articleId === select.value) || artifact.articles[0];
       const state = {
         cursor: 0,
@@ -390,9 +411,17 @@
         timer: null,
       };
       renderPushes(list, [...state.pushes.values()]);
+      // A newly selected article starts at its newest push, as in the desktop viewer.
+      goLatest();
       const incomplete = artifact.completeness !== "complete" || article.completeness !== "complete";
       status(pageStatus, incomplete ? "partial" : "complete", incomplete ? "歷史資料不完整；未出現的推文不可解讀為 0。" : "歷史資料完整。 ");
-      stopRelay = await pollRelay(config, article.aid, state, (pushes) => renderPushes(list, pushes));
+      stopRelay = await pollRelay(config, article.aid, state, (pushes) => {
+        if (sequence !== activeArticle) return;
+        // Never steal the reading position if following is disabled.
+        const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 120;
+        renderPushes(list, pushes);
+        if (followInput.checked && nearBottom) goLatest();
+      });
     };
     select.addEventListener("change", show);
     await show();
