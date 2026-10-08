@@ -10,7 +10,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".gitignore", "index.html", "custom-view/index.html", "custom-view/session/index.html", "watchalong/index.html", "ptt-today/index.html", "test_pages_poc.py", "test_cloud_client.mjs", ".github/workflows/pages-poc.yml", "docs/PAGES_CLIENT_UI_RELEASE_GATE.md", "docs/PUBLIC_DATA_CLIENT_V1.md", "assets/cloud-client.js", "public-data/config.json", "public-data/demo/home.json", "public-data/demo/ptt.json", "public-data/demo/watchalong.json", "public-data/demo/transcripts.json", "relay/worker.mjs", "relay/schema.sql", "relay/README.md", "test_relay_worker.mjs"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".gitignore", "index.html", "custom-view/index.html", "custom-view/session/index.html", "watchalong/index.html", "ptt-today/index.html", "test_pages_poc.py", "test_cloud_client.mjs", ".github/workflows/pages-poc.yml", "docs/PAGES_CLIENT_UI_RELEASE_GATE.md", "docs/PUBLIC_DATA_CLIENT_V1.md", "assets/cloud-client.js", "public-data/config.json", "public-data/demo/home.json", "public-data/demo/ptt.json", "public-data/demo/watchalong.json", "public-data/demo/transcripts.json", "relay/worker.mjs", "relay/schema.sql", "relay/README.md", "relay/wrangler.example.toml", "test_relay_worker.mjs"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
