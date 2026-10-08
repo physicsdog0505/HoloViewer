@@ -242,6 +242,63 @@ assert.ok(!readerBody.includes("next.scrollIntoView"), "old-message scroll timer
 assert.ok(readerBody.includes('window.scrollTo({ top: previousScroll, behavior: "instant" })'));
 assert.ok(readerBody.includes("if (sequence !== activeArticle) return"));
 
+// Behavioral reader-queue test executes the actual production queue closure,
+// using a small DOM/timer shim rather than relying only on source assertions.
+{
+  const begin = readerBody.indexOf("    // The authoritative private Viewer paces NEW message reveal");
+  const end = readerBody.indexOf("    let stopRelay = null;", begin);
+  assert.ok(begin >= 0 && end > begin, "locate reader queue implementation");
+  const actualQueue = readerBody.slice(begin, end);
+  const listeners = {};
+  const checkpoints = new Map();
+  const timeouts = new Map();
+  let timerSerial = 0, scrolls = 0, revealCount = 0;
+  const list = {children:[],lastElementChild:null};
+  const speedSelect = {value:"0.5", addEventListener:(key,fn)=>listeners["speed:"+key]=fn};
+  const followInput = {checked:true, addEventListener:(key,fn)=>listeners["follow:"+key]=fn};
+  const latestButton = {addEventListener:(key,fn)=>listeners["latest:"+key]=fn};
+  const viewport = {addEventListener:(key,fn)=>listeners[key]=fn};
+  const fakeSession = {setItem:(key,value)=>checkpoints.set(key,value)};
+  const makeRows = (_target, pushes, visible) => {
+    list.children=pushes.map(p=>({dataset:{pushId:p.pushId},hidden:!visible.has(p.pushId),
+      scrollIntoView:()=>{scrolls++;}}));
+    list.lastElementChild=list.children.at(-1);
+  };
+  const fakeSetTimeout = (fn,delay)=>{const id=++timerSerial;timeouts.set(id,{fn,delay});return id;};
+  const fakeClearTimeout = id=>timeouts.delete(id);
+  const create = new Function("list","speedSelect","followInput","latestButton","window",
+    "sessionStorage","renderPushes","setTimeout","clearTimeout",
+    actualQueue + "return {setBase(ids){visibleIds=new Set(ids);checkpointKey='test-aid';},"+
+    "enqueue(ids){pending.push(...ids);},rebuildRows,scheduleReveal,flushPending,"+
+    "pendingSize:()=>pending.length,paused:()=>userPausedFollow};");
+  const reader = create(list,speedSelect,followInput,latestButton,viewport,fakeSession,
+    makeRows,fakeSetTimeout,fakeClearTimeout);
+  reader.setBase(["old"]);
+  reader.rebuildRows([{pushId:"old"},{pushId:"new"}]);
+  assert.equal(list.children[0].hidden,false,"historical baseline immediately visible");
+  assert.equal(list.children[1].hidden,true,"new relay row initially queued");
+  reader.enqueue(["new"]);
+  reader.scheduleReveal();
+  assert.equal([...timeouts.values()][0].delay,500,"default reveal is 500ms, not page scrolling");
+  listeners.wheel();
+  assert.equal(reader.paused(),true,"manual scroll pauses following");
+  const [id,timer]=[...timeouts][0];timeouts.delete(id);timer.fn();
+  assert.equal(list.children[1].hidden,false,"timer reveals queued new row");
+  assert.equal(scrolls,0,"manual scroll not overridden by reveal");
+  assert.equal(checkpoints.get("test-aid"),"new");
+  reader.rebuildRows([{pushId:"old"},{pushId:"new"},{pushId:"new2"}]);
+  reader.enqueue(["new2"]);reader.scheduleReveal();
+  listeners["latest:click"]();
+  assert.equal(reader.pendingSize(),0,"jump latest flushes queue");
+  assert.equal(list.children[2].hidden,false);
+  assert.equal(timeouts.size,0,"jump latest cancels reveal timer");
+  assert.equal(reader.paused(),false,"jump latest resumes follow");
+  assert.equal(scrolls,1,"jump latest scrolls once");
+  assert.equal(checkpoints.get("test-aid"),"new2");
+  listeners["latest:click"]();
+  assert.equal(scrolls,2,"jump latest remains idempotent");
+}
+
 console.log("cloud-client contract tests: pass");
 
 
