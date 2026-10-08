@@ -48,7 +48,8 @@ class PagesPoC(unittest.TestCase):
             self.assertIn(item,html)
         self.assertIn("data:image/svg+xml",html)
         self.assertIn('data-cloud-page="home"',html)
-        self.assertIn("data-public-streams",html)
+        self.assertIn('id="homeDynamic"',html)
+        self.assertIn("現在直播中",html)
 
     def test_cloud_data_contract_is_bounded_and_read_only(self):
         client=(ROOT/"assets/cloud-client.js").read_text(encoding="utf-8")

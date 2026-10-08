@@ -235,19 +235,49 @@
     if (!config.homepage) throw new PublicDataError("homepage public artifact is not configured");
     const artifact = validateHome(await fetchJson(config.homepage));
     status(homeStatus, artifact.completeness, artifact.completeness === "complete" ? `公開快照已載入（${artifact.streams.length} 筆）。` : `公開快照僅為部分資料（${artifact.streams.length} 筆）；缺席不代表沒有直播。`);
-    const target = document.querySelector("[data-public-streams]");
-    if (!target) return;
-    clear(target);
+    const sections = new Map();
+    const headings = { "現在直播中": "live", "即將開始": "upcoming", "狀態待更新": "unknown", "已結束": "ended" };
+    document.querySelectorAll("#homeDynamic section.section").forEach((section) => {
+      const target = section.querySelector(".client-grid");
+      const key = headings[section.querySelector("h2")?.textContent?.trim()];
+      if (target && key) { clear(target); sections.set(key, { section, target }); }
+    });
+    const rail = document.querySelector(".live-channel-rail");
+    clear(rail);
+    if (rail) rail.append(element("span", "live-channel-label", "直播頻道"));
     for (const stream of artifact.streams) {
+      const bucket = sections.get(stream.lifecycle) || sections.get("unknown");
+      if (!bucket) continue;
       const card = element("a", "client-card stream-card");
       card.href = stream.videoId ? `custom-view/session/?stream=${encodeURIComponent(stream.videoId)}` : "#";
-      const copy = element("div", "card-copy");
-      copy.append(element("span", `status-pill ${stream.lifecycle}`, stream.lifecycle));
+      card.dataset.group = stream.group.toLowerCase();
+      const thumb = element("div", "card-thumb");
+      const overlay = element("div", "thumb-overlay");
+      overlay.append(element("span", `thumb-badge ${stream.lifecycle}`, stream.lifecycle));
+      thumb.append(overlay);
+      const meta = element("div", "yt-meta");
+      const avatar = element("span", "channel-avatar-ring");
+      avatar.append(element("span", "channel-avatar-fallback", stream.channelName.slice(0, 1)));
+      const copy = element("div", "yt-copy");
       copy.append(element("h3", "stream-title", stream.title));
-      copy.append(element("p", "channel-name", `${stream.channelName} · ${stream.group}`));
-      card.append(copy); target.append(card);
+      copy.append(element("div", "channel-name", `${stream.channelName} · ${stream.group}`));
+      meta.append(avatar, copy); card.append(thumb, meta); bucket.target.append(card);
+      if (stream.lifecycle === "live" && rail) {
+        const item = element("a", "live-channel-rail-item"); item.href = card.href;
+        item.dataset.group = stream.group.toLowerCase();
+        item.append(element("span", "live-channel-avatar", stream.channelName.slice(0, 1)), element("strong", "", stream.channelName));
+        rail.append(item);
+      }
     }
-    if (!artifact.streams.length) target.append(element("p", "empty-note", "此快照沒有可顯示的直播。"));
+    for (const { section, target } of sections.values()) section.hidden = !target.children.length;
+    if (rail) rail.hidden = rail.querySelectorAll("a").length === 0;
+    document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => {
+      const filter = button.dataset.filter;
+      document.querySelectorAll("[data-filter]").forEach((item) => item.classList.toggle("active", item === button));
+      document.querySelectorAll(".stream-card[data-group],.live-channel-rail-item[data-group]").forEach((item) => {
+        item.hidden = filter !== "all" && item.dataset.group !== filter;
+      });
+    }));
   }
 
   async function pollRelay(config, articleId, state, onUpdate) {
