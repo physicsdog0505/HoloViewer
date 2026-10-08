@@ -406,6 +406,8 @@
     speedLabel.append(speedSelect);
     controls.append(latestButton, followLabel, speedLabel);
     list.before(controls);
+    // User scrolling takes priority over both follow and automatic reading.
+    let userPausedFollow = false;
     let readingTimer = null;
     const stopReading = () => {
       if (readingTimer !== null) clearInterval(readingTimer);
@@ -437,12 +439,40 @@
         next.scrollIntoView({ block: "start", behavior: "smooth" });
       }, seconds * 1000);
     };
-    speedSelect.addEventListener("change", resetReading);
+    speedSelect.addEventListener("change", () => {
+      // Choosing a reading speed is explicit navigation, not live-tail following.
+      if (speedSelect.value !== "0") userPausedFollow = true;
+      resetReading();
+    });
+    const pauseOnManualNavigation = () => {
+      userPausedFollow = true;
+      // Manual navigation must win over a running 1/3/5-second reader timer.
+      if (readingTimer !== null) {
+        speedSelect.value = "0";
+        stopReading();
+      }
+    };
+    window.addEventListener("wheel", pauseOnManualNavigation, { passive: true });
+    window.addEventListener("touchmove", pauseOnManualNavigation, { passive: true });
+    window.addEventListener("keydown", (event) => {
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key) &&
+          !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) pauseOnManualNavigation();
+    });
     const goLatest = () => {
       const last = list.lastElementChild;
       if (last) last.scrollIntoView({ block: "end", behavior: "auto" });
     };
-    latestButton.addEventListener("click", goLatest);
+    latestButton.addEventListener("click", () => {
+      userPausedFollow = false;
+      goLatest();
+    });
+    followInput.addEventListener("change", () => {
+      // Re-enabling checkbox is an explicit choice to resume at the live tail.
+      if (followInput.checked) {
+        userPausedFollow = false;
+        goLatest();
+      }
+    });
     let stopRelay = null;
     let activeArticle = 0;
     const show = async () => {
@@ -457,6 +487,7 @@
         relayStatus: (kind, message) => status(relayStatus, kind, message),
         timer: null,
       };
+      userPausedFollow = false;
       renderPushes(list, [...state.pushes.values()]);
       // A newly selected article starts at its newest push, as in the desktop viewer.
       goLatest();
@@ -464,10 +495,13 @@
       status(pageStatus, incomplete ? "partial" : "complete", incomplete ? "歷史資料不完整；未出現的推文不可解讀為 0。" : "歷史資料完整。 ");
       stopRelay = await pollRelay(config, article.aid, state, (pushes) => {
         if (sequence !== activeArticle) return;
-        // Never steal the reading position if following is disabled.
-        const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 120;
+        // Scrolling up explicitly suspends live-tail following until Jump to latest.
+        const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24;
+        const shouldFollow = followInput.checked && !userPausedFollow && nearBottom && readingTimer === null;
+        const previousScroll = window.scrollY;
         renderPushes(list, pushes);
-        if (followInput.checked && nearBottom) goLatest();
+        if (shouldFollow) goLatest();
+        else window.scrollTo({ top: previousScroll, behavior: "instant" });
       });
     };
     select.addEventListener("change", show);
