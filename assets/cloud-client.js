@@ -154,8 +154,12 @@
     const sourceLine = raw.source_line == null ? null : Number(raw.source_line);
     if (floor != null && (!Number.isSafeInteger(floor) || floor < 1)) throw new PublicDataError("PTT floor is invalid");
     if (sourceLine != null && (!Number.isSafeInteger(sourceLine) || sourceLine < 1)) throw new PublicDataError("PTT source_line is invalid");
+    const pushId = boundedString(raw.push_id, "push_id", 256, true);
+    if (!/^ptt:v1:[0-9a-f]{64}$/.test(pushId)) {
+      throw new PublicDataError("push_id is not canonical");
+    }
     return {
-      pushId: boundedString(raw.push_id, "push_id", 256, true),
+      pushId,
       floor,
       sourceLine,
       kind: boundedString(raw.kind, "push.kind", 16, true),
