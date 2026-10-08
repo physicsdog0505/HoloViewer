@@ -329,7 +329,7 @@
           const page = validateRelayPage(await fetchJson(url, 512 * 1024), requestedCursor);
           checkedAt = page.checkedAt;
           historyGap = historyGap || page.historyGap;
-          if (page.historyGap) state.historyIncomplete = true;
+          // Defer gap state until all pages validate and can be committed.
           for (const push of page.pushes) pendingPushes.set(push.pushId, push);
           nextCursor = page.nextCursor;
           if (!page.hasMore) break;
@@ -338,6 +338,7 @@
         if (stopped) return;
         for (const push of pendingPushes.values()) state.pushes.set(push.pushId, push);
         state.cursor = nextCursor;
+        if (historyGap) state.historyIncomplete = true;
         // Retention loss requires a fresh slow-lane baseline, not a cursor reset.
         // Never declare completeness solely because the snapshot fetch succeeded.
         if (historyGap && config.ptt && Date.now() - lastRebaseAttempt >= 60000) {
