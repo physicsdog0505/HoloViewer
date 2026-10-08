@@ -198,6 +198,7 @@
     const fields = ["schema_version", "next_cursor", "has_more", "checked_at", "history_gap", "purged_through_cursor", "pushes"];
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== fields.sort().join()) throw new PublicDataError("relay page fields mismatch v1 contract");
     if (value.schema_version !== 1 || typeof value.has_more !== "boolean" || typeof value.history_gap !== "boolean" || !Number.isSafeInteger(value.purged_through_cursor) || value.purged_through_cursor < 0) throw new PublicDataError("relay page schema is incompatible");
+    if (value.history_gap !== (afterCursor < value.purged_through_cursor)) throw new PublicDataError("relay retention gap is inconsistent");
     const next = Number(value.next_cursor);
     if (!Number.isSafeInteger(next) || next < afterCursor || !Array.isArray(value.pushes) || value.pushes.length > 500) throw new PublicDataError("relay page cursor/list is invalid");
     const checkedAt = isoTime(value.checked_at, "relay checked_at");
