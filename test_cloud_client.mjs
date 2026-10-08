@@ -127,4 +127,14 @@ try {
   assert.equal(actual.completeness,"partial");
 } finally {globalThis.fetch=oldFetchForContract;}
 
+// Reader parity: speed control is locally bounded and cannot overwrite live data.
+const readerSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
+const readerBody = readerSource.slice(readerSource.indexOf("async function startPtt("), readerSource.indexOf("async function startCustomView("));
+assert.ok(readerBody.includes('["0", "停止"]'));
+for (const seconds of ["5", "3", "1"]) assert.ok(readerBody.includes('["' + seconds + '",'));
+assert.ok(readerBody.includes('speedSelect.addEventListener("change", resetReading)'));
+assert.ok(readerBody.includes('speedSelect.value = "0";\n      stopReading();'));
+assert.ok(readerBody.includes('if (followInput.checked && nearBottom) goLatest()'));
+assert.ok(readerBody.includes('if (sequence !== activeArticle) return'));
+
 console.log("cloud-client contract tests: pass");
