@@ -12,12 +12,24 @@ class FakeStatement {
       this.db.rows.push({cursor:this.db.cursor,push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at});
       return {meta:{changes:1}};
     }
+    if (this.sql.startsWith("INSERT INTO ptt_retention_watermark")) {
+      const threshold=this.args[0];
+      for(const row of this.db.rows.filter(row=>row.cursor<=threshold)) {
+        this.db.watermarks.set(row.aid,Math.max(this.db.watermarks.get(row.aid)||0,row.cursor));
+      }
+      return {meta:{changes:0}};
+    }
     if (this.sql.startsWith("DELETE FROM")) {
-      const keep=this.args[0], threshold=this.db.cursor-keep;
+      const threshold=this.args[0];
       this.db.rows=this.db.rows.filter((row)=>row.cursor>threshold);
       return {meta:{changes:0}};
     }
     throw new Error("unexpected run SQL");
+  }
+  async first() {
+    if (this.sql.startsWith("SELECT COALESCE(MAX(cursor)")) return {max_cursor:this.db.cursor};
+    if (this.sql.startsWith("SELECT purged_through_cursor")) return {purged_through_cursor:this.db.watermarks.get(this.args[0])||0};
+    throw new Error("unexpected first SQL");
   }
   async all() {
     if (!this.sql.startsWith("SELECT cursor")) throw new Error("unexpected all SQL");
@@ -26,10 +38,10 @@ class FakeStatement {
   }
 }
 class FakeDB {
-  constructor(){this.rows=[];this.cursor=0;this.failAtBatchIndex=-1;}
+  constructor(){this.rows=[];this.cursor=0;this.failAtBatchIndex=-1;this.watermarks=new Map();}
   prepare(sql){return new FakeStatement(this,sql);}
   async batch(statements){
-    const rows=this.rows.map((row)=>({...row})), cursor=this.cursor;
+    const rows=this.rows.map((row)=>({...row})), cursor=this.cursor, watermarks=new Map(this.watermarks);
     const results=[];
     try {
       for(let i=0;i<statements.length;i++){
@@ -38,7 +50,7 @@ class FakeDB {
       }
       return results;
     } catch(error){
-      this.rows=rows;this.cursor=cursor;
+      this.rows=rows;this.cursor=cursor;this.watermarks=watermarks;
       throw error;
     }
   }
@@ -69,6 +81,8 @@ assert.equal(response.status,200);
 assert.equal(response.headers.get("access-control-allow-origin"),"https://physicsdog0505.github.io");
 const page=await response.json();
 assert.equal(page.schema_version,1);
+assert.equal(page.history_gap,false);
+assert.equal(page.purged_through_cursor,0);
 assert.equal(page.next_cursor,1);
 assert.equal(page.has_more,false);
 assert.equal(page.pushes.length,1);
@@ -92,4 +106,14 @@ assert.equal(response.status,200);
 assert.equal((await response.json()).accepted,2);
 assert.equal(DB.rows.length,3);
 
+
+// Simulate a previously retained-and-purged article and assert explicit incompleteness.
+DB.watermarks.set("M.123.A.1",1);
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=0&limit=200"),env);
+assert.equal(response.status,200);
+const gapPage=await response.json();
+assert.equal(gapPage.history_gap,true);
+assert.equal(gapPage.purged_through_cursor,1);
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=1&limit=200"),env);
+assert.equal((await response.json()).history_gap,false);
 console.log("relay worker adapter tests: pass");
