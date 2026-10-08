@@ -456,6 +456,7 @@
         pushes: new Map(article.pushes.map((push) => [push.pushId, push])),
         relayStatus: (kind, message) => status(relayStatus, kind, message),
         timer: null,
+        bootstrapTail: article.pushes.length === 0,
       };
       renderPushes(list, [...state.pushes.values()]);
       // A newly selected article starts at its newest push, as in the desktop viewer.
