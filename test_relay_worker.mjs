@@ -26,8 +26,22 @@ class FakeStatement {
   }
 }
 class FakeDB {
-  constructor(){this.rows=[];this.cursor=0;}
+  constructor(){this.rows=[];this.cursor=0;this.failAtBatchIndex=-1;}
   prepare(sql){return new FakeStatement(this,sql);}
+  async batch(statements){
+    const rows=this.rows.map((row)=>({...row})), cursor=this.cursor;
+    const results=[];
+    try {
+      for(let i=0;i<statements.length;i++){
+        if(i===this.failAtBatchIndex) throw new Error("injected batch insert failure");
+        results.push(await statements[i].run());
+      }
+      return results;
+    } catch(error){
+      this.rows=rows;this.cursor=cursor;
+      throw error;
+    }
+  }
 }
 
 const push={push_id:"ptt:C_Chat:M.123.A.1:1",aid:"M.123.A.1",article_url:"https://www.ptt.cc/bbs/C_Chat/M.123.A.1.html",source_line:1,floor:1,kind:"推",author:"viewer",content:"hello",occurred_at:"2026-10-08T12:00:00Z"};
@@ -62,5 +76,20 @@ assert.equal(page.pushes[0].content,"hello");
 
 response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=1&limit=200"),env);
 assert.equal((await response.json()).pushes.length,0);
+
+
+// D1 batch failure must not persist an earlier insert from the same publish request.
+const second={...push,push_id:"ptt:C_Chat:M.123.A.1:2",source_line:2,floor:2};
+const third={...push,push_id:"ptt:C_Chat:M.123.A.1:3",source_line:3,floor:3};
+DB.failAtBatchIndex=1;
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[second,third]})}),env);
+assert.equal(response.status,500);
+assert.equal(DB.rows.length,1);
+assert.equal(DB.cursor,1);
+DB.failAtBatchIndex=-1;
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[second,third]})}),env);
+assert.equal(response.status,200);
+assert.equal((await response.json()).accepted,2);
+assert.equal(DB.rows.length,3);
 
 console.log("relay worker adapter tests: pass");
