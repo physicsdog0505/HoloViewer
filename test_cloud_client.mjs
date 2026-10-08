@@ -33,4 +33,9 @@ assert.ok(relayBody.includes("const pendingPushes = new Map()"));
 assert.ok(relayBody.includes("for (const push of pendingPushes.values()) state.pushes.set(push.pushId, push);"));
 assert.ok(relayBody.indexOf("if (pageNumber === RELAY_MAX_PAGES_PER_POLL - 1) throw") < relayBody.indexOf("state.cursor = nextCursor"));
 assert.ok(relayBody.indexOf("if (stopped) return;", relayBody.indexOf("const pendingPushes")) < relayBody.indexOf("state.cursor = nextCursor"));
+
+// Offline producer/consumer boundary checks against #302 public PTT exporter limits.
+const pttSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
+assert.match(pttSource, /articleId: boundedString\(raw\.article_id, "article_id", 320, true\)/);
+assert.match(pttSource, /aid: boundedString\(raw\.aid, "article.aid", 128, true\)/);
 console.log("cloud-client contract tests: pass");
