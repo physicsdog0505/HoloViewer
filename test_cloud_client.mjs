@@ -14,8 +14,10 @@ assert.equal(window.HoloViewerCloud.parseYouTubeId("https://example.com/watch?v=
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://youtube.com.evil.example/watch?v=abcdefghijk"), null);
 assert.equal(window.HoloViewerCloud.parseYouTubeId("javascript:alert(1)"), null);
 const push = {push_id:"ptt:C_Chat:aid:1",aid:"M.123.A.1",article_url:"https://www.ptt.cc/bbs/C_Chat/M.123.A.1.html",source_line:1,floor:1,kind:"推",author:"fixture",content:"hello",occurred_at:"2026-10-08T10:00:00Z",cursor:1};
-const page = {schema_version:1,next_cursor:1,has_more:false,checked_at:"2026-10-08T10:00:01Z",pushes:[push]};
+const page = {schema_version:1,next_cursor:1,has_more:false,history_gap:false,purged_through_cursor:0,checked_at:"2026-10-08T10:00:01Z",pushes:[push]};
 assert.equal(window.HoloViewerCloud.validateRelayPage(page, 0).pushes[0].cursor, 1);
+assert.equal(window.HoloViewerCloud.validateRelayPage({...page,history_gap:true,purged_through_cursor:1},0).historyGap,true);
+assert.throws(()=>window.HoloViewerCloud.validateRelayPage({...page,history_gap:"yes"},0));
 assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, items:page.pushes}, 0));
 assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, pushes:[{...push, secret:"no"}]}, 0));
 assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, next_cursor:0}, 0));
