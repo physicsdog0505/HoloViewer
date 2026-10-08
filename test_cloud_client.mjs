@@ -25,4 +25,12 @@ const transcript = JSON.parse(fs.readFileSync(new URL("./public-data/demo/transc
 const bundles = window.HoloViewerCloud.validateTranscriptArtifact(transcript);
 assert.equal(bundles[0].translations[0].texts.length, bundles[0].segments.length);
 assert.throws(() => window.HoloViewerCloud.validateTranscriptArtifact({...transcript, bundles:[{...transcript.bundles[0], translations:[{...transcript.bundles[0].translations[0],texts:[]}]}]}));
+
+// Regression: a failed later relay page must not advance cursor or publish partial pushes.
+const source = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
+const relayBody = source.slice(source.indexOf("async function pollRelay("), source.indexOf("async function startPtt("));
+assert.ok(relayBody.includes("const pendingPushes = new Map()"));
+assert.ok(relayBody.includes("for (const push of pendingPushes.values()) state.pushes.set(push.pushId, push);"));
+assert.ok(relayBody.indexOf("if (pageNumber === RELAY_MAX_PAGES_PER_POLL - 1) throw") < relayBody.indexOf("state.cursor = nextCursor"));
+assert.ok(relayBody.indexOf("if (stopped) return;", relayBody.indexOf("const pendingPushes")) < relayBody.indexOf("state.cursor = nextCursor"));
 console.log("cloud-client contract tests: pass");
