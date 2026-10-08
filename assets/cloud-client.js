@@ -391,8 +391,49 @@
     followInput.type = "checkbox";
     followInput.checked = true;
     followLabel.append(followInput, document.createTextNode("有新推文時自動跟隨"));
-    controls.append(latestButton, followLabel);
+    const speedLabel = element("label", "", "自動閱讀");
+    speedLabel.style.cssText = "display:inline-flex;align-items:center;gap:6px;font-size:13px";
+    const speedSelect = document.createElement("select");
+    speedSelect.setAttribute("aria-label", "自動閱讀速度");
+    for (const [value, label] of [["0", "停止"], ["5", "慢（5 秒）"], ["3", "中（3 秒）"], ["1", "快（1 秒）"]]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      speedSelect.append(option);
+    }
+    speedLabel.append(speedSelect);
+    controls.append(latestButton, followLabel, speedLabel);
     list.before(controls);
+    let readingTimer = null;
+    const stopReading = () => {
+      if (readingTimer !== null) clearInterval(readingTimer);
+      readingTimer = null;
+    };
+    const resetReading = () => {
+      stopReading();
+      const seconds = Number(speedSelect.value);
+      if (!seconds) return;
+      // Advance from the first currently visible row, one push per interval.
+      readingTimer = setInterval(() => {
+        const rows = list.children;
+        if (!rows.length) return;
+        const top = window.scrollY + 100;
+        let next = null;
+        for (const row of rows) {
+          if (row.getBoundingClientRect().top + window.scrollY > top + 2) {
+            next = row;
+            break;
+          }
+        }
+        if (!next) {
+          speedSelect.value = "0";
+          stopReading();
+          return;
+        }
+        next.scrollIntoView({ block: "start", behavior: "smooth" });
+      }, seconds * 1000);
+    };
+    speedSelect.addEventListener("change", resetReading);
     const goLatest = () => {
       const last = list.lastElementChild;
       if (last) last.scrollIntoView({ block: "end", behavior: "auto" });
@@ -402,6 +443,8 @@
     let activeArticle = 0;
     const show = async () => {
       if (stopRelay) stopRelay();
+      speedSelect.value = "0";
+      stopReading();
       const sequence = ++activeArticle;
       const article = artifact.articles.find((item) => item.articleId === select.value) || artifact.articles[0];
       const state = {
