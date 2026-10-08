@@ -316,19 +316,24 @@
       if (stopped) return;
       try {
         let checkedAt = null;
+        let nextCursor = state.cursor;
+        const pendingPushes = new Map();
         for (let pageNumber = 0; pageNumber < RELAY_MAX_PAGES_PER_POLL; pageNumber += 1) {
-          const requestedCursor = state.cursor;
+          const requestedCursor = nextCursor;
           const url = new URL(config.liveRelay);
           url.searchParams.set("aid", aid);
           url.searchParams.set("after_cursor", String(requestedCursor));
           url.searchParams.set("limit", String(RELAY_LIMIT));
           const page = validateRelayPage(await fetchJson(url, 512 * 1024), requestedCursor);
           checkedAt = page.checkedAt;
-          for (const push of page.pushes) state.pushes.set(push.pushId, push);
-          state.cursor = page.nextCursor;
+          for (const push of page.pushes) pendingPushes.set(push.pushId, push);
+          nextCursor = page.nextCursor;
           if (!page.hasMore) break;
           if (pageNumber === RELAY_MAX_PAGES_PER_POLL - 1) throw new PublicDataError("relay pagination exceeds client poll bound");
         }
+        if (stopped) return;
+        for (const push of pendingPushes.values()) state.pushes.set(push.pushId, push);
+        state.cursor = nextCursor;
         onUpdate([...state.pushes.values()]);
         const stale = !checkedAt || Date.now() - new Date(checkedAt).getTime() > RELAY_STALE_MS;
         state.relayStatus(stale ? "stale" : "fresh", stale ? "即時 relay 已過期，保留最後資料。" : "即時 relay 已連線。", stale);
