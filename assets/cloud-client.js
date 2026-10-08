@@ -329,7 +329,7 @@
           const page = validateRelayPage(await fetchJson(url, 512 * 1024), requestedCursor);
           checkedAt = page.checkedAt;
           historyGap = historyGap || page.historyGap;
-          if (page.historyGap) state.historyIncomplete = true;
+          // Gap status is committed only after every relay page validates.
           for (const push of page.pushes) pendingPushes.set(push.pushId, push);
           nextCursor = page.nextCursor;
           if (!page.hasMore) break;
@@ -338,6 +338,7 @@
         if (stopped) return;
         for (const push of pendingPushes.values()) state.pushes.set(push.pushId, push);
         state.cursor = nextCursor;
+        if (historyGap) state.historyIncomplete = true;
         // Retention loss requires a fresh slow-lane baseline, not a cursor reset.
         // Never declare completeness solely because the snapshot fetch succeeded.
         if (historyGap && config.ptt && Date.now() - lastRebaseAttempt >= 60000) {
@@ -359,7 +360,7 @@
         const stale = !checkedAt || Date.now() - new Date(checkedAt).getTime() > RELAY_STALE_MS;
         state.relayStatus(state.historyIncomplete ? "partial" : stale ? "stale" : "fresh", state.historyIncomplete ? "即時 relay 部分舊推文已超出保留期限；目前資料不完整，需以新的歷史快照回補。" : stale ? "即時 relay 已過期，保留最後資料。" : "即時 relay 已連線。", state.historyIncomplete || stale);
       } catch (error) {
-        state.relayStatus("stale", `即時 relay 暫時不可用（${error.name}）；保留最後資料。`, true);
+        if (!stopped) state.relayStatus("stale", `即時 relay 暫時不可用（${error.name}）；保留最後資料。`, true);
       } finally {
         if (!stopped) state.timer = setTimeout(run, RELAY_POLL_MS);
       }
@@ -419,13 +420,15 @@
         const rows = list.children;
         if (!rows.length) return;
         const top = window.scrollY + 100;
-        let next = null;
-        for (const row of rows) {
-          if (row.getBoundingClientRect().top + window.scrollY > top + 2) {
-            next = row;
-            break;
-          }
+        // Long articles use logarithmic row lookup instead of a full DOM scan.
+        let low = 0;
+        let high = rows.length;
+        while (low < high) {
+          const mid = (low + high) >>> 1;
+          if (rows[mid].getBoundingClientRect().top + window.scrollY > top + 2) high = mid;
+          else low = mid + 1;
         }
+        const next = low < rows.length ? rows[low] : null;
         if (!next) {
           speedSelect.value = "0";
           stopReading();
