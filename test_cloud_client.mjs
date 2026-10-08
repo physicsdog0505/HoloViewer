@@ -13,7 +13,7 @@ assert.equal(window.HoloViewerCloud.parseYouTubeId("https://youtu.be/abcdefghijk
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://example.com/watch?v=abcdefghijk"), null);
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://youtube.com.evil.example/watch?v=abcdefghijk"), null);
 assert.equal(window.HoloViewerCloud.parseYouTubeId("javascript:alert(1)"), null);
-const push = {push_id:"ptt:C_Chat:aid:1",aid:"M.123.A.1",article_url:"https://www.ptt.cc/bbs/C_Chat/M.123.A.1.html",source_line:1,floor:1,kind:"推",author:"fixture",content:"hello",occurred_at:"2026-10-08T10:00:00Z",cursor:1};
+const push = {push_id:"ptt:v1:ae579782abf8089bb96d37c9fb725d580ac590b9e9bfdff9a7009c30cd6bacdc",aid:"M.123.A.1",article_url:"https://www.ptt.cc/bbs/C_Chat/M.123.A.1.html",source_line:1,floor:1,kind:"推",author:"fixture",content:"hello",occurred_at:"2026-10-08T10:00:00Z",cursor:1};
 const page = {schema_version:1,next_cursor:1,has_more:false,history_gap:false,purged_through_cursor:0,checked_at:"2026-10-08T10:00:01Z",pushes:[push]};
 assert.equal(window.HoloViewerCloud.validateRelayPage(page, 0).pushes[0].cursor, 1);
 assert.equal(window.HoloViewerCloud.validateRelayPage({...page,history_gap:true,purged_through_cursor:1},0).historyGap,true);
@@ -21,7 +21,7 @@ assert.throws(()=>window.HoloViewerCloud.validateRelayPage({...page,history_gap:
 assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, items:page.pushes}, 0));
 assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, pushes:[{...push, secret:"no"}]}, 0));
 assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, next_cursor:0}, 0));
-assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, pushes:[{...push,cursor:2},{...push,push_id:"ptt:C_Chat:aid:2",cursor:1}],next_cursor:2}, 0));
+assert.throws(() => window.HoloViewerCloud.validateRelayPage({...page, pushes:[{...push,cursor:2},{...push,push_id:"ptt:v1:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",cursor:1}],next_cursor:2}, 0));
 
 const transcript = JSON.parse(fs.readFileSync(new URL("./public-data/demo/transcripts.json", import.meta.url), "utf8"));
 const bundles = window.HoloViewerCloud.validateTranscriptArtifact(transcript);
@@ -58,13 +58,13 @@ const originalClearTimeout = globalThis.clearTimeout;
 const pendingTimers = [];
 const requested = [];
 let relayReadCount = 0;
-const relayPush = {...push, content:"relay", cursor:1};
+const relayPush = {...push, cursor:1};
 const baseline = JSON.parse(fs.readFileSync(new URL("./public-data/demo/ptt.json", import.meta.url), "utf8"));
 baseline.completeness = "complete";
 baseline.articles[0].completeness = "complete";
 baseline.generated_at = new Date().toISOString();
 baseline.articles[0].aid = "M.123.A.1";
-baseline.articles[0].pushes = [{push_id:push.push_id, floor:1, source_line:1, kind:"推", author:"fixture", content:"snapshot", occurred_at:push.occurred_at}];
+baseline.articles[0].pushes = [{push_id:push.push_id, floor:1, source_line:1, kind:"推", author:"fixture", content:"hello", occurred_at:push.occurred_at}];
 globalThis.fetch = async (url) => {
   const u = String(url);
   requested.push(u);
@@ -113,7 +113,7 @@ const exporterArtifact = {
     board:"C_Chat",aid:"M.1791417600.A.001",title:"fixture thread",
     url:"https://www.ptt.cc/bbs/C_Chat/M.1791417600.A.001.html",
     completeness:"partial",pushes:[{
-      push_id:"ptt:synthetic:001",floor:null,source_line:10,kind:"推",
+      push_id:"ptt:v1:f526ec62458b77bc55fbd47df16f12954347b0f903215e2a767e1bfd129b74bf",floor:null,source_line:10,kind:"推",
       author:"same",content:"collector wins",occurred_at:"2026-10-08T04:00:00Z"
     }]}]
 };
