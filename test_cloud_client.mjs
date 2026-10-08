@@ -143,3 +143,11 @@ assert.ok(readerBody.includes('if (followInput.checked && nearBottom) goLatest()
 assert.ok(readerBody.includes('if (sequence !== activeArticle) return'));
 
 console.log("cloud-client contract tests: pass");
+
+
+const checkedConfig = JSON.parse(fs.readFileSync(new URL("./public-data/config.json", import.meta.url), "utf8"));
+assert.equal(
+  checkedConfig.sources.live_relay,
+  "https://holoviewer-ptt-relay.singlebagel.workers.dev/v1/ptt",
+  "public preview must point at the deployed read-only relay",
+);
