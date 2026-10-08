@@ -27,6 +27,7 @@ class FakeStatement {
     throw new Error("unexpected run SQL");
   }
   async first() {
+    if (this.sql.startsWith("SELECT 1 AS ok")) return {ok:1};
     if (this.sql.startsWith("SELECT COALESCE(MAX(cursor)")) return {max_cursor:this.db.cursor};
     if (this.sql.startsWith("SELECT purged_through_cursor")) return {purged_through_cursor:this.db.watermarks.get(this.args[0])||0};
     throw new Error("unexpected first SQL");
@@ -60,6 +61,11 @@ const push={push_id:"ptt:C_Chat:M.123.A.1:1",aid:"M.123.A.1",article_url:"https:
 const batch={schema_version:1,producer_id:"collector-main",published_at:"2026-10-08T12:00:01Z",pushes:[push]};
 assert.equal(validatePublishBatch(batch).pushes.length,1);
 assert.throws(()=>validatePublishBatch({...batch,pushes:[push,push]}));
+
+const healthDB=new FakeDB();
+let health=await handleRequest(new Request("https://relay.example/healthz"),{DB:healthDB,PUBLIC_ORIGIN:"https://physicsdog0505.github.io"});
+assert.equal(health.status,200);
+assert.deepEqual(await health.json(),{status:"ok",schema_version:1});
 
 const DB=new FakeDB();
 const env={DB,PUBLISH_TOKEN:"secret",PUBLIC_ORIGIN:"https://physicsdog0505.github.io",RETENTION_ROWS:"1000"};
