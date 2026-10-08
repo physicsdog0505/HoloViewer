@@ -224,9 +224,9 @@
       articles: value.articles.map((raw) => {
         if (!raw || typeof raw !== "object" || !Array.isArray(raw.pushes)) throw new PublicDataError("PTT article is invalid");
         return {
-          articleId: boundedString(raw.article_id, "article_id", 256, true),
+          articleId: boundedString(raw.article_id, "article_id", 320, true),
           board: boundedString(raw.board, "article.board", 64, true),
-          aid: boundedString(raw.aid, "article.aid", 64, true),
+          aid: boundedString(raw.aid, "article.aid", 128, true),
           title: boundedString(raw.title, "article.title", 300, true),
           url: raw.url == null ? null : boundedString(raw.url, "article.url", 2048, true),
           completeness: ["complete", "partial", "unknown"].includes(raw.completeness) ? raw.completeness : "unknown",
