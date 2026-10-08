@@ -48,4 +48,45 @@ assert.ok(relayBody.includes("refreshed.articles.find((item) => item.aid === aid
 assert.ok(relayBody.includes("state.pushes.set(push.pushId, push)"));
 assert.ok(relayBody.includes('historyGap ? "partial"'));
 assert.ok(relayBody.includes("Date.now() - lastRebaseAttempt >= 60000"));
+
+// Behavioral integration: gap -> fetch slow snapshot -> preserve cursor -> dedupe -> partial warning.
+// Expose the closure's poller ONLY in this test VM, not in shipped browser code.
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { pollRelay, "));
+const originalFetch = globalThis.fetch;
+const originalSetTimeout = globalThis.setTimeout;
+const originalClearTimeout = globalThis.clearTimeout;
+const pendingTimers = [];
+const requested = [];
+const relayPush = {...push, content:"relay", cursor:1};
+const baseline = JSON.parse(fs.readFileSync(new URL("./public-data/demo/ptt.json", import.meta.url), "utf8"));
+baseline.articles[0].aid = "M.123.A.1";
+baseline.articles[0].pushes = [{push_id:push.push_id, floor:1, source_line:1, kind:"推", author:"fixture", content:"snapshot", occurred_at:push.occurred_at}];
+globalThis.fetch = async (url) => {
+  const u = String(url);
+  requested.push(u);
+  const body = u.includes("/v1/ptt") ? {...page, history_gap:true, purged_through_cursor:1, checked_at:new Date().toISOString(), pushes:[relayPush]} : baseline;
+  return new Response(JSON.stringify(body), {status:200, headers:{"content-type":"application/json"}});
+};
+globalThis.setTimeout = (callback, ms) => { pendingTimers.push({callback,ms}); return pendingTimers.length; };
+globalThis.clearTimeout = () => {};
+try {
+  const state = {cursor:0, pushes:new Map(), relayStatus:(kind,message)=>{state.status={kind,message};}, timer:null};
+  let rendered = [];
+  const stop = await window.HoloViewerCloud.pollRelay(
+    {liveRelay:new URL("https://relay.example/v1/ptt"), ptt:new URL("https://physicsdog0505.github.io/HoloViewer/public-data/demo/ptt.json")},
+    "M.123.A.1",state,items=>{rendered=items;}
+  );
+  for(let i=0;i<40 && !state.status;i++) await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(state.cursor,1, "relay cursor advances after complete valid page");
+  assert.equal(state.pushes.size,1, "same push_id deduplicated across both planes");
+  assert.equal(rendered.length,1);
+  assert.equal(state.status?.kind,"partial", "a re-fetched snapshot is not completeness proof");
+  assert.ok(requested.some(u=>u.includes("/public-data/demo/ptt.json")), "gap triggers snapshot refresh");
+  stop();
+} finally {
+  globalThis.fetch=originalFetch;
+  globalThis.setTimeout=originalSetTimeout;
+  globalThis.clearTimeout=originalClearTimeout;
+}
+
 console.log("cloud-client contract tests: pass");
