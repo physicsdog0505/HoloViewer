@@ -299,6 +299,31 @@ assert.ok(readerBody.includes("if (sequence !== activeArticle) return"));
   assert.equal(scrolls,2,"jump latest remains idempotent");
 }
 
+// Incremental batch regressions: the production queue deduplicates and sorts
+// incoming PTT rows, and stale poll startup cannot replace the active stop hook.
+assert.ok(readerBody.includes("const known = new Set([...visibleIds, ...pending])"));
+assert.ok(readerBody.includes("pending.sort((a, b) => pushOrder(byId.get(a), byId.get(b)))"));
+assert.ok(readerBody.includes("if (sequence !== activeArticle) stopCurrentRelay?.()"));
+assert.ok(readerBody.includes("else stopRelay = stopCurrentRelay || null"));
+assert.ok(readerBody.includes("const previousCheckpoint = loadCheckpoint()"));
+{
+  const order = (x,y) => (x.floor ?? Number.MAX_SAFE_INTEGER)-(y.floor ?? Number.MAX_SAFE_INTEGER);
+  const visible = new Set(["old"]);
+  let pending = ["new-3"];
+  const pushes = [
+    {pushId:"old",floor:1},
+    {pushId:"new-3",floor:3},
+    {pushId:"new-2",floor:2},
+    {pushId:"new-2",floor:2},
+  ];
+  const known = new Set([...visible, ...pending]);
+  const incoming = pushes.filter(p => !known.has(p.pushId)).sort(order);
+  for(const p of incoming) {pending.push(p.pushId);known.add(p.pushId);}
+  const byId = new Map(pushes.map(p => [p.pushId,p]));
+  pending.sort((a,b) => order(byId.get(a),byId.get(b)));
+  assert.deepEqual(pending,["new-2","new-3"]);
+}
+
 console.log("cloud-client contract tests: pass");
 
 
