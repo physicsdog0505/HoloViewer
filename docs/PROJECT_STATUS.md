@@ -113,3 +113,20 @@ Isolated temporary SQLite with exact schema style `cursor INTEGER PRIMARY KEY AU
 
 ## 2026-10-09 further D1 risk: post-retention replay
 Current public PR #12 Worker UNIQUE(push_id) applies only to retained ptt_pushes. After DELETE removes a push, Publisher restart replay of that same ID can INSERT it again with a new cursor. Watermark stores only an old cursor per AID and cannot reject that identity. This can resurrect purged rows and amplify writes; source-derived risk, **not observed production incident evidence**. Fix needs row-count-accurate retention AND bounded post-purge replay suppression consistent with late-arriving/out-of-order source lines. Do not simply blacklist all lower source lines. Offline replay regression needed in existing Worker test suite; keep D1 Publisher off. Evidence: Public PR #12 source relay/schema.sql and relay/worker.mjs; comment https://github.com/physicsdog0505/HoloViewer/pull/12#issuecomment-6066854266.
+
+## 2026-10-09 isolated SQLite reproduction — purged push ID resurrects
+Verified in a new in-memory SQLite using Worker-equivalent schema and SQL (NO real D1/Collector touched):
+1. Insert push A (cursor 1).
+2. Attempt 1,005 duplicate `INSERT OR IGNORE` of A; insert push B (cursor 1007). Actual rows are A and B only.
+3. Execute Worker `threshold=MAX(cursor)-1000`, retention watermark UPSERT and DELETE. A is deleted, B remains, watermark ('A',1).
+4. Replay A: `INSERT OR IGNORE` accepts it as a new row, cursor 1008. Final order B (1007), A (1008), contrary to source chronology.
+
+Conclusion **VERIFIED in SQLite fixture**: unique-key dedupe disappears on pruning; sparse-cursor-based pruning and replay can reorder/resurrect historical pushes. Does **not** prove production D1 has this precise sequence or establish its billed rows_written.
+
+Repair contract for existing Public #12 and Private #324 work (not yet implemented):
+- Keep reader cursor monotonic and existing history_gap / per-AID watermark behavior.
+- Retention must select actual rows to retain (not numeric cursor delta), with bounded cost and reliable per-AID watermark updates.
+- Publisher should not resend known pushes on idle cycles, restart, or memory rollover, while not discarding legitimate delayed/new pushes.
+- Worker must prevent pruned historic IDs from being reinserted under its approved retention horizon. Evaluate tombstones/watermark strategy with finite storage and late-arrival semantics before coding; do not silently assume source_line monotonicity.
+- Add SQLite-engine regression for duplicate gap → prune → replay and Reader ordering; FakeDB alone is insufficient.
+- Keep current operations frozen: no Cloudflare D1 writes, deployment, merges, operational schema changes, or Publisher restarts.
