@@ -40,4 +40,12 @@ assert.ok(relayBody.indexOf("if (stopped) return;", relayBody.indexOf("const pen
 const pttSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 assert.match(pttSource, /articleId: boundedString\(raw\.article_id, "article_id", 320, true\)/);
 assert.match(pttSource, /aid: boundedString\(raw\.aid, "article.aid", 128, true\)/);
+
+// A retention gap must try an approved slow-lane snapshot rebase, preserve the
+// relay cursor, and continue to report partial rather than a false 'complete'.
+assert.ok(relayBody.includes("const refreshed = await loadPttArtifact(config.ptt)"));
+assert.ok(relayBody.includes("refreshed.articles.find((item) => item.aid === aid)"));
+assert.ok(relayBody.includes("state.pushes.set(push.pushId, push)"));
+assert.ok(relayBody.includes('historyGap ? "partial"'));
+assert.ok(relayBody.includes("Date.now() - lastRebaseAttempt >= 60000"));
 console.log("cloud-client contract tests: pass");
