@@ -1,21 +1,27 @@
 # HoloViewer
 
-Unofficial Hololive fan viewer. **Private staging scaffold — not yet a released or feature-complete website.** Not affiliated with COVER Corp. or YouTube.
+**Unofficial Hololive fan viewer — public deployment smoke preview, not a functional product release.**
 
-This is a deliberately isolated code repository. It does **not** include PTT Collector, backfill, administration, private SQLite databases, credentials, local runtime state or the original project's Git history.
+This minimal Streamlit application is an isolated preview for testing hosting and presentation. It is **not affiliated with, endorsed by, or operated by COVER Corp., hololive production, YouTube, or Google**.
 
-## Current state
+## What this preview does
 
-- `app.py`: isolated Streamlit frontend with three placeholder tabs (Home, Live Sync, Watchalong).
-- `public_snapshot.py`: validates an optional reviewed read-only snapshot. No live data is present by default; missing snapshot is displayed as unavailable.
-- Live Sync and Watchalong are **not enabled** in this staging package. Multi-stream is out of scope.
+- Shows three navigation tabs: 首頁, 直播同步, 同時視聽.
+- If a separately reviewed public snapshot is published, the homepage may display its sanitized YouTube video titles and links. **No snapshot is currently shipped.**
+- 直播同步 and 同時視聽 are disabled placeholders. No multi-stream functionality exists in this repo.
 
-## Streamlit private staging
+This repository has **no PTT Collector, backfill, admin services, PTT login, private database, authentication credentials, Google API key, embedded YouTube player, assets, recordings or third-party transcripts**. It was initialized using an explicit small-file copy; **no private upstream Git history was copied**.
 
-Use this repo (`physicsdog0505/HoloViewer`), branch `main`, main file `app.py`, and **no secrets**. Before giving anyone its URL, explicitly set app access to private/invite-only and verify access denial in an unauthenticated browser session. A private GitHub repository does not automatically prove the deployed website is private.
+## Deploy
 
-**Do not deploy** if the hosting account does not support viewer access restrictions.
+Repository `physicsdog0505/HoloViewer`, branch `main`, entrypoint `app.py`, no Secrets. Python 3.11 was used for initial isolated test CI.
 
-## Release guardrails
+**Privacy warning:** Publishing this GitHub repo and deploying it to Streamlit Community Cloud makes the smoke code (and potentially the hosted page) available publicly. Never upload private data or deployment secrets. Do not confuse this preview with a restricted-access staging environment.
 
-Changes to publicly accessible features require security, provenance, rights and runtime review. Sources and policies belong in [REFERENCES.md](REFERENCES.md). The private upstream repository is the authoritative development source; this repo is a reviewed copy only. **No automatic synchronization or public release is configured yet.**
+## Contributions, copyright and references
+
+This preview has not adopted an open-source license yet. Publishing code on GitHub does not itself grant an open-source redistribution license. Any later licensing decision must be explicit and must separately cover only code we own or can license. Consult [REFERENCES.md](REFERENCES.md) for frameworks and applicable third-party policies. Attribution alone is not copyright permission.
+
+## Release gate
+
+The private engineering repository remains the canonical source. Publishing this minimal scaffold **does not authorize** publishing more private code, integrating API keys, enabling Watchalong or Live Sync, or automatic sync from the private repo. Future additions require independent security, dependency, permissions, source/rights, and user-acceptance review.

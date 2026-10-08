@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+.streamlit/secrets.toml
+*.db
+*.sqlite
+*.sqlite3
+published_snapshot.json
