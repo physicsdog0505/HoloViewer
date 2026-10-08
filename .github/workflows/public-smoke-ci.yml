@@ -1,0 +1,39 @@
+name: Public smoke release review
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check compile and boundary tests
+        run: |
+          python -B -m py_compile app.py public_snapshot.py test_public_smoke.py
+          python -B -m unittest -v test_public_smoke
+      - name: Dependency install and Streamlit boot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r requirements.txt
+          streamlit run app.py --server.headless true --server.address 127.0.0.1 --server.port 8765 --browser.gatherUsageStats false > /tmp/holoviewer-smoke.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" || true' EXIT
+          for i in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:8765/_stcore/health | grep -q ok; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/holoviewer-smoke.log
+          exit 1
