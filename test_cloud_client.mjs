@@ -228,7 +228,12 @@ assert.ok(readerBody.includes('["0", "停止"]'));
 for (const seconds of ["5", "3", "1"]) assert.ok(readerBody.includes('["' + seconds + '",'));
 assert.ok(readerBody.includes('speedSelect.addEventListener("change", resetReading)'));
 assert.ok(readerBody.includes('speedSelect.value = "0";\n      stopReading();'));
-assert.ok(readerBody.includes('if (followInput.checked && nearBottom) goLatest()'));
+assert.ok(readerBody.includes("const shouldFollow = followInput.checked && !userPausedFollow && nearBottom && readingTimer === null"));
+assert.ok(readerBody.includes('window.addEventListener("wheel", pauseOnManualNavigation'));
+assert.ok(readerBody.includes('window.addEventListener("touchmove", pauseOnManualNavigation'));
+assert.ok(readerBody.includes('speedSelect.value = "0";\n        stopReading();'));
+assert.ok(readerBody.includes("userPausedFollow = false;\n      goLatest();"));
+assert.ok(readerBody.includes('window.scrollTo({ top: previousScroll, behavior: "instant" })'));
 assert.ok(readerBody.includes('if (sequence !== activeArticle) return'));
 
 // Behavioral complexity guard: long articles must not linearly scan every row
