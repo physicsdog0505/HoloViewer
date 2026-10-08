@@ -478,6 +478,8 @@
     const pushes = document.querySelector("[data-live-pushes]");
     const params = new URLSearchParams(location.search);
     const input = form?.querySelector("input[name=stream]");
+    const relayAid = params.get("aid");
+    const validRelayAid = relayAid && /^[A-Za-z0-9._-]{1,32}$/.test(relayAid) ? relayAid : null;
     let stopRelay = null;
     if (input && params.get("stream")) input.value = params.get("stream");
     const load = async (event, supplied = null) => {
@@ -493,12 +495,18 @@
       if (input) history.replaceState(null, "", `?stream=${encodeURIComponent(raw)}`);
       try {
         if (stopRelay) stopRelay();
-        const artifact = await loadPttArtifact(config.ptt);
-        const article = artifact.articles[0];
-        if (article) {
-          const state = { cursor: 0, pushes: new Map(article.pushes.map((push) => [push.pushId, push])), relayStatus: () => {}, timer: null };
-          renderPushes(pushes, [...state.pushes.values()]);
-          stopRelay = await pollRelay(config, article.aid, state, (items) => renderPushes(pushes, items));
+        if (validRelayAid) {
+          const state = { cursor: 0, pushes: new Map(), relayStatus: () => {}, timer: null };
+          renderPushes(pushes, []);
+          stopRelay = await pollRelay(config, validRelayAid, state, (items) => renderPushes(pushes, items));
+        } else {
+          const artifact = await loadPttArtifact(config.ptt);
+          const article = artifact.articles[0];
+          if (article) {
+            const state = { cursor: 0, pushes: new Map(article.pushes.map((push) => [push.pushId, push])), relayStatus: () => {}, timer: null };
+            renderPushes(pushes, [...state.pushes.values()]);
+            stopRelay = await pollRelay(config, article.aid, state, (items) => renderPushes(pushes, items));
+          }
         }
       } catch (error) {
         clear(pushes);
