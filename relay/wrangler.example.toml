@@ -1,0 +1,15 @@
+name = "holoviewer-ptt-relay"
+main = "worker.mjs"
+compatibility_date = "2026-10-08"
+
+# Copy this file to a local deployment config and replace the D1 identifiers.
+# Never commit PUBLISH_TOKEN; set it with `wrangler secret put PUBLISH_TOKEN`.
+
+[vars]
+PUBLIC_ORIGIN = "https://physicsdog0505.github.io"
+RETENTION_ROWS = "100000"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "holoviewer-ptt-relay"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
