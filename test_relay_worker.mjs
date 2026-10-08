@@ -1,0 +1,66 @@
+import assert from "node:assert/strict";
+import {handleRequest, validatePublishBatch} from "./relay/worker.mjs";
+
+class FakeStatement {
+  constructor(db, sql) { this.db=db; this.sql=sql; this.args=[]; }
+  bind(...args) { this.args=args; return this; }
+  async run() {
+    if (this.sql.startsWith("INSERT OR IGNORE")) {
+      const [push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at]=this.args;
+      if (this.db.rows.some((row)=>row.push_id===push_id)) return {meta:{changes:0}};
+      this.db.cursor += 1;
+      this.db.rows.push({cursor:this.db.cursor,push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at});
+      return {meta:{changes:1}};
+    }
+    if (this.sql.startsWith("DELETE FROM")) {
+      const keep=this.args[0], threshold=this.db.cursor-keep;
+      this.db.rows=this.db.rows.filter((row)=>row.cursor>threshold);
+      return {meta:{changes:0}};
+    }
+    throw new Error("unexpected run SQL");
+  }
+  async all() {
+    if (!this.sql.startsWith("SELECT cursor")) throw new Error("unexpected all SQL");
+    const [aid,after,limit]=this.args;
+    return {results:this.db.rows.filter((row)=>row.aid===aid&&row.cursor>after).sort((a,b)=>a.cursor-b.cursor).slice(0,limit)};
+  }
+}
+class FakeDB {
+  constructor(){this.rows=[];this.cursor=0;}
+  prepare(sql){return new FakeStatement(this,sql);}
+}
+
+const push={push_id:"ptt:C_Chat:M.123.A.1:1",aid:"M.123.A.1",article_url:"https://www.ptt.cc/bbs/C_Chat/M.123.A.1.html",source_line:1,floor:1,kind:"推",author:"viewer",content:"hello",occurred_at:"2026-10-08T12:00:00Z"};
+const batch={schema_version:1,producer_id:"collector-main",published_at:"2026-10-08T12:00:01Z",pushes:[push]};
+assert.equal(validatePublishBatch(batch).pushes.length,1);
+assert.throws(()=>validatePublishBatch({...batch,pushes:[push,push]}));
+
+const DB=new FakeDB();
+const env={DB,PUBLISH_TOKEN:"secret",PUBLIC_ORIGIN:"https://physicsdog0505.github.io",RETENTION_ROWS:"1000"};
+let response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer wrong","content-type":"application/json"},body:JSON.stringify(batch)}),env);
+assert.equal(response.status,401);
+assert.equal(DB.rows.length,0);
+
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify(batch)}),env);
+assert.equal(response.status,200);
+assert.equal((await response.json()).accepted,1);
+assert.equal(DB.rows.length,1);
+
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify(batch)}),env);
+assert.equal((await response.json()).accepted,0);
+assert.equal(DB.rows.length,1);
+
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=0&limit=200"),env);
+assert.equal(response.status,200);
+assert.equal(response.headers.get("access-control-allow-origin"),"https://physicsdog0505.github.io");
+const page=await response.json();
+assert.equal(page.schema_version,1);
+assert.equal(page.next_cursor,1);
+assert.equal(page.has_more,false);
+assert.equal(page.pushes.length,1);
+assert.equal(page.pushes[0].content,"hello");
+
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=1&limit=200"),env);
+assert.equal((await response.json()).pushes.length,0);
+
+console.log("relay worker adapter tests: pass");
