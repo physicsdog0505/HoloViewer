@@ -100,4 +100,31 @@ try {
   globalThis.clearTimeout=originalClearTimeout;
 }
 
+
+// Cross-repo producer contract example from private #302 public_ptt_projection.py.
+// Use the production-shaped eight-field projection including exporter metadata.
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, "));
+const exporterArtifact = {
+  schema_version:1, snapshot_id:"public-ptt:v1:synthetic-contract",
+  generated_at:"2026-10-08T05:00:00Z", completeness:"partial",
+  date:"2026-10-08", exporter_policy_version:"public-ptt-export:v1",
+  source_hashes:{collector:"synthetic",web:"synthetic"},
+  articles:[{article_id:"ptt:C_Chat:M.1791417600.A.001",
+    board:"C_Chat",aid:"M.1791417600.A.001",title:"fixture thread",
+    url:"https://www.ptt.cc/bbs/C_Chat/M.1791417600.A.001.html",
+    completeness:"partial",pushes:[{
+      push_id:"ptt:synthetic:001",floor:null,source_line:10,kind:"推",
+      author:"same",content:"collector wins",occurred_at:"2026-10-08T04:00:00Z"
+    }]}]
+};
+const oldFetchForContract=globalThis.fetch;
+globalThis.fetch=async()=>new Response(JSON.stringify(exporterArtifact),{status:200,headers:{"content-type":"application/json"}});
+try {
+  const actual=await window.HoloViewerCloud.loadPttArtifact(new URL("https://physicsdog0505.github.io/HoloViewer/public-data/ptt.json"));
+  assert.equal(actual.articles[0].aid,"M.1791417600.A.001");
+  assert.equal(actual.articles[0].pushes[0].floor,null);
+  assert.equal(actual.articles[0].pushes[0].content,"collector wins");
+  assert.equal(actual.completeness,"partial");
+} finally {globalThis.fetch=oldFetchForContract;}
+
 console.log("cloud-client contract tests: pass");
