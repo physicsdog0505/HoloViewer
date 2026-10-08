@@ -419,13 +419,16 @@
         const rows = list.children;
         if (!rows.length) return;
         const top = window.scrollY + 100;
-        let next = null;
-        for (const row of rows) {
-          if (row.getBoundingClientRect().top + window.scrollY > top + 2) {
-            next = row;
-            break;
-          }
+        // Rows are ordered vertically: binary search avoids scanning every
+        // rendered push on every reader tick in long articles.
+        let low = 0;
+        let high = rows.length;
+        while (low < high) {
+          const mid = (low + high) >>> 1;
+          if (rows[mid].getBoundingClientRect().top + window.scrollY > top + 2) high = mid;
+          else low = mid + 1;
         }
+        const next = low < rows.length ? rows[low] : null;
         if (!next) {
           speedSelect.value = "0";
           stopReading();
