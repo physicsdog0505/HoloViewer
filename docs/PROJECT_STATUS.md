@@ -82,3 +82,14 @@ Context: Cloudflare D1 exceeded free daily Rows Written quota on 2026-10-09. Thi
 - INFERRED, NOT PROVEN: Worker AUTOINCREMENT bookkeeping and repeated insert attempt volume may be responsible for disproportionate Cloudflare D1 billed `rows_written`. SQLite ROWID gap mechanism **does not establish D1 metered write attribution**. Don't claim the full ~180k are billed solely due to duplicates or `sqlite_sequence`.
 - BLOCKED EVIDENCE: Cloudflare per-SQL Query Insights (`totalRowsWritten` grouped by SQL) or actual Worker response `meta.rows_written`, and deployed Worker version/digest. Official docs https://developers.cloudflare.com/d1/observability/metrics-analytics/ . No live production query, Worker deployment, or Publisher restart.
 - MINIMUM FIX CANDIDATES (not authorized to implement): persistent new-push-only publisher checkpoint with safe replay recovery; no-empty POST; Worker never issue duplicated per-row mutations; avoid retention thresholds based on ever-increasing AUTOINCREMENT ids; retention period based on actual retained rows and bounded frequency; explicit D1 budget/circuit breaker. Verify offline and measure on a disposable database before any approved live test.
+
+## P0 critical integration regression found 2026-10-09
+## P0 BLOCKER discovered 2026-10-09 — integrated Publisher regresses dedupe
+
+Read-only GitHub source comparison:
+- PR #313 branch `cloud/issue-296-live-relay-canonical` `ptt_live_relay_publisher.py` has `seen_push_ids`, passes it to `build_publish_batches(... exclude_push_ids=...)` and initializes it for `--watch`. It is **in-memory only**, so still no restart-proof guarantee.
+- PR #324 branch `integration/issue-323-private-cloud` `ptt_live_relay_publisher.py` **does not contain `seen_push_ids` or exclusion from batches**. Its `publish_cycle()` resends the bounded tail, and its `while True` calls this function every `--interval` (default 5 sec). Therefore PR #324 **does not include** the #313 in-process duplicate suppression and could recreate the known D1 write-amplification exposure if used for production watch.
+- No assertion here about live Mac executable/deployed Worker; neither was inspected. This finding requires correcting the integration candidate AND verifying safe restart semantics, provider metered costs, and user's approval before ANY restart. Do not merge #324 or revive the publisher based on passing offline CI.
+- Prior check: public PR #12 Worker still executes `INSERT OR IGNORE` per push and watermark+DELETE on each POST. No evidence of deployed Worker revision parity.
+
+**Keep P0 HOLD: source-integrated regression, potential cost incident recurrence.** This is an audit observation, not authorization for implementation/deployment.
