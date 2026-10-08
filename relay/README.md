@@ -14,6 +14,9 @@ endpoint.
   - accepts contract-v1 batches (max 200 pushes / 256 KiB)
   - `push_id` is idempotent
   - publisher token is never sent to the browser
+- `GET /healthz`
+  - public-safe deployment check
+  - verifies the D1 binding responds without exposing data
 - `GET /v1/ptt?aid=...&after_cursor=...&limit=...`
   - public read-only cursor API
   - max 500 pushes per page
@@ -31,13 +34,14 @@ data, or change production DNS/config.
 
 Before launch:
 
-1. create an isolated D1 database and apply `schema.sql`;
-2. set a strong Worker secret `PUBLISH_TOKEN` (never in repo/browser);
-3. set `PUBLIC_ORIGIN` to the approved HoloViewer Pages origin;
-4. deploy the Worker;
-5. point public `config.json:sources.live_relay` at the GET endpoint;
-6. run a bounded publisher smoke from a disposable fixture;
-7. only after human approval, connect the local Collector outbound publisher.
+1. copy `wrangler.example.toml` to a local deployment config and replace the D1 id;
+2. create an isolated D1 database and apply `schema.sql`;
+3. set a strong Worker secret `PUBLISH_TOKEN` (never in repo/browser);
+4. set `PUBLIC_ORIGIN` to the approved HoloViewer Pages origin;
+5. deploy the Worker and verify `GET /healthz`;
+6. point public `config.json:sources.live_relay` at the GET endpoint;
+7. run the approved bounded publisher against the real Collector projection;
+8. only after the human deployment gate, leave the local Collector outbound publisher running.
 
 The Mac mini remains outbound-only; no public inbound connection is required.
 
