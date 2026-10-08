@@ -456,7 +456,7 @@
     window.addEventListener("touchmove", pauseOnManualNavigation, { passive: true });
     window.addEventListener("keydown", (event) => {
       if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key) &&
-          !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) pauseOnManualNavigation();
+          !["input", "textarea", "select"].includes(document.activeElement?.tagName?.toLowerCase())) pauseOnManualNavigation();
     });
     const goLatest = () => {
       const last = list.lastElementChild;
