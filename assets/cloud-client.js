@@ -130,6 +130,7 @@
       homepage: safeSourceUrl(sources.homepage, configUrl),
       ptt: safeSourceUrl(sources.ptt, configUrl),
       watchalong: safeSourceUrl(sources.watchalong, configUrl),
+      transcripts: safeSourceUrl(sources.transcripts, configUrl),
       liveRelay: safeSourceUrl(sources.live_relay, configUrl),
       automaticFollowerPlayback: value.watchalong_policy?.automatic_follower_playback === true,
     };
@@ -393,6 +394,38 @@
     }));
   }
 
+  function validateTranscriptArtifact(value) {
+    if (!value || value.schema_version !== 1 || !Array.isArray(value.bundles)) throw new PublicDataError("transcript artifact schema is incompatible");
+    isoTime(value.generated_at, "transcript generated_at");
+    if (typeof value.complete !== "boolean") throw new PublicDataError("transcript completeness is invalid");
+    return value.bundles.map((raw) => {
+      if (!raw || !Array.isArray(raw.segments) || !Array.isArray(raw.translations)) throw new PublicDataError("transcript bundle is invalid");
+      const segments = raw.segments.map((segment) => {
+        const start = Number(segment.start_ms), end = Number(segment.end_ms);
+        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end <= start) throw new PublicDataError("transcript cue time is invalid");
+        return { segmentId: boundedString(segment.segment_id, "segment_id", 128, true), startMs: start, endMs: end, text: boundedString(segment.text, "segment.text", 8000, true) };
+      });
+      const translations = raw.translations.map((translation) => {
+        if (!Array.isArray(translation.texts) || translation.texts.length !== segments.length) throw new PublicDataError("translation cardinality is invalid");
+        return { targetLanguage: boundedString(translation.target_language, "target_language", 32, true), texts: translation.texts.map((item) => boundedString(item, "translation.text", 8000, true)) };
+      });
+      return { videoId: parseYouTubeId(raw.video_id), transcriptId: boundedString(raw.transcript_id, "transcript_id", 256, true), segments, translations };
+    });
+  }
+
+  function renderTranscript(target, bundle) {
+    clear(target);
+    if (!bundle) { target.append(element("p", "empty-note", "字幕資料 unavailable；播放功能仍可使用。")); return; }
+    const translation = bundle.translations[0];
+    bundle.segments.forEach((segment, index) => {
+      const cue = element("div", "subtitle-cue");
+      const seconds = Math.floor(segment.startMs / 1000);
+      cue.append(element("time", "subtitle-time", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`));
+      cue.append(element("span", "subtitle-text", translation?.texts[index] || segment.text));
+      target.append(cue);
+    });
+  }
+
   async function startWatchalong(config) {
     const selector = document.querySelector("[data-watchalong-select]");
     const master = document.querySelector("[data-master-player]");
@@ -402,6 +435,11 @@
     const syncButton = document.querySelector("[data-manual-sync]");
     if (!config.watchalong) throw new PublicDataError("Watchalong artifact is not configured");
     const sessions = validateWatchalong(await fetchJson(config.watchalong));
+    let transcriptBundles = [];
+    if (config.transcripts) {
+      try { transcriptBundles = validateTranscriptArtifact(await fetchJson(config.transcripts)); }
+      catch (_) { transcriptBundles = []; }
+    }
     clear(selector);
     for (const session of sessions) {
       const option = document.createElement("option");
@@ -420,9 +458,8 @@
       source.hidden = !session.sourceVideoId;
       syncButton.disabled = !session.sourceVideoId;
       syncButton.dataset.offset = String(session.sourceOffset);
-      const transcriptReady = session.transcript?.status === "ready";
-      const translationReady = session.translation?.status === "ready";
-      subtitle.textContent = translationReady ? "已載入完成翻譯 artifact。" : transcriptReady ? "已載入完成逐字稿 artifact。" : "字幕資料 unavailable；播放功能仍可使用。";
+      const bundle = transcriptBundles.find((item) => item.videoId === session.masterVideoId);
+      renderTranscript(subtitle, bundle);
       const mode = config.automaticFollowerPlayback ? "自動 follower policy 已啟用" : "自動 follower 預設關閉；使用手動同步";
       status(statusNode, "ready", `${mode}。`);
     };
@@ -451,7 +488,7 @@
     }
   }
 
-  window.HoloViewerCloud = { PublicDataError, fetchJson, parseYouTubeId, validateConfig, validateHome, validatePush };
+  window.HoloViewerCloud = { PublicDataError, fetchJson, parseYouTubeId, validateConfig, validateHome, validatePush, validateTranscriptArtifact };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
   else boot();
 })();

@@ -6,6 +6,7 @@
     "homepage": "demo/home.json",
     "ptt": "demo/ptt.json",
     "watchalong": "demo/watchalong.json",
+    "transcripts": "demo/transcripts.json",
     "live_relay": null
   },
   "watchalong_policy": {

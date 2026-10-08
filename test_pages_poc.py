@@ -58,7 +58,7 @@ class PagesPoC(unittest.TestCase):
         for forbidden in ("localStorage", "document.cookie", "Authorization", "POST", "PUT", "DELETE", "127.0.0.1", "localhost"):
             self.assertNotIn(forbidden,client)
         import json
-        for path in ("public-data/config.json","public-data/demo/home.json","public-data/demo/ptt.json","public-data/demo/watchalong.json"):
+        for path in ("public-data/config.json","public-data/demo/home.json","public-data/demo/ptt.json","public-data/demo/watchalong.json","public-data/demo/transcripts.json"):
             self.assertEqual(json.loads((ROOT/path).read_text(encoding="utf-8"))["schema_version"],1)
 
 if __name__=="__main__":
