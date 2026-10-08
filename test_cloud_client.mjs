@@ -229,7 +229,7 @@ assert.ok(readerBody.includes('["0.5", "普通（0.5 秒）"]'));
 assert.ok(readerBody.includes('["0.2", "快（0.2 秒）"]'));
 assert.ok(readerBody.includes('["1", "慢（1 秒）"]'));
 assert.ok(readerBody.includes("visibleIds = new Set(article.pushes.map((push) => push.pushId))"));
-assert.ok(readerBody.includes("for (const push of newPushes) {"));
+assert.ok(readerBody.includes("for (const push of newPushes) pending.push(push.pushId)"));
 assert.ok(readerBody.includes('revealTimer = setTimeout(revealNext, Number(speedSelect.value) * 1000)'));
 assert.ok(readerBody.includes("const id = pending.shift()"));
 assert.ok(readerBody.includes("if (row) row.hidden = false"));
@@ -317,8 +317,12 @@ assert.ok(readerBody.includes("const previousCheckpoint = loadCheckpoint()"));
     {pushId:"new-2",floor:2},
   ];
   const known = new Set([...visible, ...pending]);
-  const incoming = pushes.filter(p => !known.has(p.pushId)).sort(order);
-  for(const p of incoming) {pending.push(p.pushId);known.add(p.pushId);}
+  const incoming = pushes.filter(p => {
+    if(known.has(p.pushId)) return false;
+    known.add(p.pushId);
+    return true;
+  }).sort(order);
+  for(const p of incoming) pending.push(p.pushId);
   const byId = new Map(pushes.map(p => [p.pushId,p]));
   pending.sort((a,b) => order(byId.get(a),byId.get(b)));
   assert.deepEqual(pending,["new-2","new-3"]);
