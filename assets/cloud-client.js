@@ -326,7 +326,10 @@
           url.searchParams.set("aid", aid);
           url.searchParams.set("after_cursor", String(requestedCursor));
           url.searchParams.set("limit", String(RELAY_LIMIT));
+          const tailBootstrap = pageNumber === 0 && requestedCursor === 0 && state.bootstrapTail === true;
+          if (tailBootstrap) url.searchParams.set("tail", "1");
           const page = validateRelayPage(await fetchJson(url, 512 * 1024), requestedCursor);
+          if (tailBootstrap) state.bootstrapTail = false;
           checkedAt = page.checkedAt;
           historyGap = historyGap || page.historyGap;
           if (page.historyGap) state.historyIncomplete = true;
@@ -496,7 +499,7 @@
       try {
         if (stopRelay) stopRelay();
         if (validRelayAid) {
-          const state = { cursor: 0, pushes: new Map(), relayStatus: () => {}, timer: null };
+          const state = { cursor: 0, pushes: new Map(), relayStatus: () => {}, timer: null, bootstrapTail: true };
           renderPushes(pushes, []);
           stopRelay = await pollRelay(config, validRelayAid, state, (items) => renderPushes(pushes, items));
         } else {
