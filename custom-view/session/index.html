@@ -1,0 +1,99 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>自訂觀看 · HoloViewer Pages PoC</title><style>
+:root{
+  color-scheme:light;
+  --bg:#f7f5f2;--surface:#fffdfa;--surface-2:#f1efeb;--text:#242321;--muted:#77736c;
+  --line:#e6e1da;--accent:#6faec9;--accent-soft:#e5f2f7;--danger:#c85d67;
+  --shadow:0 10px 30px rgba(52,44,36,.08);--content:1240px;--rail-collapsed:64px;--rail-expanded:210px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,"Noto Sans TC","PingFang TC",system-ui,-apple-system,sans-serif}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit}
+.client-rail{position:fixed;left:0;top:0;bottom:0;z-index:60;width:var(--rail-collapsed);padding:12px 8px;background:rgba(255,253,250,.97);backdrop-filter:blur(18px);border-right:1px solid var(--line);transition:width .18s ease;overflow:hidden}
+.client-rail:hover,.client-rail:focus-within{width:var(--rail-expanded);box-shadow:10px 0 28px rgba(52,44,36,.08)}
+.rail-brand,.rail-nav a{display:flex;align-items:center;gap:12px;height:44px;border-radius:12px;white-space:nowrap}
+.rail-brand{margin-bottom:14px;font-weight:800}
+.rail-nav{display:grid;gap:6px}
+.rail-nav a{color:var(--muted)}
+.rail-nav a:hover,.rail-nav a.active{background:var(--surface-2);color:var(--text)}
+.rail-icon{width:46px;min-width:46px;display:grid;place-items:center;font-size:12px;font-weight:800}
+.rail-label{font-size:14px;opacity:0;transform:translateX(-6px);transition:.16s ease}
+.client-rail:hover .rail-label,.client-rail:focus-within .rail-label{opacity:1;transform:none}
+.client-topbar{position:sticky;top:0;z-index:30;height:58px;margin-left:var(--rail-collapsed);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 24px;background:rgba(247,245,242,.9);backdrop-filter:blur(16px);border-bottom:1px solid rgba(230,225,218,.8);transition:margin-left .18s ease}
+.top-brand{grid-column:2;font-weight:750;font-size:14px;color:var(--muted)}
+.top-status{justify-self:end;color:#9b968e;font-size:12px}
+.mobile-nav-button{display:none}
+.mobile-nav{display:none}
+.client-main{max-width:calc(var(--content) + var(--rail-collapsed));margin:0 auto;padding:34px 24px 80px calc(24px + var(--rail-collapsed));transition:padding-left .18s ease,max-width .18s ease}
+.page-head{display:flex;justify-content:space-between;gap:24px;align-items:end;margin-bottom:26px}
+.page-head h1{margin:0 0 8px;font-size:34px;letter-spacing:-.035em}
+.page-head p{margin:0;color:var(--muted);line-height:1.65}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.11em;color:#4f7f93;text-transform:uppercase}
+.section{margin:34px 0 46px}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:15px}
+.section-head h2{margin:0;font-size:22px}
+.section-head p{margin:5px 0 0;color:var(--muted);font-size:13px}
+.surface{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 1px 0 rgba(52,44,36,.02)}
+.primary-action,.subtle-action{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:700}
+.primary-action{background:var(--text);color:#fff;border-color:var(--text)}
+.subtle-action:hover{background:var(--surface-2)}
+.form-error{margin:0 0 14px;padding:10px 12px;border-radius:12px;background:#fff0ed;color:#9b3528;border:1px solid #f2d3cd}
+.empty-note{color:var(--muted);font-size:13px;line-height:1.65}
+.client-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px 18px}
+.client-card{display:block;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease}
+.client-card:hover,.client-card:focus-visible{transform:translateY(-2px);border-color:#cbdde4;box-shadow:0 8px 22px rgba(52,44,36,.06);outline:none}
+.card-thumb{position:relative;aspect-ratio:16/9;background:linear-gradient(135deg,#cfdde3,#e8ddd5);overflow:hidden}
+.card-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.card-copy{padding:12px 13px 14px}
+.card-copy h3{font-size:14px;line-height:1.48;margin:7px 0 4px}
+.card-copy p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.status-pill{display:inline-flex;align-items:center;min-height:22px;padding:0 7px;border-radius:999px;font-size:10px;font-weight:800;background:var(--surface-2);color:#625e58}
+.status-pill.live{background:#ffe5e8;color:#c94450}
+.status-pill.upcoming{background:#fff3d9;color:#8e6500}
+.status-pill.ended{background:#eeece9;color:#706b64}
+.card-meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;margin-top:6px}
+.feature-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.feature-card{padding:20px;min-height:126px;border:1px solid var(--line);border-radius:18px;background:var(--surface);display:flex;flex-direction:column;justify-content:space-between}
+.feature-card strong{font-size:18px}.feature-card span{margin-top:8px;color:var(--muted);font-size:13px;line-height:1.55}
+.tool-card{padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+input,select{width:100%;border:1px solid #d8d3cc;border-radius:11px;padding:11px 12px;background:white;color:var(--text)}
+input:focus,select:focus{outline:2px solid #cfe4ed;border-color:#9fc7d7}
+.viewer-shell{display:grid;gap:14px}
+.viewer-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.viewer-head h1{margin:0;font-size:25px;letter-spacing:-.025em}
+.viewer-frame{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#0b0b0b;box-shadow:var(--shadow)}
+.viewer-frame iframe{display:block;width:100%;height:calc(100vh - 132px);min-height:680px;border:0;background:#0b0b0b}
+body.viewer-wide .client-main{max-width:none;padding-right:18px}
+body.viewer-wide .viewer-shell{width:100%}
+body.viewer-wide .viewer-frame iframe{height:calc(100vh - 126px);min-height:720px}
+@media (min-width:761px){
+  body:has(.client-rail:hover) .client-topbar,body:has(.client-rail:focus-within) .client-topbar{margin-left:var(--rail-expanded)}
+  body:has(.client-rail:hover) .client-main,body:has(.client-rail:focus-within) .client-main{padding-left:calc(24px + var(--rail-expanded));max-width:calc(var(--content) + var(--rail-expanded))}
+}
+@media(max-width:1040px){.client-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.feature-row{grid-template-columns:1fr}}
+@media(max-width:760px){
+  .client-rail{display:none}.client-topbar{margin-left:0;padding:0 16px;grid-template-columns:1fr auto 1fr}.mobile-nav-button{display:block;justify-self:start;border:1px solid var(--line);background:var(--surface);border-radius:10px;width:38px;height:38px}
+  .mobile-nav{position:fixed;z-index:70;left:12px;right:12px;top:64px;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);display:grid;gap:4px}
+  .mobile-nav[hidden]{display:none}.mobile-nav a{padding:11px 12px;border-radius:10px}.mobile-nav a.active,.mobile-nav a:hover{background:var(--surface-2)}
+  .client-main{padding:26px 16px 72px}.page-head{align-items:start;flex-direction:column}.page-head h1{font-size:29px}.client-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px}
+  .viewer-frame iframe{height:calc(100vh - 130px);min-height:520px}
+}
+@media(max-width:480px){.client-grid{grid-template-columns:1fr}.top-brand{font-size:13px}}
+
+</style></head><body class=""><aside class="client-rail" aria-label="主要功能"><a class="rail-brand" href="../../" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">Holo Viewer</span></a><nav class="rail-nav"><a class="" href="../../"><span class="rail-icon">今</span><span class="rail-label">今日</span></a><a class="" href="../../watchalong/"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a><a class="active" href="../../custom-view/"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a><a class="" href="../../ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a></nav></aside><header class="client-topbar"><button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav">☰</button><a class="top-brand" href="../../">Holo Viewer</a><div class="top-status">PAGES POC · STATIC</div></header><div id="mobileNav" class="mobile-nav" hidden><a class="" href="../../">今日</a><a class="" href="../../watchalong/">同時視聽</a><a class="active" href="../../custom-view/">自訂觀看</a><a class="" href="../../ptt-today/">PTT 今日專串</a></div><main class="client-main"><div class="page-head"><div><h1>自訂觀看｜單支影片 PoC</h1><p>僅驗證公開 YouTube iframe，不使用後台或 API key</p></div></div><div class="surface" style="padding:16px"><p id="playerStatus">請從自訂觀看加入公開影片。</p><div id="player" style="aspect-ratio:16/9;width:100%"></div></div></main><script>
+const mobileNavButton=document.getElementById('mobileNavButton');
+const mobileNav=document.getElementById('mobileNav');
+if(mobileNavButton&&mobileNav){
+  mobileNavButton.addEventListener('click',()=>{
+    const opening=mobileNav.hidden;
+    mobileNav.hidden=!opening;
+    mobileNavButton.setAttribute('aria-expanded',String(opening));
+  });
+  mobileNav.addEventListener('click',()=>{
+    mobileNav.hidden=true;
+    mobileNavButton.setAttribute('aria-expanded','false');
+  });
+}
+
+const values=new URLSearchParams(location.search).getAll('stream');function parse(v){if(/^[a-zA-Z0-9_-]{11}$/.test(v))return v;try{const u=new URL(v);if(!['youtube.com','www.youtube.com','m.youtube.com','youtu.be'].includes(u.hostname))return null;let id=u.hostname==='youtu.be'?u.pathname.slice(1).split('/')[0]:u.searchParams.get('v');if(!id&&u.pathname.startsWith('/live/'))id=u.pathname.split('/')[2];return /^[a-zA-Z0-9_-]{11}$/.test(id||'')?id:null}catch{return null}}const id=values.length===1?parse(values[0]):null;if(id){const frame=document.createElement('iframe');frame.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id);frame.title='YouTube player';frame.allow='accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;frame.style.cssText='width:100%;height:100%;border:0';document.getElementById('player').append(frame);document.getElementById('playerStatus').textContent='YouTube iframe 已載入；是否可播放取決於影片的嵌入限制。'}else{document.getElementById('playerStatus').textContent='無效或非單一 YouTube 影片，請返回自訂觀看。'}</script></body></html>
