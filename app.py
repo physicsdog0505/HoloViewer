@@ -33,3 +33,4 @@ with tabs[2]:
     st.subheader("同時視聽")
     st.info("公開預覽版尚未開放此功能。")
 st.caption("Public deployment smoke preview only — no live PTT data, credentials or administrative services.")
+st.caption("Deployment check: public-smoke-v2")

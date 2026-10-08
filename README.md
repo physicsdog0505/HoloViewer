@@ -25,3 +25,16 @@ This preview has not adopted an open-source license yet. Publishing code on GitH
 ## Release gate
 
 The private engineering repository remains the canonical source. Publishing this minimal scaffold **does not authorize** publishing more private code, integrating API keys, enabling Watchalong or Live Sync, or automatic sync from the private repo. Future additions require independent security, dependency, permissions, source/rights, and user-acceptance review.
+
+## Phase 1A deployment verification and rollback
+
+This is a smoke verification only; it does **not** publish live data or enable unfinished features.
+
+1. Verify the public page renders all three tabs with placeholders, and no secrets are required.
+2. Review public PR #3 and check the `Public smoke release review` CI success. It checks Python compilation, strict import/asset boundaries, dependencies, and local Streamlit `/_stcore/health`.
+3. **Only after human approval**, merge this small PR to `main`. Streamlit Community Cloud should follow `main` automatically.
+4. Open https://holoviewer.streamlit.app, refresh and look for `Deployment check: public-smoke-v2`. Record actual observed result and time. GitHub CI success alone does not prove cloud redeployment.
+5. For rollback verification, open a *separate revert PR* removing only the marker (or revert this exact deployment commit), run CI, obtain human merge approval, and confirm the marker disappears after deployment. Do not force-push or expose private files.
+6. Keep screenshots/logs with secrets redacted. If the page fails, check Streamlit Cloud app logs for entrypoint `app.py`, Python 3.11 and requirements resolution.
+
+The app has no runtime dependence on the user's Mac mini, private repository or private SQLite. Public site filesystem is ephemeral; any future snapshot must have a separate persistent origin. GitHub Release Assets remain a future **candidate** under #290–#292; not a blocker for Phase 1A.
