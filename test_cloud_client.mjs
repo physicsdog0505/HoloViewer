@@ -151,3 +151,10 @@ assert.equal(
   "https://holoviewer-ptt-relay.singlebagel.workers.dev/v1/ptt",
   "public preview must point at the deployed read-only relay",
 );
+
+
+// explicit Live Sync relay AID
+const liveSyncBody = source.slice(source.indexOf("async function startCustomView("), source.indexOf("function validateWatchalong("));
+assert.ok(liveSyncBody.includes('const relayAid = params.get("aid")'));
+assert.ok(liveSyncBody.includes("if (validRelayAid)"));
+assert.ok(liveSyncBody.includes("pollRelay(config, validRelayAid"));
