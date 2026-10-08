@@ -2,9 +2,10 @@ const SCHEMA_VERSION = 1;
 const MAX_BATCH_PUSHES = 200;
 const MAX_READ_PUSHES = 500;
 const MAX_BATCH_BYTES = 256 * 1024;
+const MAX_READ_BYTES = 512 * 1024;
 const DEFAULT_RETENTION_ROWS = 100000;
 const AID = /^[A-Za-z0-9._-]{1,32}$/;
-const PUSH_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
+const PUSH_ID = /^ptt:v1:[0-9a-f]{64}$/;
 const PRODUCER = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
 const KINDS = new Set(["推", "噓", "嘘", "→"]);
 
@@ -133,6 +134,23 @@ async function publish(request, env) {
   return json({schema_version: 1, accepted, received: batch.pushes.length});
 }
 
+function readResponseBody({after, checkedAt, historyGap, purgedThrough, pushes, hasMore}) {
+  const next = pushes.length ? pushes[pushes.length - 1].cursor : after;
+  return {
+    schema_version: 1,
+    next_cursor: next,
+    has_more: hasMore,
+    checked_at: checkedAt,
+    history_gap: historyGap,
+    purged_through_cursor: purgedThrough,
+    pushes,
+  };
+}
+
+function encodedJsonBytes(value) {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
 async function read(request, env) {
   if (!env.DB) throw new RelayError("relay database is not configured", 503);
   const url = new URL(request.url);
@@ -153,8 +171,8 @@ async function read(request, env) {
      FROM ptt_pushes WHERE aid = ? AND cursor > ? ORDER BY cursor ASC LIMIT ?`
   ).bind(aid, after, limit + 1).all();
   const rows = Array.isArray(result?.results) ? result.results : [];
-  const hasMore = rows.length > limit;
-  const visible = rows.slice(0, limit).map((row) => ({
+  const checkedAt = new Date().toISOString();
+  const projected = rows.slice(0, limit).map((row) => ({
     push_id: String(row.push_id),
     aid: String(row.aid),
     article_url: String(row.article_url),
@@ -166,16 +184,37 @@ async function read(request, env) {
     occurred_at: String(row.occurred_at),
     cursor: Number(row.cursor),
   }));
-  const next = visible.length ? visible[visible.length - 1].cursor : after;
-  return json({
-    schema_version: 1,
-    next_cursor: next,
-    has_more: hasMore,
-    checked_at: new Date().toISOString(),
-    history_gap: historyGap,
-    purged_through_cursor: purgedThrough,
+
+  const visible = [];
+  for (const push of projected) {
+    const candidate = [...visible, push];
+    // Use has_more=false for the size probe because "false" is one byte
+    // larger than "true"; fitting this form guarantees either final form fits.
+    const probe = readResponseBody({
+      after,
+      checkedAt,
+      historyGap,
+      purgedThrough,
+      pushes: candidate,
+      hasMore: false,
+    });
+    if (encodedJsonBytes(probe) > MAX_READ_BYTES) break;
+    visible.push(push);
+  }
+
+  const hasMore = rows.length > visible.length;
+  const body = readResponseBody({
+    after,
+    checkedAt,
+    historyGap,
+    purgedThrough,
     pushes: visible,
-  }, 200, publicHeaders(env));
+    hasMore,
+  });
+  if (encodedJsonBytes(body) > MAX_READ_BYTES) {
+    throw new RelayError("read page exceeds byte limit", 500);
+  }
+  return json(body, 200, publicHeaders(env));
 }
 
 export async function handleRequest(request, env) {
