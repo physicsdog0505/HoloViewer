@@ -142,4 +142,24 @@ assert.ok(readerBody.includes('speedSelect.value = "0";\n      stopReading();'))
 assert.ok(readerBody.includes('if (followInput.checked && nearBottom) goLatest()'));
 assert.ok(readerBody.includes('if (sequence !== activeArticle) return'));
 
+// Behavioral complexity guard: long articles must not linearly scan every row
+// at each automatic-reading tick. Execute the actual reader search snippet.
+{
+  const from = readerSource.indexOf("        const rows = list.children;");
+  const to = readerSource.indexOf("        if (!next) {", from);
+  assert.ok(from >= 0 && to > from);
+  const snippet = readerSource.slice(from, to);
+  const rowCount = 2623;
+  let geometryReads = 0;
+  const rows = Array.from({length:rowCount}, (_,i) => ({
+    getBoundingClientRect() { geometryReads++; return {top: i * 24 - 800}; },
+  }));
+  const list = {children:rows};
+  const viewport = {scrollY:800};
+  const selectNext = new Function("list", "window", snippet + "return next;");
+  const next = selectNext(list, viewport);
+  assert.equal(next, rows[38], "reader advances from first row below scroll threshold");
+  assert.ok(geometryReads <= 13, "2,623-row reader lookup must use logarithmic geometry reads");
+}
+
 console.log("cloud-client contract tests: pass");
