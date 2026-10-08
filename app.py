@@ -1,4 +1,4 @@
-"""HoloViewer private staging entrypoint. No internal service imports."""
+"""HoloViewer public deployment smoke preview. No internal service imports."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,9 +8,10 @@ import streamlit as st
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-st.set_page_config(page_title="HoloViewer — Private staging", page_icon="📺", layout="wide")
+st.set_page_config(page_title="HoloViewer — Preview", page_icon="📺", layout="wide")
 st.title("HoloViewer")
-st.caption("Unofficial fan project · Private staging · Not affiliated with COVER Corp. or YouTube.")
+st.caption("Unofficial fan project · Public preview · Not affiliated with COVER Corp. or YouTube.")
+st.info("Deployment preview only. Live data and playback pages are not connected or enabled yet.")
 tabs = st.tabs(["首頁", "直播同步", "同時視聽"])
 with tabs[0]:
     st.subheader("今日直播")
@@ -27,8 +28,8 @@ with tabs[0]:
             st.link_button("在 YouTube 觀看", f"https://www.youtube.com/watch?v={stream['video_id']}")
 with tabs[1]:
     st.subheader("直播同步")
-    st.info("此功能尚未完成獨立公開版驗收；Staging 暫不提供播放器。")
+    st.info("公開預覽版尚未開放此功能。")
 with tabs[2]:
     st.subheader("同時視聽")
-    st.info("此功能尚未完成授權及公開版驗收；Staging 暫不提供播放器。")
-st.caption("Private staging only. No PTT credentials, Collector or Admin available.")
+    st.info("公開預覽版尚未開放此功能。")
+st.caption("Public deployment smoke preview only — no live PTT data, credentials or administrative services.")
