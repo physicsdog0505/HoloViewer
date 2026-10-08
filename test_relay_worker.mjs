@@ -102,16 +102,6 @@ response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123
 assert.equal((await response.json()).pushes.length,0);
 
 
-response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=0&limit=2&tail=1"),env);
-assert.equal(response.status,200);
-const tailPage=await response.json();
-assert.equal(tailPage.has_more,false);
-assert.deepEqual(tailPage.pushes.map((item)=>item.cursor),[2,3]);
-assert.equal(tailPage.next_cursor,3);
-
-response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=1&limit=2&tail=1"),env);
-assert.equal(response.status,400);
-
 
 // D1 batch failure must not persist an earlier insert from the same publish request.
 const second={...push,push_id:"ptt:C_Chat:M.123.A.1:2",source_line:2,floor:2};
@@ -126,6 +116,17 @@ response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",
 assert.equal(response.status,200);
 assert.equal((await response.json()).accepted,2);
 assert.equal(DB.rows.length,3);
+
+
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=0&limit=2&tail=1"),env);
+assert.equal(response.status,200);
+const tailPage=await response.json();
+assert.equal(tailPage.has_more,false);
+assert.deepEqual(tailPage.pushes.map((item)=>item.cursor),[2,3]);
+assert.equal(tailPage.next_cursor,3);
+
+response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=1&limit=2&tail=1"),env);
+assert.equal(response.status,400);
 
 
 // Simulate a previously retained-and-purged article and assert explicit incompleteness.
