@@ -134,6 +134,8 @@ const cancelledPollBody = cancelledPollSource.slice(cancelledPollSource.indexOf(
 assert.ok(cancelledPollBody.includes('if (!stopped) state.relayStatus("stale"'), "cancelled poll must not write an obsolete stale status");
 
 // Behavioral race: an old article's in-flight fetch fails after the poll was cancelled.
+// Prior test re-exposed loadPttArtifact only; re-expose pollRelay within this VM.
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { pollRelay, "));
 // The cancelled old poll must never write over the new article's status.
 {
   const previousFetch = globalThis.fetch;
