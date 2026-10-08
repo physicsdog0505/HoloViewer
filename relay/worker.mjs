@@ -105,18 +105,19 @@ async function publish(request, env) {
   if (auth !== `Bearer ${env.PUBLISH_TOKEN}`) throw new RelayError("unauthorized", 401);
   if (!env.DB) throw new RelayError("relay database is not configured", 503);
   const batch = validatePublishBatch(await readBody(request));
-  let accepted = 0;
-  for (const push of batch.pushes) {
-    const result = await env.DB.prepare(
-      `INSERT OR IGNORE INTO ptt_pushes
+  // Cloudflare D1 batch executes its statements transactionally: do not expose
+  // a partially published push batch when a later insert fails.
+  if (typeof env.DB.batch !== "function") throw new RelayError("atomic D1 batch is unavailable", 503);
+  const statements = batch.pushes.map((push) => env.DB.prepare(
+    `INSERT OR IGNORE INTO ptt_pushes
        (push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at, producer_id, published_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      push.push_id, push.aid, push.article_url, push.source_line, push.floor,
-      push.kind, push.author, push.content, push.occurred_at, batch.producer_id, batch.published_at
-    ).run();
-    if (Number(result?.meta?.changes || 0) > 0) accepted += 1;
-  }
+  ).bind(
+    push.push_id, push.aid, push.article_url, push.source_line, push.floor,
+    push.kind, push.author, push.content, push.occurred_at, batch.producer_id, batch.published_at
+  ));
+  const results = statements.length ? await env.DB.batch(statements) : [];
+  const accepted = results.reduce((total, result) => total + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0);
   const keep = Number.isSafeInteger(Number(env.RETENTION_ROWS)) ? Math.max(1000, Number(env.RETENTION_ROWS)) : DEFAULT_RETENTION_ROWS;
   await env.DB.prepare(
     "DELETE FROM ptt_pushes WHERE cursor <= COALESCE((SELECT MAX(cursor) FROM ptt_pushes),0) - ?"
