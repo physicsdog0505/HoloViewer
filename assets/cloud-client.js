@@ -95,9 +95,11 @@
     if (/^[A-Za-z0-9_-]{11}$/.test(raw)) return raw;
     try {
       const url = new URL(raw);
-      let id = url.searchParams.get("v");
-      if (!id && url.hostname === "youtu.be") id = url.pathname.slice(1).split("/")[0];
-      if (!id && url.pathname.startsWith("/live/")) id = url.pathname.split("/")[2];
+      if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+      const host = url.hostname.toLowerCase();
+      if (!["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtube-nocookie.com"].includes(host)) return null;
+      let id = host === "youtu.be" ? url.pathname.slice(1).split("/")[0] : url.searchParams.get("v");
+      if (!id && (url.pathname.startsWith("/live/") || url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/"))) id = url.pathname.split("/")[2];
       return /^[A-Za-z0-9_-]{11}$/.test(id || "") ? id : null;
     } catch (_) {
       return null;
