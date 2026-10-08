@@ -127,6 +127,12 @@ try {
   assert.equal(actual.completeness,"partial");
 } finally {globalThis.fetch=oldFetchForContract;}
 
+// Cancelled in-flight relay failures must not clobber a newly selected article status.
+// This structural guard complements the browser race test pending owner acceptance.
+const cancelledPollSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
+const cancelledPollBody = cancelledPollSource.slice(cancelledPollSource.indexOf("async function pollRelay("), cancelledPollSource.indexOf("async function startPtt("));
+assert.ok(cancelledPollBody.includes('if (!stopped) state.relayStatus("stale"'), "cancelled poll must not write an obsolete stale status");
+
 // Idle relay polls must preserve DOM and reading position, including long articles.
 const liveSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 const livePoll = liveSource.slice(liveSource.indexOf("async function pollRelay("), liveSource.indexOf("async function startPtt("));
