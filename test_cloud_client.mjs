@@ -161,3 +161,10 @@ assert.ok(liveSyncBody.includes('const relayAid = params.get("aid")'));
 assert.ok(liveSyncBody.includes("if (validRelayAid)"));
 assert.ok(liveSyncBody.includes("pollRelay(config, validRelayAid"));
 assert.ok(liveSyncBody.includes("bootstrapTail: true"));
+
+
+// Live Sync exposes relay freshness independently from video readiness.
+const liveHtml = fs.readFileSync(new URL("./custom-view/session/index.html", import.meta.url), "utf8");
+assert.ok(liveHtml.includes("data-live-relay-status"));
+assert.ok(liveSyncBody.includes('document.querySelector("[data-live-relay-status]")'));
+assert.ok(liveSyncBody.includes("status(relayMessage, kind, text)"));
