@@ -173,6 +173,49 @@ vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloVie
   }
 }
 
+// Multi-page atomicity: page one reports a retention gap, page two fails.
+// No cursor, rows, gap flag, or repaint should be committed from that poll.
+{
+  vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { pollRelay, "));
+  const oldFetch = globalThis.fetch;
+  const oldSetTimeout = globalThis.setTimeout;
+  const oldClearTimeout = globalThis.clearTimeout;
+  let calls = 0;
+  let paints = 0;
+  const states = [];
+  globalThis.setTimeout = () => 1;
+  globalThis.clearTimeout = () => {};
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 2) throw new Error("second relay page failed");
+    return new Response(JSON.stringify({
+      ...page, history_gap:true, purged_through_cursor:1,
+      has_more:true, checked_at:new Date().toISOString(),
+      pushes:[{...push, cursor:1}], next_cursor:1,
+    }), {status:200,headers:{"content-type":"application/json"}});
+  };
+  try {
+    const state = {cursor:0,pushes:new Map(),timer:null,relayStatus:(kind)=>states.push(kind)};
+    const stop = await window.HoloViewerCloud.pollRelay(
+      {liveRelay:new URL("https://relay.example/v1/ptt"),ptt:null},
+      "M.123.A.1",state,()=>{paints++;}
+    );
+    for (let i=0; i<20 && calls<2; i++) await new Promise(resolve=>setImmediate(resolve));
+    for (let i=0; i<10; i++) await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(calls,2);
+    assert.equal(state.cursor,0,"failed page must not advance cursor");
+    assert.equal(state.pushes.size,0,"failed page must not commit pushes");
+    assert.equal(state.historyIncomplete,undefined,"failed page must not commit gap");
+    assert.equal(paints,0,"failed page must not repaint");
+    assert.equal(states.at(-1),"stale","failed poll reports temporary failure");
+    stop();
+  } finally {
+    globalThis.fetch=oldFetch;
+    globalThis.setTimeout=oldSetTimeout;
+    globalThis.clearTimeout=oldClearTimeout;
+  }
+}
+
 // Idle relay polls must preserve DOM and reading position, including long articles.
 const liveSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 const livePoll = liveSource.slice(liveSource.indexOf("async function pollRelay("), liveSource.indexOf("async function startPtt("));
