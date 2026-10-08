@@ -5,6 +5,8 @@
   const FETCH_TIMEOUT_MS = 8000;
   const RELAY_LIMIT = 200;
   const RELAY_POLL_MS = 5000;
+  const RELAY_STALE_MS = 30000;
+  const RELAY_MAX_PAGES_PER_POLL = 3;
 
   class PublicDataError extends Error {}
 
@@ -186,6 +188,27 @@
     }
   }
 
+  function validateRelayPage(value, afterCursor) {
+    const fields = ["schema_version", "next_cursor", "has_more", "checked_at", "pushes"];
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== fields.sort().join()) throw new PublicDataError("relay page fields mismatch v1 contract");
+    if (value.schema_version !== 1 || typeof value.has_more !== "boolean") throw new PublicDataError("relay page schema is incompatible");
+    const next = Number(value.next_cursor);
+    if (!Number.isSafeInteger(next) || next < afterCursor || !Array.isArray(value.pushes) || value.pushes.length > 500) throw new PublicDataError("relay page cursor/list is invalid");
+    const checkedAt = isoTime(value.checked_at, "relay checked_at");
+    const relayPushFields = ["push_id", "aid", "article_url", "source_line", "floor", "kind", "author", "content", "occurred_at", "cursor"].sort().join();
+    const pushes = value.pushes.map((raw) => {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).sort().join() !== relayPushFields) throw new PublicDataError("relay push fields mismatch v1 contract");
+      return validatePush(raw);
+    });
+    let previous = afterCursor;
+    for (const push of pushes) {
+      if (!Number.isSafeInteger(push.cursor) || push.cursor <= previous) throw new PublicDataError("relay cursor is not unique/increasing");
+      previous = push.cursor;
+    }
+    if (pushes.length && next < previous) throw new PublicDataError("relay next_cursor precedes returned pushes");
+    return { nextCursor: next, hasMore: value.has_more, checkedAt, pushes };
+  }
+
   async function loadPttArtifact(url) {
     if (!url) throw new PublicDataError("PTT public artifact is not configured");
     const value = await fetchJson(url);
@@ -281,7 +304,7 @@
     }));
   }
 
-  async function pollRelay(config, articleId, state, onUpdate) {
+  async function pollRelay(config, aid, state, onUpdate) {
     if (!config.liveRelay) {
       state.relayStatus("unavailable", "即時 relay 尚未設定；目前顯示歷史快照。", false);
       return;
@@ -290,20 +313,22 @@
     const run = async () => {
       if (stopped) return;
       try {
-        const url = new URL(config.liveRelay);
-        url.searchParams.set("article_id", articleId);
-        url.searchParams.set("after_cursor", String(state.cursor));
-        url.searchParams.set("limit", String(RELAY_LIMIT));
-        const page = await fetchJson(url, 512 * 1024);
-        if (!page || page.schema_version !== 1 || !Array.isArray(page.items)) throw new PublicDataError("relay page schema is incompatible");
-        const items = page.items.map(validatePush);
-        for (const push of items) {
-          if (!Number.isSafeInteger(push.cursor) || push.cursor <= state.cursor) throw new PublicDataError("relay cursor is not monotonic");
-          state.cursor = push.cursor;
-          state.pushes.set(push.pushId, push);
+        let checkedAt = null;
+        for (let pageNumber = 0; pageNumber < RELAY_MAX_PAGES_PER_POLL; pageNumber += 1) {
+          const requestedCursor = state.cursor;
+          const url = new URL(config.liveRelay);
+          url.searchParams.set("aid", aid);
+          url.searchParams.set("after_cursor", String(requestedCursor));
+          url.searchParams.set("limit", String(RELAY_LIMIT));
+          const page = validateRelayPage(await fetchJson(url, 512 * 1024), requestedCursor);
+          checkedAt = page.checkedAt;
+          for (const push of page.pushes) state.pushes.set(push.pushId, push);
+          state.cursor = page.nextCursor;
+          if (!page.hasMore) break;
+          if (pageNumber === RELAY_MAX_PAGES_PER_POLL - 1) throw new PublicDataError("relay pagination exceeds client poll bound");
         }
         onUpdate([...state.pushes.values()]);
-        const stale = page.stale === true;
+        const stale = !checkedAt || Date.now() - new Date(checkedAt).getTime() > RELAY_STALE_MS;
         state.relayStatus(stale ? "stale" : "fresh", stale ? "即時 relay 已過期，保留最後資料。" : "即時 relay 已連線。", stale);
       } catch (error) {
         state.relayStatus("stale", `即時 relay 暫時不可用（${error.name}）；保留最後資料。`, true);
@@ -340,7 +365,7 @@
       renderPushes(list, [...state.pushes.values()]);
       const incomplete = artifact.completeness !== "complete" || article.completeness !== "complete";
       status(pageStatus, incomplete ? "partial" : "complete", incomplete ? "歷史資料不完整；未出現的推文不可解讀為 0。" : "歷史資料完整。 ");
-      stopRelay = await pollRelay(config, article.articleId, state, (pushes) => renderPushes(list, pushes));
+      stopRelay = await pollRelay(config, article.aid, state, (pushes) => renderPushes(list, pushes));
     };
     select.addEventListener("change", show);
     await show();
@@ -353,6 +378,7 @@
     const pushes = document.querySelector("[data-live-pushes]");
     const params = new URLSearchParams(location.search);
     const input = form?.querySelector("input[name=stream]");
+    let stopRelay = null;
     if (input && params.get("stream")) input.value = params.get("stream");
     const load = async (event, supplied = null) => {
       event?.preventDefault();
@@ -366,9 +392,14 @@
       status(message, "ready", "影片已初始化；PTT 不可用時仍可播放。 ");
       if (input) history.replaceState(null, "", `?stream=${encodeURIComponent(raw)}`);
       try {
+        if (stopRelay) stopRelay();
         const artifact = await loadPttArtifact(config.ptt);
         const article = artifact.articles[0];
-        if (article) renderPushes(pushes, article.pushes);
+        if (article) {
+          const state = { cursor: 0, pushes: new Map(article.pushes.map((push) => [push.pushId, push])), relayStatus: () => {}, timer: null };
+          renderPushes(pushes, [...state.pushes.values()]);
+          stopRelay = await pollRelay(config, article.aid, state, (items) => renderPushes(pushes, items));
+        }
       } catch (error) {
         clear(pushes);
         pushes.append(element("p", "empty-note", `PTT 暫時不可用（${error.name}）。`));
@@ -433,6 +464,12 @@
     const statusNode = document.querySelector("[data-watchalong-status]");
     const subtitle = document.querySelector("[data-subtitle]");
     const syncButton = document.querySelector("[data-manual-sync]");
+    const pttSection = element("section", "surface watch-ptt");
+    pttSection.append(element("h2", "", "PTT 時間軸"));
+    const pttStatus = element("p", "empty-note", "載入 PTT baseline…");
+    const pttList = element("div", "watch-ptt-list");
+    pttSection.append(pttStatus, pttList);
+    document.querySelector("main")?.append(pttSection);
     if (!config.watchalong) throw new PublicDataError("Watchalong artifact is not configured");
     const sessions = validateWatchalong(await fetchJson(config.watchalong));
     let transcriptBundles = [];
@@ -440,6 +477,10 @@
       try { transcriptBundles = validateTranscriptArtifact(await fetchJson(config.transcripts)); }
       catch (_) { transcriptBundles = []; }
     }
+    let pttArtifact = null;
+    try { pttArtifact = await loadPttArtifact(config.ptt); }
+    catch (_) { status(pttStatus, "unavailable", "PTT 暫時不可用；播放與字幕仍可使用。"); }
+    let stopRelay = null;
     clear(selector);
     for (const session of sessions) {
       const option = document.createElement("option");
@@ -448,6 +489,7 @@
       selector.append(option);
     }
     const show = () => {
+      if (stopRelay) { stopRelay(); stopRelay = null; }
       const session = sessions.find((item) => item.sessionId === selector.value) || sessions[0];
       if (!session) {
         status(statusNode, "unavailable", "目前沒有可用的同時視聽資料。 ");
@@ -460,6 +502,15 @@
       syncButton.dataset.offset = String(session.sourceOffset);
       const bundle = transcriptBundles.find((item) => item.videoId === session.masterVideoId);
       renderTranscript(subtitle, bundle);
+      const article = pttArtifact?.articles.find((item) => item.articleId === session.pttArticleId);
+      if (article) {
+        const state = { cursor: 0, pushes: new Map(article.pushes.map((push) => [push.pushId, push])), relayStatus: (kind, message) => status(pttStatus, kind, message), timer: null };
+        renderPushes(pttList, [...state.pushes.values()]);
+        status(pttStatus, article.completeness === "complete" ? "complete" : "partial", article.completeness === "complete" ? "PTT baseline 完整。" : "PTT baseline 不完整；缺席不代表 0。 ");
+        pollRelay(config, article.aid, state, (items) => renderPushes(pttList, items)).then((stop) => { stopRelay = stop || null; });
+      } else {
+        clear(pttList); status(pttStatus, "unavailable", "此場次沒有公開 PTT artifact；播放與字幕仍可使用。 ");
+      }
       const mode = config.automaticFollowerPlayback ? "自動 follower policy 已啟用" : "自動 follower 預設關閉；使用手動同步";
       status(statusNode, "ready", `${mode}。`);
     };
@@ -488,7 +539,7 @@
     }
   }
 
-  window.HoloViewerCloud = { PublicDataError, fetchJson, parseYouTubeId, validateConfig, validateHome, validatePush, validateTranscriptArtifact };
+  window.HoloViewerCloud = { PublicDataError, fetchJson, parseYouTubeId, validateConfig, validateHome, validatePush, validateRelayPage, validateTranscriptArtifact };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
   else boot();
 })();
