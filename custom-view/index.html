@@ -1,0 +1,183 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>自訂觀看 · HoloViewer Pages PoC</title><style>
+:root{
+  color-scheme:light;
+  --bg:#f7f5f2;--surface:#fffdfa;--surface-2:#f1efeb;--text:#242321;--muted:#77736c;
+  --line:#e6e1da;--accent:#6faec9;--accent-soft:#e5f2f7;--danger:#c85d67;
+  --shadow:0 10px 30px rgba(52,44,36,.08);--content:1240px;--rail-collapsed:64px;--rail-expanded:210px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,"Noto Sans TC","PingFang TC",system-ui,-apple-system,sans-serif}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit}
+.client-rail{position:fixed;left:0;top:0;bottom:0;z-index:60;width:var(--rail-collapsed);padding:12px 8px;background:rgba(255,253,250,.97);backdrop-filter:blur(18px);border-right:1px solid var(--line);transition:width .18s ease;overflow:hidden}
+.client-rail:hover,.client-rail:focus-within{width:var(--rail-expanded);box-shadow:10px 0 28px rgba(52,44,36,.08)}
+.rail-brand,.rail-nav a{display:flex;align-items:center;gap:12px;height:44px;border-radius:12px;white-space:nowrap}
+.rail-brand{margin-bottom:14px;font-weight:800}
+.rail-nav{display:grid;gap:6px}
+.rail-nav a{color:var(--muted)}
+.rail-nav a:hover,.rail-nav a.active{background:var(--surface-2);color:var(--text)}
+.rail-icon{width:46px;min-width:46px;display:grid;place-items:center;font-size:12px;font-weight:800}
+.rail-label{font-size:14px;opacity:0;transform:translateX(-6px);transition:.16s ease}
+.client-rail:hover .rail-label,.client-rail:focus-within .rail-label{opacity:1;transform:none}
+.client-topbar{position:sticky;top:0;z-index:30;height:58px;margin-left:var(--rail-collapsed);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 24px;background:rgba(247,245,242,.9);backdrop-filter:blur(16px);border-bottom:1px solid rgba(230,225,218,.8);transition:margin-left .18s ease}
+.top-brand{grid-column:2;font-weight:750;font-size:14px;color:var(--muted)}
+.top-status{justify-self:end;color:#9b968e;font-size:12px}
+.mobile-nav-button{display:none}
+.mobile-nav{display:none}
+.client-main{max-width:calc(var(--content) + var(--rail-collapsed));margin:0 auto;padding:34px 24px 80px calc(24px + var(--rail-collapsed));transition:padding-left .18s ease,max-width .18s ease}
+.page-head{display:flex;justify-content:space-between;gap:24px;align-items:end;margin-bottom:26px}
+.page-head h1{margin:0 0 8px;font-size:34px;letter-spacing:-.035em}
+.page-head p{margin:0;color:var(--muted);line-height:1.65}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.11em;color:#4f7f93;text-transform:uppercase}
+.section{margin:34px 0 46px}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:15px}
+.section-head h2{margin:0;font-size:22px}
+.section-head p{margin:5px 0 0;color:var(--muted);font-size:13px}
+.surface{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 1px 0 rgba(52,44,36,.02)}
+.primary-action,.subtle-action{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:700}
+.primary-action{background:var(--text);color:#fff;border-color:var(--text)}
+.subtle-action:hover{background:var(--surface-2)}
+.form-error{margin:0 0 14px;padding:10px 12px;border-radius:12px;background:#fff0ed;color:#9b3528;border:1px solid #f2d3cd}
+.empty-note{color:var(--muted);font-size:13px;line-height:1.65}
+.client-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px 18px}
+.client-card{display:block;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease}
+.client-card:hover,.client-card:focus-visible{transform:translateY(-2px);border-color:#cbdde4;box-shadow:0 8px 22px rgba(52,44,36,.06);outline:none}
+.card-thumb{position:relative;aspect-ratio:16/9;background:linear-gradient(135deg,#cfdde3,#e8ddd5);overflow:hidden}
+.card-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.card-copy{padding:12px 13px 14px}
+.card-copy h3{font-size:14px;line-height:1.48;margin:7px 0 4px}
+.card-copy p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.status-pill{display:inline-flex;align-items:center;min-height:22px;padding:0 7px;border-radius:999px;font-size:10px;font-weight:800;background:var(--surface-2);color:#625e58}
+.status-pill.live{background:#ffe5e8;color:#c94450}
+.status-pill.upcoming{background:#fff3d9;color:#8e6500}
+.status-pill.ended{background:#eeece9;color:#706b64}
+.card-meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;margin-top:6px}
+.feature-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.feature-card{padding:20px;min-height:126px;border:1px solid var(--line);border-radius:18px;background:var(--surface);display:flex;flex-direction:column;justify-content:space-between}
+.feature-card strong{font-size:18px}.feature-card span{margin-top:8px;color:var(--muted);font-size:13px;line-height:1.55}
+.tool-card{padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+input,select{width:100%;border:1px solid #d8d3cc;border-radius:11px;padding:11px 12px;background:white;color:var(--text)}
+input:focus,select:focus{outline:2px solid #cfe4ed;border-color:#9fc7d7}
+.viewer-shell{display:grid;gap:14px}
+.viewer-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.viewer-head h1{margin:0;font-size:25px;letter-spacing:-.025em}
+.viewer-frame{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#0b0b0b;box-shadow:var(--shadow)}
+.viewer-frame iframe{display:block;width:100%;height:calc(100vh - 132px);min-height:680px;border:0;background:#0b0b0b}
+body.viewer-wide .client-main{max-width:none;padding-right:18px}
+body.viewer-wide .viewer-shell{width:100%}
+body.viewer-wide .viewer-frame iframe{height:calc(100vh - 126px);min-height:720px}
+@media (min-width:761px){
+  body:has(.client-rail:hover) .client-topbar,body:has(.client-rail:focus-within) .client-topbar{margin-left:var(--rail-expanded)}
+  body:has(.client-rail:hover) .client-main,body:has(.client-rail:focus-within) .client-main{padding-left:calc(24px + var(--rail-expanded));max-width:calc(var(--content) + var(--rail-expanded))}
+}
+@media(max-width:1040px){.client-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.feature-row{grid-template-columns:1fr}}
+@media(max-width:760px){
+  .client-rail{display:none}.client-topbar{margin-left:0;padding:0 16px;grid-template-columns:1fr auto 1fr}.mobile-nav-button{display:block;justify-self:start;border:1px solid var(--line);background:var(--surface);border-radius:10px;width:38px;height:38px}
+  .mobile-nav{position:fixed;z-index:70;left:12px;right:12px;top:64px;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);display:grid;gap:4px}
+  .mobile-nav[hidden]{display:none}.mobile-nav a{padding:11px 12px;border-radius:10px}.mobile-nav a.active,.mobile-nav a:hover{background:var(--surface-2)}
+  .client-main{padding:26px 16px 72px}.page-head{align-items:start;flex-direction:column}.page-head h1{font-size:29px}.client-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px}
+  .viewer-frame iframe{height:calc(100vh - 130px);min-height:520px}
+}
+@media(max-width:480px){.client-grid{grid-template-columns:1fr}.top-brand{font-size:13px}}
+
+
+.custom-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.8fr);gap:22px;align-items:start}
+.custom-main{display:grid;gap:16px}.search-box{display:flex;gap:10px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.search-box input{flex:1}.selection-panel{position:sticky;top:78px;padding:18px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow)}
+.selection-panel h2{margin:5px 0 14px;font-size:20px}.selected-list{display:grid;gap:8px;max-height:360px;overflow:auto;padding-right:2px}
+.selected-item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.selected-index{width:26px;height:26px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)}
+.selected-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.item-actions{display:flex;gap:5px}.item-actions button{border:0;background:var(--surface-2);color:var(--text);border-radius:8px;padding:6px 8px;cursor:pointer}
+.empty-selection{padding:22px 8px;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--line);border-radius:12px}
+.custom-settings{display:grid;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.controls{display:grid;gap:10px}label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#5e5a54}
+.start-row{display:flex;justify-content:stretch;margin-top:16px}.start-row .primary-action{width:100%}
+.builder-note{padding:14px 16px;border-radius:14px;background:#eef6f8;color:#4f6f7b;font-size:12px;line-height:1.6}
+@media(max-width:900px){.custom-layout{grid-template-columns:1fr}.selection-panel{position:static}.search-box{display:grid;grid-template-columns:1fr}}
+</style></head><body class=""><aside class="client-rail" aria-label="主要功能"><a class="rail-brand" href="../" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">Holo Viewer</span></a><nav class="rail-nav"><a class="" href="../"><span class="rail-icon">今</span><span class="rail-label">今日</span></a><a class="" href="../watchalong/"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a><a class="active" href="../custom-view/"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a><a class="" href="../ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a></nav></aside><header class="client-topbar"><button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav">☰</button><a class="top-brand" href="../">Holo Viewer</a><div class="top-status">PAGES POC · STATIC</div></header><div id="mobileNav" class="mobile-nav" hidden><a class="" href="../">今日</a><a class="" href="../watchalong/">同時視聽</a><a class="active" href="../custom-view/">自訂觀看</a><a class="" href="../ptt-today/">PTT 今日專串</a></div><main class="client-main">
+<div class="page-head"><div><h1>自訂觀看</h1><p>自己挑任意直播組合，再交給系統排版。</p></div></div>
+<div class="custom-layout">
+  <section class="custom-main">
+    <div class="search-box">
+      <input id="url" aria-label="YouTube URL 或 Video ID" placeholder="貼上 YouTube URL 或 Video ID">
+      <button id="add" class="subtle-action" type="button">加入網址</button>
+    </div>
+    
+    <div class="builder-note">目前第一版先從網址加入；之後可接今日直播搜尋與「加入自訂觀看」。跨日期組合不會猜測共用 PTT。</div>
+    <div class="surface" style="padding:20px">
+      <span class="eyebrow">選擇來源</span>
+      <h2 style="margin:7px 0 6px;font-size:21px">自由加入任意直播或 VOD</h2>
+      <p class="empty-note" style="margin:0">加入後會固定在右側觀看清單，可重新排序或移除。</p>
+    </div>
+  </section>
+  <aside class="selection-panel">
+    <span class="eyebrow">觀看清單</span>
+    <h2>已選 <span id="selectedCount">0</span> 個直播</h2>
+    <div id="list" class="selected-list"><div class="empty-selection">還沒有選擇直播。</div></div>
+    <div class="custom-settings">
+      <div class="controls">
+        <label>版面
+          <select id="layout"><option value="auto">自動</option><option value="equal">平均排列</option><option value="primary">主視角</option></select>
+        </label>
+        <label>主要畫面<select id="primary"></select></label>
+        <label>主要聲音<select id="audio"></select></label>
+      </div>
+    </div>
+    <div class="start-row"><button id="start" class="primary-action" type="button">開始觀看</button></div>
+  </aside>
+</div>
+</main><script>
+const mobileNavButton=document.getElementById('mobileNavButton');
+const mobileNav=document.getElementById('mobileNav');
+if(mobileNavButton&&mobileNav){
+  mobileNavButton.addEventListener('click',()=>{
+    const opening=mobileNav.hidden;
+    mobileNav.hidden=!opening;
+    mobileNavButton.setAttribute('aria-expanded',String(opening));
+  });
+  mobileNav.addEventListener('click',()=>{
+    mobileNav.hidden=true;
+    mobileNavButton.setAttribute('aria-expanded','false');
+  });
+}
+
+
+const items=[];const list=document.getElementById('list');const input=document.getElementById('url');
+const primary=document.getElementById('primary'),audio=document.getElementById('audio'),count=document.getElementById('selectedCount');
+function render(){
+  list.replaceChildren();count.textContent=String(items.length);
+  if(!items.length){
+    const e=document.createElement('div');e.className='empty-selection';e.textContent='還沒有選擇直播。';list.appendChild(e);
+  }
+  items.forEach((value,index)=>{
+    const row=document.createElement('div');row.className='selected-item';
+    const num=document.createElement('span');num.className='selected-index';num.textContent=String(index+1);
+    const text=document.createElement('div');text.className='selected-name';text.textContent=value;
+    const actions=document.createElement('div');actions.className='item-actions';
+    [['↑',-1],['↓',1]].forEach(([label,delta])=>{
+      const b=document.createElement('button');b.type='button';b.textContent=label;b.title=delta<0?'往前':'往後';
+      b.onclick=()=>{const j=index+delta;if(j<0||j>=items.length)return;[items[index],items[j]]=[items[j],items[index]];render();};actions.appendChild(b);
+    });
+    const rm=document.createElement('button');rm.type='button';rm.textContent='×';rm.title='移除';rm.onclick=()=>{items.splice(index,1);render();};actions.appendChild(rm);
+    row.append(num,text,actions);list.appendChild(row);
+  });
+  [primary,audio].forEach(select=>{
+    const old=Number(select.value||0);select.replaceChildren();
+    items.forEach((value,index)=>{const o=document.createElement('option');o.value=String(index);o.textContent=(index+1)+' · '+value;select.appendChild(o);});
+    select.disabled=!items.length;if(items.length)select.value=String(Math.min(old,items.length-1));
+  });
+}
+document.getElementById('add').onclick=()=>{
+  const value=input.value.trim();if(!value)return;items.push(value);input.value='';render();input.focus();
+};
+input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();document.getElementById('add').click();}});
+document.getElementById('start').onclick=()=>{
+  if(!items.length){alert('請先加入至少一個影片。');return;}
+  const q=new URLSearchParams();items.forEach(v=>q.append('stream',v));
+  q.set('layout',document.getElementById('layout').value);q.set('primary',primary.value||'0');q.set('audio',audio.value||'0');
+  location.href='./session/?'+q.toString();
+};
+render();
+</script></body></html>
