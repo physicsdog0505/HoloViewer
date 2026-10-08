@@ -221,40 +221,26 @@ const liveSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.me
 const livePoll = liveSource.slice(liveSource.indexOf("async function pollRelay("), liveSource.indexOf("async function startPtt("));
 assert.ok(livePoll.includes("if (pendingPushes.size || historyGap) onUpdate("));
 
-// Reader parity: speed control is locally bounded and cannot overwrite live data.
+// Authoritative reader parity: baseline rows are immediately visible, new relay
+// rows enter a reveal queue, and visual speed never scrolls through old history.
 const readerSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 const readerBody = readerSource.slice(readerSource.indexOf("async function startPtt("), readerSource.indexOf("async function startCustomView("));
-assert.ok(readerBody.includes('["0", "停止"]'));
-for (const seconds of ["5", "3", "1"]) assert.ok(readerBody.includes('["' + seconds + '",'));
-assert.ok(readerBody.includes('speedSelect.addEventListener("change", () => {'));
-assert.ok(readerBody.includes('speedSelect.value = "0";\n      stopReading();'));
-assert.ok(readerBody.includes("const shouldFollow = followInput.checked && !userPausedFollow && nearBottom && readingTimer === null"));
+assert.ok(readerBody.includes('["0.5", "普通（0.5 秒）"]'));
+assert.ok(readerBody.includes('["0.2", "快（0.2 秒）"]'));
+assert.ok(readerBody.includes('["1", "慢（1 秒）"]'));
+assert.ok(readerBody.includes("visibleIds = new Set(article.pushes.map((push) => push.pushId))"));
+assert.ok(readerBody.includes("for (const push of newPushes) pending.push(push.pushId)"));
+assert.ok(readerBody.includes('revealTimer = setTimeout(revealNext, Number(speedSelect.value) * 1000)'));
+assert.ok(readerBody.includes("const id = pending.shift()"));
+assert.ok(readerBody.includes("if (row) row.hidden = false"));
+assert.ok(readerBody.includes("flushPending();"));
+assert.ok(readerBody.includes("userPausedFollow = false;"));
 assert.ok(readerBody.includes('window.addEventListener("wheel", pauseOnManualNavigation'));
 assert.ok(readerBody.includes('window.addEventListener("touchmove", pauseOnManualNavigation'));
-assert.ok(readerBody.includes('speedSelect.value = "0";\n        stopReading();'));
-assert.ok(readerBody.includes("userPausedFollow = false;\n      goLatest();"));
+assert.ok(readerBody.includes("sessionStorage.setItem(checkpointKey, pushId)"));
+assert.ok(!readerBody.includes("next.scrollIntoView"), "old-message scroll timer must not return");
 assert.ok(readerBody.includes('window.scrollTo({ top: previousScroll, behavior: "instant" })'));
-assert.ok(readerBody.includes('if (sequence !== activeArticle) return'));
-
-// Behavioral complexity guard: long articles must not linearly scan every row
-// at each automatic-reading tick. Execute the actual reader search snippet.
-{
-  const from = readerSource.indexOf("        const rows = list.children;");
-  const to = readerSource.indexOf("        if (!next) {", from);
-  assert.ok(from >= 0 && to > from);
-  const snippet = readerSource.slice(from, to);
-  const rowCount = 2623;
-  let geometryReads = 0;
-  const rows = Array.from({length:rowCount}, (_,i) => ({
-    getBoundingClientRect() { geometryReads++; return {top: i * 24 - 800}; },
-  }));
-  const list = {children:rows};
-  const viewport = {scrollY:800};
-  const selectNext = new Function("list", "window", snippet + "return next;");
-  const next = selectNext(list, viewport);
-  assert.equal(next, rows[38], "reader advances from first row below scroll threshold");
-  assert.ok(geometryReads <= 13, "2,623-row reader lookup must use logarithmic geometry reads");
-}
+assert.ok(readerBody.includes("if (sequence !== activeArticle) return"));
 
 console.log("cloud-client contract tests: pass");
 
