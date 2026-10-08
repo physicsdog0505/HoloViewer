@@ -33,3 +33,23 @@ Status owner: active integration/audit agent (NOT a chat-specific narrative)
 - Do not paste entire chat histories, invent statuses, or replace current source/runtime truth. If disputed, mark **CONFLICT / UNVERIFIED** rather than silently overwriting.
 - This index is global; individual work belongs in task handoffs using [HANDOFF_TEMPLATE](HANDOFF_TEMPLATE.md).
 - Before next work, read docs and CURRENT GitHub state; if status here differs, record discrepancy and stop unsafe progression.
+
+## 2026-10-09 recovery triage checkpoint (evidence from current GitHub open-PR search)
+**Purpose:** sort existing work, not initiate another implementation stream. No PR was merged, closed, retargeted, or deployed during this checkpoint.
+
+**Current recommended execution sequence (not an authorization to execute while frozen):**
+1. Keep Collector + accepted local 8501 function/4174 UI intact. Preserve D1/Worker evidence and leave Publisher OFF. Investigate cost root cause before any live writer restart.
+2. Determine current exact SHA and deployment status of the public GitHub Pages site; identify the smallest existing public Pages Client branch that can preserve 4174 visuals and 8501 functions, rather than reimplementing them.
+3. Reconcile the current PUBLIC PR stack: #8 Pages PoC (explicit DO NOT MERGE), #10 read-only Pages client, #12 canonical relay, #13-15 hardening, #16 integration, #17 parity-document contract and #18 behavior-changing reader. No blind sequential merge: these are stacked/overlapping alternatives and need a single verified integration decision.
+4. Reconcile the current PRIVATE relay/snapshot stack: #311 canonical identity → #313 publisher and #312 projection → #315 snapshot, #318/#319 hardening, #321/#322 fixes, #324 integration. These are not independent merge-ready units. D1 incident safety first.
+5. Other old private stacked ASR, historical backfill and client rendering PR families are **PARKED**, not failed and not deleted, until scoped against accepted 8501/4174 runtime. No parallel feature streams during recovery.
+
+**Explicit HOLD labels (comments, not status mutation):**
+- PUBLIC #6 and #7: obsolete Streamlit-preview lineage since user deleted hosted Streamlit app; no new Streamlit deployment.
+- PUBLIC #18: proposed reader timing/interaction changed; may conflict with 8501. STOP until actual functionality is compared.
+- PRIVATE #289: alternate full-VOD/progressive subtitles behavior; requires 8501 function and 4174 UI check.
+- PRIVATE #325: governance expansion beyond existing guidelines; do not merge during cleanup.
+
+**Known unknowns / blockers:** exact actual running 8501/4174 commits; exact GitHub Pages deployed SHA and functional acceptance; deployed Cloudflare Worker artifact; query-level D1 metered write attribution; current Mac process presence; complete individual PR diff/CI audit. No workflow document can substitute for these checks.
+
+**Next receiving agent must do:** read root guideline + AGENTS + this status index; refresh current GitHub SHA and open PRs; choose ONE bounded read-only reconciliation step. Never confuse HOLD comments with technical enforcement. User requested visible, tidy handoff and ability to resume product development; do not create new feature Issues/PRs until risk and baseline alignment are demonstrated.
