@@ -1,4 +1,10 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>今日直播 · HoloViewer Pages PoC</title><style>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>今日直播 · Hololive PTT Viewer</title>
+<style>
 :root{
   color-scheme:light;
   --bg:#f7f5f2;--surface:#fffdfa;--surface-2:#f1efeb;--text:#242321;--muted:#77736c;
@@ -151,19 +157,133 @@ body.home-wide .client-main{max-width:1580px}
 .highlight-copy h3{margin:0 0 10px;font-size:24px;line-height:1.35;letter-spacing:-.02em}.highlight-copy p{margin:0;color:var(--muted);font-size:13px}.highlight-copy .highlight-channel{color:var(--member-accent,var(--muted));font-weight:750}
 .highlight-cta{margin-top:22px;font-size:13px;font-weight:800}
 @media(max-width:760px){.home-highlight{grid-template-columns:1fr}.highlight-thumb{min-height:0;aspect-ratio:16/9}.highlight-copy{padding:18px}.highlight-copy h3{font-size:19px}}
-</style></head><body class="home-wide"><aside class="client-rail" aria-label="主要功能"><a class="rail-brand" href="./" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">Holo Viewer</span></a><nav class="rail-nav"><a class="active" href="./"><span class="rail-icon">今</span><span class="rail-label">今日</span></a><a class="" href="./watchalong/"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a><a class="" href="./custom-view/"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a><a class="" href="./ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a></nav></aside><header class="client-topbar"><button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav">☰</button><a class="top-brand" href="./">Holo Viewer</a><div class="top-status">PAGES POC · STATIC</div></header><div id="mobileNav" class="mobile-nav" hidden><a class="active" href="./">今日</a><a class="" href="./watchalong/">同時視聽</a><a class="" href="./custom-view/">自訂觀看</a><a class="" href="./ptt-today/">PTT 今日專串</a></div><main class="client-main"><div class="page-head"><div><h1>今日直播</h1><p>STATIC POC · 與 4174 比較樣式，不含真實資料</p></div></div><div class="stream-filter" role="group" aria-label="直播群組"><button class="stream-filter-button active" data-filter="hololive">Hololive</button><button class="stream-filter-button" data-filter="holostars">HOLOSTARS</button><button class="stream-filter-button" data-filter="mekpark">mekPark</button><button class="stream-filter-button" data-filter="all">全部</button></div><aside class="live-channel-rail" aria-label="目前直播頻道"><a href="#stream-fixture-1" class="live-channel-rail-item"><span class="live-channel-avatar"><span>D</span><i></i></span><strong>Demo Channel 1</strong></a><a href="#stream-fixture-2" class="live-channel-rail-item"><span class="live-channel-avatar"><span>D</span><i></i></span><strong>Demo Channel 2</strong></a><a href="#stream-fixture-3" class="live-channel-rail-item"><span class="live-channel-avatar"><span>D</span><i></i></span><strong>Demo Channel 3</strong></a><a href="#stream-fixture-4" class="live-channel-rail-item"><span class="live-channel-avatar"><span>D</span><i></i></span><strong>Demo Channel 4</strong></a></aside><section class="section"><div class="section-head"><div><h2>現在直播中</h2><p>靜態測試資料，不代表實際直播狀態</p></div></div><div class="client-grid"><a id="stream-fixture-1" class="client-card stream-card" data-group="hololive" href="./custom-view/?stream=fixture-1"><div class="card-thumb"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 360%22%3E%3Crect width=%22640%22 height=%22360%22 fill=%22%23e6e1da%22/%3E%3Ctext x=%22320%22 y=%22180%22 text-anchor=%22middle%22 font-size=%2224%22 fill=%22%2377736c%22%3EFIXTURE%3C/text%3E%3C/svg%3E" alt=""><div class="thumb-overlay"><span class="thumb-badge live">LIVE</span><span class="thumb-time">18:00</span></div></div><div class="yt-meta"><span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span><div class="yt-copy"><h3 class="stream-title">UI 測試直播 #1｜僅供版面展示</h3><div class="channel-name">Demo Channel 1</div></div></div></a><a id="stream-fixture-2" class="client-card stream-card" data-group="hololive" href="./custom-view/?stream=fixture-2"><div class="card-thumb"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 360%22%3E%3Crect width=%22640%22 height=%22360%22 fill=%22%23e6e1da%22/%3E%3Ctext x=%22320%22 y=%22180%22 text-anchor=%22middle%22 font-size=%2224%22 fill=%22%2377736c%22%3EFIXTURE%3C/text%3E%3C/svg%3E" alt=""><div class="thumb-overlay"><span class="thumb-badge live">LIVE</span><span class="thumb-time">18:00</span></div></div><div class="yt-meta"><span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span><div class="yt-copy"><h3 class="stream-title">UI 測試直播 #2｜僅供版面展示</h3><div class="channel-name">Demo Channel 2</div></div></div></a><a id="stream-fixture-3" class="client-card stream-card" data-group="hololive" href="./custom-view/?stream=fixture-3"><div class="card-thumb"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 360%22%3E%3Crect width=%22640%22 height=%22360%22 fill=%22%23e6e1da%22/%3E%3Ctext x=%22320%22 y=%22180%22 text-anchor=%22middle%22 font-size=%2224%22 fill=%22%2377736c%22%3EFIXTURE%3C/text%3E%3C/svg%3E" alt=""><div class="thumb-overlay"><span class="thumb-badge live">LIVE</span><span class="thumb-time">18:00</span></div></div><div class="yt-meta"><span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span><div class="yt-copy"><h3 class="stream-title">UI 測試直播 #3｜僅供版面展示</h3><div class="channel-name">Demo Channel 3</div></div></div></a><a id="stream-fixture-4" class="client-card stream-card" data-group="holostars" href="./custom-view/?stream=fixture-4"><div class="card-thumb"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 360%22%3E%3Crect width=%22640%22 height=%22360%22 fill=%22%23e6e1da%22/%3E%3Ctext x=%22320%22 y=%22180%22 text-anchor=%22middle%22 font-size=%2224%22 fill=%22%2377736c%22%3EFIXTURE%3C/text%3E%3C/svg%3E" alt=""><div class="thumb-overlay"><span class="thumb-badge live">LIVE</span><span class="thumb-time">18:00</span></div></div><div class="yt-meta"><span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span><div class="yt-copy"><h3 class="stream-title">UI 測試直播 #4｜僅供版面展示</h3><div class="channel-name">Demo Channel 4</div></div></div></a></div></section><section class="section"><div class="section-head"><div><h2>即將開始</h2><p>靜態測試資料，不代表實際直播狀態</p></div></div><div class="client-grid"><a id="stream-fixture-5" class="client-card stream-card" data-group="hololive" href="./custom-view/?stream=fixture-5"><div class="card-thumb"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 360%22%3E%3Crect width=%22640%22 height=%22360%22 fill=%22%23e6e1da%22/%3E%3Ctext x=%22320%22 y=%22180%22 text-anchor=%22middle%22 font-size=%2224%22 fill=%22%2377736c%22%3EFIXTURE%3C/text%3E%3C/svg%3E" alt=""><div class="thumb-overlay"><span class="thumb-badge ">即將開始</span><span class="thumb-time">18:00</span></div></div><div class="yt-meta"><span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span><div class="yt-copy"><h3 class="stream-title">UI 測試直播 #5｜僅供版面展示</h3><div class="channel-name">Demo Channel 5</div></div></div></a><a id="stream-fixture-6" class="client-card stream-card" data-group="mekpark" href="./custom-view/?stream=fixture-6"><div class="card-thumb"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 360%22%3E%3Crect width=%22640%22 height=%22360%22 fill=%22%23e6e1da%22/%3E%3Ctext x=%22320%22 y=%22180%22 text-anchor=%22middle%22 font-size=%2224%22 fill=%22%2377736c%22%3EFIXTURE%3C/text%3E%3C/svg%3E" alt=""><div class="thumb-overlay"><span class="thumb-badge ">即將開始</span><span class="thumb-time">18:00</span></div></div><div class="yt-meta"><span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span><div class="yt-copy"><h3 class="stream-title">UI 測試直播 #6｜僅供版面展示</h3><div class="channel-name">Demo Channel 6</div></div></div></a></div></section><section class="section"><div class="section-head"><div><h2>已結束</h2><p>靜態測試資料，不代表實際直播狀態</p></div></div><div class="client-grid"><a id="stream-fixture-7" class="client-card stream-card" data-group="hololive" href="./custom-view/?stream=fixture-7"><div class="card-thumb"><img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 640 360%22%3E%3Crect width=%22640%22 height=%22360%22 fill=%22%23e6e1da%22/%3E%3Ctext x=%22320%22 y=%22180%22 text-anchor=%22middle%22 font-size=%2224%22 fill=%22%2377736c%22%3EFIXTURE%3C/text%3E%3C/svg%3E" alt=""><div class="thumb-overlay"><span class="thumb-badge ">已結束</span><span class="thumb-time">18:00</span></div></div><div class="yt-meta"><span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span><div class="yt-copy"><h3 class="stream-title">UI 測試直播 #7｜僅供版面展示</h3><div class="channel-name">Demo Channel 7</div></div></div></a></div></section><section class="section"><div class="section-head"><div><h2>觀看方式</h2></div></div><div class="feature-row"><a class="feature-card" href="./watchalong/"><div><span class="eyebrow">WATCHALONG</span><strong>同時視聽</strong></div><span>PoC 僅驗證路由</span></a><a class="feature-card" href="./custom-view/"><div><span class="eyebrow">CUSTOM</span><strong>自訂觀看</strong></div><span>單一 YouTube 播放流程</span></a><a class="feature-card" href="./ptt-today/"><div><span class="eyebrow">PTT</span><strong>PTT 今日專串</strong></div><span>PoC 僅驗證路由</span></a></div></section></main><script>
-const mobileNavButton=document.getElementById('mobileNavButton');
-const mobileNav=document.getElementById('mobileNav');
-if(mobileNavButton&&mobileNav){
-  mobileNavButton.addEventListener('click',()=>{
-    const opening=mobileNav.hidden;
-    mobileNav.hidden=!opening;
-    mobileNavButton.setAttribute('aria-expanded',String(opening));
-  });
-  mobileNav.addEventListener('click',()=>{
-    mobileNav.hidden=true;
-    mobileNavButton.setAttribute('aria-expanded','false');
-  });
-}
+</style>
+</head>
+<body class="home-wide">
+<aside class="client-rail" aria-label="主要功能">
+  <a class="rail-brand" href="#" aria-label="Holo Viewer 首頁"><span class="rail-icon">H</span><span class="rail-label">Holo Viewer</span></a>
+  <nav class="rail-nav"><a class="active" href="#"><span class="rail-icon">今</span><span class="rail-label">今日</span></a><a class="" href="#"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a><a class="" href="#"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a><a class="" href="#"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a></nav>
+</aside>
+<header class="client-topbar">
+  <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav">☰</button>
+  <a class="top-brand" href="#">Holo Viewer</a>
+  <div class="top-status">2026/10/08 · OFFLINE UI FIXTURE</div>
+</header>
+<div id="mobileNav" class="mobile-nav" hidden><a class="active" href="#">今日</a><a class="" href="#">同時視聽</a><a class="" href="#">自訂觀看</a><a class="" href="#">PTT 今日專串</a></div>
+<main class="client-main"><div role="note" style="padding:12px 18px;background:#fff5d9;color:#594b1c;font-size:13px">OFFLINE UI FIXTURE — genuine Client renderer, test data only; navigation, polling and playback disabled.</div><div id="homeDynamic">
+<div class="page-head">
+  <div><h1>今日直播</h1><p>2026/10/08 · OFFLINE UI FIXTURE</p></div>
+</div>
+<div class="stream-filter" role="group" aria-label="直播群組">
+  <button class="stream-filter-button active" type="button" data-filter="hololive">Hololive</button>
+  <button class="stream-filter-button" type="button" data-filter="holostars">HOLOSTARS</button>
+  <button class="stream-filter-button" type="button" data-filter="mekpark">mekPark</button>
+  <button class="stream-filter-button" type="button" data-filter="all">全部</button>
+</div>
+<aside class="live-channel-rail" aria-label="目前直播頻道"><span class="live-channel-label">直播頻道</span><a class="live-channel-rail-item" data-group="hololive" href="#stream-test0000001"><span class="live-channel-avatar"><span aria-hidden="true">D</span><i></i></span><strong>Demo Channel 1</strong></a><a class="live-channel-rail-item" data-group="hololive" href="#stream-test0000002"><span class="live-channel-avatar"><span aria-hidden="true">D</span><i></i></span><strong>Demo Channel 2</strong></a><a class="live-channel-rail-item" data-group="hololive" href="#stream-test0000003"><span class="live-channel-avatar"><span aria-hidden="true">D</span><i></i></span><strong>Demo Channel 3</strong></a><a class="live-channel-rail-item" data-group="holostars" href="#stream-test0000004"><span class="live-channel-avatar"><span aria-hidden="true">D</span><i></i></span><strong>Demo Channel 4</strong></a></aside>
+<section class="section"><div class="section-head"><div><h2>現在直播中</h2><p>目前可直接觀看的直播。</p></div></div><div class="client-grid"><a id="stream-test0000001" class="client-card stream-card" data-group="hololive" href="#">
+<div class="card-thumb">
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e6e1da'/%3E%3Ctext x='320' y='180' text-anchor='middle' fill='%2377736c' font-size='26'%3EFIXTURE%3C/text%3E%3C/svg%3E" alt="" loading="lazy">
+  <div class="thumb-overlay"><span class="thumb-badge live">LIVE</span><span class="thumb-time">18:00</span></div>
+</div>
+<div class="yt-meta">
+  <span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span>
+  <div class="yt-copy">
+    <h3 class="stream-title">UI 測試直播 #1｜僅供版面展示</h3>
+    <div class="channel-name">Demo Channel 1</div>
+  </div>
+</div></a><a id="stream-test0000002" class="client-card stream-card" data-group="hololive" href="#">
+<div class="card-thumb">
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e6e1da'/%3E%3Ctext x='320' y='180' text-anchor='middle' fill='%2377736c' font-size='26'%3EFIXTURE%3C/text%3E%3C/svg%3E" alt="" loading="lazy">
+  <div class="thumb-overlay"><span class="thumb-badge live">LIVE</span><span class="thumb-time">18:00</span></div>
+</div>
+<div class="yt-meta">
+  <span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span>
+  <div class="yt-copy">
+    <h3 class="stream-title">UI 測試直播 #2｜僅供版面展示</h3>
+    <div class="channel-name">Demo Channel 2</div>
+  </div>
+</div></a><a id="stream-test0000003" class="client-card stream-card" data-group="hololive" href="#">
+<div class="card-thumb">
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e6e1da'/%3E%3Ctext x='320' y='180' text-anchor='middle' fill='%2377736c' font-size='26'%3EFIXTURE%3C/text%3E%3C/svg%3E" alt="" loading="lazy">
+  <div class="thumb-overlay"><span class="thumb-badge live">LIVE</span><span class="thumb-time">18:00</span></div>
+</div>
+<div class="yt-meta">
+  <span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span>
+  <div class="yt-copy">
+    <h3 class="stream-title">UI 測試直播 #3｜僅供版面展示</h3>
+    <div class="channel-name">Demo Channel 3</div>
+  </div>
+</div></a><a id="stream-test0000004" class="client-card stream-card" data-group="holostars" href="#">
+<div class="card-thumb">
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e6e1da'/%3E%3Ctext x='320' y='180' text-anchor='middle' fill='%2377736c' font-size='26'%3EFIXTURE%3C/text%3E%3C/svg%3E" alt="" loading="lazy">
+  <div class="thumb-overlay"><span class="thumb-badge live">LIVE</span><span class="thumb-time">18:00</span></div>
+</div>
+<div class="yt-meta">
+  <span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span>
+  <div class="yt-copy">
+    <h3 class="stream-title">UI 測試直播 #4｜僅供版面展示</h3>
+    <div class="channel-name">Demo Channel 4</div>
+  </div>
+</div></a></div></section>
+<section class="section"><div class="section-head"><div><h2>即將開始</h2><p>已排程、尚未開始的直播。</p></div></div><div class="client-grid"><a id="stream-test0000005" class="client-card stream-card" data-group="hololive" href="#">
+<div class="card-thumb">
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e6e1da'/%3E%3Ctext x='320' y='180' text-anchor='middle' fill='%2377736c' font-size='26'%3EFIXTURE%3C/text%3E%3C/svg%3E" alt="" loading="lazy">
+  <div class="thumb-overlay"><span class="thumb-badge upcoming">即將開始</span><span class="thumb-time">18:00</span></div>
+</div>
+<div class="yt-meta">
+  <span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span>
+  <div class="yt-copy">
+    <h3 class="stream-title">UI 測試直播 #5｜僅供版面展示</h3>
+    <div class="channel-name">Demo Channel 5</div>
+  </div>
+</div></a><a id="stream-test0000006" class="client-card stream-card" data-group="mekpark" href="#">
+<div class="card-thumb">
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e6e1da'/%3E%3Ctext x='320' y='180' text-anchor='middle' fill='%2377736c' font-size='26'%3EFIXTURE%3C/text%3E%3C/svg%3E" alt="" loading="lazy">
+  <div class="thumb-overlay"><span class="thumb-badge upcoming">即將開始</span><span class="thumb-time">18:00</span></div>
+</div>
+<div class="yt-meta">
+  <span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span>
+  <div class="yt-copy">
+    <h3 class="stream-title">UI 測試直播 #6｜僅供版面展示</h3>
+    <div class="channel-name">Demo Channel 6</div>
+  </div>
+</div></a></div></section>
+<section class="section"><div class="section-head"><div><h2>狀態待更新</h2><p>已找到直播，但目前沒有足夠新的 lifecycle 證據。</p></div></div><div class="client-grid"><a id="stream-test0000008" class="client-card stream-card" data-group="hololive" href="#">
+<div class="card-thumb">
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e6e1da'/%3E%3Ctext x='320' y='180' text-anchor='middle' fill='%2377736c' font-size='26'%3EFIXTURE%3C/text%3E%3C/svg%3E" alt="" loading="lazy">
+  <div class="thumb-overlay"><span class="thumb-badge ">狀態待更新</span><span class="thumb-time">18:00</span></div>
+</div>
+<div class="yt-meta">
+  <span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span>
+  <div class="yt-copy">
+    <h3 class="stream-title">UI 測試直播 #8｜僅供版面展示</h3>
+    <div class="channel-name">Demo Channel 8</div>
+  </div>
+</div></a></div></section>
 
-document.querySelectorAll('.stream-filter-button').forEach(button=>button.addEventListener('click',()=>{const group=button.dataset.filter;document.querySelectorAll('.stream-filter-button').forEach(b=>b.classList.toggle('active',b===button));document.querySelectorAll('.stream-card').forEach(c=>{c.hidden=group!=='all'&&c.dataset.group!==group;});}));</script></body></html>
+<section class="section">
+  <div class="section-head"><div><h2>觀看方式</h2></div></div>
+  <div class="feature-row">
+    <a class="feature-card" href="#"><div><span class="eyebrow">WATCHALONG</span><strong>同時視聽</strong></div><span>Hololive 保持主時間軸，片源跟隨觀看。</span></a>
+    <a class="feature-card" href="#"><div><span class="eyebrow">CUSTOM</span><strong>自訂觀看</strong></div><span>自由加入直播、排列畫面並指定主要聲音。</span></a>
+    <a class="feature-card" href="#"><div><span class="eyebrow">PTT</span><strong>PTT 今日專串</strong></div><span>只留下今天的 PTT 推文時間軸。</span></a>
+  </div>
+</section>
+<section class="section"><div class="section-head"><div><h2>已結束</h2><p>今天已完成的直播存檔。</p></div></div><div class="client-grid"><a id="stream-test0000007" class="client-card stream-card" data-group="hololive" href="#">
+<div class="card-thumb">
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23e6e1da'/%3E%3Ctext x='320' y='180' text-anchor='middle' fill='%2377736c' font-size='26'%3EFIXTURE%3C/text%3E%3C/svg%3E" alt="" loading="lazy">
+  <div class="thumb-overlay"><span class="thumb-badge ended">已結束</span><span class="thumb-time">18:00</span></div>
+</div>
+<div class="yt-meta">
+  <span class="channel-avatar-ring"><span class="channel-avatar-fallback" aria-hidden="true">D</span></span>
+  <div class="yt-copy">
+    <h3 class="stream-title">UI 測試直播 #7｜僅供版面展示</h3>
+    <div class="channel-name">Demo Channel 7</div>
+  </div>
+</div></a></div></section>
+
+</div></main>
+
+</body>
+</html>
