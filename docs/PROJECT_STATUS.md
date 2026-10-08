@@ -93,3 +93,9 @@ Read-only GitHub source comparison:
 - Prior check: public PR #12 Worker still executes `INSERT OR IGNORE` per push and watermark+DELETE on each POST. No evidence of deployed Worker revision parity.
 
 **Keep P0 HOLD: source-integrated regression, potential cost incident recurrence.** This is an audit observation, not authorization for implementation/deployment.
+
+## D1 P0 test-model blind spot — 2026-10-09 source check
+
+Public PR #12 `test_relay_worker.mjs` uses `FakeDB` where duplicate `INSERT OR IGNORE` returns `{meta:{changes:0}}` *before* incrementing `this.db.cursor`. Real SQLite `INTEGER PRIMARY KEY AUTOINCREMENT` may advance its sequence on failed unique inserts. Therefore tests asserting `accepted=0` and `rows.length` unchanged **do not reproduce the observed ~174020 cursor vs 601 surviving rows or measure provider-billed writes**.
+Worker triggers watermark UPSERT and DELETE on every POST and bases retention on max cursor; current fake retention tests use dense sequential cursors, not duplicate-induced gaps.
+Needed before approved restart: focused offline SQLite (actual engine) reproduction of failed-insert cursor gaps and retention behavior, plus separately Cloudflare D1 query-level billed-write attribution, and effective deployed Worker SHA. No production D1 tests/commands done here.
