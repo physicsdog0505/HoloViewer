@@ -139,22 +139,32 @@ async function read(request, env) {
   const aid = url.searchParams.get("aid") || "";
   const after = Number(url.searchParams.get("after_cursor") || 0);
   const requestedLimit = Number(url.searchParams.get("limit") || 200);
+  const tailRaw = url.searchParams.get("tail");
+  const tail = tailRaw === "1";
   if (!AID.test(aid)) throw new RelayError("invalid aid");
   if (!Number.isSafeInteger(after) || after < 0) throw new RelayError("invalid after_cursor");
   if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1) throw new RelayError("invalid limit");
+  if (tailRaw !== null && tailRaw !== "0" && tailRaw !== "1") throw new RelayError("invalid tail");
+  if (tail && after !== 0) throw new RelayError("tail bootstrap requires after_cursor=0");
   const limit = Math.min(requestedLimit, MAX_READ_PUSHES);
   const watermark = await env.DB.prepare(
     "SELECT purged_through_cursor FROM ptt_retention_watermark WHERE aid = ?"
   ).bind(aid).first();
   const purgedThrough = Number(watermark?.purged_through_cursor || 0);
   const historyGap = after < purgedThrough;
-  const result = await env.DB.prepare(
-    `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
-     FROM ptt_pushes WHERE aid = ? AND cursor > ? ORDER BY cursor ASC LIMIT ?`
-  ).bind(aid, after, limit + 1).all();
+  const result = tail
+    ? await env.DB.prepare(
+      `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
+       FROM ptt_pushes WHERE aid = ? ORDER BY cursor DESC LIMIT ?`
+    ).bind(aid, limit).all()
+    : await env.DB.prepare(
+      `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
+       FROM ptt_pushes WHERE aid = ? AND cursor > ? ORDER BY cursor ASC LIMIT ?`
+    ).bind(aid, after, limit + 1).all();
   const rows = Array.isArray(result?.results) ? result.results : [];
-  const hasMore = rows.length > limit;
-  const visible = rows.slice(0, limit).map((row) => ({
+  const orderedRows = tail ? [...rows].reverse() : rows;
+  const hasMore = tail ? false : orderedRows.length > limit;
+  const visible = orderedRows.slice(0, limit).map((row) => ({
     push_id: String(row.push_id),
     aid: String(row.aid),
     article_url: String(row.article_url),
