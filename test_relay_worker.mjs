@@ -1,5 +1,21 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {handleRequest, validatePublishBatch} from "./relay/worker.mjs";
+
+
+function canonicalPushId(push) {
+  const material = [
+    push.aid,
+    push.source_line,
+    push.author,
+    push.occurred_at,
+    push.content,
+  ];
+  const digest = createHash("sha256")
+    .update(JSON.stringify(material), "utf8")
+    .digest("hex");
+  return `ptt:v1:${digest}`;
+}
 
 class FakeStatement {
   constructor(db, sql) { this.db=db; this.sql=sql; this.args=[]; }
@@ -57,9 +73,15 @@ class FakeDB {
   }
 }
 
-const push={push_id:"ptt:C_Chat:M.123.A.1:1",aid:"M.123.A.1",article_url:"https://www.ptt.cc/bbs/C_Chat/M.123.A.1.html",source_line:1,floor:1,kind:"推",author:"viewer",content:"hello",occurred_at:"2026-10-08T12:00:00Z"};
+const pushBase={aid:"M.123.A.1",article_url:"https://www.ptt.cc/bbs/C_Chat/M.123.A.1.html",source_line:1,floor:1,kind:"推",author:"viewer",content:"hello",occurred_at:"2026-10-08T12:00:00Z"};
+const push={...pushBase,push_id:canonicalPushId(pushBase)};
 const batch={schema_version:1,producer_id:"collector-main",published_at:"2026-10-08T12:00:01Z",pushes:[push]};
 assert.equal(validatePublishBatch(batch).pushes.length,1);
+assert.throws(
+  ()=>validatePublishBatch({...batch,pushes:[{...push,push_id:"ptt:C_Chat:legacy:1"}]}),
+  /push_id/,
+  "legacy push id must be rejected"
+);
 assert.throws(()=>validatePublishBatch({...batch,pushes:[push,push]}));
 
 const healthDB=new FakeDB();
@@ -99,8 +121,12 @@ assert.equal((await response.json()).pushes.length,0);
 
 
 // D1 batch failure must not persist an earlier insert from the same publish request.
-const second={...push,push_id:"ptt:C_Chat:M.123.A.1:2",source_line:2,floor:2};
-const third={...push,push_id:"ptt:C_Chat:M.123.A.1:3",source_line:3,floor:3};
+const secondBase={...push,source_line:2,floor:2};
+delete secondBase.push_id;
+const second={...secondBase,push_id:canonicalPushId(secondBase)};
+const thirdBase={...push,source_line:3,floor:3};
+delete thirdBase.push_id;
+const third={...thirdBase,push_id:canonicalPushId(thirdBase)};
 DB.failAtBatchIndex=1;
 response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[second,third]})}),env);
 assert.equal(response.status,500);
@@ -126,14 +152,19 @@ assert.equal((await response.json()).history_gap,false);
 // Exercise actual retention pruning, rather than manually setting a watermark.
 // The cursor is global across articles; gap detection must remain per AID.
 const retentionDB = new FakeDB();
-retentionDB.rows = Array.from({length:1002}, (_,i) => ({
-  ...push, cursor:i+1, push_id:`ptt:retention:${i+1}`,
-  aid:i%2===0 ? "M.123.A.1" : "M.123.A.2",
-  source_line:i+1, floor:i+1,
-}));
+retentionDB.rows = Array.from({length:1002}, (_,i) => {
+  const row = {
+    ...push,
+    aid:i%2===0 ? "M.123.A.1" : "M.123.A.2",
+    source_line:i+1,
+    floor:i+1,
+  };
+  delete row.push_id;
+  return {...row, cursor:i+1, push_id:canonicalPushId(row)};
+});
 retentionDB.cursor = 1002;
 const retentionEnv = {...env, DB:retentionDB};
-response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[{...push,push_id:"ptt:retention:1003",source_line:1003,floor:1003}]})}),retentionEnv);
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[(()=>{const row={...push,source_line:1003,floor:1003};delete row.push_id;return {...row,push_id:canonicalPushId(row)};})()]})}),retentionEnv);
 assert.equal(response.status,200);
 assert.equal(retentionDB.rows.length,1000);
 assert.equal(retentionDB.watermarks.get("M.123.A.1"),3);
@@ -147,8 +178,43 @@ assert.equal(retainedPage.pushes[0].cursor,5);
 response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.2&after_cursor=2&limit=200"),retentionEnv);
 assert.equal((await response.json()).history_gap,false);
 // Duplicate publish cannot resurrect purged history or regress watermarks.
-response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[{...push,push_id:"ptt:retention:1003",source_line:1003,floor:1003}]})}),retentionEnv);
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify({...batch,pushes:[(()=>{const row={...push,source_line:1003,floor:1003};delete row.push_id;return {...row,push_id:canonicalPushId(row)};})()]})}),retentionEnv);
 assert.equal((await response.json()).accepted,0);
 assert.equal(retentionDB.watermarks.get("M.123.A.1"),3);
+
+
+// Read responses must stay within the relay v1 512 KiB wire bound and paginate.
+const byteDB = new FakeDB();
+byteDB.rows = Array.from({length:500}, (_,i) => {
+  const row = {
+    ...push,
+    aid:"M.123.A.9",
+    source_line:i+1,
+    floor:i+1,
+    content:"界".repeat(1000),
+  };
+  delete row.push_id;
+  return {...row, cursor:i+1, push_id:canonicalPushId(row)};
+});
+byteDB.cursor = 500;
+const byteEnv = {...env, DB:byteDB};
+response = await handleRequest(
+  new Request("https://relay.example/v1/ptt?aid=M.123.A.9&after_cursor=0&limit=500"),
+  byteEnv,
+);
+assert.equal(response.status,200);
+const firstText = await response.text();
+assert.ok(new TextEncoder().encode(firstText).byteLength <= 512 * 1024);
+const firstPage = JSON.parse(firstText);
+assert.equal(firstPage.has_more,true);
+assert.ok(firstPage.pushes.length > 0 && firstPage.pushes.length < 500);
+response = await handleRequest(
+  new Request(`https://relay.example/v1/ptt?aid=M.123.A.9&after_cursor=${firstPage.next_cursor}&limit=500`),
+  byteEnv,
+);
+assert.equal(response.status,200);
+const secondPage = await response.json();
+assert.ok(secondPage.pushes.length > 0);
+assert.ok(secondPage.next_cursor > firstPage.next_cursor);
 
 console.log("relay worker adapter tests: pass");

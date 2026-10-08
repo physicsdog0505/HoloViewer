@@ -48,3 +48,36 @@ The Mac mini remains outbound-only; no public inbound connection is required.
 ## Retention-gap contract (review required before live deployment)
 
 The D1 schema now includes `ptt_retention_watermark`, recording the highest purged cursor for each article AID. The Worker records watermarks and purges rows in the same D1 batch transaction, and the public GET adds `history_gap` (boolean) and `purged_through_cursor` (integer). The Pages reader displays an explicit incomplete-data warning if a requested cursor is older than the purge watermark. This **detects** lost relay history but does not automatically recover it; recovery requires a separately refreshed historical projection/snapshot. The v1 response has been extended in lockstep with its Pages validator; upgrade Worker and browser together. Run `relay/schema.sql` migration before starting this Worker version. Retention, concurrent publishing and actual Cloudflare D1 migration must still be integration-tested before enabling real relay traffic.
+
+
+## Canonical push identity
+
+Publisher writes must use the same canonical public PTT identity contract as the
+private trusted producer:
+
+`ptt:v1:<64 lowercase hex chars>`
+
+The canonical digest is derived from:
+
+- aid
+- source_line
+- author
+- canonical UTC occurred_at
+- content
+
+Floor, article URL formatting, local DB ids, relay cursor and provider state are
+not identity material. The Worker rejects legacy/non-canonical push ids.
+
+## Wire size bounds
+
+- publish request body: at most 256 KiB
+- read response body: at most 512 KiB
+- publish batch: at most 200 pushes
+- read request: at most 500 pushes
+
+Read responses are byte-aware: if the requested row count would exceed 512 KiB,
+the Worker returns the largest prefix that fits and sets `has_more=true`.
+Clients continue from `next_cursor`.
+
+These bounds are part of relay v1 and must remain aligned with the private
+provider-neutral contract.
