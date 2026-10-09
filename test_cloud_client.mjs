@@ -228,7 +228,7 @@ const readerBody = readerSource.slice(readerSource.indexOf("async function start
 assert.ok(readerBody.includes('["0.5", "普通（0.5 秒）"]'));
 assert.ok(readerBody.includes('["0.2", "快（0.2 秒）"]'));
 assert.ok(readerBody.includes('["1", "慢（1 秒）"]'));
-assert.ok(readerBody.includes("visibleIds = new Set(article.pushes.map((push) => push.pushId))"));
+assert.ok(readerBody.includes("visibleIds = new Set(initial.slice(0, visibleCount).map((push) => push.pushId))"));
 assert.ok(readerBody.includes("for (const push of newPushes) pending.push(push.pushId)"));
 assert.ok(readerBody.includes('revealTimer = setTimeout(revealNext, Number(speedSelect.value) * 1000)'));
 assert.ok(readerBody.includes("const id = pending.shift()"));
