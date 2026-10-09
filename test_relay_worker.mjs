@@ -24,11 +24,15 @@ class FakeStatement {
   async run() {
     if (this.sql.startsWith("INSERT OR IGNORE")) {
       this.db.mutationCount++;
-      const [push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at]=this.args;
-      this.db.cursor += 1; // SQLite AUTOINCREMENT advances even on INSERT OR IGNORE conflicts.
-      if (this.db.rows.some((row)=>row.push_id===push_id)) return {meta:{changes:0}};
-      this.db.rows.push({cursor:this.db.cursor,push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at});
-      return {meta:{changes:1}};
+      let changed=0;
+      for(let n=0;n<this.args.length;n+=11) {
+        const [push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at]=this.args.slice(n,n+11);
+        this.db.cursor += 1;
+        if (this.db.rows.some((row)=>row.push_id===push_id)) continue;
+        this.db.rows.push({cursor:this.db.cursor,push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at});
+        changed++;
+      }
+      return {meta:{changes:changed}};
     }
     if (this.sql.startsWith("INSERT INTO ptt_purged_source_floor")) {
       this.db.mutationCount++;
@@ -67,6 +71,12 @@ class FakeStatement {
     throw new Error("unexpected first SQL");
   }
   async all() {
+    if (this.sql.startsWith("SELECT aid, source_line FROM ptt_purged_source_floor")) {
+      return {results:this.args.filter(aid=>this.db.floors.has(aid)).map(aid=>({aid,source_line:this.db.floors.get(aid)}))};
+    }
+    if (this.sql.startsWith("SELECT aid, purged_through_cursor FROM ptt_retention_watermark")) {
+      return {results:this.args.filter(aid=>this.db.watermarks.has(aid)).map(aid=>({aid,purged_through_cursor:this.db.watermarks.get(aid)}))};
+    }
     if (this.sql.startsWith("SELECT push_id")) {
       return {results:this.db.rows.filter(row=>this.args.includes(row.push_id)).map(row=>({push_id:row.push_id}))};
     }
@@ -77,7 +87,16 @@ class FakeStatement {
 }
 class FakeDB {
   constructor(){this.rows=[];this.cursor=0;this.failAtBatchIndex=-1;this.watermarks=new Map();this.floors=new Map();this.mutationCount=0;}
-  prepare(sql){return new FakeStatement(this,sql);}
+  prepare(sql){
+    const db=this;
+    const stmt=new FakeStatement(db,sql);
+    const originalBind=stmt.bind.bind(stmt);
+    stmt.bind=(...args)=>{
+      if(args.length>100) throw new Error("D1 per-statement parameter limit exceeded");
+      return originalBind(...args);
+    };
+    return stmt;
+  }
   async batch(statements){
     const rows=this.rows.map((row)=>({...row})), cursor=this.cursor, watermarks=new Map(this.watermarks), floors=new Map(this.floors), mutationCount=this.mutationCount;
     const results=[];
@@ -320,6 +339,60 @@ const rateReject=await handleRequest(new Request(
   }),{...env,DB:rateRejectDB});
 assert.equal(rateReject.status,429);
 assert.match((await rateReject.json()).error,/write budget exceeded/);
+
+
+// Free-tier D1 compatibility: 200 pushes, many AIDs, duplicate/mixed ACK,
+// every single SQL statement <=100 bound params and <=50 statements/request.
+const budgetDB=new FakeDB();
+let requestQueries=0;
+let largestBind=0;
+const originalPrepare=budgetDB.prepare.bind(budgetDB);
+budgetDB.prepare=sql=>{
+  requestQueries++;
+  if(requestQueries>50)throw Error("Workers Free query budget exceeded");
+  const stmt=originalPrepare(sql);
+  const bind=stmt.bind.bind(stmt);
+  stmt.bind=(...args)=>{largestBind=Math.max(largestBind,args.length);return bind(...args);};
+  return stmt;
+};
+const budgetEnv={...env,DB:budgetDB};
+const makePush=(i,aid)=>{const row={...pushBase,aid,source_line:i+1,floor:i+1};return {...row,push_id:canonicalPushId(row)};};
+const fullPushes=Array.from({length:200},(_,i)=>makePush(i,`AID-${i}`));
+const publishBudget=async pushes=>{
+  requestQueries=0;largestBind=0;
+  const result=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{
+    method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+    body:JSON.stringify({...batch,pushes})
+  }),budgetEnv);
+  return {status:result.status,body:await result.json(),queries:requestQueries,binds:largestBind};
+};
+let full=await publishBudget(fullPushes);
+assert.equal(full.status,200);
+assert.equal(full.body.received,200);
+assert.equal(full.body.accepted,200);
+assert.ok(full.queries<=50);
+assert.ok(full.binds<=100);
+assert.equal(budgetDB.rows.length,200);
+full=await publishBudget(fullPushes);
+assert.equal(full.status,200);
+assert.equal(full.body.accepted,0);
+assert.ok(full.queries<=50);
+const extraPushes=Array.from({length:100},(_,i)=>makePush(i+200,`AID-extra-${i}`));
+full=await publishBudget([...fullPushes.slice(0,100),...extraPushes]);
+assert.equal(full.status,200);
+assert.equal(full.body.received,200);
+assert.equal(full.body.accepted,100);
+assert.equal(budgetDB.rows.length,300);
+assert.ok(full.queries<=50 && full.binds<=100);
+budgetDB.floors.set("AID-blocked",3);
+full=await publishBudget([makePush(0,"AID-blocked")]);
+assert.equal(full.status,409);
+assert.equal(budgetDB.rows.length,300);
+const originalBudgetBatch=budgetDB.batch.bind(budgetDB);
+budgetDB.batch=async()=>{throw new Error("hour insert budget exceeded");};
+full=await publishBudget([makePush(400,"AID-429")]);
+assert.equal(full.status,429);
+budgetDB.batch=originalBudgetBatch;
 
 // Read responses must stay within the relay v1 512 KiB wire bound and paginate.
 const byteDB = new FakeDB();
