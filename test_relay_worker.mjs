@@ -24,8 +24,8 @@ class FakeStatement {
     if (this.sql.startsWith("INSERT OR IGNORE")) {
       this.db.mutationCount++;
       const [push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at]=this.args;
+      this.db.cursor += 1; // SQLite AUTOINCREMENT advances even on INSERT OR IGNORE conflicts.
       if (this.db.rows.some((row)=>row.push_id===push_id)) return {meta:{changes:0}};
-      this.db.cursor += 1;
       this.db.rows.push({cursor:this.db.cursor,push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at});
       return {meta:{changes:1}};
     }
@@ -215,6 +215,37 @@ response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",
 }),sparseEnv);
 assert.equal((await response.json()).accepted,0);
 assert.equal(sparseDB.mutationCount,afterFirstMutation);
+
+
+ // Duplicate with one fresh push: only the new row should attempt insertion.
+const mixedDB = new FakeDB();
+const mixedEnv = {...env, DB:mixedDB};
+const postMixed = async pushes => {
+  const result=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{
+    method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+    body:JSON.stringify({...batch,pushes})
+  }),mixedEnv);
+  assert.equal(result.status,200);
+  return result.json();
+};
+assert.deepEqual(await postMixed([push]),{schema_version:1,received:1,accepted:1});
+assert.equal(mixedDB.cursor,1);
+const mixedBefore = mixedDB.mutationCount;
+assert.deepEqual(await postMixed([push]),{schema_version:1,received:1,accepted:0});
+assert.equal(mixedDB.cursor,1,"duplicate-only POST must not consume AUTOINCREMENT");
+assert.equal(mixedDB.mutationCount,mixedBefore);
+assert.deepEqual(await postMixed([push,second]),{schema_version:1,received:2,accepted:1});
+assert.equal(mixedDB.cursor,2,"mixed duplicate/new POST must insert only new ID");
+assert.equal(mixedDB.rows.length,2);
+assert.equal(mixedDB.mutationCount,mixedBefore+3);
+
+ // A long-running duplicate storm must not create sparse cursor gaps.
+for (let i=0; i<5000; i++) {
+  const ack=await postMixed([push,second]);
+  assert.equal(ack.accepted,0);
+}
+assert.equal(mixedDB.cursor,2);
+assert.equal(mixedDB.rows.length,2);
 
 // Read responses must stay within the relay v1 512 KiB wire bound and paginate.
 const byteDB = new FakeDB();
