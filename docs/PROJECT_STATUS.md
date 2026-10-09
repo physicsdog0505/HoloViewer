@@ -137,3 +137,9 @@ Repair contract for existing Public #12 and Private #324 work (not yet implement
 - P0 BLOCKED: D1 Publisher restart, Worker deployment/DB schema migration, retention changes against production, or declaring cloud live PTT verified. Requires offline fix + review + cost/safety criteria and explicit operational approval.
 - Next practical gate: obtain a browser-accessible GitHub Pages read-only acceptance build tied to exact commit, preserving 8501 behavior/4174 appearance; verify real PTT snapshot locally first, then obtain user acceptance before production cutover. Existing 8766 server was a stopped local test, not a live/public deployment.
 - Local runtime and Mac health remain unverified until user-attended read-only inspection; do not hold unrelated development hostage to that inspection.
+
+## 2026-10-09 OWNER DECISION — PTT Today reader behavior
+- The actual **currently running local port 8501** interface is the sole authoritative functional baseline for PTT Today reader behavior. Port 4174 remains the visual/UI baseline.
+- **Neither** Public #16's 5/3/1-second scrolling of already loaded historical pushes **nor** Public #18's 1/0.5/0.2-second new-push reveal queue is accepted solely based on GitHub source or tests.
+- Before changing reader UI or merging a branch, observe 8501 actual speed options, ordering, follow behavior, manual scrolling, Jump Latest and checkpoint behavior, and compare candidate in browser. If 8501 cannot be reached from the agent environment, mark parity NOT VERIFIED and leave reader behavior unchanged; do not guess from documentation.
+- Continue independent read-only Pages snapshot integration work without D1 publisher restart, production data writes, cloud deployment, merges, or unapproved UI changes. Conflicts with 4174 appearance go to owner.
