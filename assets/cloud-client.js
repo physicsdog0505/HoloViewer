@@ -316,6 +316,18 @@
     }
   }
 
+  function mergeCompatiblePushes(existing, additions) {
+    // Preflight the entire batch, including duplicate IDs inside the refresh,
+    // before mutating any previously displayed data.
+    const checked = new Map();
+    for (const push of additions) {
+      assertCompatiblePush(existing.get(push.pushId), push);
+      assertCompatiblePush(checked.get(push.pushId), push);
+      checked.set(push.pushId, push);
+    }
+    for (const push of checked.values()) existing.set(push.pushId, push);
+  }
+
   async function pollRelay(config, aid, state, onUpdate) {
     if (!config.liveRelay) {
       state.relayStatus("unavailable", "即時 relay 尚未設定；目前顯示歷史快照。", false);
@@ -364,7 +376,7 @@
             if (stopped) return;
             const matching = refreshed.articles.find((item) => item.aid === aid);
             if (matching) {
-              for (const push of matching.pushes) state.pushes.set(push.pushId, push);
+              mergeCompatiblePushes(state.pushes, matching.pushes);
             }
           } catch (_) {
             // Keep the live cursor and previous baseline; partial status below remains.
