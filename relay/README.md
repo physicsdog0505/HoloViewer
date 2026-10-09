@@ -81,3 +81,34 @@ Clients continue from `next_cursor`.
 
 These bounds are part of relay v1 and must remain aligned with the private
 provider-neutral contract.
+
+## Offline safety integration candidate — NOT DEPLOYED
+
+Public PR #19 adds these **schema-dependent**, fail-closed protections; apply
+`relay/schema.sql` to a disposable D1-equivalent SQLite fixture before testing.
+The operational D1 migration and deployment are **not authorized**:
+
+- A bounded `ptt_purged_source_floor` table retains each AID's maximum purged
+  `source_line` (100,000-AID ceiling). Unknown/replayed lines at or below the
+  floor are rejected with HTTP **409** rather than resurrected, or silently
+  acknowledged. Legacy retained watermarks without corresponding source floors
+  also fail closed for unseen inserts. Valid historical/backfill pushes below a
+  purged floor will likewise receive 409: explicit operator reconciliation is
+  required, rather than silent data loss.
+- SQLite `AFTER INSERT` triggers enforce at most **240 actual new pushes/minute**
+  and **2,000 actual new pushes/hour**, across concurrent Worker requests. The
+  request transaction rolls back on violation. The SQLite counters are kept to
+  about 2 hours of minute windows and 2 days of hour windows through successful
+  new-push Worker transactions. These are insert ceilings, **not provider billing
+  limits**; read queries, attempted writes, D1 row metering and Worker requests
+  still require controlled production measurement.
+- Every new batch's accepted push inserts, source floor, history-gap watermark
+  and row-count pruning occur inside one D1 batch; an entirely already-retained
+  duplicate batch runs no mutating SQL.
+- Local Publisher checkpointing and in-process limits belong to Private #328;
+  this Worker does not have access to the Mac or Collector DB. Neither a Worker
+  schema nor CI green authorizes restarting the Publisher.
+- **STOP** if old watermark rows lack corresponding source-floor provenance;
+  do not guess old source-line floors, delete operational data, or treat an
+  HTTP 409 as successfully delivered. Planned migration needs review, backup/
+  rollback design and separate owner authorization.
