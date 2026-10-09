@@ -351,11 +351,17 @@ assert.ok(readerBody.includes("scheduleReveal();"));
 console.log("cloud-client contract tests: pass");
 
 
+assert.ok(source.includes("const MAX_PTT_SNAPSHOT_BYTES = 16 * 1024 * 1024;"));
+assert.ok(source.slice(source.indexOf("async function loadPttArtifact("),source.indexOf("function articleOption(")).includes("fetchJson(url, MAX_PTT_SNAPSHOT_BYTES)"));
+assert.ok(source.includes("fetchJson(url, 512 * 1024)"));
+assert.equal(window.HoloViewerCloud.validatePush({push_id:"fixture",floor:null,source_line:1,kind:"→",author:"fixture",content:"",occurred_at:"2026-10-09T00:00:00Z"}).content,"");
+assert.throws(()=>window.HoloViewerCloud.validatePush({push_id:"fixture",floor:null,source_line:1,kind:"→",author:"fixture",content:123,occurred_at:"2026-10-09T00:00:00Z"}),/push.content/);
+
 const checkedConfig = JSON.parse(fs.readFileSync(new URL("./public-data/config.json", import.meta.url), "utf8"));
 assert.equal(
   checkedConfig.sources.live_relay,
-  "https://holoviewer-ptt-relay.singlebagel.workers.dev/v1/ptt",
-  "public preview must point at the deployed read-only relay",
+  null,
+  "read-only acceptance must not contact production D1 relay",
 );
 
 
