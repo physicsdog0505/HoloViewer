@@ -8,7 +8,7 @@ globalThis.window = {};
 globalThis.location = { origin: "https://physicsdog0505.github.io" };
 globalThis.document = { readyState: "loading", addEventListener() {}, querySelector() { return null; } };
 const source = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
-vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, "));
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, assertCompatiblePush, "));
 const client = window.HoloViewerCloud;
 const id = "ptt:v1:" + "a".repeat(64);
 const base = {
@@ -60,17 +60,20 @@ try {
   for (const p of page.pushes) merged.set(p.pushId, p);
   assert.equal(merged.size, 1, "same canonical ID should have one visible row");
 
-  // Document an existing contract gap, rather than silently accepting conflicting payload.
-  const conflicting = {...base, content: "different fixture payload", cursor: 9};
-  const conflictPage = client.validateRelayPage({
-    ...relay, next_cursor: 9, pushes: [conflicting]
-  }, 8);
-  assert.equal(conflictPage.pushes[0].pushId, id);
-  assert.notEqual(conflictPage.pushes[0].content, snapshot.articles[0].pushes[0].content);
-  assert.equal(
-    typeof client.assessPayloadConflict, "undefined",
-    "payload conflict detection is NOT implemented by the current client; #317 contract gate"
-  );
+  // Same identity must never mask changed author, content, timestamp or floor.
+  const baseline = snapshot.articles[0].pushes[0];
+  assert.doesNotThrow(() => client.assertCompatiblePush(baseline, page.pushes[0]));
+  for (const changed of [
+    {content: "different fixture payload"}, {author: "another"},
+    {occurredAt: "2026-10-09T02:00:00Z"}, {floor: 3},
+    {sourceLine: 8}, {kind: "噓"}
+  ]) {
+    assert.throws(() => client.assertCompatiblePush(baseline, {...page.pushes[0], ...changed}), /payload conflict/);
+  }
+  const state = new Map([[id, baseline]]);
+  assert.throws(() => client.assertCompatiblePush(state.get(id), {...page.pushes[0], content: "changed"}), /payload conflict/);
+  assert.equal(state.get(id).content, base.content, "snapshot value must remain unchanged");
+
 } finally {
   globalThis.fetch = originalFetch;
 }
@@ -113,4 +116,4 @@ try {
   globalThis.fetch = originalFetch;
 }
 
-console.log("public snapshot/live boundary offline: PASS (payload conflict handling remains gated)");
+console.log("public snapshot/live boundary offline: PASS (same-ID conflict protected)");
