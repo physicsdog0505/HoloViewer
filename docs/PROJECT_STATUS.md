@@ -143,3 +143,21 @@ Repair contract for existing Public #12 and Private #324 work (not yet implement
 - **Neither** Public #16's 5/3/1-second scrolling of already loaded historical pushes **nor** Public #18's 1/0.5/0.2-second new-push reveal queue is accepted solely based on GitHub source or tests.
 - Before changing reader UI or merging a branch, observe 8501 actual speed options, ordering, follow behavior, manual scrolling, Jump Latest and checkpoint behavior, and compare candidate in browser. If 8501 cannot be reached from the agent environment, mark parity NOT VERIFIED and leave reader behavior unchanged; do not guess from documentation.
 - Continue independent read-only Pages snapshot integration work without D1 publisher restart, production data writes, cloud deployment, merges, or unapproved UI changes. Conflicts with 4174 appearance go to owner.
+
+## 2026-10-09 OWNER ARCHITECTURE DECISION — SUPERSEDES EARLIER TWO-BASELINE SHORTHAND
+
+**Authoritative clarification:**
+1. **8501 = internal verification**: complete source data, underlying functionality/logic, engineering controls. New underlying logic is validated here first. NOT a specification for every public-facing UI control.
+2. **4174 = running LOCAL PRODUCTION PREVIEW**: owner accepts ALL user-facing pages, content choices, interactions and UX/UI here. Uses the same underlying logic as 8501, but has equal or fewer user-facing functions and optimized UX. The authoritative product reference for users.
+3. **PUBLIC production**: reproduce the accepted 4174 user-facing UI and behavior, without new navigation or reader modes. Replace local data access with safe snapshots/APIs. Verify public data completeness, correctness, timeliness and deployment identity in production; do not repeat owner acceptance of unchanged local UI or invent alternate public test sites.
+4. **Core logic may not diverge** between 8501 and 4174; UX can differ. If 4174 requires new core behavior, validate it in 8501 first, then update 4174. Owner alone decides conflicts, with a general preference for 4174 user-visible behavior.
+5. **Earlier shorthand “8501 = functional baseline of public Reader” is SUPERSEDED** if construed as copying all 8501 UX into Public. Public #16/#18 reader controls and article selector are not owner requirements merely because in code. Old PR #18 external “8501 Reader UI parity” task is ON HOLD; do not dispatch its prompt until re-scoped by owner.
+6. **FOUR potential independent workstreams, assigned one by one:** A = maintain 4174 local preview for continuous owner acceptance; B = public fidelity to accepted 4174 and local-to-public data conversion; C = 8501 verified core logic followed by 4174 presentation; D = separate offline infrastructure repairs. Coordinator chat reviews/corrects and does not implement; delegates develop. Define non-overlapping file ownership.
+7. All decisions, task briefs, preflight with actual GitHub guideline SHA, progress, files/commits, test and CI evidence, risks, and final handoff MUST be written on GitHub BEFORE developer reports a link/SHA to owner for forwarding to coordinator. Retain private info in private repository only. No chat-only handoff.
+8. Frozen high-risk actions remain frozen: no unapproved merges, deployment, live Cloudflare D1 writes, Publisher restart, Collector database changes, destructive operations or credential exposure. Keep accepted 4174 running.
+
+**Correction audit:** https://github.com/physicsdog0505/HoloViewer/pull/18#issuecomment-6073140146 . Old delegated Workstream A document remains for history but is superseded in scope.
+
+**Not yet verified:** live 8501 and 4174 running SHA, individual page acceptance inventory, public deployed SHA and actual visual/data parity. PR/CI evidence is not equivalent to these facts.
+
+**Status:** Documentation-only synchronization. No new development agent dispatched; owner to approve each next assignment separately.
