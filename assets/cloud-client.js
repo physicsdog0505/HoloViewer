@@ -2,6 +2,8 @@
   "use strict";
 
   const MAX_JSON_BYTES = 2 * 1024 * 1024;
+  // Match private public_ptt_projection.py MAX_OUTPUT_BYTES; only PTT snapshots use this bound.
+  const MAX_PTT_SNAPSHOT_BYTES = 16 * 1024 * 1024;
   const FETCH_TIMEOUT_MS = 8000;
   const RELAY_LIMIT = 200;
   const RELAY_POLL_MS = 5000;
@@ -213,7 +215,7 @@
 
   async function loadPttArtifact(url) {
     if (!url) throw new PublicDataError("PTT public artifact is not configured");
-    const value = await fetchJson(url);
+    const value = await fetchJson(url, MAX_PTT_SNAPSHOT_BYTES);
     if (!value || value.schema_version !== 1 || !Array.isArray(value.articles)) throw new PublicDataError("PTT artifact schema is incompatible");
     isoTime(value.generated_at, "PTT generated_at");
     if (!["complete", "partial"].includes(value.completeness)) throw new PublicDataError("PTT completeness is invalid");
