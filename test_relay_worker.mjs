@@ -308,6 +308,19 @@ const replies = await Promise.all(parallel.map(r=>r.json()));
 assert.equal(replies.reduce((total,r)=>total+r.accepted,0),1);
 assert.equal(concurrentDB.rows.length,1);
 
+
+// A database rate-limit abort is a distinguishable fail-closed HTTP 429,
+// rather than a generic 500 or a false matching ACK.
+const rateRejectDB = new FakeDB();
+rateRejectDB.batch = async () => { throw new Error("minute insert budget exceeded"); };
+const rateReject=await handleRequest(new Request(
+  "https://relay.example/v1/ptt/publish",{
+    method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+    body:JSON.stringify(batch)
+  }),{...env,DB:rateRejectDB});
+assert.equal(rateReject.status,429);
+assert.match((await rateReject.json()).error,/write budget exceeded/);
+
 // Read responses must stay within the relay v1 512 KiB wire bound and paginate.
 const byteDB = new FakeDB();
 byteDB.rows = Array.from({length:500}, (_,i) => {
