@@ -221,49 +221,147 @@ const liveSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.me
 const livePoll = liveSource.slice(liveSource.indexOf("async function pollRelay("), liveSource.indexOf("async function startPtt("));
 assert.ok(livePoll.includes("if (pendingPushes.size || historyGap) onUpdate("));
 
-// Reader parity: speed control is locally bounded and cannot overwrite live data.
+// Authoritative reader parity: baseline rows are immediately visible, new relay
+// rows enter a reveal queue, and visual speed never scrolls through old history.
 const readerSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 const readerBody = readerSource.slice(readerSource.indexOf("async function startPtt("), readerSource.indexOf("async function startCustomView("));
-assert.ok(readerBody.includes('["0", "停止"]'));
-for (const seconds of ["5", "3", "1"]) assert.ok(readerBody.includes('["' + seconds + '",'));
-assert.ok(readerBody.includes('speedSelect.addEventListener("change", () => {'));
-assert.ok(readerBody.includes('speedSelect.value = "0";\n      stopReading();'));
-assert.ok(readerBody.includes("const shouldFollow = followInput.checked && !userPausedFollow && nearBottom && readingTimer === null"));
+assert.ok(readerBody.includes('["0.5", "普通（0.5 秒）"]'));
+assert.ok(readerBody.includes('["0.2", "快（0.2 秒）"]'));
+assert.ok(readerBody.includes('["1", "慢（1 秒）"]'));
+assert.ok(readerBody.includes("visibleIds = new Set(initial.slice(0, visibleCount).map((push) => push.pushId))"));
+assert.ok(readerBody.includes("for (const push of newPushes) pending.push(push.pushId)"));
+assert.ok(readerBody.includes('revealTimer = setTimeout(revealNext, Number(speedSelect.value) * 1000)'));
+assert.ok(readerBody.includes("const id = pending.shift()"));
+assert.ok(readerBody.includes("if (row) row.hidden = false"));
+assert.ok(readerBody.includes("flushPending();"));
+assert.ok(readerBody.includes("userPausedFollow = false;"));
 assert.ok(readerBody.includes('window.addEventListener("wheel", pauseOnManualNavigation'));
 assert.ok(readerBody.includes('window.addEventListener("touchmove", pauseOnManualNavigation'));
-assert.ok(readerBody.includes('speedSelect.value = "0";\n        stopReading();'));
-assert.ok(readerBody.includes("userPausedFollow = false;\n      goLatest();"));
+assert.ok(readerBody.includes("sessionStorage.setItem(checkpointKey, pushId)"));
+assert.ok(!readerBody.includes("next.scrollIntoView"), "old-message scroll timer must not return");
 assert.ok(readerBody.includes('window.scrollTo({ top: previousScroll, behavior: "instant" })'));
-assert.ok(readerBody.includes('if (sequence !== activeArticle) return'));
+assert.ok(readerBody.includes("if (sequence !== activeArticle) return"));
 
-// Behavioral complexity guard: long articles must not linearly scan every row
-// at each automatic-reading tick. Execute the actual reader search snippet.
+// Behavioral reader-queue test executes the actual production queue closure,
+// using a small DOM/timer shim rather than relying only on source assertions.
 {
-  const from = readerSource.indexOf("        const rows = list.children;");
-  const to = readerSource.indexOf("        if (!next) {", from);
-  assert.ok(from >= 0 && to > from);
-  const snippet = readerSource.slice(from, to);
-  const rowCount = 2623;
-  let geometryReads = 0;
-  const rows = Array.from({length:rowCount}, (_,i) => ({
-    getBoundingClientRect() { geometryReads++; return {top: i * 24 - 800}; },
-  }));
-  const list = {children:rows};
-  const viewport = {scrollY:800};
-  const selectNext = new Function("list", "window", snippet + "return next;");
-  const next = selectNext(list, viewport);
-  assert.equal(next, rows[38], "reader advances from first row below scroll threshold");
-  assert.ok(geometryReads <= 13, "2,623-row reader lookup must use logarithmic geometry reads");
+  const begin = readerBody.indexOf("    // The authoritative private Viewer paces NEW message reveal");
+  const end = readerBody.indexOf("    let stopRelay = null;", begin);
+  assert.ok(begin >= 0 && end > begin, "locate reader queue implementation");
+  const actualQueue = readerBody.slice(begin, end);
+  const listeners = {};
+  const checkpoints = new Map();
+  const timeouts = new Map();
+  let timerSerial = 0, scrolls = 0, revealCount = 0;
+  const list = {children:[],lastElementChild:null};
+  const speedSelect = {value:"0.5", addEventListener:(key,fn)=>listeners["speed:"+key]=fn};
+  const followInput = {checked:true, addEventListener:(key,fn)=>listeners["follow:"+key]=fn};
+  const latestButton = {addEventListener:(key,fn)=>listeners["latest:"+key]=fn};
+  const viewport = {addEventListener:(key,fn)=>listeners[key]=fn};
+  const fakeSession = {setItem:(key,value)=>checkpoints.set(key,value)};
+  const makeRows = (_target, pushes, visible) => {
+    list.children=pushes.map(p=>({dataset:{pushId:p.pushId},hidden:!visible.has(p.pushId),
+      scrollIntoView:()=>{scrolls++;}}));
+    list.lastElementChild=list.children.at(-1);
+  };
+  const fakeSetTimeout = (fn,delay)=>{const id=++timerSerial;timeouts.set(id,{fn,delay});return id;};
+  const fakeClearTimeout = id=>timeouts.delete(id);
+  const create = new Function("list","speedSelect","followInput","latestButton","window",
+    "sessionStorage","renderPushes","setTimeout","clearTimeout",
+    actualQueue + "return {setBase(ids){visibleIds=new Set(ids);checkpointKey='test-aid';},"+
+    "enqueue(ids){pending.push(...ids);},rebuildRows,scheduleReveal,flushPending,"+
+    "pendingSize:()=>pending.length,paused:()=>userPausedFollow};");
+  const reader = create(list,speedSelect,followInput,latestButton,viewport,fakeSession,
+    makeRows,fakeSetTimeout,fakeClearTimeout);
+  reader.setBase(["old"]);
+  reader.rebuildRows([{pushId:"old"},{pushId:"new"}]);
+  assert.equal(list.children[0].hidden,false,"historical baseline immediately visible");
+  assert.equal(list.children[1].hidden,true,"new relay row initially queued");
+  reader.enqueue(["new"]);
+  reader.scheduleReveal();
+  assert.equal([...timeouts.values()][0].delay,500,"default reveal is 500ms, not page scrolling");
+  listeners.wheel();
+  assert.equal(reader.paused(),true,"manual scroll pauses following");
+  const [id,timer]=[...timeouts][0];timeouts.delete(id);timer.fn();
+  assert.equal(list.children[1].hidden,false,"timer reveals queued new row");
+  assert.equal(scrolls,0,"manual scroll not overridden by reveal");
+  assert.equal(checkpoints.get("test-aid"),"new");
+  reader.rebuildRows([{pushId:"old"},{pushId:"new"},{pushId:"new2"}]);
+  reader.enqueue(["new2"]);reader.scheduleReveal();
+  listeners["latest:click"]();
+  assert.equal(reader.pendingSize(),0,"jump latest flushes queue");
+  assert.equal(list.children[2].hidden,false);
+  assert.equal(timeouts.size,0,"jump latest cancels reveal timer");
+  assert.equal(reader.paused(),false,"jump latest resumes follow");
+  assert.equal(scrolls,1,"jump latest scrolls once");
+  assert.equal(checkpoints.get("test-aid"),"new2");
+  listeners["latest:click"]();
+  assert.equal(scrolls,2,"jump latest remains idempotent");
+}
+
+// Incremental batch regressions: the production queue deduplicates and sorts
+// incoming PTT rows, and stale poll startup cannot replace the active stop hook.
+assert.ok(readerBody.includes("const known = new Set([...visibleIds, ...pending])"));
+assert.ok(readerBody.includes("pending.sort((a, b) => pushOrder(byId.get(a), byId.get(b)))"));
+assert.ok(readerBody.includes("if (sequence !== activeArticle) stopCurrentRelay?.()"));
+assert.ok(readerBody.includes("else stopRelay = stopCurrentRelay || null"));
+assert.ok(readerBody.includes("const previousCheckpoint = loadCheckpoint()"));
+
+// Private 8501 checkpoint contract: never mark previously unread baseline rows
+// as read before their paced reveal. A missing checkpoint means first visit.
+assert.ok(readerBody.includes("const checkpointIndex = previousCheckpoint"));
+assert.ok(readerBody.includes("const visibleCount = checkpointIndex >= 0 ? checkpointIndex + 1 : initial.length"));
+assert.ok(readerBody.includes("pending = initial.slice(visibleCount).map((push) => push.pushId)"));
+assert.ok(readerBody.includes("if (initial.length && pending.length === 0)"));
+assert.ok(readerBody.includes("scheduleReveal();"));
+{
+  const initial = [{pushId:"seen-1"},{pushId:"seen-2"},{pushId:"unseen-3"},{pushId:"unseen-4"}];
+  const derive = (checkpoint) => {
+    const checkpointIndex = checkpoint ? initial.findIndex((push) => push.pushId === checkpoint) : -1;
+    const visibleCount = checkpointIndex >= 0 ? checkpointIndex + 1 : initial.length;
+    return {visible:initial.slice(0,visibleCount).map(p=>p.pushId),pending:initial.slice(visibleCount).map(p=>p.pushId)};
+  };
+  assert.deepEqual(derive("seen-2"), {visible:["seen-1","seen-2"],pending:["unseen-3","unseen-4"]});
+  assert.deepEqual(derive(null), {visible:initial.map(p=>p.pushId),pending:[]});
+  assert.deepEqual(derive("rotated-away"), {visible:initial.map(p=>p.pushId),pending:[]});
+}
+
+{
+  const order = (x,y) => (x.floor ?? Number.MAX_SAFE_INTEGER)-(y.floor ?? Number.MAX_SAFE_INTEGER);
+  const visible = new Set(["old"]);
+  let pending = ["new-3"];
+  const pushes = [
+    {pushId:"old",floor:1},
+    {pushId:"new-3",floor:3},
+    {pushId:"new-2",floor:2},
+    {pushId:"new-2",floor:2},
+  ];
+  const known = new Set([...visible, ...pending]);
+  const incoming = pushes.filter(p => {
+    if(known.has(p.pushId)) return false;
+    known.add(p.pushId);
+    return true;
+  }).sort(order);
+  for(const p of incoming) pending.push(p.pushId);
+  const byId = new Map(pushes.map(p => [p.pushId,p]));
+  pending.sort((a,b) => order(byId.get(a),byId.get(b)));
+  assert.deepEqual(pending,["new-2","new-3"]);
 }
 
 console.log("cloud-client contract tests: pass");
 
 
+assert.ok(source.includes("const MAX_PTT_SNAPSHOT_BYTES = 16 * 1024 * 1024;"));
+assert.ok(source.slice(source.indexOf("async function loadPttArtifact("),source.indexOf("function articleOption(")).includes("fetchJson(url, MAX_PTT_SNAPSHOT_BYTES)"));
+assert.ok(source.includes("fetchJson(url, 512 * 1024)"));
+assert.equal(window.HoloViewerCloud.validatePush({push_id:"fixture",floor:null,source_line:1,kind:"→",author:"fixture",content:"",occurred_at:"2026-10-09T00:00:00Z"}).content,"");
+assert.throws(()=>window.HoloViewerCloud.validatePush({push_id:"fixture",floor:null,source_line:1,kind:"→",author:"fixture",content:123,occurred_at:"2026-10-09T00:00:00Z"}),/push.content/);
+
 const checkedConfig = JSON.parse(fs.readFileSync(new URL("./public-data/config.json", import.meta.url), "utf8"));
 assert.equal(
   checkedConfig.sources.live_relay,
-  "https://holoviewer-ptt-relay.singlebagel.workers.dev/v1/ptt",
-  "public preview must point at the deployed read-only relay",
+  null,
+  "read-only acceptance must not contact production D1 relay",
 );
 
 

@@ -2,6 +2,8 @@
   "use strict";
 
   const MAX_JSON_BYTES = 2 * 1024 * 1024;
+  // The public PTT exporter permits up to 16 MiB; other artifacts stay bounded.
+  const MAX_PTT_SNAPSHOT_BYTES = 16 * 1024 * 1024;
   const FETCH_TIMEOUT_MS = 8000;
   const RELAY_LIMIT = 200;
   const RELAY_POLL_MS = 5000;
@@ -160,7 +162,7 @@
       sourceLine,
       kind: boundedString(raw.kind, "push.kind", 16, true),
       author: boundedString(raw.author, "push.author", 64, true),
-      content: boundedString(raw.content, "push.content", 1000, true),
+      content: typeof raw.content === "string" ? boundedString(raw.content, "push.content", 1000) : boundedString(raw.content, "push.content", 1000, true),
       occurredAt: isoTime(raw.occurred_at, "push.occurred_at", false),
       cursor: raw.cursor == null ? null : Number(raw.cursor),
     };
@@ -176,10 +178,12 @@
     return text(a.occurredAt).localeCompare(text(b.occurredAt)) || a.pushId.localeCompare(b.pushId);
   }
 
-  function renderPushes(target, pushes) {
+  function renderPushes(target, pushes, visibleIds = null) {
     clear(target);
     for (const push of pushes.sort(pushOrder)) {
       const row = element("article", "ptt-push");
+      row.dataset.pushId = push.pushId;
+      if (visibleIds && !visibleIds.has(push.pushId)) row.hidden = true;
       const marker = push.floor == null ? "樓層未明" : `#${push.floor}`;
       row.append(element("span", "ptt-floor", marker));
       row.append(element("span", `ptt-kind kind-${push.kind}`, push.kind));
@@ -213,7 +217,7 @@
 
   async function loadPttArtifact(url) {
     if (!url) throw new PublicDataError("PTT public artifact is not configured");
-    const value = await fetchJson(url);
+    const value = await fetchJson(url, MAX_PTT_SNAPSHOT_BYTES);
     if (!value || value.schema_version !== 1 || !Array.isArray(value.articles)) throw new PublicDataError("PTT artifact schema is incompatible");
     isoTime(value.generated_at, "PTT generated_at");
     if (!["complete", "partial"].includes(value.completeness)) throw new PublicDataError("PTT completeness is invalid");
@@ -397,77 +401,85 @@
     speedLabel.style.cssText = "display:inline-flex;align-items:center;gap:6px;font-size:13px";
     const speedSelect = document.createElement("select");
     speedSelect.setAttribute("aria-label", "自動閱讀速度");
-    for (const [value, label] of [["0", "停止"], ["5", "慢（5 秒）"], ["3", "中（3 秒）"], ["1", "快（1 秒）"]]) {
+    for (const [value, label] of [["0", "暫停"], ["1", "慢（1 秒）"], ["0.5", "普通（0.5 秒）"], ["0.2", "快（0.2 秒）"]]) {
       const option = document.createElement("option");
       option.value = value;
       option.textContent = label;
       speedSelect.append(option);
     }
+    speedSelect.value = "0.5";
     speedLabel.append(speedSelect);
     controls.append(latestButton, followLabel, speedLabel);
     list.before(controls);
-    // User scrolling takes priority over both follow and automatic reading.
+    // The authoritative private Viewer paces NEW message reveal, not old-row scroll.
     let userPausedFollow = false;
-    let readingTimer = null;
-    const stopReading = () => {
-      if (readingTimer !== null) clearInterval(readingTimer);
-      readingTimer = null;
+    let revealTimer = null;
+    let pending = [];
+    let visibleIds = new Set();
+    let currentRows = new Map();
+    let checkpointKey = null;
+    const saveCheckpoint = (pushId) => {
+      try { if (checkpointKey) sessionStorage.setItem(checkpointKey, pushId); } catch (_) {}
     };
-    const resetReading = () => {
-      stopReading();
-      const seconds = Number(speedSelect.value);
-      if (!seconds) return;
-      // Advance from the first currently visible row, one push per interval.
-      readingTimer = setInterval(() => {
-        const rows = list.children;
-        if (!rows.length) return;
-        const top = window.scrollY + 100;
-        // Long articles use logarithmic row lookup instead of a full DOM scan.
-        let low = 0;
-        let high = rows.length;
-        while (low < high) {
-          const mid = (low + high) >>> 1;
-          if (rows[mid].getBoundingClientRect().top + window.scrollY > top + 2) high = mid;
-          else low = mid + 1;
-        }
-        const next = low < rows.length ? rows[low] : null;
-        if (!next) {
-          speedSelect.value = "0";
-          stopReading();
-          return;
-        }
-        next.scrollIntoView({ block: "start", behavior: "smooth" });
-      }, seconds * 1000);
+    const loadCheckpoint = () => {
+      try { return checkpointKey ? sessionStorage.getItem(checkpointKey) : null; } catch (_) { return null; }
     };
-    speedSelect.addEventListener("change", () => {
-      // Choosing a reading speed is explicit navigation, not live-tail following.
-      if (speedSelect.value !== "0") userPausedFollow = true;
-      resetReading();
-    });
-    const pauseOnManualNavigation = () => {
-      userPausedFollow = true;
-      // Manual navigation must win over a running 1/3/5-second reader timer.
-      if (readingTimer !== null) {
-        speedSelect.value = "0";
-        stopReading();
-      }
+    const rebuildRows = (pushes) => {
+      renderPushes(list, pushes, visibleIds);
+      currentRows = new Map(Array.from(list.children, (row) => [row.dataset.pushId, row]));
     };
-    window.addEventListener("wheel", pauseOnManualNavigation, { passive: true });
-    window.addEventListener("touchmove", pauseOnManualNavigation, { passive: true });
-    window.addEventListener("keydown", (event) => {
-      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key) &&
-          !["input", "textarea", "select"].includes(document.activeElement?.tagName?.toLowerCase())) pauseOnManualNavigation();
-    });
     const goLatest = () => {
       const last = list.lastElementChild;
       if (last) last.scrollIntoView({ block: "end", behavior: "auto" });
     };
+    const stopReveal = () => {
+      if (revealTimer !== null) clearTimeout(revealTimer);
+      revealTimer = null;
+    };
+    const revealNext = () => {
+      revealTimer = null;
+      if (!pending.length || speedSelect.value === "0") return;
+      const id = pending.shift();
+      visibleIds.add(id);
+      const row = currentRows.get(id);
+      if (row) row.hidden = false;
+      saveCheckpoint(id);
+      if (followInput.checked && !userPausedFollow) goLatest();
+      scheduleReveal();
+    };
+    const scheduleReveal = () => {
+      if (revealTimer !== null || !pending.length || speedSelect.value === "0") return;
+      revealTimer = setTimeout(revealNext, Number(speedSelect.value) * 1000);
+    };
+    const flushPending = () => {
+      stopReveal();
+      for (const id of pending) {
+        visibleIds.add(id);
+        const row = currentRows.get(id);
+        if (row) row.hidden = false;
+        saveCheckpoint(id);
+      }
+      pending = [];
+    };
+    const pauseOnManualNavigation = () => { userPausedFollow = true; };
+    window.addEventListener("wheel", pauseOnManualNavigation, { passive: true });
+    window.addEventListener("touchmove", pauseOnManualNavigation, { passive: true });
+    window.addEventListener("keydown", (event) => {
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key) &&
+          !["input", "textarea", "select"].includes(document.activeElement?.tagName?.toLowerCase())) {
+        pauseOnManualNavigation();
+      }
+    });
+    speedSelect.addEventListener("change", () => {
+      stopReveal();
+      scheduleReveal();
+    });
     latestButton.addEventListener("click", () => {
+      flushPending();
       userPausedFollow = false;
       goLatest();
     });
     followInput.addEventListener("change", () => {
-      // Re-enabling checkbox is an explicit choice to resume at the live tail.
       if (followInput.checked) {
         userPausedFollow = false;
         goLatest();
@@ -477,8 +489,8 @@
     let activeArticle = 0;
     const show = async () => {
       if (stopRelay) stopRelay();
-      speedSelect.value = "0";
-      stopReading();
+      stopReveal();
+      pending = [];
       const sequence = ++activeArticle;
       const article = artifact.articles.find((item) => item.articleId === select.value) || artifact.articles[0];
       const state = {
@@ -488,21 +500,45 @@
         timer: null,
       };
       userPausedFollow = false;
-      renderPushes(list, [...state.pushes.values()]);
+      checkpointKey = "holoviewer-ptt-reveal:" + article.articleId;
+      const initial = [...state.pushes.values()].sort(pushOrder);
+      const previousCheckpoint = loadCheckpoint();
+      const checkpointIndex = previousCheckpoint
+        ? initial.findIndex((push) => push.pushId === previousCheckpoint) : -1;
+      // Private 8501 makes only pushes AFTER a recognized session checkpoint
+      // newly animated. First visits and missing checkpoints show the baseline.
+      const visibleCount = checkpointIndex >= 0 ? checkpointIndex + 1 : initial.length;
+      visibleIds = new Set(initial.slice(0, visibleCount).map((push) => push.pushId));
+      pending = initial.slice(visibleCount).map((push) => push.pushId);
+      rebuildRows(initial);
+      if (initial.length && pending.length === 0) {
+        saveCheckpoint(initial[initial.length - 1].pushId);
+      }
+      scheduleReveal();
       // A newly selected article starts at its newest push, as in the desktop viewer.
       goLatest();
       const incomplete = artifact.completeness !== "complete" || article.completeness !== "complete";
       status(pageStatus, incomplete ? "partial" : "complete", incomplete ? "歷史資料不完整；未出現的推文不可解讀為 0。" : "歷史資料完整。 ");
-      stopRelay = await pollRelay(config, article.aid, state, (pushes) => {
+      const stopCurrentRelay = await pollRelay(config, article.aid, state, (pushes) => {
         if (sequence !== activeArticle) return;
-        // Scrolling up explicitly suspends live-tail following until Jump to latest.
-        const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24;
-        const shouldFollow = followInput.checked && !userPausedFollow && nearBottom && readingTimer === null;
+        // Snapshot rows are already visible; only genuinely new relay rows queue.
+        const known = new Set([...visibleIds, ...pending]);
+        const newPushes = pushes.filter((push) => {
+          if (known.has(push.pushId)) return false;
+          known.add(push.pushId);
+          return true;
+        }).sort(pushOrder);
+        for (const push of newPushes) pending.push(push.pushId);
+        const byId = new Map(pushes.map((push) => [push.pushId, push]));
+        pending.sort((a, b) => pushOrder(byId.get(a), byId.get(b)));
         const previousScroll = window.scrollY;
-        renderPushes(list, pushes);
-        if (shouldFollow) goLatest();
-        else window.scrollTo({ top: previousScroll, behavior: "instant" });
+        rebuildRows(pushes);
+        // DOM rebuilds must never steal a user-controlled history position.
+        window.scrollTo({ top: previousScroll, behavior: "instant" });
+        scheduleReveal();
       });
+      if (sequence !== activeArticle) stopCurrentRelay?.();
+      else stopRelay = stopCurrentRelay || null;
     };
     select.addEventListener("change", show);
     await show();
