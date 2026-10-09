@@ -8,6 +8,8 @@ globalThis.document = { readyState: "loading", addEventListener() {}, querySelec
 vm.runInThisContext(fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8"));
 
 
+assert.equal(window.HoloViewerCloud.validatePush({push_id:"ptt:v1:"+"a".repeat(64),floor:null,source_line:4,kind:"→",author:"fixture",content:"",occurred_at:"2026-10-09T00:00:00Z"}).content,"", "empty push body is valid in private projection contract");
+assert.throws(()=>window.HoloViewerCloud.validatePush({push_id:"ptt:v1:"+"a".repeat(64),floor:null,source_line:4,kind:"→",author:"fixture",content:42,occurred_at:"2026-10-09T00:00:00Z"}), /push.content/, "nontext push body remains invalid");
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://youtube.com/watch?v=abcdefghijk"), "abcdefghijk");
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://youtu.be/abcdefghijk"), "abcdefghijk");
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://example.com/watch?v=abcdefghijk"), null);
