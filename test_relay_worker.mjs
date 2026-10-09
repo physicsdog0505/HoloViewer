@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
+import {execFileSync} from "node:child_process";
 import {handleRequest, validatePublishBatch} from "./relay/worker.mjs";
 
 
@@ -315,4 +316,5 @@ const secondPage = await response.json();
 assert.ok(secondPage.pushes.length > 0);
 assert.ok(secondPage.next_cursor > firstPage.next_cursor);
 
+execFileSync("python3", ["test_relay_schema_sqlite.py"], {stdio: "inherit"});
 console.log("relay worker adapter tests: pass");
