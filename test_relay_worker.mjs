@@ -373,10 +373,15 @@ assert.equal(full.body.accepted,200);
 assert.ok(full.queries<=50);
 assert.ok(full.binds<=100);
 assert.equal(budgetDB.rows.length,200);
+const noOpMutationCount=budgetDB.mutationCount;
 full=await publishBudget(fullPushes);
 assert.equal(full.status,200);
+assert.equal(full.body.received,200);
 assert.equal(full.body.accepted,0);
 assert.ok(full.queries<=50);
+assert.equal(budgetDB.mutationCount,noOpMutationCount,
+  "full-size duplicate-only POST must execute no mutating SQL");
+assert.equal(budgetDB.rows.length,200);
 const extraPushes=Array.from({length:100},(_,i)=>makePush(i+200,`AID-extra-${i}`));
 full=await publishBudget([...fullPushes.slice(0,100),...extraPushes]);
 assert.equal(full.status,200);
@@ -388,6 +393,19 @@ budgetDB.floors.set("AID-blocked",3);
 full=await publishBudget([makePush(0,"AID-blocked")]);
 assert.equal(full.status,409);
 assert.equal(budgetDB.rows.length,300);
+// Fail-closed across 3 floor-query chunks (200 distinct article IDs):
+// source-line rejection in the *last* chunk must abort BEFORE mutating batch.
+const lateBlockDB=new FakeDB();
+const lateBlockEnv={...env,DB:lateBlockDB};
+const lastAid="AID-199";
+lateBlockDB.floors.set(lastAid,200);
+const lastResponse=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{
+  method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+  body:JSON.stringify({...batch,pushes:fullPushes})
+}),lateBlockEnv);
+assert.equal(lastResponse.status,409);
+assert.equal(lateBlockDB.rows.length,0);
+assert.equal(lateBlockDB.mutationCount,0);
 const originalBudgetBatch=budgetDB.batch.bind(budgetDB);
 budgetDB.batch=async()=>{throw new Error("hour insert budget exceeded");};
 full=await publishBudget([makePush(400,"AID-429")]);
