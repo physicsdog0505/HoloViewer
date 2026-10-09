@@ -8,7 +8,7 @@ globalThis.window = {};
 globalThis.location = { origin: "https://physicsdog0505.github.io" };
 globalThis.document = { readyState: "loading", addEventListener() {}, querySelector() { return null; } };
 const source = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
-vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, assertCompatiblePush, mergeCompatiblePushes, "));
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, assertCompatiblePush, mergeCompatiblePushes, compatiblePushMap, "));
 const client = window.HoloViewerCloud;
 const id = "ptt:v1:" + "a".repeat(64);
 const base = {
@@ -102,6 +102,13 @@ assert.throws(
   /payload conflict/
 );
 assert.equal(selfConflictRows.size, 0);
+
+// Initial snapshot entries must not silently overwrite the same-ID row.
+const duplicateStart = {...unchanged, content: "conflicting starting snapshot"};
+assert.throws(() => client.compatiblePushMap([unchanged, duplicateStart]), /payload conflict/);
+const identicalStart = client.compatiblePushMap([unchanged, {...unchanged}]);
+assert.equal(identicalStart.size, 1);
+assert.equal(identicalStart.get(id).content, unchanged.content);
 
 // Negative-path fixture matrix: verify no invalid relay page is accepted and no
 // incomplete snapshot is silently promoted to complete.
