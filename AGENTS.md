@@ -1,6 +1,6 @@
 # Public HoloViewer agent entrypoint
 
-**MANDATORY FIRST READ:** [HOLOVIEWER_PROJECT_GUIDELINES.md](HOLOVIEWER_PROJECT_GUIDELINES.md) from the current GitHub revision before any work. Follow its preflight, 8501 functional baseline, 4174 UI baseline, active freeze and mandatory prompt prefix. If it cannot be read, STOP risky work.
+**MANDATORY FIRST READ:** [HOLOVIEWER_PROJECT_GUIDELINES.md](HOLOVIEWER_PROJECT_GUIDELINES.md) from the current GitHub revision before any work. Follow its preflight, 8501 functional baseline, 4174 UI baseline, partial development release and remaining production freeze and mandatory prompt prefix. If it cannot be read, STOP risky work.
 
 **MANDATORY CROSS-WINDOW STATE:** Read [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) before resuming work, and use [docs/HANDOFF_TEMPLATE.md](docs/HANDOFF_TEMPLATE.md) for each cross-window transfer. Verify all stated SHA, PR and deployed status from current sources; treat contradictions as blockers for risky work.
 
