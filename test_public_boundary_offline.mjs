@@ -8,7 +8,7 @@ globalThis.window = {};
 globalThis.location = { origin: "https://physicsdog0505.github.io" };
 globalThis.document = { readyState: "loading", addEventListener() {}, querySelector() { return null; } };
 const source = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
-vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, assertCompatiblePush, "));
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, assertCompatiblePush, mergeCompatiblePushes, "));
 const client = window.HoloViewerCloud;
 const id = "ptt:v1:" + "a".repeat(64);
 const base = {
@@ -77,6 +77,31 @@ try {
 } finally {
   globalThis.fetch = originalFetch;
 }
+
+// Snapshot rebase must either commit the entire batch or preserve old rows.
+const unchanged = {pushId: id, floor: null, sourceLine: 7, kind: "推",
+                   author: "fixture", content: "synthetic push",
+                   occurredAt: "2026-10-09T01:00:00Z", cursor: 8};
+const newlySeen = {...unchanged, pushId: "ptt:v1:" + "b".repeat(64)};
+const conflict = {...unchanged, content: "conflicting rebase payload"};
+const existingRows = new Map([[id, unchanged]]);
+assert.throws(
+  () => client.mergeCompatiblePushes(existingRows, [newlySeen, conflict]),
+  /payload conflict/
+);
+assert.equal(existingRows.size, 1, "failed rebase must not partially insert");
+assert.equal(existingRows.get(id), unchanged, "failed rebase must not replace previous value");
+client.mergeCompatiblePushes(existingRows, [newlySeen, {...unchanged}]);
+assert.equal(existingRows.size, 2, "valid complete rebase should insert new evidence");
+assert.equal(existingRows.get(id).content, unchanged.content);
+
+// Snapshot refresh must also reject conflicting duplicate IDs within its own batch.
+const selfConflictRows = new Map();
+assert.throws(
+  () => client.mergeCompatiblePushes(selfConflictRows, [newlySeen, {...newlySeen, author: "changed"}]),
+  /payload conflict/
+);
+assert.equal(selfConflictRows.size, 0);
 
 // Negative-path fixture matrix: verify no invalid relay page is accepted and no
 // incomplete snapshot is silently promoted to complete.
