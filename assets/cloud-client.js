@@ -2,6 +2,8 @@
   "use strict";
 
   const MAX_JSON_BYTES = 2 * 1024 * 1024;
+  // The public PTT exporter permits up to 16 MiB; other artifacts stay bounded.
+  const MAX_PTT_SNAPSHOT_BYTES = 16 * 1024 * 1024;
   const FETCH_TIMEOUT_MS = 8000;
   const RELAY_LIMIT = 200;
   const RELAY_POLL_MS = 5000;
@@ -160,7 +162,7 @@
       sourceLine,
       kind: boundedString(raw.kind, "push.kind", 16, true),
       author: boundedString(raw.author, "push.author", 64, true),
-      content: boundedString(raw.content, "push.content", 1000, true),
+      content: typeof raw.content === "string" ? boundedString(raw.content, "push.content", 1000) : boundedString(raw.content, "push.content", 1000, true),
       occurredAt: isoTime(raw.occurred_at, "push.occurred_at", false),
       cursor: raw.cursor == null ? null : Number(raw.cursor),
     };
@@ -215,7 +217,7 @@
 
   async function loadPttArtifact(url) {
     if (!url) throw new PublicDataError("PTT public artifact is not configured");
-    const value = await fetchJson(url);
+    const value = await fetchJson(url, MAX_PTT_SNAPSHOT_BYTES);
     if (!value || value.schema_version !== 1 || !Array.isArray(value.articles)) throw new PublicDataError("PTT artifact schema is incompatible");
     isoTime(value.generated_at, "PTT generated_at");
     if (!["complete", "partial"].includes(value.completeness)) throw new PublicDataError("PTT completeness is invalid");
