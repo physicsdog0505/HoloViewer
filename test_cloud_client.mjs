@@ -8,6 +8,8 @@ globalThis.document = { readyState: "loading", addEventListener() {}, querySelec
 vm.runInThisContext(fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8"));
 
 
+assert.equal(window.HoloViewerCloud.validatePush({push_id:"ptt:v1:"+"a".repeat(64),floor:null,source_line:4,kind:"→",author:"fixture",content:"",occurred_at:"2026-10-09T00:00:00Z"}).content,"", "empty push body is valid in private projection contract");
+assert.throws(()=>window.HoloViewerCloud.validatePush({push_id:"ptt:v1:"+"a".repeat(64),floor:null,source_line:4,kind:"→",author:"fixture",content:42,occurred_at:"2026-10-09T00:00:00Z"}), /push.content/, "nontext push body remains invalid");
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://youtube.com/watch?v=abcdefghijk"), "abcdefghijk");
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://youtu.be/abcdefghijk"), "abcdefghijk");
 assert.equal(window.HoloViewerCloud.parseYouTubeId("https://example.com/watch?v=abcdefghijk"), null);
@@ -37,6 +39,11 @@ assert.ok(relayBody.includes("state.bootstrapTail = false"));
 assert.ok(relayBody.includes("for (const push of pendingPushes.values()) state.pushes.set(push.pushId, push);"));
 assert.ok(relayBody.indexOf("if (pageNumber === RELAY_MAX_PAGES_PER_POLL - 1) throw") < relayBody.indexOf("state.cursor = nextCursor"));
 assert.ok(relayBody.indexOf("if (stopped) return;", relayBody.indexOf("const pendingPushes")) < relayBody.indexOf("state.cursor = nextCursor"));
+
+// Atomic gap bookkeeping: a failed second page must not apply a first-page
+// history_gap flag before its batch, cursor and rows can be committed.
+assert.ok(!relayBody.includes("if (page.historyGap) state.historyIncomplete = true;"));
+assert.ok(relayBody.indexOf("if (historyGap) state.historyIncomplete = true;") > relayBody.indexOf("state.cursor = nextCursor;"));
 
 // Offline producer/consumer boundary checks against #302 public PTT exporter limits.
 const pttSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
@@ -129,6 +136,90 @@ try {
   assert.equal(actual.completeness,"partial");
 } finally {globalThis.fetch=oldFetchForContract;}
 
+// Cancelled in-flight relay failures must not clobber a newly selected article status.
+// This structural guard complements the browser race test pending owner acceptance.
+const cancelledPollSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
+const cancelledPollBody = cancelledPollSource.slice(cancelledPollSource.indexOf("async function pollRelay("), cancelledPollSource.indexOf("async function startPtt("));
+assert.ok(cancelledPollBody.includes('if (!stopped) state.relayStatus("stale"'), "cancelled poll must not write an obsolete stale status");
+
+// Behavioral race: an old article's in-flight fetch fails after the poll was cancelled.
+// Prior test re-exposed loadPttArtifact only; re-expose pollRelay within this VM.
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { pollRelay, "));
+// The cancelled old poll must never write over the new article's status.
+{
+  const previousFetch = globalThis.fetch;
+  const previousSetTimeout = globalThis.setTimeout;
+  const previousClearTimeout = globalThis.clearTimeout;
+  let rejectOldRequest;
+  const statuses = [];
+  globalThis.setTimeout = () => 1;
+  globalThis.clearTimeout = () => {};
+  globalThis.fetch = () => new Promise((resolve, reject) => { rejectOldRequest = reject; });
+  try {
+    const oldState = {
+      cursor: 0, pushes: new Map(), timer: null,
+      relayStatus: (kind) => statuses.push(kind),
+    };
+    const stopOld = await window.HoloViewerCloud.pollRelay(
+      {liveRelay:new URL("https://relay.example/v1/ptt"),ptt:null},
+      "old-article", oldState, () => { throw new Error("cancelled poll updated DOM"); }
+    );
+    assert.equal(typeof rejectOldRequest, "function", "old request must be in flight");
+    stopOld();
+    rejectOldRequest(new Error("old request failed after switch"));
+    for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(statuses, [], "cancelled old request must not update status");
+    assert.equal(oldState.cursor, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.setTimeout = previousSetTimeout;
+    globalThis.clearTimeout = previousClearTimeout;
+  }
+}
+
+// Multi-page atomicity: page one reports a retention gap, page two fails.
+// No cursor, rows, gap flag, or repaint should be committed from that poll.
+{
+  vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { pollRelay, "));
+  const oldFetch = globalThis.fetch;
+  const oldSetTimeout = globalThis.setTimeout;
+  const oldClearTimeout = globalThis.clearTimeout;
+  let calls = 0;
+  let paints = 0;
+  const states = [];
+  globalThis.setTimeout = () => 1;
+  globalThis.clearTimeout = () => {};
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 2) throw new Error("second relay page failed");
+    return new Response(JSON.stringify({
+      ...page, history_gap:true, purged_through_cursor:1,
+      has_more:true, checked_at:new Date().toISOString(),
+      pushes:[{...push, cursor:1}], next_cursor:1,
+    }), {status:200,headers:{"content-type":"application/json"}});
+  };
+  try {
+    const state = {cursor:0,pushes:new Map(),timer:null,relayStatus:(kind)=>states.push(kind)};
+    const stop = await window.HoloViewerCloud.pollRelay(
+      {liveRelay:new URL("https://relay.example/v1/ptt"),ptt:null},
+      "M.123.A.1",state,()=>{paints++;}
+    );
+    for (let i=0; i<20 && calls<2; i++) await new Promise(resolve=>setImmediate(resolve));
+    for (let i=0; i<10; i++) await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(calls,2);
+    assert.equal(state.cursor,0,"failed page must not advance cursor");
+    assert.equal(state.pushes.size,0,"failed page must not commit pushes");
+    assert.equal(state.historyIncomplete,undefined,"failed page must not commit gap");
+    assert.equal(paints,0,"failed page must not repaint");
+    assert.equal(states.at(-1),"stale","failed poll reports temporary failure");
+    stop();
+  } finally {
+    globalThis.fetch=oldFetch;
+    globalThis.setTimeout=oldSetTimeout;
+    globalThis.clearTimeout=oldClearTimeout;
+  }
+}
+
 // Idle relay polls must preserve DOM and reading position, including long articles.
 const liveSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
 const livePoll = liveSource.slice(liveSource.indexOf("async function pollRelay("), liveSource.indexOf("async function startPtt("));
@@ -139,20 +230,77 @@ const readerSource = fs.readFileSync(new URL("./assets/cloud-client.js", import.
 const readerBody = readerSource.slice(readerSource.indexOf("async function startPtt("), readerSource.indexOf("async function startCustomView("));
 assert.ok(readerBody.includes('["0", "停止"]'));
 for (const seconds of ["5", "3", "1"]) assert.ok(readerBody.includes('["' + seconds + '",'));
-assert.ok(readerBody.includes('speedSelect.addEventListener("change", resetReading)'));
+assert.ok(readerBody.includes('speedSelect.addEventListener("change", () => {'));
 assert.ok(readerBody.includes('speedSelect.value = "0";\n      stopReading();'));
-assert.ok(readerBody.includes('if (followInput.checked && nearBottom) goLatest()'));
+assert.ok(readerBody.includes("const shouldFollow = followInput.checked && !userPausedFollow && nearBottom && readingTimer === null"));
+assert.ok(readerBody.includes('window.addEventListener("wheel", pauseOnManualNavigation'));
+assert.ok(readerBody.includes('window.addEventListener("touchmove", pauseOnManualNavigation'));
+assert.ok(readerBody.includes('speedSelect.value = "0";\n        stopReading();'));
+assert.ok(readerBody.includes("userPausedFollow = false;\n      goLatest();"));
+assert.ok(readerBody.includes('window.scrollTo({ top: previousScroll, behavior: "instant" })'));
 assert.ok(readerBody.includes('if (sequence !== activeArticle) return'));
+
+// Behavioral complexity guard: long articles must not linearly scan every row
+// at each automatic-reading tick. Execute the actual reader search snippet.
+{
+  const from = readerSource.indexOf("        const rows = list.children;");
+  const to = readerSource.indexOf("        if (!next) {", from);
+  assert.ok(from >= 0 && to > from);
+  const snippet = readerSource.slice(from, to);
+  const rowCount = 2623;
+  let geometryReads = 0;
+  const rows = Array.from({length:rowCount}, (_,i) => ({
+    getBoundingClientRect() { geometryReads++; return {top: i * 24 - 800}; },
+  }));
+  const list = {children:rows};
+  const viewport = {scrollY:800};
+  const selectNext = new Function("list", "window", snippet + "return next;");
+  const next = selectNext(list, viewport);
+  assert.equal(next, rows[38], "reader advances from first row below scroll threshold");
+  assert.ok(geometryReads <= 13, "2,623-row reader lookup must use logarithmic geometry reads");
+}
 
 console.log("cloud-client contract tests: pass");
 
 
 const checkedConfig = JSON.parse(fs.readFileSync(new URL("./public-data/config.json", import.meta.url), "utf8"));
+// Production exporter permits up to 16 MiB PTT snapshots, while other artifacts
+// remain under the default 2 MiB and relay pages under 512 KiB.
+assert.ok(source.includes("const MAX_PTT_SNAPSHOT_BYTES = 16 * 1024 * 1024;"));
+const pttLoader = source.slice(source.indexOf("async function loadPttArtifact("), source.indexOf("function articleOption("));
+assert.ok(pttLoader.includes("fetchJson(url, MAX_PTT_SNAPSHOT_BYTES)"));
+assert.ok(source.includes("async function fetchJson(url, maxBytes = MAX_JSON_BYTES)"));
+assert.ok(source.includes("fetchJson(url, 512 * 1024)"));
+
 assert.equal(
   checkedConfig.sources.live_relay,
-  "https://holoviewer-ptt-relay.singlebagel.workers.dev/v1/ptt",
-  "public preview must point at the deployed read-only relay",
+  null,
+  "snapshot-only acceptance must not request the D1 relay",
 );
+
+// When relay is intentionally disabled, the PTT reader must stay on the
+// local snapshot and must not issue even a read request to Cloudflare.
+{
+  const previousFetch = globalThis.fetch;
+  let requests = 0;
+  const statuses = [];
+  globalThis.fetch = async () => {
+    requests++;
+    throw new Error("snapshot-only mode unexpectedly requested the relay");
+  };
+  try {
+    await window.HoloViewerCloud.pollRelay(
+      { liveRelay: null, ptt: new URL("https://physicsdog0505.github.io/HoloViewer/public-data/demo/ptt.json") },
+      "M.123.A.1",
+      { cursor: 0, pushes: new Map(), timer: null, relayStatus: (kind) => statuses.push(kind) },
+      () => { throw new Error("disabled relay unexpectedly repainted the reader"); }
+    );
+    assert.equal(requests, 0, "no live relay requests in snapshot-only acceptance");
+    assert.deepEqual(statuses, ["unavailable"]);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+}
 
 
 // explicit Live Sync relay AID

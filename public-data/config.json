@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "environment": "cloud-preview-real-relay",
+  "environment": "snapshot-only-acceptance",
   "generated_at": "2026-10-09T00:00:00Z",
   "sources": {
     "homepage": "demo/home.json",
     "ptt": "live/ptt.json",
     "watchalong": "demo/watchalong.json",
     "transcripts": "demo/transcripts.json",
-    "live_relay": "https://holoviewer-ptt-relay.singlebagel.workers.dev/v1/ptt"
+    "live_relay": null
   },
   "watchalong_policy": {
     "automatic_follower_playback": false
