@@ -499,16 +499,20 @@
       };
       userPausedFollow = false;
       checkpointKey = "holoviewer-ptt-reveal:" + article.articleId;
-      visibleIds = new Set(article.pushes.map((push) => push.pushId));
-      const initial = [...state.pushes.values()];
+      const initial = [...state.pushes.values()].sort(pushOrder);
       const previousCheckpoint = loadCheckpoint();
-      // A restored checkpoint is meaningful only when it exists in this baseline;
-      // never advance beyond unseen live rows simply because a page refreshed.
-      const checkpointInBaseline = initial.some((push) => push.pushId === previousCheckpoint);
+      const checkpointIndex = previousCheckpoint
+        ? initial.findIndex((push) => push.pushId === previousCheckpoint) : -1;
+      // Private 8501 makes only pushes AFTER a recognized session checkpoint
+      // newly animated. First visits and missing checkpoints show the baseline.
+      const visibleCount = checkpointIndex >= 0 ? checkpointIndex + 1 : initial.length;
+      visibleIds = new Set(initial.slice(0, visibleCount).map((push) => push.pushId));
+      pending = initial.slice(visibleCount).map((push) => push.pushId);
       rebuildRows(initial);
-      if (initial.length && (!previousCheckpoint || checkpointInBaseline)) {
+      if (initial.length && pending.length === 0) {
         saveCheckpoint(initial[initial.length - 1].pushId);
       }
+      scheduleReveal();
       // A newly selected article starts at its newest push, as in the desktop viewer.
       goLatest();
       const incomplete = artifact.completeness !== "complete" || article.completeness !== "complete";
