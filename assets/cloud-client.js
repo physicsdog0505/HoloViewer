@@ -306,6 +306,16 @@
     }));
   }
 
+  function assertCompatiblePush(existing, incoming) {
+    if (!existing) return;
+    // Cursor is transport-local; it is not part of the canonical push payload.
+    for (const field of ["floor", "sourceLine", "kind", "author", "content", "occurredAt"]) {
+      if (existing[field] !== incoming[field]) {
+        throw new PublicDataError("snapshot/live push_id payload conflict");
+      }
+    }
+  }
+
   async function pollRelay(config, aid, state, onUpdate) {
     if (!config.liveRelay) {
       state.relayStatus("unavailable", "即時 relay 尚未設定；目前顯示歷史快照。", false);
@@ -333,7 +343,11 @@
           checkedAt = page.checkedAt;
           historyGap = historyGap || page.historyGap;
           if (page.historyGap) state.historyIncomplete = true;
-          for (const push of page.pushes) pendingPushes.set(push.pushId, push);
+          for (const push of page.pushes) {
+            assertCompatiblePush(pendingPushes.get(push.pushId), push);
+            assertCompatiblePush(state.pushes.get(push.pushId), push);
+            pendingPushes.set(push.pushId, push);
+          }
           nextCursor = page.nextCursor;
           if (!page.hasMore) break;
           if (pageNumber === RELAY_MAX_PAGES_PER_POLL - 1) throw new PublicDataError("relay pagination exceeds client poll bound");
