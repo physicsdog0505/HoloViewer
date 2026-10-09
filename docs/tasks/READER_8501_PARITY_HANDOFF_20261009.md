@@ -39,7 +39,7 @@ STOP CONDITIONS: Cannot substantiate 8501 live behavior, conflicts with 4174 sty
 ## Bounded implementation plan and acceptance gate
 
 1. Preflight and record current PR HEAD, both guidelines, docs, current 8501 source, 4174 styling evidence and current CI before modifications. Post GitHub PR #18 task-start comment with link to THIS handoff and a verified/unknown table.
-2. Create a **behavior matrix** of existing 8501 source/live evidence versus #18 for first visit, reload with checkpoint, missing checkpoint, updated snapshot, new relay push, dedupe/order, hidden-row reveal interval, manual upward/downward scroll, bottom scroll flush, Latest flush, article switch, pause/follow, 300-row default and other existing controls. Mark every cell VERIFIED (source/live independently) or UNKNOWN. No UI redesign.
+2. Create a **behavior matrix** of existing 8501 source/live evidence versus #18 for first visit, reload with checkpoint, missing checkpoint, updated snapshot, new relay push, dedupe/order, hidden-row reveal interval, manual upward/downward scroll, bottom scroll flush, Latest flush, any existing article/navigation context (do NOT assume article switching exists), pause/follow, 300-row default and other existing controls. Mark every cell VERIFIED (source/live independently) or UNKNOWN. No UI redesign.
 3. Write failing, executable DOM/runtime behavior regressions on actual Reader code for the mismatches, not just source-string assertions. Use synthetic data and zero live endpoints. Keep current separate snapshot/cost/relay checks intact.
 4. Fix only **evidenced** differences in the existing #18 Reader code and tests; avoid changing shared `pollRelay`, Cloudflare, playback/watchalong, homepage, or global CSS. If an actual baseline conflict arises, STOP the affected change and ask.
 5. Run required Public tests: `python3 -B -m unittest -v test_pages_poc test_public_smoke`, `node test_cloud_client.mjs`, `node test_relay_worker.mjs` (offline), plus any direct Reader behavioral test and PR CI. State exact versions and results; if not runnable, explain and mark untested. Confirm no production Pages deployment triggered.
@@ -56,3 +56,8 @@ STOP CONDITIONS: Cannot substantiate 8501 live behavior, conflicts with 4174 sty
 
 - Status: **ASSIGNED / NOT STARTED**. No developer has acknowledged this task yet.
 - This file + PR #18 issue comment are the permanent GitHub task log entrypoint. New execution evidence goes to the same PR thread, not separate informal handoffs.
+
+## Correction — user challenge, 2026-10-09
+- **Article switching is NOT an approved 8501 feature.** The coordinator incorrectly promoted Public #18's `article-select` implementation into the user-facing task scope. Do not add, implement, or require article-switch UI based on this handoff.
+- First verify which article/selection or navigation controls actually exist in live 8501. If no verified matching control exists, treat Public's selector as an **unaccepted divergence**, not a feature to replicate. Do not remove Public controls without scope/owner approval either; log discrepancy and request a decision.
+- No repeated manual test request to user. Scope remains strictly 8501 reader parity.
