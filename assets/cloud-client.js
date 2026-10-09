@@ -162,7 +162,7 @@
       sourceLine,
       kind: boundedString(raw.kind, "push.kind", 16, true),
       author: boundedString(raw.author, "push.author", 64, true),
-      content: boundedString(raw.content, "push.content", 1000, false) ?? "",
+      content: typeof raw.content === "string" ? boundedString(raw.content, "push.content", 1000) : boundedString(raw.content, "push.content", 1000, true),
       occurredAt: isoTime(raw.occurred_at, "push.occurred_at", false),
       cursor: raw.cursor == null ? null : Number(raw.cursor),
     };
