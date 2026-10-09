@@ -130,3 +130,10 @@ Repair contract for existing Public #12 and Private #324 work (not yet implement
 - Worker must prevent pruned historic IDs from being reinserted under its approved retention horizon. Evaluate tombstones/watermark strategy with finite storage and late-arrival semantics before coding; do not silently assume source_line monotonicity.
 - Add SQLite-engine regression for duplicate gap → prune → replay and Reader ordering; FakeDB alone is insufficient.
 - Keep current operations frozen: no Cloudflare D1 writes, deployment, merges, operational schema changes, or Publisher restarts.
+
+## 2026-10-09 triage cutoff / development resumption decision
+- Broad inventory is CLOSED for scheduling purposes: do not block all HoloViewer development on full historical PR audit or D1 billing attribution. The above known blockers remain tracked, not resolved.
+- READY TO RESUME without D1 writes: existing local 8501 function / 4174 UI parity inspection, GitHub Pages read-only UI wiring, snapshot-based PTT Today with known 3,169-row local acceptance evidence, and other independent front-end fixes that preserve established baseline. No automatic production deployment or unauthorized UI redesign.
+- P0 BLOCKED: D1 Publisher restart, Worker deployment/DB schema migration, retention changes against production, or declaring cloud live PTT verified. Requires offline fix + review + cost/safety criteria and explicit operational approval.
+- Next practical gate: obtain a browser-accessible GitHub Pages read-only acceptance build tied to exact commit, preserving 8501 behavior/4174 appearance; verify real PTT snapshot locally first, then obtain user acceptance before production cutover. Existing 8766 server was a stopped local test, not a live/public deployment.
+- Local runtime and Mac health remain unverified until user-attended read-only inspection; do not hold unrelated development hostage to that inspection.
