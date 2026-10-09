@@ -179,7 +179,20 @@ async function publish(request, env) {
   statements.push(env.DB.prepare(
     "DELETE FROM ptt_write_rate WHERE window_kind='hour' AND window_key < strftime('%Y-%m-%dT%H', 'now', '-2 days')"
   ));
-  const results = await env.DB.batch(statements);
+  let results;
+  try {
+    results = await env.DB.batch(statements);
+  } catch (error) {
+    const reason = String(error?.message || "");
+    if (reason.includes("minute insert budget exceeded") ||
+        reason.includes("hour insert budget exceeded")) {
+      throw new RelayError("relay write budget exceeded", 429);
+    }
+    if (reason.includes("purged source floor capacity reached")) {
+      throw new RelayError("purge provenance storage full; writes paused", 503);
+    }
+    throw error;
+  }
   const accepted = results.slice(0, fresh.length).reduce(
     (total, result) => total + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0
   );
