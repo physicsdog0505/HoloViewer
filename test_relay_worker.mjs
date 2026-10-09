@@ -282,6 +282,32 @@ const legacyReply=await handleRequest(new Request("https://relay.example/v1/ptt/
 assert.equal(legacyReply.status,409);
 assert.equal(legacyPurgedDB.rows.length,0);
 
+
+// Full Worker-path replay after actual retention must be rejected.
+const purgedOld = {...push};
+const beforePurgedReplayCount = retentionDB.rows.length;
+const replayAfterPrune = await handleRequest(new Request(
+  "https://relay.example/v1/ptt/publish", {
+    method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+    body:JSON.stringify({...batch,pushes:[purgedOld]})
+  }), retentionEnv);
+assert.equal(replayAfterPrune.status,409);
+assert.equal(retentionDB.rows.length,beforePurgedReplayCount);
+
+// Two simultaneous producers of the same ID: transaction and UNIQUE must
+// allow only one effective accepted mutation even with a shared fake backend.
+const concurrentDB=new FakeDB();
+const concurrentEnv={...env,DB:concurrentDB};
+const postConcurrent = () => handleRequest(new Request(
+  "https://relay.example/v1/ptt/publish", {
+    method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+    body:JSON.stringify(batch)
+  }), concurrentEnv);
+const parallel = await Promise.all([postConcurrent(),postConcurrent()]);
+const replies = await Promise.all(parallel.map(r=>r.json()));
+assert.equal(replies.reduce((total,r)=>total+r.accepted,0),1);
+assert.equal(concurrentDB.rows.length,1);
+
 // Read responses must stay within the relay v1 512 KiB wire bound and paginate.
 const byteDB = new FakeDB();
 byteDB.rows = Array.from({length:500}, (_,i) => {
