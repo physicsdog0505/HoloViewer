@@ -112,3 +112,26 @@ The operational D1 migration and deployment are **not authorized**:
   do not guess old source-line floors, delete operational data, or treat an
   HTTP 409 as successfully delivered. Planned migration needs review, backup/
   rollback design and separate owner authorization.
+
+## Workers Free SQL invocation compatibility (offline candidate, 2026-10-09)
+
+Cloudflare D1 documents **100 bound parameters per SQL statement** and Workers
+Free **50 D1 queries per Worker invocation**. Every SQL statement in a
+`DB.batch()` counts independently for safety budgeting; a batch does **not**
+turn 25 INSERT statements into one counted query.
+
+This adapter reserves headroom with an in-process maximum of **45 statements**
+per publish invocation and **96 bind arguments per query**. An accepted 200-push
+request consumes at most **39 statements** (3 ID existence lookups, 6 source
+floor/watermark lookups for 200 distinct AIDs, 25 inserts with 8 rows each,
+5 retention/rate-ledger statements) and 88 INSERT bind parameters maximum.
+Fully duplicate requests perform only existence lookups; no SQL mutation.
+A partially duplicate payload still ACKs `received=200` and counts only
+actual newly inserted rows in `accepted`. All preflight lookups and the
+mutating D1 batch retain the authenticated v1 API contract.
+
+The Free ceilings are **per Worker invocation**, not D1 daily cost caps.
+D1's actual metered Rows Read/Written, query execution limits, and hosted batch
+semantics still require separately approved low-volume canary evidence. No
+Worker deployment or paid Cloudflare test was performed for this patch.
+Reference: https://developers.cloudflare.com/d1/platform/limits/
