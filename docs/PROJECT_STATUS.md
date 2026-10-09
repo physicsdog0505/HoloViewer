@@ -4,7 +4,7 @@ Status owner: active integration/audit agent (NOT a chat-specific narrative)
 **This is an evidence index, not proof of deployment or automatic synchronization. Always refresh GitHub and runtime state.**
 
 ## Immediate operating condition
-- **DEVELOPMENT FREEZE**: only explicitly authorized documentation and read-only audit. No feature implementation, agent dispatch, merging, deployments, production DB changes, or D1 PTT Publisher restart.
+- **PARTIAL RELEASE, 2026-10-09 owner decision**: D1-independent implementation on existing branches and offline tests may resume. Still prohibited: production deployment, merge, live DB writes, D1 Publisher restart, unapproved UI behavior changes, and new agent dispatch without authorization.
 - Product source of truth: live **8501 = functional behavior**; live **4174 = visual/UI behavior**. Runtime parity **NOT VERIFIED in this document**. Conflicts go to user; no agent arbitrates.
 - [Mandatory guidelines](../HOLOVIEWER_PROJECT_GUIDELINES.md) and [AGENTS](../AGENTS.md) govern all new windows.
 - User deleted the old Streamlit Cloud App; screenshot showed no apps in the current account. **GitHub Pages production acceptance remains UNVERIFIED.**
