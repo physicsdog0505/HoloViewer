@@ -260,6 +260,14 @@ console.log("cloud-client contract tests: pass");
 
 
 const checkedConfig = JSON.parse(fs.readFileSync(new URL("./public-data/config.json", import.meta.url), "utf8"));
+// Production exporter permits up to 16 MiB PTT snapshots, while other artifacts
+// remain under the default 2 MiB and relay pages under 512 KiB.
+assert.ok(source.includes("const MAX_PTT_SNAPSHOT_BYTES = 16 * 1024 * 1024;"));
+const pttLoader = source.slice(source.indexOf("async function loadPttArtifact("), source.indexOf("function articleOption("));
+assert.ok(pttLoader.includes("fetchJson(url, MAX_PTT_SNAPSHOT_BYTES)"));
+assert.ok(source.includes("async function fetchJson(url, maxBytes = MAX_JSON_BYTES)"));
+assert.ok(source.includes("fetchJson(url, 512 * 1024)"));
+
 assert.equal(
   checkedConfig.sources.live_relay,
   null,
