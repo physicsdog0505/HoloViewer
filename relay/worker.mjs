@@ -109,7 +109,21 @@ async function publish(request, env) {
   // Cloudflare D1 batch executes its statements transactionally: do not expose
   // a partially published push batch when a later insert fails.
   if (typeof env.DB.batch !== "function") throw new RelayError("atomic D1 batch is unavailable", 503);
-  const statements = batch.pushes.map((push) => env.DB.prepare(
+  // A duplicate-only request must not execute mutating SQL. This avoids
+  // retention churn during overlapping Publisher retries. The UNIQUE index
+  // remains the final concurrency guard for two simultaneous producers.
+  const known = new Set();
+  if (batch.pushes.length) {
+    const placeholders = batch.pushes.map(() => "?").join(",");
+    const existing = await env.DB.prepare(
+      `SELECT push_id FROM ptt_pushes WHERE push_id IN (${placeholders})`
+    ).bind(...batch.pushes.map(push => push.push_id)).all();
+    for (const row of existing?.results || []) known.add(String(row.push_id));
+  }
+  const fresh = batch.pushes.filter(push => !known.has(push.push_id));
+  if (!fresh.length) return json({schema_version: 1, accepted: 0, received: batch.pushes.length});
+
+  const statements = fresh.map((push) => env.DB.prepare(
     `INSERT OR IGNORE INTO ptt_pushes
        (push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at, producer_id, published_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -117,20 +131,26 @@ async function publish(request, env) {
     push.push_id, push.aid, push.article_url, push.source_line, push.floor,
     push.kind, push.author, push.content, push.occurred_at, batch.producer_id, batch.published_at
   ));
-  const results = statements.length ? await env.DB.batch(statements) : [];
-  const accepted = results.reduce((total, result) => total + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0);
   const keep = Number.isSafeInteger(Number(env.RETENTION_ROWS)) ? Math.max(1000, Number(env.RETENTION_ROWS)) : DEFAULT_RETENTION_ROWS;
-  // The watermark and prune must commit together, or history gaps become invisible.
-  const threshold = Math.max(0, await env.DB.prepare("SELECT COALESCE(MAX(cursor),0) AS max_cursor FROM ptt_pushes").first().then((row) => Number(row?.max_cursor || 0)) - keep);
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO ptt_retention_watermark (aid, purged_through_cursor)
-       SELECT aid, MAX(cursor) FROM ptt_pushes WHERE cursor <= ? GROUP BY aid
+  // Retain the newest N *actual rows*, not a max(cursor)-N span: AUTOINCREMENT
+  // skips values after ignored inserts. The two statements share a D1 batch
+  // transaction, so a deletion never precedes its history-gap watermark.
+  const boundary = `SELECT cursor FROM ptt_pushes ORDER BY cursor DESC LIMIT 1 OFFSET ?`;
+  statements.push(env.DB.prepare(
+    `INSERT INTO ptt_retention_watermark (aid, purged_through_cursor)
+       SELECT aid, MAX(cursor) FROM ptt_pushes
+       WHERE cursor < COALESCE((${boundary}), 0)
+       GROUP BY aid
        ON CONFLICT(aid) DO UPDATE SET purged_through_cursor =
          MAX(ptt_retention_watermark.purged_through_cursor, excluded.purged_through_cursor)`
-    ).bind(threshold),
-    env.DB.prepare("DELETE FROM ptt_pushes WHERE cursor <= ?").bind(threshold),
-  ]);
+  ).bind(keep - 1));
+  statements.push(env.DB.prepare(
+    `DELETE FROM ptt_pushes WHERE cursor < COALESCE((${boundary}), 0)`
+  ).bind(keep - 1));
+  const results = await env.DB.batch(statements);
+  const accepted = results.slice(0, fresh.length).reduce(
+    (total, result) => total + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0
+  );
   return json({schema_version: 1, accepted, received: batch.pushes.length});
 }
 
