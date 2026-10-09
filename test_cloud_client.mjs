@@ -266,6 +266,30 @@ assert.equal(
   "snapshot-only acceptance must not request the D1 relay",
 );
 
+// When relay is intentionally disabled, the PTT reader must stay on the
+// local snapshot and must not issue even a read request to Cloudflare.
+{
+  const previousFetch = globalThis.fetch;
+  let requests = 0;
+  const statuses = [];
+  globalThis.fetch = async () => {
+    requests++;
+    throw new Error("snapshot-only mode unexpectedly requested the relay");
+  };
+  try {
+    await window.HoloViewerCloud.pollRelay(
+      { liveRelay: null, ptt: new URL("https://physicsdog0505.github.io/HoloViewer/public-data/demo/ptt.json") },
+      "M.123.A.1",
+      { cursor: 0, pushes: new Map(), timer: null, relayStatus: (kind) => statuses.push(kind) },
+      () => { throw new Error("disabled relay unexpectedly repainted the reader"); }
+    );
+    assert.equal(requests, 0, "no live relay requests in snapshot-only acceptance");
+    assert.deepEqual(statuses, ["unavailable"]);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+}
+
 
 // explicit Live Sync relay AID
 const liveSyncBody = source.slice(source.indexOf("async function startCustomView("), source.indexOf("function validateWatchalong("));
