@@ -2,7 +2,7 @@
   "use strict";
 
   const MAX_JSON_BYTES = 2 * 1024 * 1024;
-  // Match private public_ptt_projection.py MAX_OUTPUT_BYTES; only PTT snapshots use this bound.
+  // Match the private exporter's 16 MiB cap; only PTT snapshots use this bound.
   const MAX_PTT_SNAPSHOT_BYTES = 16 * 1024 * 1024;
   const FETCH_TIMEOUT_MS = 8000;
   const RELAY_LIMIT = 200;
