@@ -22,6 +22,7 @@ class FakeStatement {
   bind(...args) { this.args=args; return this; }
   async run() {
     if (this.sql.startsWith("INSERT OR IGNORE")) {
+      this.db.mutationCount++;
       const [push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at]=this.args;
       if (this.db.rows.some((row)=>row.push_id===push_id)) return {meta:{changes:0}};
       this.db.cursor += 1;
@@ -29,15 +30,19 @@ class FakeStatement {
       return {meta:{changes:1}};
     }
     if (this.sql.startsWith("INSERT INTO ptt_retention_watermark")) {
-      const threshold=this.args[0];
-      for(const row of this.db.rows.filter(row=>row.cursor<=threshold)) {
+      this.db.mutationCount++;
+      const keep=this.args[0]+1;
+      const boundary=[...this.db.rows].sort((a,b)=>b.cursor-a.cursor)[keep-1]?.cursor || 0;
+      for(const row of this.db.rows.filter(row=>row.cursor<boundary)) {
         this.db.watermarks.set(row.aid,Math.max(this.db.watermarks.get(row.aid)||0,row.cursor));
       }
       return {meta:{changes:0}};
     }
     if (this.sql.startsWith("DELETE FROM")) {
-      const threshold=this.args[0];
-      this.db.rows=this.db.rows.filter((row)=>row.cursor>threshold);
+      this.db.mutationCount++;
+      const keep=this.args[0]+1;
+      const boundary=[...this.db.rows].sort((a,b)=>b.cursor-a.cursor)[keep-1]?.cursor || 0;
+      this.db.rows=this.db.rows.filter((row)=>row.cursor>=boundary);
       return {meta:{changes:0}};
     }
     throw new Error("unexpected run SQL");
@@ -49,16 +54,19 @@ class FakeStatement {
     throw new Error("unexpected first SQL");
   }
   async all() {
+    if (this.sql.startsWith("SELECT push_id")) {
+      return {results:this.db.rows.filter(row=>this.args.includes(row.push_id)).map(row=>({push_id:row.push_id}))};
+    }
     if (!this.sql.startsWith("SELECT cursor")) throw new Error("unexpected all SQL");
     const [aid,after,limit]=this.args;
     return {results:this.db.rows.filter((row)=>row.aid===aid&&row.cursor>after).sort((a,b)=>a.cursor-b.cursor).slice(0,limit)};
   }
 }
 class FakeDB {
-  constructor(){this.rows=[];this.cursor=0;this.failAtBatchIndex=-1;this.watermarks=new Map();}
+  constructor(){this.rows=[];this.cursor=0;this.failAtBatchIndex=-1;this.watermarks=new Map();this.mutationCount=0;}
   prepare(sql){return new FakeStatement(this,sql);}
   async batch(statements){
-    const rows=this.rows.map((row)=>({...row})), cursor=this.cursor, watermarks=new Map(this.watermarks);
+    const rows=this.rows.map((row)=>({...row})), cursor=this.cursor, watermarks=new Map(this.watermarks), mutationCount=this.mutationCount;
     const results=[];
     try {
       for(let i=0;i<statements.length;i++){
@@ -67,7 +75,7 @@ class FakeDB {
       }
       return results;
     } catch(error){
-      this.rows=rows;this.cursor=cursor;this.watermarks=watermarks;
+      this.rows=rows;this.cursor=cursor;this.watermarks=watermarks;this.mutationCount=mutationCount;
       throw error;
     }
   }
@@ -103,6 +111,7 @@ assert.equal(DB.rows.length,1);
 response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify(batch)}),env);
 assert.equal((await response.json()).accepted,0);
 assert.equal(DB.rows.length,1);
+assert.equal(DB.mutationCount,3, "duplicate-only POST must not write or prune");
 
 response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=0&limit=200"),env);
 assert.equal(response.status,200);
@@ -182,6 +191,30 @@ response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",
 assert.equal((await response.json()).accepted,0);
 assert.equal(retentionDB.watermarks.get("M.123.A.1"),3);
 
+
+
+// Sparse cursor proof: logical row count must govern retention, not max(cursor).
+const sparseDB = new FakeDB();
+sparseDB.rows = Array.from({length:1000}, (_,i)=>({...push,cursor:i===999?9000:i+1,push_id:`sparse-${i}`}));
+sparseDB.cursor=9000;
+const sparseEnv={...env,DB:sparseDB};
+const lateBase={...push,source_line:1005,floor:1005};delete lateBase.push_id;
+const late={...lateBase,push_id:canonicalPushId(lateBase)};
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{
+  method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+  body:JSON.stringify({...batch,pushes:[late]})
+}),sparseEnv);
+assert.equal(response.status,200);
+assert.equal(sparseDB.rows.length,1000);
+assert.equal(sparseDB.rows[0].cursor,2);
+assert.equal(sparseDB.watermarks.get(push.aid),1);
+const afterFirstMutation=sparseDB.mutationCount;
+response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{
+  method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+  body:JSON.stringify({...batch,pushes:[late]})
+}),sparseEnv);
+assert.equal((await response.json()).accepted,0);
+assert.equal(sparseDB.mutationCount,afterFirstMutation);
 
 // Read responses must stay within the relay v1 512 KiB wire bound and paginate.
 const byteDB = new FakeDB();
