@@ -112,71 +112,99 @@ async function publish(request, env) {
   // A duplicate-only request must not execute mutating SQL. This avoids
   // retention churn during overlapping Publisher retries. The UNIQUE index
   // remains the final concurrency guard for two simultaneous producers.
+  // Free Workers: 50 D1 queries/invocation. Count each statement in batch,
+  // not the batch call as one query. Reserve capacity for transaction housekeeping.
+  const MAX_D1_PARAMETERS = 96;
+  const MAX_D1_QUERIES = 45;
+  const INSERT_ROWS_PER_STATEMENT = 8; // 8*11 fields = 88 binds
+  let queries = 0;
+  const counted = (sql, params = []) => {
+    if (params.length > MAX_D1_PARAMETERS || ++queries > MAX_D1_QUERIES) {
+      throw new RelayError("relay D1 query budget exceeded", 503);
+    }
+    return env.DB.prepare(sql).bind(...params);
+  };
+  const chunks = (items, size) => {
+    const output = [];
+    for (let i=0; i<items.length; i+=size) output.push(items.slice(i,i+size));
+    return output;
+  };
   const known = new Set();
-  if (batch.pushes.length) {
-    const placeholders = batch.pushes.map(() => "?").join(",");
-    const existing = await env.DB.prepare(
-      `SELECT push_id FROM ptt_pushes WHERE push_id IN (${placeholders})`
-    ).bind(...batch.pushes.map(push => push.push_id)).all();
-    for (const row of existing?.results || []) known.add(String(row.push_id));
+  for (const group of chunks(batch.pushes.map(p => p.push_id), MAX_D1_PARAMETERS)) {
+    const rows = await counted(
+      `SELECT push_id FROM ptt_pushes WHERE push_id IN (${group.map(() => "?").join(",")})`, group
+    ).all();
+    for (const row of rows?.results || []) known.add(String(row.push_id));
   }
   const fresh = batch.pushes.filter(push => !known.has(push.push_id));
-  // Once a source line is purged, its identity is no longer in ptt_pushes.
-  // Reject ambiguous historical replay rather than resurrecting it or ACKing
-  // an unseen legitimate late push as accepted. This is intentionally 409.
+  if (!fresh.length) return json({schema_version: 1, accepted: 0, received: batch.pushes.length});
+
+  // Read floor and legacy watermark at most once per distinct AID.
+  const aids = [...new Set(fresh.map(push => push.aid))];
+  const floors = new Map();
+  const watermarks = new Map();
+  for (const group of chunks(aids, MAX_D1_PARAMETERS)) {
+    const qs = group.map(() => "?").join(",");
+    const floorRows = await counted(
+      `SELECT aid, source_line FROM ptt_purged_source_floor WHERE aid IN (${qs})`, group
+    ).all();
+    for (const row of floorRows?.results || []) floors.set(row.aid, Number(row.source_line));
+    const watermarkRows = await counted(
+      `SELECT aid, purged_through_cursor FROM ptt_retention_watermark WHERE aid IN (${qs})`, group
+    ).all();
+    for (const row of watermarkRows?.results || []) watermarks.set(row.aid, Number(row.purged_through_cursor));
+  }
   for (const push of fresh) {
-    const floor = await env.DB.prepare(
-      "SELECT source_line FROM ptt_purged_source_floor WHERE aid = ?"
-    ).bind(push.aid).first();
-    if (floor && push.source_line <= Number(floor.source_line)) {
+    if (floors.has(push.aid) && push.source_line <= floors.get(push.aid)) {
       throw new RelayError("push is at or below purged source-line floor", 409);
     }
-    const watermark = await env.DB.prepare(
-      "SELECT purged_through_cursor FROM ptt_retention_watermark WHERE aid = ?"
-    ).bind(push.aid).first();
-    if (Number(watermark?.purged_through_cursor || 0) > 0 && !floor) {
+    if ((watermarks.get(push.aid) || 0) > 0 && !floors.has(push.aid)) {
       throw new RelayError("purged history lacks source-line provenance", 409);
     }
   }
-  if (!fresh.length) return json({schema_version: 1, accepted: 0, received: batch.pushes.length});
 
-  const statements = fresh.map((push) => env.DB.prepare(
-    `INSERT OR IGNORE INTO ptt_pushes
+  // Multi-row inserts reduce 200 insert statements to 25. UNIQUE is the
+  // final concurrency guard; ACK counts inserted rows, not SQL statements.
+  const statements = chunks(fresh, INSERT_ROWS_PER_STATEMENT).map(group => {
+    const sql = `INSERT OR IGNORE INTO ptt_pushes
        (push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at, producer_id, published_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    push.push_id, push.aid, push.article_url, push.source_line, push.floor,
-    push.kind, push.author, push.content, push.occurred_at, batch.producer_id, batch.published_at
-  ));
+       VALUES ${group.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",")}`;
+    const params = group.flatMap(push => [
+      push.push_id, push.aid, push.article_url, push.source_line, push.floor,
+      push.kind, push.author, push.content, push.occurred_at, batch.producer_id, batch.published_at
+    ]);
+    return counted(sql, params);
+  });
+  const insertStatementCount = statements.length;
   const keep = Number.isSafeInteger(Number(env.RETENTION_ROWS)) ? Math.max(1000, Number(env.RETENTION_ROWS)) : DEFAULT_RETENTION_ROWS;
   // Retain the newest N *actual rows*, not a max(cursor)-N span: AUTOINCREMENT
   // skips values after ignored inserts. The two statements share a D1 batch
   // transaction, so a deletion never precedes its history-gap watermark.
   const boundary = `SELECT cursor FROM ptt_pushes ORDER BY cursor DESC LIMIT 1 OFFSET ?`;
-  statements.push(env.DB.prepare(
+  statements.push(counted(
     `INSERT INTO ptt_purged_source_floor(aid, source_line)
        SELECT aid, MAX(source_line) FROM ptt_pushes
        WHERE cursor < COALESCE((${boundary}), 0)
        GROUP BY aid
        ON CONFLICT(aid) DO UPDATE SET source_line =
          MAX(ptt_purged_source_floor.source_line, excluded.source_line)`
-  ).bind(keep - 1));
-  statements.push(env.DB.prepare(
+  , [keep - 1]));
+  statements.push(counted(
     `INSERT INTO ptt_retention_watermark (aid, purged_through_cursor)
        SELECT aid, MAX(cursor) FROM ptt_pushes
        WHERE cursor < COALESCE((${boundary}), 0)
        GROUP BY aid
        ON CONFLICT(aid) DO UPDATE SET purged_through_cursor =
          MAX(ptt_retention_watermark.purged_through_cursor, excluded.purged_through_cursor)`
-  ).bind(keep - 1));
-  statements.push(env.DB.prepare(
+  , [keep - 1]));
+  statements.push(counted(
     `DELETE FROM ptt_pushes WHERE cursor < COALESCE((${boundary}), 0)`
-  ).bind(keep - 1));
+  , [keep - 1]));
   // Bounded SQL-rate ledger storage (2h minute windows, 2d hour windows).
-  statements.push(env.DB.prepare(
+  statements.push(counted(
     "DELETE FROM ptt_write_rate WHERE window_kind='minute' AND window_key < strftime('%Y-%m-%dT%H:%M', 'now', '-2 hours')"
   ));
-  statements.push(env.DB.prepare(
+  statements.push(counted(
     "DELETE FROM ptt_write_rate WHERE window_kind='hour' AND window_key < strftime('%Y-%m-%dT%H', 'now', '-2 days')"
   ));
   let results;
@@ -193,8 +221,8 @@ async function publish(request, env) {
     }
     throw error;
   }
-  const accepted = results.slice(0, fresh.length).reduce(
-    (total, result) => total + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0
+  const accepted = results.slice(0, insertStatementCount).reduce(
+    (total, result) => total + Math.max(0, Number(result?.meta?.changes || 0)), 0
   );
   return json({schema_version: 1, accepted, received: batch.pushes.length});
 }
