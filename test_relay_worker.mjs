@@ -29,6 +29,15 @@ class FakeStatement {
       this.db.rows.push({cursor:this.db.cursor,push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at});
       return {meta:{changes:1}};
     }
+    if (this.sql.startsWith("INSERT INTO ptt_purged_source_floor")) {
+      this.db.mutationCount++;
+      const keep=this.args[0]+1;
+      const boundary=[...this.db.rows].sort((a,b)=>b.cursor-a.cursor)[keep-1]?.cursor || 0;
+      for (const row of this.db.rows.filter(r=>r.cursor<boundary)) {
+        this.db.floors.set(row.aid,Math.max(this.db.floors.get(row.aid)||0,row.source_line));
+      }
+      return {meta:{changes:0}};
+    }
     if (this.sql.startsWith("INSERT INTO ptt_retention_watermark")) {
       this.db.mutationCount++;
       const keep=this.args[0]+1;
@@ -38,6 +47,7 @@ class FakeStatement {
       }
       return {meta:{changes:0}};
     }
+    if (this.sql.startsWith("DELETE FROM ptt_write_rate")) return {meta:{changes:0}};
     if (this.sql.startsWith("DELETE FROM")) {
       this.db.mutationCount++;
       const keep=this.args[0]+1;
@@ -50,6 +60,8 @@ class FakeStatement {
   async first() {
     if (this.sql.startsWith("SELECT 1 AS ok")) return {ok:1};
     if (this.sql.startsWith("SELECT COALESCE(MAX(cursor)")) return {max_cursor:this.db.cursor};
+    if (this.sql.startsWith("SELECT source_line FROM ptt_purged_source_floor"))
+      return this.db.floors.has(this.args[0]) ? {source_line:this.db.floors.get(this.args[0])} : null;
     if (this.sql.startsWith("SELECT purged_through_cursor")) return {purged_through_cursor:this.db.watermarks.get(this.args[0])||0};
     throw new Error("unexpected first SQL");
   }
@@ -63,10 +75,10 @@ class FakeStatement {
   }
 }
 class FakeDB {
-  constructor(){this.rows=[];this.cursor=0;this.failAtBatchIndex=-1;this.watermarks=new Map();this.mutationCount=0;}
+  constructor(){this.rows=[];this.cursor=0;this.failAtBatchIndex=-1;this.watermarks=new Map();this.floors=new Map();this.mutationCount=0;}
   prepare(sql){return new FakeStatement(this,sql);}
   async batch(statements){
-    const rows=this.rows.map((row)=>({...row})), cursor=this.cursor, watermarks=new Map(this.watermarks), mutationCount=this.mutationCount;
+    const rows=this.rows.map((row)=>({...row})), cursor=this.cursor, watermarks=new Map(this.watermarks), floors=new Map(this.floors), mutationCount=this.mutationCount;
     const results=[];
     try {
       for(let i=0;i<statements.length;i++){
@@ -75,7 +87,7 @@ class FakeDB {
       }
       return results;
     } catch(error){
-      this.rows=rows;this.cursor=cursor;this.watermarks=watermarks;this.mutationCount=mutationCount;
+      this.rows=rows;this.cursor=cursor;this.watermarks=watermarks;this.floors=floors;this.mutationCount=mutationCount;
       throw error;
     }
   }
@@ -111,7 +123,7 @@ assert.equal(DB.rows.length,1);
 response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify(batch)}),env);
 assert.equal((await response.json()).accepted,0);
 assert.equal(DB.rows.length,1);
-assert.equal(DB.mutationCount,3, "duplicate-only POST must not write or prune");
+assert.equal(DB.mutationCount,4, "duplicate-only POST must not write or prune");
 
 response=await handleRequest(new Request("https://relay.example/v1/ptt?aid=M.123.A.1&after_cursor=0&limit=200"),env);
 assert.equal(response.status,200);
@@ -237,7 +249,7 @@ assert.equal(mixedDB.mutationCount,mixedBefore);
 assert.deepEqual(await postMixed([push,second]),{schema_version:1,received:2,accepted:1});
 assert.equal(mixedDB.cursor,2,"mixed duplicate/new POST must insert only new ID");
 assert.equal(mixedDB.rows.length,2);
-assert.equal(mixedDB.mutationCount,mixedBefore+3);
+assert.equal(mixedDB.mutationCount,mixedBefore+4);
 
  // A long-running duplicate storm must not create sparse cursor gaps.
 for (let i=0; i<5000; i++) {
@@ -246,6 +258,28 @@ for (let i=0; i<5000; i++) {
 }
 assert.equal(mixedDB.cursor,2);
 assert.equal(mixedDB.rows.length,2);
+
+
+// Replay of purged canonical ID is rejected, not resurrected or falsely ACKed.
+const purgedReplayDB = new FakeDB();
+const purgedReplayEnv = {...env,DB:purgedReplayDB};
+purgedReplayDB.floors.set(push.aid, push.source_line);
+const replayResult=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{
+  method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+  body:JSON.stringify(batch)
+}),purgedReplayEnv);
+assert.equal(replayResult.status,409);
+assert.equal(purgedReplayDB.rows.length,0);
+assert.equal(purgedReplayDB.mutationCount,0);
+// Existing migration with watermark but no new provenance floor must fail closed.
+const legacyPurgedDB = new FakeDB();
+legacyPurgedDB.watermarks.set(push.aid,5);
+const legacyReply=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{
+  method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},
+  body:JSON.stringify(batch)
+}),{...env,DB:legacyPurgedDB});
+assert.equal(legacyReply.status,409);
+assert.equal(legacyPurgedDB.rows.length,0);
 
 // Read responses must stay within the relay v1 512 KiB wire bound and paginate.
 const byteDB = new FakeDB();
