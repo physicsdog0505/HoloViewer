@@ -81,7 +81,7 @@ const invalidRelayPages = [
   [{...relay, checked_at: "invalid"}, /UTC-Z/],
   [{...relay, has_more: "false"}, /schema/],
   [{...relay, purged_through_cursor: -1}, /schema/],
-  [{...relay, next_cursor: 1}, /precedes/],
+  [{...relay, next_cursor: 1}, /cursor/],
   [{...relay, pushes: [{...base, cursor: 7}]}, /cursor/],
   [{...relay, pushes: [{...base, cursor: 8}, {...base, cursor: 8}], next_cursor: 8}, /cursor/],
   [{...relay, pushes: Array.from({length: 501}, (_, i) => ({...base, cursor: 8 + i})), next_cursor: 508}, /list/],
