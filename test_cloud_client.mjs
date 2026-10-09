@@ -306,6 +306,26 @@ assert.ok(readerBody.includes("pending.sort((a, b) => pushOrder(byId.get(a), byI
 assert.ok(readerBody.includes("if (sequence !== activeArticle) stopCurrentRelay?.()"));
 assert.ok(readerBody.includes("else stopRelay = stopCurrentRelay || null"));
 assert.ok(readerBody.includes("const previousCheckpoint = loadCheckpoint()"));
+
+// Private 8501 checkpoint contract: never mark previously unread baseline rows
+// as read before their paced reveal. A missing checkpoint means first visit.
+assert.ok(readerBody.includes("const checkpointIndex = previousCheckpoint"));
+assert.ok(readerBody.includes("const visibleCount = checkpointIndex >= 0 ? checkpointIndex + 1 : initial.length"));
+assert.ok(readerBody.includes("pending = initial.slice(visibleCount).map((push) => push.pushId)"));
+assert.ok(readerBody.includes("if (initial.length && pending.length === 0)"));
+assert.ok(readerBody.includes("scheduleReveal();"));
+{
+  const initial = [{pushId:"seen-1"},{pushId:"seen-2"},{pushId:"unseen-3"},{pushId:"unseen-4"}];
+  const derive = (checkpoint) => {
+    const checkpointIndex = checkpoint ? initial.findIndex((push) => push.pushId === checkpoint) : -1;
+    const visibleCount = checkpointIndex >= 0 ? checkpointIndex + 1 : initial.length;
+    return {visible:initial.slice(0,visibleCount).map(p=>p.pushId),pending:initial.slice(visibleCount).map(p=>p.pushId)};
+  };
+  assert.deepEqual(derive("seen-2"), {visible:["seen-1","seen-2"],pending:["unseen-3","unseen-4"]});
+  assert.deepEqual(derive(null), {visible:initial.map(p=>p.pushId),pending:[]});
+  assert.deepEqual(derive("rotated-away"), {visible:initial.map(p=>p.pushId),pending:[]});
+}
+
 {
   const order = (x,y) => (x.floor ?? Number.MAX_SAFE_INTEGER)-(y.floor ?? Number.MAX_SAFE_INTEGER);
   const visible = new Set(["old"]);
