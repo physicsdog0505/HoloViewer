@@ -1,3 +1,9 @@
+# SUPERSEDED — DO NOT DISPATCH OR IMPLEMENT THIS HISTORICAL PROMPT
+
+Owner clarified on 2026-10-09: 8501 is internal underlying-logic validation, 4174 is the authoritative owner-accepted USER product preview, and Public must faithfully reproduce 4174 while replacing local data with safe snapshots/APIs. This historical 8501-to-Public reader-UX parity prompt has **incorrect scope** and is ON HOLD. Read current main HOLOVIEWER_PROJECT_GUIDELINES.md and docs/PROJECT_STATUS.md in BOTH repos; await separately authorized new assignment. Preserve this file only as an audit record. See https://github.com/physicsdog0505/HoloViewer/pull/18#issuecomment-6073140146 .
+
+---
+
 # Workstream A — PTT Today Reader, 8501 functionality parity (2026-10-09)
 
 **Owner authorization:** Delegate Workstream A implementation to a separate development window, sequentially. Coordinator chat performs review and corrective guidance **only**, no feature development. Existing Public Draft PR [#18](https://github.com/physicsdog0505/HoloViewer/pull/18) and its current branch `feat/public-reader-reveal-queue-parity` are the work location. Do not create new feature branches/PRs unless demonstrably necessary and approved.
