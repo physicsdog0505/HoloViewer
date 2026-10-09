@@ -13,6 +13,7 @@ on:
       - 'docs/PUBLIC_DATA_CLIENT_V1.md'
       - 'test_pages_poc.py'
       - 'test_cloud_client.mjs'
+      - 'test_public_boundary_offline.mjs'
       - 'test_relay_worker.mjs'
       - 'relay/**'
       - 'test_public_smoke.py'
@@ -40,6 +41,7 @@ jobs:
         run: |
           python -B -m unittest -v test_pages_poc test_public_smoke
           node test_cloud_client.mjs
+          node test_public_boundary_offline.mjs
           node test_relay_worker.mjs
       - name: Build bounded Pages artifact
         run: |
