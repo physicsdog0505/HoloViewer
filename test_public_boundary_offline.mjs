@@ -74,4 +74,43 @@ try {
 } finally {
   globalThis.fetch = originalFetch;
 }
+
+// Negative-path fixture matrix: verify no invalid relay page is accepted and no
+// incomplete snapshot is silently promoted to complete.
+const invalidRelayPages = [
+  [{...relay, checked_at: "invalid"}, /UTC-Z/],
+  [{...relay, has_more: "false"}, /schema/],
+  [{...relay, purged_through_cursor: -1}, /schema/],
+  [{...relay, next_cursor: 1}, /precedes/],
+  [{...relay, pushes: [{...base, cursor: 7}]}, /cursor/],
+  [{...relay, pushes: [{...base, cursor: 8}, {...base, cursor: 8}], next_cursor: 8}, /cursor/],
+  [{...relay, pushes: Array.from({length: 501}, (_, i) => ({...base, cursor: 8 + i})), next_cursor: 508}, /list/],
+];
+for (const [badPage, expected] of invalidRelayPages) {
+  assert.throws(() => client.validateRelayPage(badPage, 7), expected);
+}
+const rejectedSnapshots = [
+  {...artifact, schema_version: 2},
+  {...artifact, generated_at: "2026-10-09T01:00:00+08:00"},
+  {...artifact, completeness: "complete-ish"},
+  {...artifact, articles: null},
+];
+globalThis.fetch = async () => new Response(JSON.stringify(rejectedSnapshots[0]), {status: 200});
+try {
+  for (const rejected of rejectedSnapshots) {
+    globalThis.fetch = async () => new Response(JSON.stringify(rejected), {status: 200});
+    await assert.rejects(
+      client.loadPttArtifact(new URL("https://fixture.invalid/ptt.json")),
+      /schema|UTC-Z|completeness/
+    );
+  }
+  globalThis.fetch = async () => { throw new TypeError("fixture offline"); };
+  await assert.rejects(
+    client.loadPttArtifact(new URL("https://fixture.invalid/ptt.json")),
+    /fixture offline/
+  );
+} finally {
+  globalThis.fetch = originalFetch;
+}
+
 console.log("public snapshot/live boundary offline: PASS (payload conflict handling remains gated)");
