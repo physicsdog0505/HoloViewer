@@ -121,6 +121,23 @@ async function publish(request, env) {
     for (const row of existing?.results || []) known.add(String(row.push_id));
   }
   const fresh = batch.pushes.filter(push => !known.has(push.push_id));
+  // Once a source line is purged, its identity is no longer in ptt_pushes.
+  // Reject ambiguous historical replay rather than resurrecting it or ACKing
+  // an unseen legitimate late push as accepted. This is intentionally 409.
+  for (const push of fresh) {
+    const floor = await env.DB.prepare(
+      "SELECT source_line FROM ptt_purged_source_floor WHERE aid = ?"
+    ).bind(push.aid).first();
+    if (floor && push.source_line <= Number(floor.source_line)) {
+      throw new RelayError("push is at or below purged source-line floor", 409);
+    }
+    const watermark = await env.DB.prepare(
+      "SELECT purged_through_cursor FROM ptt_retention_watermark WHERE aid = ?"
+    ).bind(push.aid).first();
+    if (Number(watermark?.purged_through_cursor || 0) > 0 && !floor) {
+      throw new RelayError("purged history lacks source-line provenance", 409);
+    }
+  }
   if (!fresh.length) return json({schema_version: 1, accepted: 0, received: batch.pushes.length});
 
   const statements = fresh.map((push) => env.DB.prepare(
@@ -137,6 +154,14 @@ async function publish(request, env) {
   // transaction, so a deletion never precedes its history-gap watermark.
   const boundary = `SELECT cursor FROM ptt_pushes ORDER BY cursor DESC LIMIT 1 OFFSET ?`;
   statements.push(env.DB.prepare(
+    `INSERT INTO ptt_purged_source_floor(aid, source_line)
+       SELECT aid, MAX(source_line) FROM ptt_pushes
+       WHERE cursor < COALESCE((${boundary}), 0)
+       GROUP BY aid
+       ON CONFLICT(aid) DO UPDATE SET source_line =
+         MAX(ptt_purged_source_floor.source_line, excluded.source_line)`
+  ).bind(keep - 1));
+  statements.push(env.DB.prepare(
     `INSERT INTO ptt_retention_watermark (aid, purged_through_cursor)
        SELECT aid, MAX(cursor) FROM ptt_pushes
        WHERE cursor < COALESCE((${boundary}), 0)
@@ -147,6 +172,13 @@ async function publish(request, env) {
   statements.push(env.DB.prepare(
     `DELETE FROM ptt_pushes WHERE cursor < COALESCE((${boundary}), 0)`
   ).bind(keep - 1));
+  // Bounded SQL-rate ledger storage (2h minute windows, 2d hour windows).
+  statements.push(env.DB.prepare(
+    "DELETE FROM ptt_write_rate WHERE window_kind='minute' AND window_key < strftime('%Y-%m-%dT%H:%M', 'now', '-2 hours')"
+  ));
+  statements.push(env.DB.prepare(
+    "DELETE FROM ptt_write_rate WHERE window_kind='hour' AND window_key < strftime('%Y-%m-%dT%H', 'now', '-2 days')"
+  ));
   const results = await env.DB.batch(statements);
   const accepted = results.slice(0, fresh.length).reduce(
     (total, result) => total + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0
