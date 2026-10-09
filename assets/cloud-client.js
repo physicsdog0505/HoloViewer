@@ -328,6 +328,12 @@
     for (const push of checked.values()) existing.set(push.pushId, push);
   }
 
+  function compatiblePushMap(pushes) {
+    const result = new Map();
+    mergeCompatiblePushes(result, pushes);
+    return result;
+  }
+
   async function pollRelay(config, aid, state, onUpdate) {
     if (!config.liveRelay) {
       state.relayStatus("unavailable", "即時 relay 尚未設定；目前顯示歷史快照。", false);
@@ -479,7 +485,7 @@
       const article = artifact.articles.find((item) => item.articleId === select.value) || artifact.articles[0];
       const state = {
         cursor: 0,
-        pushes: new Map(article.pushes.map((push) => [push.pushId, push])),
+        pushes: compatiblePushMap(article.pushes),
         relayStatus: (kind, message) => status(relayStatus, kind, message),
         timer: null,
         bootstrapTail: article.pushes.length === 0,
@@ -534,7 +540,7 @@
           const artifact = await loadPttArtifact(config.ptt);
           const article = artifact.articles[0];
           if (article) {
-            const state = { cursor: 0, pushes: new Map(article.pushes.map((push) => [push.pushId, push])), relayStatus: (kind, text) => status(relayMessage, kind, text), timer: null };
+            const state = { cursor: 0, pushes: compatiblePushMap(article.pushes), relayStatus: (kind, text) => status(relayMessage, kind, text), timer: null };
             renderPushes(pushes, [...state.pushes.values()]);
             stopRelay = await pollRelay(config, article.aid, state, (items) => renderPushes(pushes, items));
           }
@@ -643,7 +649,7 @@
       renderTranscript(subtitle, bundle);
       const article = pttArtifact?.articles.find((item) => item.articleId === session.pttArticleId);
       if (article) {
-        const state = { cursor: 0, pushes: new Map(article.pushes.map((push) => [push.pushId, push])), relayStatus: (kind, message) => status(pttStatus, kind, message), timer: null };
+        const state = { cursor: 0, pushes: compatiblePushMap(article.pushes), relayStatus: (kind, message) => status(pttStatus, kind, message), timer: null };
         renderPushes(pttList, [...state.pushes.values()]);
         status(pttStatus, article.completeness === "complete" ? "complete" : "partial", article.completeness === "complete" ? "PTT baseline 完整。" : "PTT baseline 不完整；缺席不代表 0。 ");
         pollRelay(config, article.aid, state, (items) => renderPushes(pttList, items)).then((stop) => { stopRelay = stop || null; });
