@@ -109,28 +109,123 @@ async function publish(request, env) {
   // Cloudflare D1 batch executes its statements transactionally: do not expose
   // a partially published push batch when a later insert fails.
   if (typeof env.DB.batch !== "function") throw new RelayError("atomic D1 batch is unavailable", 503);
-  const statements = batch.pushes.map((push) => env.DB.prepare(
-    `INSERT OR IGNORE INTO ptt_pushes
+  // A duplicate-only request must not execute mutating SQL. This avoids
+  // retention churn during overlapping Publisher retries. The UNIQUE index
+  // remains the final concurrency guard for two simultaneous producers.
+  // Free Workers: 50 D1 queries/invocation. Count each statement in batch,
+  // not the batch call as one query. Reserve capacity for transaction housekeeping.
+  const MAX_D1_PARAMETERS = 96;
+  const MAX_D1_QUERIES = 45;
+  const INSERT_ROWS_PER_STATEMENT = 8; // 8*11 fields = 88 binds
+  let queries = 0;
+  const counted = (sql, params = []) => {
+    if (params.length > MAX_D1_PARAMETERS || ++queries > MAX_D1_QUERIES) {
+      throw new RelayError("relay D1 query budget exceeded", 503);
+    }
+    return env.DB.prepare(sql).bind(...params);
+  };
+  const chunks = (items, size) => {
+    const output = [];
+    for (let i=0; i<items.length; i+=size) output.push(items.slice(i,i+size));
+    return output;
+  };
+  const known = new Set();
+  for (const group of chunks(batch.pushes.map(p => p.push_id), MAX_D1_PARAMETERS)) {
+    const rows = await counted(
+      `SELECT push_id FROM ptt_pushes WHERE push_id IN (${group.map(() => "?").join(",")})`, group
+    ).all();
+    for (const row of rows?.results || []) known.add(String(row.push_id));
+  }
+  const fresh = batch.pushes.filter(push => !known.has(push.push_id));
+  if (!fresh.length) return json({schema_version: 1, accepted: 0, received: batch.pushes.length});
+
+  // Read floor and legacy watermark at most once per distinct AID.
+  const aids = [...new Set(fresh.map(push => push.aid))];
+  const floors = new Map();
+  const watermarks = new Map();
+  for (const group of chunks(aids, MAX_D1_PARAMETERS)) {
+    const qs = group.map(() => "?").join(",");
+    const floorRows = await counted(
+      `SELECT aid, source_line FROM ptt_purged_source_floor WHERE aid IN (${qs})`, group
+    ).all();
+    for (const row of floorRows?.results || []) floors.set(row.aid, Number(row.source_line));
+    const watermarkRows = await counted(
+      `SELECT aid, purged_through_cursor FROM ptt_retention_watermark WHERE aid IN (${qs})`, group
+    ).all();
+    for (const row of watermarkRows?.results || []) watermarks.set(row.aid, Number(row.purged_through_cursor));
+  }
+  for (const push of fresh) {
+    if (floors.has(push.aid) && push.source_line <= floors.get(push.aid)) {
+      throw new RelayError("push is at or below purged source-line floor", 409);
+    }
+    if ((watermarks.get(push.aid) || 0) > 0 && !floors.has(push.aid)) {
+      throw new RelayError("purged history lacks source-line provenance", 409);
+    }
+  }
+
+  // Multi-row inserts reduce 200 insert statements to 25. UNIQUE is the
+  // final concurrency guard; ACK counts inserted rows, not SQL statements.
+  const statements = chunks(fresh, INSERT_ROWS_PER_STATEMENT).map(group => {
+    const sql = `INSERT OR IGNORE INTO ptt_pushes
        (push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at, producer_id, published_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    push.push_id, push.aid, push.article_url, push.source_line, push.floor,
-    push.kind, push.author, push.content, push.occurred_at, batch.producer_id, batch.published_at
-  ));
-  const results = statements.length ? await env.DB.batch(statements) : [];
-  const accepted = results.reduce((total, result) => total + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0);
+       VALUES ${group.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",")} RETURNING push_id`;
+    const params = group.flatMap(push => [
+      push.push_id, push.aid, push.article_url, push.source_line, push.floor,
+      push.kind, push.author, push.content, push.occurred_at, batch.producer_id, batch.published_at
+    ]);
+    return counted(sql, params);
+  });
+  const insertStatementCount = statements.length;
   const keep = Number.isSafeInteger(Number(env.RETENTION_ROWS)) ? Math.max(1000, Number(env.RETENTION_ROWS)) : DEFAULT_RETENTION_ROWS;
-  // The watermark and prune must commit together, or history gaps become invisible.
-  const threshold = Math.max(0, await env.DB.prepare("SELECT COALESCE(MAX(cursor),0) AS max_cursor FROM ptt_pushes").first().then((row) => Number(row?.max_cursor || 0)) - keep);
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO ptt_retention_watermark (aid, purged_through_cursor)
-       SELECT aid, MAX(cursor) FROM ptt_pushes WHERE cursor <= ? GROUP BY aid
+  // Retain the newest N *actual rows*, not a max(cursor)-N span: AUTOINCREMENT
+  // skips values after ignored inserts. The two statements share a D1 batch
+  // transaction, so a deletion never precedes its history-gap watermark.
+  const boundary = `SELECT cursor FROM ptt_pushes ORDER BY cursor DESC LIMIT 1 OFFSET ?`;
+  statements.push(counted(
+    `INSERT INTO ptt_purged_source_floor(aid, source_line)
+       SELECT aid, MAX(source_line) FROM ptt_pushes
+       WHERE cursor < COALESCE((${boundary}), 0)
+       GROUP BY aid
+       ON CONFLICT(aid) DO UPDATE SET source_line =
+         MAX(ptt_purged_source_floor.source_line, excluded.source_line)`
+  , [keep - 1]));
+  statements.push(counted(
+    `INSERT INTO ptt_retention_watermark (aid, purged_through_cursor)
+       SELECT aid, MAX(cursor) FROM ptt_pushes
+       WHERE cursor < COALESCE((${boundary}), 0)
+       GROUP BY aid
        ON CONFLICT(aid) DO UPDATE SET purged_through_cursor =
          MAX(ptt_retention_watermark.purged_through_cursor, excluded.purged_through_cursor)`
-    ).bind(threshold),
-    env.DB.prepare("DELETE FROM ptt_pushes WHERE cursor <= ?").bind(threshold),
-  ]);
+  , [keep - 1]));
+  statements.push(counted(
+    `DELETE FROM ptt_pushes WHERE cursor < COALESCE((${boundary}), 0)`
+  , [keep - 1]));
+  // Bounded SQL-rate ledger storage (2h minute windows, 2d hour windows).
+  statements.push(counted(
+    "DELETE FROM ptt_write_rate WHERE window_kind='minute' AND window_key < strftime('%Y-%m-%dT%H:%M', 'now', '-2 hours')"
+  ));
+  statements.push(counted(
+    "DELETE FROM ptt_write_rate WHERE window_kind='hour' AND window_key < strftime('%Y-%m-%dT%H', 'now', '-2 days')"
+  ));
+  let results;
+  try {
+    results = await env.DB.batch(statements);
+  } catch (error) {
+    const reason = String(error?.message || "");
+    if (reason.includes("minute insert budget exceeded") ||
+        reason.includes("hour insert budget exceeded")) {
+      throw new RelayError("relay write budget exceeded", 429);
+    }
+    if (reason.includes("purged source floor capacity reached")) {
+      throw new RelayError("purge provenance storage full; writes paused", 503);
+    }
+    throw error;
+  }
+  // Count only rows returned by INSERT ... RETURNING. D1 meta.changes also
+  // counts the minute/hour rate-trigger writes, and is not a push ACK count.
+  const accepted = results.slice(0, insertStatementCount).reduce(
+    (total, result) => total + (Array.isArray(result?.results) ? result.results.length : 0), 0
+  );
   return json({schema_version: 1, accepted, received: batch.pushes.length});
 }
 
@@ -156,6 +251,10 @@ async function read(request, env) {
   const url = new URL(request.url);
   const aid = url.searchParams.get("aid") || "";
   const after = Number(url.searchParams.get("after_cursor") || 0);
+  const tailValues = url.searchParams.getAll("tail");
+  if (tailValues.length > 1 || (tailValues.length === 1 && tailValues[0] !== "1")) throw new RelayError("invalid tail");
+  const tail = tailValues.length === 1;
+  if (tail && url.searchParams.has("after_cursor")) throw new RelayError("tail cannot be combined with after_cursor");
   const requestedLimit = Number(url.searchParams.get("limit") || 200);
   if (!AID.test(aid)) throw new RelayError("invalid aid");
   if (!Number.isSafeInteger(after) || after < 0) throw new RelayError("invalid after_cursor");
@@ -166,11 +265,17 @@ async function read(request, env) {
   ).bind(aid).first();
   const purgedThrough = Number(watermark?.purged_through_cursor || 0);
   const historyGap = after < purgedThrough;
-  const result = await env.DB.prepare(
-    `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
-     FROM ptt_pushes WHERE aid = ? AND cursor > ? ORDER BY cursor ASC LIMIT ?`
-  ).bind(aid, after, limit + 1).all();
-  const rows = Array.isArray(result?.results) ? result.results : [];
+  const result = tail
+    ? await env.DB.prepare(
+      `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
+       FROM ptt_pushes WHERE aid = ? ORDER BY cursor DESC LIMIT ?`
+    ).bind(aid, limit).all()
+    : await env.DB.prepare(
+      `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
+       FROM ptt_pushes WHERE aid = ? AND cursor > ? ORDER BY cursor ASC LIMIT ?`
+    ).bind(aid, after, limit + 1).all();
+  // Tail obtains the newest page, but public responses always advance forward.
+  const rows = Array.isArray(result?.results) ? (tail ? [...result.results].reverse() : result.results) : [];
   const checkedAt = new Date().toISOString();
   const projected = rows.slice(0, limit).map((row) => ({
     push_id: String(row.push_id),
@@ -202,7 +307,9 @@ async function read(request, env) {
     visible.push(push);
   }
 
-  const hasMore = rows.length > visible.length;
+  // tail=1 is an initialization snapshot, not an oldest-first backlog page.
+  // A smaller byte budget may require a subsequent cursor GET for remaining rows.
+  const hasMore = tail ? visible.length < rows.length : rows.length > visible.length;
   const body = readResponseBody({
     after,
     checkedAt,

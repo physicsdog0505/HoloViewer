@@ -81,3 +81,65 @@ Clients continue from `next_cursor`.
 
 These bounds are part of relay v1 and must remain aligned with the private
 provider-neutral contract.
+
+## Offline safety integration candidate — NOT DEPLOYED
+
+Public PR #19 adds these **schema-dependent**, fail-closed protections; apply
+`relay/schema.sql` to a disposable D1-equivalent SQLite fixture before testing.
+The operational D1 migration and deployment are **not authorized**:
+
+- A bounded `ptt_purged_source_floor` table retains each AID's maximum purged
+  `source_line` (100,000-AID ceiling). Unknown/replayed lines at or below the
+  floor are rejected with HTTP **409** rather than resurrected, or silently
+  acknowledged. Legacy retained watermarks without corresponding source floors
+  also fail closed for unseen inserts. Valid historical/backfill pushes below a
+  purged floor will likewise receive 409: explicit operator reconciliation is
+  required, rather than silent data loss.
+- SQLite `AFTER INSERT` triggers enforce at most **240 actual new pushes/minute**
+  and **2,000 actual new pushes/hour**, across concurrent Worker requests. The
+  request transaction rolls back on violation. The SQLite counters are kept to
+  about 2 hours of minute windows and 2 days of hour windows through successful
+  new-push Worker transactions. These are insert ceilings, **not provider billing
+  limits**; read queries, attempted writes, D1 row metering and Worker requests
+  still require controlled production measurement.
+- Every new batch's accepted push inserts, source floor, history-gap watermark
+  and row-count pruning occur inside one D1 batch; an entirely already-retained
+  duplicate batch runs no mutating SQL.
+- Local Publisher checkpointing and in-process limits belong to Private #328;
+  this Worker does not have access to the Mac or Collector DB. Neither a Worker
+  schema nor CI green authorizes restarting the Publisher.
+- **STOP** if old watermark rows lack corresponding source-floor provenance;
+  do not guess old source-line floors, delete operational data, or treat an
+  HTTP 409 as successfully delivered. Planned migration needs review, backup/
+  rollback design and separate owner authorization.
+
+## Workers Free SQL invocation compatibility (offline candidate, 2026-10-09)
+
+Cloudflare D1 documents **100 bound parameters per SQL statement** and Workers
+Free **50 D1 queries per Worker invocation**. Every SQL statement in a
+`DB.batch()` counts independently for safety budgeting; a batch does **not**
+turn 25 INSERT statements into one counted query.
+
+This adapter reserves headroom with an in-process maximum of **45 statements**
+per publish invocation and **96 bind arguments per query**. An accepted 200-push
+request consumes at most **39 statements** (3 ID existence lookups, 6 source
+floor/watermark lookups for 200 distinct AIDs, 25 inserts with 8 rows each,
+5 retention/rate-ledger statements) and 88 INSERT bind parameters maximum.
+Fully duplicate requests perform only existence lookups; no SQL mutation.
+A partially duplicate payload still ACKs `received=200` and counts only
+actual newly inserted rows in `accepted`. All preflight lookups and the
+mutating D1 batch retain the authenticated v1 API contract.
+
+The Free ceilings are **per Worker invocation**, not D1 daily cost caps.
+D1's actual metered Rows Read/Written, query execution limits, and hosted batch
+semantics still require separately approved low-volume canary evidence. No
+Worker deployment or paid Cloudflare test was performed for this patch.
+Reference: https://developers.cloudflare.com/d1/platform/limits/
+
+## Public latest-page initialization (`tail=1`, offline contract)
+
+`GET /v1/ptt?aid=<AID>&tail=1&limit=200` returns the **newest** up to `limit` retained pushes (default 200, maximum 500), but `pushes` is always sorted by global D1 `cursor` ascending. This is an initialization snapshot, **not** the full historical backlog. `next_cursor` is the last delivered cursor, or `0` if empty. After initialization use ordinary `GET /v1/ptt?aid=<AID>&after_cursor=<next_cursor>` to poll newer pushes, retaining exactly-once merging by `push_id`/cursor. Cursor values are global and may be sparse; numeric adjacency must never be assumed. A new push during initialization may appear in tail or in subsequent polling, but must not be skipped by using the returned cursor.
+
+`tail=1` rejects any explicit `after_cursor` (HTTP 400), repeated `tail` or non-`1` values (400). The existing no-tail GET is unchanged: ascending oldest-first rows after the specified cursor, `has_more` indicates remaining rows after that page, and `history_gap` indicates a requested cursor below the per-AID purge watermark. For tail, `has_more` indicates the 512 KiB wire cap forced a partial response of its selected newest window; it **does not** indicate whether older historical rows exist. If tail `has_more=true`, resume from the returned `next_cursor` to finish that sampled window and proceed live. `history_gap` in tail is a conservative from-zero retained-history warning, not a license to assert archived continuity. No-tail cursor GETs keep their old behavior.
+
+This feature is currently an **offline PR change**; it is not deployed to G2 or Production until separately reviewed/authorized.
