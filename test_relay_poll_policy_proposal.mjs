@@ -44,7 +44,7 @@ test("weekly 10-second windows apply independently to all seven Taipei weekdays"
   // 2026-10-12 is Monday; 18:00 Taipei = 10:00Z; 16:00 Taipei = 08:00Z.
   for (let index = 0; index < 7; index++) {
     const date = new Date(Date.UTC(2026, 9, 12 + index, 0, 0));
-    const expectedStart = index < 5 ? 8 : 6;
+    const expectedStart = index < 5 ? 10 : 8;
     const at = hour => new Date(date.getTime() + hour * 3600000);
     assert.equal(proposalInterval(at(expectedStart - 1)), 120, `day ${index} before start`);
     assert.equal(proposalInterval(at(expectedStart)), 10, `day ${index} start inclusive`);
