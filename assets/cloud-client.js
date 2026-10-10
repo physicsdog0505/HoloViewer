@@ -394,7 +394,8 @@
         const stale = !checkedAt || Date.now() - new Date(checkedAt).getTime() > RELAY_STALE_MS;
         state.relayStatus(state.historyIncomplete ? "partial" : stale ? "stale" : "fresh", state.historyIncomplete ? "即時 relay 部分舊推文已超出保留期限；目前資料不完整，需以新的歷史快照回補。" : stale ? "即時 relay 已過期，保留最後資料。" : "即時 relay 已連線。", state.historyIncomplete || stale);
       } catch (error) {
-        state.relayStatus("stale", `即時 relay 暫時不可用（${error.name}）；保留最後資料。`, true);
+        // Ignore status updates from polls cancelled by an article switch.
+        if (!stopped) state.relayStatus("stale", `即時 relay 暫時不可用（${error.name}）；保留最後資料。`, true);
       } finally {
         if (!stopped) state.timer = setTimeout(run, RELAY_POLL_MS);
       }
