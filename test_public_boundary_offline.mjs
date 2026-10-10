@@ -311,7 +311,8 @@ for (const statusCode of [400, 429, 503]) {
   let oldUpdates = 0, newUpdates = 0;
   globalThis.setTimeout = (callback, milliseconds) => {
     const key = ++serial;
-    pendingTimers.set(key, {callback, milliseconds});
+    // fetchJson has its own 8s timeout; only count 5s poll-rearm timers.
+    if (milliseconds === 5000) pendingTimers.set(key, {callback, milliseconds});
     return key;
   };
   globalThis.clearTimeout = key => { pendingTimers.delete(key); };
