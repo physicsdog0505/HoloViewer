@@ -123,7 +123,7 @@ const pageTwo = client.validateRelayPage({
   ...relay, next_cursor: 17, has_more: false, pushes: [secondWirePush],
   checked_at: "2026-10-10T01:00:01Z"
 }, pageOne.nextCursor);
-const mergedG2 = client.compatiblePushMap([baseline]);
+const mergedG2 = client.compatiblePushMap([unchanged]);
 client.mergeCompatiblePushes(mergedG2, [...pageOne.pushes, ...pageTwo.pushes]);
 assert.equal(mergedG2.size, 3);
 assert.equal(pageTwo.nextCursor, 17, "next_cursor is a relay cursor, not an archive floor");
