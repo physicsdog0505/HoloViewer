@@ -135,3 +135,11 @@ D1's actual metered Rows Read/Written, query execution limits, and hosted batch
 semantics still require separately approved low-volume canary evidence. No
 Worker deployment or paid Cloudflare test was performed for this patch.
 Reference: https://developers.cloudflare.com/d1/platform/limits/
+
+## Public latest-page initialization (`tail=1`, offline contract)
+
+`GET /v1/ptt?aid=<AID>&tail=1&limit=200` returns the **newest** up to `limit` retained pushes (default 200, maximum 500), but `pushes` is always sorted by global D1 `cursor` ascending. This is an initialization snapshot, **not** the full historical backlog. `next_cursor` is the last delivered cursor, or `0` if empty. After initialization use ordinary `GET /v1/ptt?aid=<AID>&after_cursor=<next_cursor>` to poll newer pushes, retaining exactly-once merging by `push_id`/cursor. Cursor values are global and may be sparse; numeric adjacency must never be assumed. A new push during initialization may appear in tail or in subsequent polling, but must not be skipped by using the returned cursor.
+
+`tail=1` rejects any explicit `after_cursor` (HTTP 400), repeated `tail` or non-`1` values (400). The existing no-tail GET is unchanged: ascending oldest-first rows after the specified cursor, `has_more` indicates remaining rows after that page, and `history_gap` indicates a requested cursor below the per-AID purge watermark. For tail, `has_more` indicates the 512 KiB wire cap forced a partial response of its selected newest window; it **does not** indicate whether older historical rows exist. If tail `has_more=true`, resume from the returned `next_cursor` to finish that sampled window and proceed live. `history_gap` in tail is a conservative from-zero retained-history warning, not a license to assert archived continuity. No-tail cursor GETs keep their old behavior.
+
+This feature is currently an **offline PR change**; it is not deployed to G2 or Production until separately reviewed/authorized.
