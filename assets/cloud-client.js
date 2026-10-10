@@ -352,10 +352,10 @@
           const requestedCursor = nextCursor;
           const url = new URL(config.liveRelay);
           url.searchParams.set("aid", aid);
-          url.searchParams.set("after_cursor", String(requestedCursor));
           url.searchParams.set("limit", String(RELAY_LIMIT));
           const tailBootstrap = pageNumber === 0 && requestedCursor === 0 && state.bootstrapTail === true;
           if (tailBootstrap) url.searchParams.set("tail", "1");
+          else url.searchParams.set("after_cursor", String(requestedCursor));
           const page = validateRelayPage(await fetchJson(url, 512 * 1024), requestedCursor);
           if (tailBootstrap) state.bootstrapTail = false;
           checkedAt = page.checkedAt;
