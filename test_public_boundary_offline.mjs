@@ -8,7 +8,7 @@ globalThis.window = {};
 globalThis.location = { origin: "https://physicsdog0505.github.io" };
 globalThis.document = { readyState: "loading", addEventListener() {}, querySelector() { return null; } };
 const source = fs.readFileSync(new URL("./assets/cloud-client.js", import.meta.url), "utf8");
-vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, assertCompatiblePush, mergeCompatiblePushes, compatiblePushMap, "));
+vm.runInThisContext(source.replace("window.HoloViewerCloud = {", "window.HoloViewerCloud = { loadPttArtifact, assertCompatiblePush, mergeCompatiblePushes, compatiblePushMap, pollRelay, "));
 const client = window.HoloViewerCloud;
 const id = "ptt:v1:" + "a".repeat(64);
 const base = {
@@ -179,6 +179,32 @@ try {
     client.loadPttArtifact(new URL("https://fixture.invalid/ptt.json")),
     /fixture offline/
   );
+} finally {
+  globalThis.fetch = originalFetch;
+}
+
+
+// Cancelled in-flight GET failures must not mark the newly selected article stale.
+let rejectOldGet;
+const oldStatuses = [];
+let oldUpdates = 0;
+globalThis.fetch = () => new Promise((_, reject) => { rejectOldGet = reject; });
+try {
+  const oldState = {
+    cursor: 0, pushes: new Map(), timer: null, bootstrapTail: false,
+    relayStatus: (...args) => oldStatuses.push(args),
+  };
+  const cancelOld = await client.pollRelay(
+    {liveRelay: "https://fixture.invalid/v1/ptt", ptt: null},
+    "M.123.A.1", oldState, () => { oldUpdates += 1; }
+  );
+  assert.equal(typeof rejectOldGet, "function", "old GET should be in flight");
+  cancelOld();
+  rejectOldGet(new TypeError("synthetic old article connection failure"));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(oldStatuses, [], "cancelled request must not publish stale status");
+  assert.equal(oldUpdates, 0, "cancelled request must not update selected article");
+  assert.equal(oldState.cursor, 0, "cancelled request must not advance cursor");
 } finally {
   globalThis.fetch = originalFetch;
 }
