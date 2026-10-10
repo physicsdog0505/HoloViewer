@@ -251,6 +251,10 @@ async function read(request, env) {
   const url = new URL(request.url);
   const aid = url.searchParams.get("aid") || "";
   const after = Number(url.searchParams.get("after_cursor") || 0);
+  const tailValues = url.searchParams.getAll("tail");
+  if (tailValues.length > 1 || (tailValues.length === 1 && tailValues[0] !== "1")) throw new RelayError("invalid tail");
+  const tail = tailValues.length === 1;
+  if (tail && url.searchParams.has("after_cursor")) throw new RelayError("tail cannot be combined with after_cursor");
   const requestedLimit = Number(url.searchParams.get("limit") || 200);
   if (!AID.test(aid)) throw new RelayError("invalid aid");
   if (!Number.isSafeInteger(after) || after < 0) throw new RelayError("invalid after_cursor");
@@ -261,11 +265,17 @@ async function read(request, env) {
   ).bind(aid).first();
   const purgedThrough = Number(watermark?.purged_through_cursor || 0);
   const historyGap = after < purgedThrough;
-  const result = await env.DB.prepare(
-    `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
-     FROM ptt_pushes WHERE aid = ? AND cursor > ? ORDER BY cursor ASC LIMIT ?`
-  ).bind(aid, after, limit + 1).all();
-  const rows = Array.isArray(result?.results) ? result.results : [];
+  const result = tail
+    ? await env.DB.prepare(
+      `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
+       FROM ptt_pushes WHERE aid = ? ORDER BY cursor DESC LIMIT ?`
+    ).bind(aid, limit).all()
+    : await env.DB.prepare(
+      `SELECT cursor, push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at
+       FROM ptt_pushes WHERE aid = ? AND cursor > ? ORDER BY cursor ASC LIMIT ?`
+    ).bind(aid, after, limit + 1).all();
+  // Tail obtains the newest page, but public responses always advance forward.
+  const rows = Array.isArray(result?.results) ? (tail ? [...result.results].reverse() : result.results) : [];
   const checkedAt = new Date().toISOString();
   const projected = rows.slice(0, limit).map((row) => ({
     push_id: String(row.push_id),
@@ -297,7 +307,9 @@ async function read(request, env) {
     visible.push(push);
   }
 
-  const hasMore = rows.length > visible.length;
+  // tail=1 is an initialization snapshot, not an oldest-first backlog page.
+  // A smaller byte budget may require a subsequent cursor GET for remaining rows.
+  const hasMore = tail ? visible.length < rows.length : rows.length > visible.length;
   const body = readResponseBody({
     after,
     checkedAt,
