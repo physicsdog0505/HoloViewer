@@ -168,7 +168,7 @@ async function publish(request, env) {
   const statements = chunks(fresh, INSERT_ROWS_PER_STATEMENT).map(group => {
     const sql = `INSERT OR IGNORE INTO ptt_pushes
        (push_id, aid, article_url, source_line, floor, kind, author, content, occurred_at, producer_id, published_at)
-       VALUES ${group.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",")}`;
+       VALUES ${group.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",")} RETURNING push_id`;
     const params = group.flatMap(push => [
       push.push_id, push.aid, push.article_url, push.source_line, push.floor,
       push.kind, push.author, push.content, push.occurred_at, batch.producer_id, batch.published_at
@@ -221,8 +221,10 @@ async function publish(request, env) {
     }
     throw error;
   }
+  // Count only rows returned by INSERT ... RETURNING. D1 meta.changes also
+  // counts the minute/hour rate-trigger writes, and is not a push ACK count.
   const accepted = results.slice(0, insertStatementCount).reduce(
-    (total, result) => total + Math.max(0, Number(result?.meta?.changes || 0)), 0
+    (total, result) => total + (Array.isArray(result?.results) ? result.results.length : 0), 0
   );
   return json({schema_version: 1, accepted, received: batch.pushes.length});
 }
