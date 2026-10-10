@@ -8,7 +8,14 @@ on:
       - 'custom-view/**'
       - 'watchalong/**'
       - 'ptt-today/**'
+      - 'assets/**'
+      - 'public-data/**'
+      - 'docs/PUBLIC_DATA_CLIENT_V1.md'
       - 'test_pages_poc.py'
+      - 'test_cloud_client.mjs'
+      - 'test_public_boundary_offline.mjs'
+      - 'test_relay_worker.mjs'
+      - 'relay/**'
       - 'test_public_smoke.py'
       - '.github/workflows/pages-poc.yml'
   workflow_dispatch:
@@ -33,11 +40,14 @@ jobs:
       - name: Static routes and public safety checks
         run: |
           python -B -m unittest -v test_pages_poc test_public_smoke
+          node test_cloud_client.mjs
+          node test_public_boundary_offline.mjs
+          node test_relay_worker.mjs
       - name: Build bounded Pages artifact
         run: |
           mkdir -p /tmp/pages
           cp index.html /tmp/pages/
-          cp -R custom-view watchalong ptt-today /tmp/pages/
+          cp -R custom-view watchalong ptt-today assets public-data /tmp/pages/
           printf '' > /tmp/pages/.nojekyll
           test ! -e /tmp/pages/app.py
       - uses: actions/upload-artifact@v4

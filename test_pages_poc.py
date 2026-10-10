@@ -37,14 +37,29 @@ class PagesPoC(unittest.TestCase):
         session=(ROOT/"custom-view/session/index.html").read_text(encoding="utf-8")
         self.assertIn("URLSearchParams",form)
         self.assertIn("session/?",form)
-        self.assertIn("youtube-nocookie.com/embed/",session)
-        self.assertIn("URLSearchParams(location.search)",session)
-        self.assertNotIn("fetch(",form+session)
+        client=(ROOT/"assets/cloud-client.js").read_text(encoding="utf-8")
+        self.assertIn("youtube-nocookie.com/embed/",client)
+        self.assertIn("URLSearchParams(location.search)",client)
+        self.assertIn("assets/cloud-client.js",session)
+        self.assertNotIn("fetch(",form)
     def test_home_uses_client_style(self):
         html=(ROOT/"index.html").read_text(encoding="utf-8")
         for item in ("home-wide","stream-filter","client-grid","stream-card","live-channel-rail","--rail-collapsed","--content","@media"):
             self.assertIn(item,html)
         self.assertIn("data:image/svg+xml",html)
+        self.assertIn('data-cloud-page="home"',html)
+        self.assertIn('id="homeDynamic"',html)
+        self.assertIn("現在直播中",html)
+
+    def test_cloud_data_contract_is_bounded_and_read_only(self):
+        client=(ROOT/"assets/cloud-client.js").read_text(encoding="utf-8")
+        for token in ('credentials: "omit"', "AbortController", "MAX_JSON_BYTES", "TextDecoder", 'cache: "no-store"'):
+            self.assertIn(token,client)
+        for forbidden in ("localStorage", "document.cookie", "Authorization", "POST", "PUT", "DELETE", "127.0.0.1", "localhost"):
+            self.assertNotIn(forbidden,client)
+        import json
+        for path in ("public-data/config.json","public-data/demo/home.json","public-data/demo/ptt.json","public-data/demo/watchalong.json","public-data/demo/transcripts.json"):
+            self.assertEqual(json.loads((ROOT/path).read_text(encoding="utf-8"))["schema_version"],1)
 
 if __name__=="__main__":
     unittest.main()

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "snapshot_id": "public-ptt-live-bootstrap:v1:1gntGd6b",
+  "generated_at": "2026-10-09T00:00:00Z",
+  "completeness": "partial",
+  "articles": [
+    {
+      "article_id": "ptt:C_Chat:1gntGd6b",
+      "board": "C_Chat",
+      "aid": "1gntGd6b",
+      "title": "C_Chat 即時專串",
+      "url": "https://www.ptt.cc/bbs/C_Chat/M.1791456295.A.1A5.html",
+      "completeness": "partial",
+      "pushes": []
+    }
+  ]
+}

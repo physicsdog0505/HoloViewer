@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "snapshot_id": "demo-ptt-v1",
+  "generated_at": "2026-10-08T00:00:00Z",
+  "completeness": "partial",
+  "articles": [
+    {
+      "article_id": "Hololive_Example",
+      "board": "C_Chat",
+      "aid": "#demo",
+      "title": "Public preview fixture — no production PTT data",
+      "url": null,
+      "completeness": "partial",
+      "pushes": [
+        {
+          "push_id": "demo:1",
+          "floor": 1,
+          "source_line": 1,
+          "kind": "推",
+          "author": "preview",
+          "content": "此頁已接好唯讀 artifact seam；真實資料仍待 public-surface audit 與人工批准。",
+          "occurred_at": "2026-10-08T00:00:00Z"
+        }
+      ]
+    }
+  ]
+}

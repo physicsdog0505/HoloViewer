@@ -159,18 +159,18 @@ body.home-wide .client-main{max-width:1580px}
 @media(max-width:760px){.home-highlight{grid-template-columns:1fr}.highlight-thumb{min-height:0;aspect-ratio:16/9}.highlight-copy{padding:18px}.highlight-copy h3{font-size:19px}}
 </style>
 </head>
-<body class="home-wide">
+<body class="home-wide" data-cloud-page="home">
 <aside class="client-rail" aria-label="主要功能">
-  <a class="rail-brand" href="#" aria-label="Holo Viewer 首頁"><span class="rail-icon">H</span><span class="rail-label">Holo Viewer</span></a>
-  <nav class="rail-nav"><a class="active" href="#"><span class="rail-icon">今</span><span class="rail-label">今日</span></a><a class="" href="#"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a><a class="" href="#"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a><a class="" href="#"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a></nav>
+  <a class="rail-brand" href="./" aria-label="Holo Viewer 首頁"><span class="rail-icon">H</span><span class="rail-label">Holo Viewer</span></a>
+  <nav class="rail-nav"><a class="active" href="./"><span class="rail-icon">今</span><span class="rail-label">今日</span></a><a href="watchalong/"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a><a href="custom-view/"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a><a href="ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a></nav>
 </aside>
 <header class="client-topbar">
   <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav">☰</button>
-  <a class="top-brand" href="#">Holo Viewer</a>
-  <div class="top-status">2026/10/08 · OFFLINE UI FIXTURE</div>
+  <a class="top-brand" href="./">Holo Viewer</a>
+  <div class="top-status" data-cloud-status>載入公開資料…</div>
 </header>
-<div id="mobileNav" class="mobile-nav" hidden><a class="active" href="#">今日</a><a class="" href="#">同時視聽</a><a class="" href="#">自訂觀看</a><a class="" href="#">PTT 今日專串</a></div>
-<main class="client-main"><div role="note" style="padding:12px 18px;background:#fff5d9;color:#594b1c;font-size:13px">OFFLINE UI FIXTURE — genuine Client renderer, test data only; navigation, polling and playback disabled.</div><div id="homeDynamic">
+<div id="mobileNav" class="mobile-nav" hidden><a class="active" href="./">今日</a><a href="watchalong/">同時視聽</a><a href="custom-view/">自訂觀看</a><a href="ptt-today/">PTT 今日專串</a></div>
+<main class="client-main"><div role="note" style="padding:12px 18px;background:#fff5d9;color:#594b1c;font-size:13px">PUBLIC PREVIEW — fixture data only；尚未發布 production Catalog。</div><p class="cloud-state" data-home-status data-page-status>載入首頁公開快照…</p><div id="homeDynamic">
 <div class="page-head">
   <div><h1>今日直播</h1><p>2026/10/08 · OFFLINE UI FIXTURE</p></div>
 </div>
@@ -265,9 +265,9 @@ body.home-wide .client-main{max-width:1580px}
 <section class="section">
   <div class="section-head"><div><h2>觀看方式</h2></div></div>
   <div class="feature-row">
-    <a class="feature-card" href="#"><div><span class="eyebrow">WATCHALONG</span><strong>同時視聽</strong></div><span>Hololive 保持主時間軸，片源跟隨觀看。</span></a>
-    <a class="feature-card" href="#"><div><span class="eyebrow">CUSTOM</span><strong>自訂觀看</strong></div><span>自由加入直播、排列畫面並指定主要聲音。</span></a>
-    <a class="feature-card" href="#"><div><span class="eyebrow">PTT</span><strong>PTT 今日專串</strong></div><span>只留下今天的 PTT 推文時間軸。</span></a>
+    <a class="feature-card" href="watchalong/"><div><span class="eyebrow">WATCHALONG</span><strong>同時視聽</strong></div><span>Hololive 保持主時間軸，片源跟隨觀看。</span></a>
+    <a class="feature-card" href="custom-view/"><div><span class="eyebrow">CUSTOM</span><strong>自訂觀看</strong></div><span>單一 YouTube 影片與 PTT 分離載入。</span></a>
+    <a class="feature-card" href="ptt-today/"><div><span class="eyebrow">PTT</span><strong>PTT 今日專串</strong></div><span>顯示公開快照與可選即時 relay。</span></a>
   </div>
 </section>
 <section class="section"><div class="section-head"><div><h2>已結束</h2><p>今天已完成的直播存檔。</p></div></div><div class="client-grid"><a id="stream-test0000007" class="client-card stream-card" data-group="hololive" href="#">
@@ -285,5 +285,5 @@ body.home-wide .client-main{max-width:1580px}
 
 </div></main>
 
-</body>
+<script src="assets/cloud-client.js" data-public-config="public-data/config.json"></script></body>
 </html>
