@@ -15,6 +15,24 @@ class WorkerSqliteSafetyTests(unittest.TestCase):
         self.conn.close()
         self.tmp.cleanup()
 
+    def test_returning_counts_only_push_rows_not_rate_trigger_writes(self):
+        sql = (
+            "INSERT OR IGNORE INTO ptt_pushes"
+            "(push_id,aid,article_url,source_line,kind,author,content,occurred_at,producer_id,published_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING push_id"
+        )
+        args = ("g2-one", "G2_SYNTHETIC_TEST", "https://ptt.cc/", 1, "推", "g2_test",
+                "synthetic", "2026-10-10T03:20:00Z", "g2-isolated-test", "2026-10-10T03:20:00Z")
+        inserted = self.conn.execute(sql, args).fetchall()
+        self.assertEqual(inserted, [("g2-one",)])
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM ptt_pushes").fetchone()[0], 1)
+        self.assertEqual(
+            dict(self.conn.execute("SELECT window_kind,inserted_pushes FROM ptt_write_rate")),
+            {"minute": 1, "hour": 1},
+        )
+        self.assertEqual(self.conn.execute(sql, args).fetchall(), [])
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM ptt_pushes").fetchone()[0], 1)
+
     def test_trigger_blocks_minute_insert_overflow_and_rolls_back(self):
         for n in range(240):
             self.conn.execute(
