@@ -25,14 +25,19 @@ class FakeStatement {
     if (this.sql.startsWith("INSERT OR IGNORE")) {
       this.db.mutationCount++;
       let changed=0;
+      const inserted=[];
       for(let n=0;n<this.args.length;n+=11) {
         const [push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at]=this.args.slice(n,n+11);
         this.db.cursor += 1;
         if (this.db.rows.some((row)=>row.push_id===push_id)) continue;
         this.db.rows.push({cursor:this.db.cursor,push_id,aid,article_url,source_line,floor,kind,author,content,occurred_at,producer_id,published_at});
+        inserted.push({push_id});
         changed++;
       }
-      return {meta:{changes:changed}};
+      // Simulate D1 accounting triggered minute/hour ledger changes: one
+      // inserted push can produce meta.changes=3, but RETURNING yields one.
+      assert.match(this.sql, /RETURNING push_id$/);
+      return {meta:{changes:changed*3},results:inserted};
     }
     if (this.sql.startsWith("INSERT INTO ptt_purged_source_floor")) {
       this.db.mutationCount++;
@@ -137,7 +142,9 @@ assert.equal(DB.rows.length,0);
 
 response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify(batch)}),env);
 assert.equal(response.status,200);
-assert.equal((await response.json()).accepted,1);
+const ack = await response.json();
+assert.equal(ack.received,1);
+assert.equal(ack.accepted,1, "SQL rate trigger writes must not inflate accepted");
 assert.equal(DB.rows.length,1);
 
 response=await handleRequest(new Request("https://relay.example/v1/ptt/publish",{method:"POST",headers:{"authorization":"Bearer secret","content-type":"application/json"},body:JSON.stringify(batch)}),env);
