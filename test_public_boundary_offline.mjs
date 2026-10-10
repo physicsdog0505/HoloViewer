@@ -262,4 +262,38 @@ try {
   globalThis.setTimeout = originalTimeout;
 }
 
+// HTTP error responses must fail closed: preserve visible rows and cursor,
+// report a stale relay, and never commit an invalid tail bootstrap.
+for (const statusCode of [400, 429, 503]) {
+  const statuses = [];
+  const retained = client.compatiblePushMap([unchanged]);
+  let rendered = 0;
+  let requested = 0;
+  globalThis.fetch = async (url) => {
+    const request = new URL(url);
+    assert.equal(request.searchParams.get("tail"), "1");
+    assert.equal(request.searchParams.has("after_cursor"), false);
+    requested += 1;
+    return new Response(JSON.stringify({error: "synthetic status"}), {status: statusCode});
+  };
+  try {
+    const state = {cursor: 0, pushes: retained, timer: null,
+      bootstrapTail: true, relayStatus: (...args) => statuses.push(args)};
+    const stop = await client.pollRelay(
+      {liveRelay: "https://fixture.invalid/v1/ptt", ptt: null},
+      "M.123.A.1", state, () => { rendered++; }
+    );
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(requested, 1);
+    assert.equal(state.cursor, 0, `HTTP ${statusCode} cannot advance cursor`);
+    assert.equal(state.pushes.size, 1, `HTTP ${statusCode} retains snapshot`);
+    assert.equal(state.bootstrapTail, true, `HTTP ${statusCode} allows tail retry`);
+    assert.equal(rendered, 0, `HTTP ${statusCode} cannot render invalid data`);
+    assert.equal(statuses.at(-1)?.[0], "stale");
+    stop();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
 console.log("public snapshot/live boundary offline: PASS (same-ID conflict protected)");
