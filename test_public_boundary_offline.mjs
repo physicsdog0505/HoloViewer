@@ -297,3 +297,6 @@ for (const statusCode of [400, 429, 503]) {
 }
 
 console.log("public snapshot/live boundary offline: PASS (same-ID conflict protected)");
+
+// Offline proposed adaptive-poll policy fixtures; does not alter production polling.
+import "./test_relay_poll_policy_proposal.mjs";
