@@ -92,3 +92,65 @@ test("request math for 10 viewers and weekday/weekend schedule", () => {
   assert.equal(volume(4,1), 2040);
   assert.equal(volume(6,100), 270000);
 });
+
+
+// A long off-peak sleep must not skip the start of a 10-second peak window.
+// Compute the next schedule boundary independently of the reader's current timer.
+function nextBoundaryDelayMs(now) {
+  const current = proposalInterval(now);
+  const base = now.getTime();
+  // Only two boundaries per day; minute-stepping is deterministic in this
+  // synthetic specification, NOT proposed as production timer implementation.
+  for (let minutes = 1; minutes <= 24 * 60 + 1; minutes++) {
+    const candidate = new Date(base + minutes * 60000);
+    if (proposalInterval(candidate) !== current) {
+      return minutes * 60000;
+    }
+  }
+  throw new Error("next boundary missing");
+}
+
+function proposedWaitMs(now, {visible = true, override = null, failures = 0, retryAfterMs = 0} = {}) {
+  const interval = proposalInterval(now, {visible, override});
+  if (interval === null) return null;
+  const adaptiveMs = interval * 1000;
+  const boundary = nextBoundaryDelayMs(now);
+  const overrideExpiry = override && now.getTime() < override.endMs
+    ? Math.max(1, override.endMs - now.getTime()) : Infinity;
+  // Avoid retry storms; a server Retry-After may further extend this delay.
+  const backoffMs = failures ? Math.min(300000, 10000 * 2 ** Math.min(failures - 1, 5)) : 0;
+  return Math.max(backoffMs, retryAfterMs, Math.min(adaptiveMs, boundary, overrideExpiry));
+}
+
+test("timer clamps offpeak wait at approaching weekday and weekend boundaries", () => {
+  assert.equal(proposedWaitMs(new Date("2026-10-12T09:59:00Z")), 60000);
+  assert.equal(proposedWaitMs(new Date("2026-10-17T07:59:00Z")), 60000);
+  assert.equal(proposedWaitMs(new Date("2026-10-12T13:59:30Z")), 10000);
+  assert.equal(proposedWaitMs(new Date("2026-10-12T14:00:00Z")), 120000);
+});
+
+test("override timer wakes at expiry even when ordinary interval is longer", () => {
+  const start = new Date("2026-10-12T06:00:00Z");
+  const override = override60Minutes(start);
+  assert.equal(proposedWaitMs(new Date("2026-10-12T06:59:55Z"), {override}), 5000);
+  assert.equal(proposedWaitMs(new Date("2026-10-12T07:00:00Z"), {override}), 120000);
+});
+
+test("429/5xx retry policy is bounded and never retries tighter than server advice", () => {
+  const offpeak = new Date("2026-10-12T05:00:00Z");
+  assert.equal(proposedWaitMs(offpeak, {failures:1}), 120000);
+  assert.equal(proposedWaitMs(offpeak, {failures:7}), 300000);
+  assert.equal(proposedWaitMs(offpeak, {failures:1,retryAfterMs:600000}), 600000);
+  assert.equal(proposedWaitMs(offpeak, {visible:false,failures:7}), null);
+});
+
+test("viewer and extra-article counts scale GETs without equating them to D1 writes", () => {
+  for (const users of [10,50,100]) {
+    assert.equal(volume(4,users), 2040 * users);
+    assert.equal(volume(6,users), 2700 * users);
+    assert.equal(5*volume(4,users)+2*volume(6,users), 15600 * users);
+  }
+  // One extra simultaneously polled AID doubles GETs without necessarily
+  // writing anything. Cache effectiveness and D1 read rows are not inferred.
+  assert.equal(2 * (5*volume(4,10)+2*volume(6,10)), 312000);
+});
