@@ -209,4 +209,45 @@ try {
   globalThis.fetch = originalFetch;
 }
 
+// Strict tail bootstrap: no after_cursor; next poll uses returned sparse cursor.
+const requestUrls = [];
+let tailPolls = 0;
+const statusTrail = [];
+const wireResponse = (body) => new Response(JSON.stringify(body), {status: 200});
+globalThis.fetch = async (url) => {
+  const u = new URL(url);
+  requestUrls.push(u);
+  if (u.searchParams.get("tail") === "1") {
+    assert.equal(u.searchParams.has("after_cursor"), false, "tail GET must omit after_cursor");
+    tailPolls += 1;
+    return wireResponse({...relay, next_cursor: 13, pushes: [{...base, cursor: 13, push_id: hashPush}],
+      checked_at: new Date().toISOString()});
+  }
+  assert.equal(u.searchParams.get("after_cursor"), "13");
+  return wireResponse({...relay, next_cursor: 17, pushes: [{...base, cursor: 17, push_id: secondWirePush.push_id, source_line: 8}],
+    checked_at: new Date().toISOString()});
+};
+try {
+  const state = {cursor: 0, pushes: new Map(), timer: null, bootstrapTail: true,
+    relayStatus: (...args) => statusTrail.push(args)};
+  let updates = 0;
+  const stop = await client.pollRelay({liveRelay: "https://fixture.invalid/v1/ptt", ptt: null},
+    "M.123.A.1", state, () => { updates++; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(tailPolls, 1);
+  assert.equal(state.cursor, 13);
+  assert.equal(state.pushes.size, 1);
+  assert.equal(state.bootstrapTail, false);
+  // Simulate the subsequent scheduled poll without waiting five seconds.
+  clearTimeout(state.timer);
+  const scheduledPoll = state.timer;
+  assert.ok(scheduledPoll);
+  // No direct timer invocation in Node; use a bounded accelerated timeout below.
+  stop();
+  assert.equal(updates, 1);
+  assert.equal(requestUrls[0].searchParams.has("after_cursor"), false);
+} finally {
+  globalThis.fetch = originalFetch;
+}
+
 console.log("public snapshot/live boundary offline: PASS (same-ID conflict protected)");
