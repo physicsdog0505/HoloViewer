@@ -296,6 +296,83 @@ for (const statusCode of [400, 429, 503]) {
   }
 }
 
+// Actual Reader pollRelay timer lifecycle under synthetic timers and held GETs.
+// No adaptive schedule is enabled; this proves the baseline cancellation seam.
+{
+  const savedTimeout = globalThis.setTimeout;
+  const savedClear = globalThis.clearTimeout;
+  const savedFetch = globalThis.fetch;
+  let serial = 0;
+  const pendingTimers = new Map();
+  const outstanding = [];
+  let maxPendingRequests = 0;
+  let inFlight = 0;
+  const statuses = [];
+  let oldUpdates = 0, newUpdates = 0;
+  globalThis.setTimeout = (callback, milliseconds) => {
+    const key = ++serial;
+    pendingTimers.set(key, {callback, milliseconds});
+    return key;
+  };
+  globalThis.clearTimeout = key => { pendingTimers.delete(key); };
+  globalThis.fetch = url => {
+    inFlight++;
+    maxPendingRequests = Math.max(maxPendingRequests, inFlight);
+    return new Promise((resolve, reject) => {
+      outstanding.push({url:new URL(url), resolve: value => { inFlight--; resolve(value); },
+        reject: reason => { inFlight--; reject(reason); }});
+    });
+  };
+  try {
+    const config = {liveRelay:"https://fixture.invalid/v1/ptt", ptt:null};
+    const oldState = {cursor:0, pushes:new Map(), timer:null, bootstrapTail:true,
+      relayStatus: (...values) => statuses.push(["old",...values])};
+    const stopOld = await client.pollRelay(config,"M.123.A.1",oldState,()=>{oldUpdates++;});
+    assert.equal(outstanding.length,1);
+    assert.equal(outstanding[0].url.searchParams.has("after_cursor"),false);
+    assert.equal(pendingTimers.size,0,"no timer while GET is unresolved");
+    const oldGet = outstanding.shift();
+    stopOld();
+    const nextState = {cursor:0,pushes:new Map(),timer:null,bootstrapTail:true,
+      relayStatus: (...values) => statuses.push(["new",...values])};
+    const stopNew = await client.pollRelay(config,"M.123.A.2",nextState,()=>{newUpdates++;});
+    assert.equal(outstanding.length,1);
+    const nextGet = outstanding.shift();
+    // A cancelled old request finishing late must not alter the new article.
+    oldGet.reject(new TypeError("old connection timeout"));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(oldUpdates,0);
+    assert.equal(oldState.cursor,0);
+    assert.equal(statuses.filter(s=>s[0]==="old").length,0);
+    assert.equal(nextState.cursor,0);
+    nextGet.reject(new TypeError("new connection timeout"));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(nextState.cursor,0);
+    assert.equal(nextState.bootstrapTail,true,"failed bootstrap remains retryable");
+    assert.equal(statuses.filter(s=>s[0]==="new").length,1);
+    assert.equal(pendingTimers.size,1,"exactly one retry timer");
+    const [timerId,timer] = [...pendingTimers][0];
+    assert.equal(timer.milliseconds,5000,"existing active Reader interval is unchanged");
+    pendingTimers.delete(timerId);
+    timer.callback();
+    assert.equal(outstanding.length,1,"retry starts one GET");
+    assert.equal(pendingTimers.size,0,"no overlapping scheduled timer during fetch");
+    const retry = outstanding.shift();
+    assert.equal(retry.url.searchParams.get("tail"),"1");
+    retry.reject(new TypeError("retry synthetic timeout"));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(pendingTimers.size,1,"one retry timer after error");
+    stopNew();
+    assert.equal(pendingTimers.size,0,"article stop clears retry timer");
+    assert.equal(newUpdates,0);
+    assert.equal(maxPendingRequests,2,"only old cancelled + new selected AID coexist");
+  } finally {
+    globalThis.setTimeout = savedTimeout;
+    globalThis.clearTimeout = savedClear;
+    globalThis.fetch = savedFetch;
+  }
+}
+
 console.log("public snapshot/live boundary offline: PASS (same-ID conflict protected)");
 
 // Offline proposed adaptive-poll policy fixtures; does not alter production polling.
