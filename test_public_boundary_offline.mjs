@@ -209,45 +209,57 @@ try {
   globalThis.fetch = originalFetch;
 }
 
-// Strict tail bootstrap: no after_cursor; next poll uses returned sparse cursor.
+// Strict Worker-like contract: tail excludes after_cursor and delta resumes from next_cursor.
+const originalTimeout = globalThis.setTimeout;
 const requestUrls = [];
-let tailPolls = 0;
-const statusTrail = [];
-const wireResponse = (body) => new Response(JSON.stringify(body), {status: 200});
+let scheduledRelayPoll = null;
+const responseFor = (body) => new Response(JSON.stringify(body), {status: 200});
+globalThis.setTimeout = (callback, ms, ...args) => {
+  if (ms === 5000) {
+    scheduledRelayPoll = callback;
+    return originalTimeout(() => {}, 60000); // cancellable placeholder, never invoked
+  }
+  return originalTimeout(callback, ms, ...args);
+};
 globalThis.fetch = async (url) => {
   const u = new URL(url);
   requestUrls.push(u);
-  if (u.searchParams.get("tail") === "1") {
-    assert.equal(u.searchParams.has("after_cursor"), false, "tail GET must omit after_cursor");
-    tailPolls += 1;
-    return wireResponse({...relay, next_cursor: 13, pushes: [{...base, cursor: 13, push_id: hashPush}],
+  assert.equal(u.searchParams.get("aid"), "M.123.A.1");
+  assert.equal(u.searchParams.get("limit"), "200");
+  if (requestUrls.length === 1) {
+    assert.equal(u.searchParams.get("tail"), "1");
+    assert.equal(u.searchParams.has("after_cursor"), false, "Worker rejects tail+after_cursor");
+    return responseFor({...relay, next_cursor: 13, pushes: [{...base, cursor: 13, push_id: hashPush}],
       checked_at: new Date().toISOString()});
   }
-  assert.equal(u.searchParams.get("after_cursor"), "13");
-  return wireResponse({...relay, next_cursor: 17, pushes: [{...base, cursor: 17, push_id: secondWirePush.push_id, source_line: 8}],
+  assert.equal(u.searchParams.has("tail"), false);
+  assert.equal(u.searchParams.get("after_cursor"), "13", "delta resumes from tail watermark");
+  return responseFor({...relay, next_cursor: 17, pushes: [{...base, cursor: 17, push_id: secondWirePush.push_id, source_line: 8}],
     checked_at: new Date().toISOString()});
 };
 try {
   const state = {cursor: 0, pushes: new Map(), timer: null, bootstrapTail: true,
-    relayStatus: (...args) => statusTrail.push(args)};
+    relayStatus: () => {}};
   let updates = 0;
   const stop = await client.pollRelay({liveRelay: "https://fixture.invalid/v1/ptt", ptt: null},
     "M.123.A.1", state, () => { updates++; });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(tailPolls, 1);
   assert.equal(state.cursor, 13);
   assert.equal(state.pushes.size, 1);
   assert.equal(state.bootstrapTail, false);
-  // Simulate the subsequent scheduled poll without waiting five seconds.
+  assert.equal(typeof scheduledRelayPoll, "function");
+  const secondPoll = scheduledRelayPoll;
   clearTimeout(state.timer);
-  const scheduledPoll = state.timer;
-  assert.ok(scheduledPoll);
-  // No direct timer invocation in Node; use a bounded accelerated timeout below.
+  secondPoll();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.cursor, 17);
+  assert.equal(state.pushes.size, 2);
+  assert.equal(updates, 2);
+  assert.equal(requestUrls.length, 2);
   stop();
-  assert.equal(updates, 1);
-  assert.equal(requestUrls[0].searchParams.has("after_cursor"), false);
 } finally {
   globalThis.fetch = originalFetch;
+  globalThis.setTimeout = originalTimeout;
 }
 
 console.log("public snapshot/live boundary offline: PASS (same-ID conflict protected)");
