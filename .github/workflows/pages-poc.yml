@@ -1,0 +1,66 @@
+name: GitHub Pages native Client PoC
+on:
+  push:
+    branches: [poc/pages-native-client-ui]
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'custom-view/**'
+      - 'watchalong/**'
+      - 'ptt-today/**'
+      - 'test_pages_poc.py'
+      - 'test_public_smoke.py'
+      - '.github/workflows/pages-poc.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: github-pages-poc
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Static routes and public safety checks
+        run: |
+          python -B -m unittest -v test_pages_poc test_public_smoke
+      - name: Build bounded Pages artifact
+        run: |
+          mkdir -p /tmp/pages
+          cp index.html /tmp/pages/
+          cp -R custom-view watchalong ptt-today /tmp/pages/
+          printf '' > /tmp/pages/.nojekyll
+          test ! -e /tmp/pages/app.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pages-native-client-poc
+          path: /tmp/pages/
+          retention-days: 7
+      - name: Configure Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/poc/pages-native-client-ui'
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/poc/pages-native-client-ui'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/pages/
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/poc/pages-native-client-ui'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy isolated Pages PoC
+        id: deployment
+        uses: actions/deploy-pages@v4
