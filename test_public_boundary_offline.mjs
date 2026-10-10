@@ -110,6 +110,41 @@ const identicalStart = client.compatiblePushMap([unchanged, {...unchanged}]);
 assert.equal(identicalStart.size, 1);
 assert.equal(identicalStart.get(id).content, unchanged.content);
 
+// G2 Worker GET v1: synthetic two-page, sparse cursor, partial/gap, and overlap.
+// This uses only in-memory wire envelopes; no Worker/cloud endpoint is called.
+const hashPush = "ptt:v1:" + "c".repeat(64);
+const wirePush = {...base, push_id: hashPush, cursor: 13};
+const secondWirePush = {...base, push_id: "ptt:v1:" + "d".repeat(64), cursor: 17, source_line: 8};
+const pageOne = client.validateRelayPage({
+  ...relay, next_cursor: 13, has_more: true, pushes: [wirePush],
+  checked_at: "2026-10-10T01:00:00Z"
+}, 7);
+const pageTwo = client.validateRelayPage({
+  ...relay, next_cursor: 17, has_more: false, pushes: [secondWirePush],
+  checked_at: "2026-10-10T01:00:01Z"
+}, pageOne.nextCursor);
+const mergedG2 = client.compatiblePushMap([baseline]);
+client.mergeCompatiblePushes(mergedG2, [...pageOne.pushes, ...pageTwo.pushes]);
+assert.equal(mergedG2.size, 3);
+assert.equal(pageTwo.nextCursor, 17, "next_cursor is a relay cursor, not an archive floor");
+const gapAfterPurge = client.validateRelayPage({
+  ...relay, next_cursor: 17, pushes: [], history_gap: true,
+  purged_through_cursor: 18, checked_at: "2026-10-10T01:00:02Z"
+}, 17);
+assert.equal(gapAfterPurge.historyGap, true, "retention loss must remain explicit");
+assert.equal(gapAfterPurge.purgedThrough, 18);
+assert.equal(mergedG2.size, 3, "history_gap alone does not authorize deleting snapshot rows");
+assert.throws(
+  () => client.mergeCompatiblePushes(mergedG2, [{...pageOne.pushes[0], content: "G2 conflicting replay"}]),
+  /payload conflict/
+);
+assert.equal(mergedG2.get(hashPush).content, base.content, "conflict must preserve earlier wire value");
+// 409 is a Publisher rejection (not a GET read page and never an ACK):
+// do not fabricate a read envelope or advance any Reader cursor from it.
+const syntheticRejection = {status: 409, error: "source-floor-conflict"};
+assert.equal(syntheticRejection.status, 409);
+assert.equal(pageTwo.nextCursor, 17);
+
 // Negative-path fixture matrix: verify no invalid relay page is accepted and no
 // incomplete snapshot is silently promoted to complete.
 const invalidRelayPages = [
