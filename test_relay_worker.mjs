@@ -86,6 +86,10 @@ class FakeStatement {
       return {results:this.db.rows.filter(row=>this.args.includes(row.push_id)).map(row=>({push_id:row.push_id}))};
     }
     if (!this.sql.startsWith("SELECT cursor")) throw new Error("unexpected all SQL");
+    if (this.sql.includes("ORDER BY cursor DESC LIMIT ?")) {
+      const [aid,limit]=this.args;
+      return {results:this.db.rows.filter(row=>row.aid===aid).sort((a,b)=>b.cursor-a.cursor).slice(0,limit)};
+    }
     const [aid,after,limit]=this.args;
     return {results:this.db.rows.filter((row)=>row.aid===aid&&row.cursor>after).sort((a,b)=>a.cursor-b.cursor).slice(0,limit)};
   }
@@ -452,6 +456,46 @@ assert.equal(response.status,200);
 const secondPage = await response.json();
 assert.ok(secondPage.pushes.length > 0);
 assert.ok(secondPage.next_cursor > firstPage.next_cursor);
+
+// Tail initializes from newest rows in ascending cursor order, including sparse
+// global cursors shared with other articles. Normal GET remains oldest-first.
+const tailDB=new FakeDB();
+const tailA="M.123.A.9";
+tailDB.rows=Array.from({length:650},(_,i)=>{
+  const data={...push,aid:tailA,source_line:i+1,floor:i+1};
+  return {...data,cursor:i*3+1};
+});
+const tailEnv={...env,DB:tailDB};
+const tailFetch=async suffix=>{
+  const resp=await handleRequest(new Request("https://relay.example/v1/ptt?aid="+tailA+suffix),tailEnv);
+  return {status:resp.status,body:await resp.json()};
+};
+let latest=await tailFetch("&tail=1&limit=200");
+assert.equal(latest.status,200);
+assert.equal(latest.body.pushes.length,200);
+assert.equal(latest.body.pushes[0].cursor,1351);
+assert.equal(latest.body.next_cursor,1948);
+assert.equal(latest.body.has_more,false);
+assert.equal(latest.body.history_gap,false);
+let oldPage=await tailFetch("&limit=200");
+assert.equal(oldPage.body.pushes[0].cursor,1);
+assert.equal(oldPage.body.pushes.length,200);
+assert.equal(oldPage.body.has_more,true);
+tailDB.rows.push({...tailDB.rows.at(-1),cursor:1954,source_line:651});
+let delta=await tailFetch("&after_cursor="+latest.body.next_cursor);
+assert.deepEqual(delta.body.pushes.map(p=>p.cursor),[1954]);
+assert.equal(delta.body.next_cursor,1954);
+assert.equal(delta.body.has_more,false);
+tailDB.watermarks.set(tailA,7);
+latest=await tailFetch("&tail=1&limit=2");
+assert.equal(latest.body.history_gap,true);
+assert.equal(latest.body.purged_through_cursor,7);
+const blank=await handleRequest(new Request("https://relay.example/v1/ptt?aid=UNSEEN&tail=1"),tailEnv);
+assert.deepEqual((await blank.json()).pushes,[]);
+for(const bad of ["&tail=0","&tail=true","&tail=1&tail=1","&tail=1&after_cursor=0","&tail=1&limit=0"]){
+ const resp=await tailFetch(bad);
+ assert.equal(resp.status,400,bad);
+}
 
 execFileSync("python3", ["test_relay_schema_sqlite.py"], {stdio: "inherit"});
 console.log("relay worker adapter tests: pass");
