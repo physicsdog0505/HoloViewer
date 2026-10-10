@@ -1,30 +1,46 @@
 # Proposal: adaptive Public PTT GET polling (OFFLINE ONLY)
 
-Status: DESIGN + synthetic contract tests; not activated. Owner parameters 2026-10-10: peak interval **10 seconds**, off-peak **120 seconds**, **6 hours/day peak**, estimate **10 simultaneous viewers**. The **six-hour clock window has not been specified**; no production schedule or 4174 UI change is authorized.
+Status: Owner-approved **policy specification and synthetic tests**, NOT enabled in the public Reader. Approved 2026-10-10: **Mon–Fri 18:00–22:00**, **Sat–Sun 16:00–22:00** `Asia/Taipei`, polling every **10 seconds** in these windows, **120 seconds** outside them. All week days have explicit independent entries for future customization. Additional peak windows or changes remain opt-in.
 
-## Frozen boundaries
-- Change only the **network GET schedule**, never the owner-accepted Reader reveal/auto-reading speeds (5/3/1 seconds or current 4174 behavior), layout, selection, scroll, or timeline state.
-- Continue the established Worker v1 protocol: initial `tail=1` without `after_cursor`; then cursor GET with previous `next_cursor`; stable-ID dedupe and retention PARTIAL remain unchanged.
-- No client-side API tokens, no local Collector/8501/4174 admin endpoints, no Cloudflare schema/Publisher changes.
-- Timezone must explicitly be `Asia/Taipei`; peak **6-hour window boundaries are pending owner selection**. Daylight-saving transitions should be treated deterministically if timezone policy changes.
-- Background tabs should pause GET and revalidate on foreground return (not guess completeness). Failed GET, 429 and 5xx must preserve cursor/data, never tight-loop; adopt bounded retry/backoff only after separate review.
-- An idle/no-new-data response must not be reported as a missing history snapshot. On change of AID, cancel pending scheduled work; no request from old AID can update the active UI.
+## Weekly schedule (Asia/Taipei)
+| Day | Peak | Interval | All other times |
+|---|---|---|---|
+| Mon | 18:00–22:00 | 10s | 120s |
+| Tue | 18:00–22:00 | 10s | 120s |
+| Wed | 18:00–22:00 | 10s | 120s |
+| Thu | 18:00–22:00 | 10s | 120s |
+| Fri | 18:00–22:00 | 10s | 120s |
+| Sat | 16:00–22:00 | 10s | 120s |
+| Sun | 16:00–22:00 | 10s | 120s |
 
-## Request-volume arithmetic (no cache/no background suppression)
-At 10 viewers each continuously monitoring one AID all day:
-- Peak: 6 h × 3600 / 10 = **2,160 GET/viewer/day**
-- Off-peak: 18 h × 3600 / 120 = **540 GET/viewer/day**
-- Total: **2,700 GET/viewer/day**; ×10 = **27,000 GET/day**
-- Baseline fixed 5-second interval: 17,280 GET/viewer/day; ×10 = **172,800/day**
-- Theoretical reduction: **84.375%** before pagination, reconnect, extra routes, inactive-tab pauses or caching.
-These are Worker request estimates **not** D1 rows read, billable cost or actual usage limits.
+Intervals apply to **GET scheduling**, not the existing owner-accepted Reader reveal/autoread/scroll/UI speed controls. Start is inclusive, end exclusive. No calls required exactly at the boundary; the next scheduler decision uses the current Asia/Taipei clock.
 
-## Next authorized implementation proposal (NOT executed)
-1. First obtain owner-approved clock bounds for the 6 peak hours. Prefer a named static policy file, not hardcoded implicit local browser timezone.
-2. Extract a pure `nextPollInterval(nowTaipei, visibility, errorState)` policy with injectable clock, then apply only to `pollRelay` scheduling with a single timer. Existing 4174 visible controls do not change.
-3. Offline test peak start/end, midnight-crossing six-hour windows, UTC vs Taiwan locale, background→foreground, 429/5xx backoff, no overlap, article-switch cancellation, cursor/tail continuity and duplicate-safe data.
-4. Estimate traffic under 1/10/100 clients, hidden tabs and multi-page catches; define monitoring and stop budget before a bounded live canary.
-5. Independent review then separately request approval for integration/deployment. No new Worker/D1/Pages activation by this proposal.
+## Temporary acceleration — approved default
+- A manually activated **60-minute override at 10-second polling**, ending automatically 60 minutes after activation and restoring the current day/time weekly rule; never a permanent toggle.
+- Policy priority: **active time-bounded override > scheduled weekday window > 120-second default**. A current 10-second peak window remains 10 seconds if overridden with 10 seconds.
+- Implement expiry as an **absolute timestamp**, not a count of polling ticks; a page reload should fail safe back to the weekly rule unless a separately authorized shared durable override mechanism exists.
+- No owner/admin endpoint or management UI is authorized. A future centrally configurable, authenticated, read-only policy-delivery adapter can be proposed separately; do not expose administrative controls or tokens in Pages.
+- Do not enable a new background timer for a hidden tab. Re-evaluate schedule on return to foreground. Account for request failures with bounded backoff (429/5xx), preserving cursor and previous pushes.
 
-## Offline fixture
-`test_relay_poll_policy_proposal.mjs` validates the calculation and proposed pure policy against a **sample** 18:00–00:00 Taipei window. This sample is NOT a user-approved actual peak schedule and does not change running Reader behavior.
+## Frozen contracts and constraints
+- Preserve GET `tail=1` bootstrap without `after_cursor`; subsequent `after_cursor=next_cursor` pagination, same-ID conflict checks and retention PARTIAL status remain unchanged.
+- Keep one timer per active AID and cancel old in-flight updates on article switch. Nothing in this proposal changes production Reader or 4174 UI, Worker/D1/Publisher, cloud deployment or existing access boundaries.
+- Weekday boundaries determined from **Asia/Taipei calendar day**, not the browser's locale; future user-defined days may use the same pure policy.
+- Defaults do not silently switch on activity detection. Any extra peak window, on-the-fly admin change, or behavior change requires a subsequent owner-approved implementation.
+- No Gemini/API secrets, Collector, 8501/4174 admin or private SQLite may enter public config.
+
+## Theoretical GET model (10 continuously active viewers, one AID each)
+- Weekday: 4h ×3600/10 +20h×3600/120 = **2,040 GET/viewer/day**, **20,400/10 viewers/day**.
+- Weekend day: 6h×3600/10 +18h×3600/120 = **2,700 GET/viewer/day**, **27,000/10 viewers/day**.
+- Weekly: five weekdays + two weekend days = **156,000 GET/week across 10 viewers**, average ~**22,285.7 GET/day**.
+- Comparison fixed 5s: **172,800 GET/day for 10 viewers**, 1,209,600/week; weekly reduction ~**87.10%**.
+These are approximate policy-level request counts, NOT Cloudflare D1 metered rows, billing or measured production traffic. Retry, pagination, page-hidden behavior, caching and multiple watched AIDs alter actual load.
+
+## Offline synthetic validation
+`test_relay_poll_policy_proposal.mjs` verifies all seven weekdays, UTC→Taipei and edge boundaries, weekly request arithmetic, override start/expiry/cross-day, hidden tabs, and deterministic fallback after expiry. Production `RELAY_POLL_MS = 5000` remains unchanged.
+
+## Next implementation gate (NOT executed)
+1. Isolate the pure clock/weekday/override policy from this fixture and inject it **only into fetch scheduling**; zero changes to 4174-visible controls.
+2. Review manual override control/auth and persistence separately; do not deploy unprotected admin endpoints.
+3. Add live Reader transition/failure/cancellation regressions under disposable synthetic GET before enabling.
+4. Require independent review, cost-stop rules and explicit separate owner approval before deployment or Worker/D1 calls.
