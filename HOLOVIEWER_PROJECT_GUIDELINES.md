@@ -107,3 +107,26 @@ These are mandatory **human-readable rules**, not proof an agent read them. Duri
 - Do not trigger GitHub Actions merely because a review arrived. Use targeted local/offline checks; GitHub CI remains manual/risk-based under the latest owner policy. Do not create another PR, new worktree, speculative feature or full test matrix to process feedback.
 - Batch closely related fixes into one push where safe. Stop after the in-scope correction and concise PR handoff; if the same root-cause fix fails twice, newly threatens a working baseline, increases live API/data costs, or crosses HIGH_RISK boundaries, escalate with evidence rather than cycling indefinitely.
 - Production/public deployments, merges, secrets, D1/Collector and operational data changes still require explicit owner permission. Preserve accepted 8501 core behavior and 4174 UI, and use the existing verification environment.
+
+
+## 9. OWNER DECISION — Short PR-number independent review command (2026-10-11)
+
+### Accepted short commands
+- `Review Private #<number>`: review that PR in `physicsdog0505/Hololive-PTT-Viewer`.
+- `Review Public #<number>`: review that PR in `physicsdog0505/HoloViewer`.
+- `Re-review Private #<number>` / `Re-review Public #<number>`: review current HEAD, verify previous blocking findings, and inspect any newly affected behavior.
+- An unqualified `Review #<number>` is allowed only when the repository is unambiguous from the active task or a verifiable PR URL. Otherwise ask only which repository; never silently guess.
+- These commands constitute authorization for a **read-only independent code review and posting review feedback on the existing PR**, not implementation, deployment, merge, or GitHub Actions execution.
+
+### Reviewer execution contract
+1. Fetch current root guidelines, AGENTS, project status and the relevant PR/Issue; verify repository, base, latest HEAD SHA, complete diff, previous reviews, inline threads and relevant comments. Follow the mandatory preflight without treating the short command as missing instructions.
+2. Review actual behavior against owner-accepted 8501 core and 4174 UI, regression risks, security/data boundaries, cost and integration. Do not rely solely on the previous reviewer or green CI. For re-review, recheck previous blockers **against current HEAD** and any affected changes; do not inherit old approval.
+3. Prefer existing offline/local evidence. **Do not dispatch GitHub Actions, paid API calls, live data tests, deployment, or speculative new agents** without separate permission. Clearly label unexecuted checks and browser/runtime acceptance as NOT VERIFIED.
+4. Post **one concise actionable review on that same GitHub PR**, using `PASS`, `PASS WITH CONDITIONS`, or `REQUEST CHANGES`. Include reviewed SHA, only material blocking findings with file/behavior and reproduction or evidence, nonblocking observations, checks run/not run, and exactly one of `NEXT OWNER: DEVELOPER — FIX IN SCOPE` or `NEXT OWNER: USER — DECISION REQUIRED`.
+5. Return a brief chat summary with PR link, SHA, verdict, blockers and next owner. **Do not stop after a chat-only review** when PR-comment access is available. If writing to GitHub fails, state that explicitly and provide the review text for manual posting.
+6. Reviewer is independent and **read-only for code**; an earlier IMPLEMENT authorization for a different window is not transferred to the reviewer. Developer continuation after an actionable review follows Section 8 when that developer is next invoked.
+
+### Boundaries
+- Do not start another review cycle for P2/docs/style findings or to satisfy ceremony. Review remains risk-based, not an implicit Full CI requirement.
+- GitHub comments do not automatically notify or wake a separate ChatGPT session. User can invoke that developer with `Review is up on Private/Public #<number>; continue`.
+- Preserve owner approval for merge, public/production deployment and protected systems.
