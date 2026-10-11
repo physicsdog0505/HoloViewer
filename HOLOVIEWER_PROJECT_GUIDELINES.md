@@ -84,3 +84,26 @@ These are mandatory **human-readable rules**, not proof an agent read them. Duri
 - No GitHub CI is automatically triggered by PR or push. Manual workflow_dispatch tests are optional for ordinary development and may be requested for significant integration risk or release; do **not** impose Full CI as a universal PR merge prerequisite. Developers still own basic verification.
 - Public deploy, live D1/operational SQLite/Collector, secrets, unbounded paid API usage or irreversible changes need distinct owner approval and proportionate safety checks. No auto-deployment or deletion is authorized by this policy.
 - Respect the owner's separate Antigravity investigation: no duplicate audit or workflow edits except when expressly assigned.
+
+
+## 8. OWNER DECISION — Review is a continuation instruction, not a status-only handoff (2026-10-11)
+
+**Purpose:** Reduce owner copy/paste, repeated “continue?” prompts, AI context use, and GitHub Actions spend. This section refines routine IMPLEMENT tasks under Section 7; it does not authorize autonomous execution across separate chat sessions or override protected operations.
+
+### Standing task contract (bounded continuation)
+- A developer already explicitly assigned an `IMPLEMENT` task retains authorization to **read the latest review on its existing PR and implement requested in-scope corrections**, with focused local/offline tests and a reversible commit/push on the same task branch. It must not stop after merely summarizing an actionable review.
+- On receiving an instruction such as “check the review,” “review is up,” or “continue,” fetch **current PR HEAD**, latest submitted review, inline threads, and relevant Issue/PR comments. Check whether review refers to current HEAD or a stale commit. Do not treat a stale PASS as current approval.
+- For `REQUEST CHANGES`: classify each finding as (a) verified, in-scope blocker to fix; (b) mistaken/stale claim to rebut with evidence; or (c) changed requirement/high-risk/out-of-scope issue to escalate. **Continue directly with (a)**: edit, run focused checks, push the existing branch, update the same PR with exact SHA and tests, then return a concise result. Do not request a second “please continue” authorization for already authorized, safe work.
+- For `PASS WITH CONDITIONS`: fix actionable **in-scope blocking** conditions; distinguish optional follow-ups. If only nonblocking conditions remain, report **READY FOR OWNER DECISION** with evidence and stop; do not silently merge, deploy, or launch another review loop.
+- For `PASS`: report **READY FOR OWNER DECISION** and smallest owner acceptance/merge step. Do not perform unnecessary code changes or rerun Full CI by default. Reviewer PASS is not browser acceptance or permission to merge.
+- If review feedback is missing, ambiguous, contradictory, outdated, or blocked by environmental access, identify the precise blocker and the single needed decision. Never invent permission, make speculative changes, or claim a different chat has been notified.
+
+### Reviewer-to-developer actionable handoff
+- Independent reviewers must post their result to the **existing PR**, not only chat. Use one of `PASS`, `PASS WITH CONDITIONS`, `REQUEST CHANGES`, with exact reviewed HEAD and clear blocker/nonblocker separation.
+- For each blocking correction give affected file/behavior, reproduction/evidence, expected outcome, and whether it is safe under the developer's existing IMPLEMENT scope. Conclude with `NEXT OWNER: DEVELOPER — FIX IN SCOPE` or `NEXT OWNER: USER — DECISION REQUIRED`. Avoid abstract “needs more review” loops.
+- Developers read GitHub directly and act on this handoff the next time they are invoked; the human need only give the PR number or “review is up.” An Issue/PR comment **does not automatically wake another ChatGPT/Codex session**; no false claims of autonomous routing.
+
+### Cost and stopping rules
+- Do not trigger GitHub Actions merely because a review arrived. Use targeted local/offline checks; GitHub CI remains manual/risk-based under the latest owner policy. Do not create another PR, new worktree, speculative feature or full test matrix to process feedback.
+- Batch closely related fixes into one push where safe. Stop after the in-scope correction and concise PR handoff; if the same root-cause fix fails twice, newly threatens a working baseline, increases live API/data costs, or crosses HIGH_RISK boundaries, escalate with evidence rather than cycling indefinitely.
+- Production/public deployments, merges, secrets, D1/Collector and operational data changes still require explicit owner permission. Preserve accepted 8501 core behavior and 4174 UI, and use the existing verification environment.
