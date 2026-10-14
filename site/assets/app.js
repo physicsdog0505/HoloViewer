@@ -464,7 +464,7 @@ function selectWatchRailVideo(id,title){
  if(!/^[A-Za-z0-9_-]{11}$/.test(id)||!viewing.ids.length)return;
  if(watchMode==='multi'){
   if(viewing.ids.includes(id))return;
-  const index=viewing.ids.length;viewing.ids.push(id);
+  const index=viewing.ids.length;viewing.ids.push(id);if(viewing.ids.length>1)$('syncPlayback').checked=true;
   $('stage').append(makeWatchCard(id,index));
   const option=node('option',String(index+1)+' · '+id);option.value=String(index);$('session-audio').append(option);
   renderFocusChoices();sessionLayout();sessionAudio();refreshWatchRail();
@@ -525,7 +525,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
   viewerPttPanel.remove();
  }
  $('session-status').textContent=clean.length+' 個影片';
- replacementTarget=0;watchMode=clean.length>1?'multi':'single';refreshWatchMode();
+ replacementTarget=0;watchMode=clean.length>1?'multi':'single';$('syncPlayback').checked=clean.length>1;refreshWatchMode();
  renderFocusChoices();route('custom-session');sessionLayout();sessionAudio();globalVolume($('globalVolume').value);
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
