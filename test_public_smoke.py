@@ -32,6 +32,28 @@ class PublicSmokeTests(unittest.TestCase):
                     "st.navigation", "st.Page", "playVideo", "st.video"):
             self.assertNotIn(bad, source)
 
+
+    def test_static_deploy_security_boundary(self):
+        config = json.loads((ROOT / "cloudflare/wrangler.json").read_text())
+        self.assertEqual(set(config), {"name", "compatibility_date", "assets"})
+        self.assertEqual(config["name"], "holoviewer-public")
+        self.assertEqual(config["assets"], {"directory": "../site"})
+        js = (ROOT / "site/assets/app.js").read_text()
+        for token in ("setInterval(", "setTimeout(", "location.reload(", "eval(", "innerHTML", "document.write("):
+            self.assertNotIn(token, js)
+        self.assertIn("credentials:'omit'", js)
+        self.assertIn("textContent=", js)
+        frontend_config = (ROOT / "site/assets/config.js").read_text()
+        self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
+        self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
+
+    def test_manual_deployment_release_gate(self):
+        workflow = (ROOT / ".github/workflows/deploy-cloudflare-production.yml").read_text()
+        for token in ("workflow_dispatch:", "BASELINE-CHECKED", "release_sha", "git rev-parse HEAD", "cloudflare-production", "refs/heads/main", "persist-credentials: false"):
+            self.assertIn(token, workflow)
+        self.assertNotIn("  push:", workflow)
+        self.assertNotIn("  schedule:", workflow)
+
     def test_absent_snapshot(self):
         with tempfile.TemporaryDirectory() as t:
             data, error = load_snapshot(Path(t) / "missing.json")
