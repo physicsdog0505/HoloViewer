@@ -249,6 +249,14 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('.slice(0,12)',js)
         self.assertIn('viewing.ids.push(id)',js)
 
+    def test_focus_selects_single_mode_replacement_target(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('function setViewerPrimary(index)',js)
+        self.assertIn('replacementTarget=index;',js)
+        self.assertIn('button.onclick=()=>setViewerPrimary(index)',js)
+        self.assertIn('primary.onclick=()=>setViewerPrimary(index)',js)
+        self.assertIn("el.classList.toggle('replacement-target',i===replacementTarget)",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)

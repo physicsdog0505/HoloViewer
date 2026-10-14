@@ -398,12 +398,20 @@ $('videoHeight').oninput=event=>{
  $('videoHeightValue').textContent=px+'px';
 };
 $('audioFollowFocus').onchange=()=>{if($('audioFollowFocus').checked){viewing.audio=viewing.primary;sessionAudio()}};
+function setViewerPrimary(index){
+ if(!Number.isInteger(index)||index<0||index>=viewing.ids.length)return;
+ // Original 4174 primary selection is also the target for single-mode rail replacement.
+ replacementTarget=index;
+ viewing.primary=index;
+ if($('audioFollowFocus').checked){viewing.audio=index;sessionAudio()}
+ sessionLayout();
+}
 function renderFocusChoices(){
  const box=$('focusChoices');box.replaceChildren();
  viewing.ids.forEach((id,index)=>{
   const button=node('button','Focus '+String.fromCharCode(65+index));button.type='button';
   button.dataset.focusIndex=String(index);button.classList.toggle('active',index===viewing.primary);
-  button.onclick=()=>{viewing.primary=index;if($('audioFollowFocus').checked){viewing.audio=index;sessionAudio()}sessionLayout()};
+  button.onclick=()=>setViewerPrimary(index);
   box.append(button);
  });
 }
@@ -414,7 +422,7 @@ function makeWatchCard(id,index){
  const wrap=node('div',undefined,'video-wrap');const player=frame(id);wrap.append(player);card.append(wrap);
  const controls=node('div',undefined,'player-controls');const copy=node('div');copy.append(node('div','影片 '+(index+1),'player-label'));
  const actions=node('div',undefined,'player-actions');const primary=node('button','主視角','master');primary.type='button';
- primary.onclick=()=>{replacementTarget=index;viewing.primary=index;if($('audioFollowFocus').checked){viewing.audio=index;sessionAudio()}sessionLayout()};
+ primary.onclick=()=>setViewerPrimary(index);
  const youtube=node('a','YouTube ↗','player-youtube-link');youtube.href='https://www.youtube.com/watch?v='+id;youtube.target='_blank';youtube.rel='noopener noreferrer';
  actions.append(primary,youtube);controls.append(copy,actions);card.append(controls);
  player.addEventListener('load',()=>{sessionMute(player,index!==viewing.audio);globalVolume($('globalVolume').value)});
@@ -456,7 +464,12 @@ function sessionLayout(){
  const stage=$('stage');const n=viewing.ids.length;
  stage.style.setProperty('--columns',String(viewing.layout==='equal'?Math.max(1,Math.ceil(Math.sqrt(n))):viewing.layout==='primary'&&n>1?2:Math.max(1,Math.ceil(Math.sqrt(n)))));
  document.body.classList.toggle('layout-primary',viewing.layout==='primary'&&$('custom-session').classList.contains('active'));
- stage.querySelectorAll('.player-card').forEach((el,i)=>el.classList.toggle('primary',i===viewing.primary));
+ stage.querySelectorAll('.player-card').forEach((el,i)=>{
+  el.classList.toggle('primary',i===viewing.primary);
+  el.classList.toggle('replacement-target',i===replacementTarget);
+  const button=el.querySelector('.master');
+  if(button)button.setAttribute('aria-pressed',String(i===viewing.primary));
+ });
  document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.classList.toggle('active',btn.dataset.sessionLayout===viewing.layout));
  $('focusChoices').querySelectorAll('[data-focus-index]').forEach(btn=>btn.classList.toggle('active',Number(btn.dataset.focusIndex)===viewing.primary));
 }
