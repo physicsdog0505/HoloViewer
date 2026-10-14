@@ -251,7 +251,7 @@ class ParityContract(unittest.TestCase):
 
     def test_focus_selects_single_mode_replacement_target(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn('function setViewerPrimary(index)',js)
+        self.assertIn('function setViewerPrimary(index,fromCarousel=false)',js)
         self.assertIn('replacementTarget=index;',js)
         self.assertIn('button.onclick=()=>setViewerPrimary(index)',js)
         self.assertIn('primary.onclick=()=>setViewerPrimary(index)',js)
@@ -308,7 +308,7 @@ class ParityContract(unittest.TestCase):
 
     def test_focus_sets_accepted_primary_layout(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        start=js.index('function setViewerPrimary(index){')
+        start=js.index('function setViewerPrimary(index,fromCarousel=false){')
         end=js.index('function renderFocusChoices()',start)
         focus=js[start:end]
         self.assertIn("viewing.layout='primary';",focus)
