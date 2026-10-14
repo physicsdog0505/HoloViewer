@@ -267,6 +267,22 @@ class ParityContract(unittest.TestCase):
         self.assertIn("registerViewerPlayer(player)",js)
         self.assertNotIn("setInterval(",js)
 
+    def test_custom_session_restores_on_reload_without_blank_shell(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("sessionStorage.setItem('hvCustomViewing'",js)
+        self.assertIn('function restoreCustomSession()',js)
+        self.assertIn("if(!ids.length){route('single');return;}",js)
+        self.assertIn('window.hvOpenCustomSession(ids,',js)
+
+    def test_immersive_overrides_watch_shell_and_has_exit(self):
+        css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('body.custom-session-watching.custom-immersive .client-main',css)
+        self.assertIn('body.custom-session-watching.custom-immersive .client-rail',css)
+        self.assertIn('id="immersiveExit"',html)
+        self.assertIn("$('immersiveExit').onclick=()=>$('customImmerse').click()",js)
+
     def test_custom_url_entry_reports_add_and_start_failures(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
