@@ -395,6 +395,31 @@ function youtubeCommand(iframe,command,args=[]){
 // specific mounted YouTube iframe; no polling, guessed seek offsets or reloads.
 const ytOrigins=new Set(['https://www.youtube-nocookie.com','https://www.youtube.com']);
 const linkedEchoUntil=new WeakMap();
+// Pinned 4174 verified-timeline engine. It stays dormant unless the session
+// caller supplies a complete, explicitly verified start-time map.
+const viewerTimeline=new Map();
+let verifiedTimelineStarts=new Map();
+function verifiedTimelineComplete(){
+ return viewing.ids.length>1&&viewing.ids.every(id=>Number.isFinite(verifiedTimelineStarts.get(id)));
+}
+function timelineSeconds(iframe){
+ const state=viewerTimeline.get(iframe);
+ return state&&Number.isFinite(state.currentTime)?Math.max(0,state.currentTime):NaN;
+}
+function alignVerifiedFollower(iframe,origin){
+ if(!verifiedTimelineComplete()||iframe===origin)return true;
+ const iframes=[...$('stage').querySelectorAll('.player-card iframe')];
+ const followerIndex=iframes.indexOf(iframe),masterIndex=iframes.indexOf(origin);
+ if(followerIndex<0||masterIndex<0)return false;
+ const masterNow=timelineSeconds(origin),followerNow=timelineSeconds(iframe);
+ if(!Number.isFinite(masterNow)||!Number.isFinite(followerNow))return false;
+ const expected=verifiedTimelineStarts.get(viewing.ids[masterIndex])+masterNow-verifiedTimelineStarts.get(viewing.ids[followerIndex]);
+ if(expected<0)return false;
+ const duration=viewerTimeline.get(iframe)?.duration;
+ if(Number.isFinite(duration)&&duration>0&&expected>=duration)return false;
+ if(Math.abs(followerNow-expected)>.8)youtubeCommand(iframe,'seekTo',[expected,true]);
+ return true;
+}
 function registerViewerPlayer(iframe){
  if(!iframe?.contentWindow)return;
  iframe.contentWindow.postMessage(JSON.stringify({event:'listening',id:String(iframe.closest('.player-card')?.dataset.index||'0')}),'https://www.youtube-nocookie.com');
@@ -403,13 +428,27 @@ function linkedPlayPause(event){
  if(!$('syncPlayback').checked||!$('custom-session').classList.contains('active'))return;
  if(!ytOrigins.has(event.origin)||typeof event.data!=='string')return;
  let data;try{data=JSON.parse(event.data)}catch{return}
- if(!data||data.event!=='onStateChange'||![1,2].includes(data.info))return;
  const iframes=[...$('stage').querySelectorAll('.player-card iframe')];
- const origin=iframes.find(iframe=>iframe.contentWindow===event.source);
+ const source=iframes.find(iframe=>iframe.contentWindow===event.source);
+ if(data?.event==='infoDelivery'&&source&&data.info&&typeof data.info==='object'){
+  const previous=viewerTimeline.get(source)||{};
+  viewerTimeline.set(source,{
+   currentTime:typeof data.info.currentTime==='number'&&Number.isFinite(data.info.currentTime)?data.info.currentTime:previous.currentTime,
+   duration:typeof data.info.duration==='number'&&Number.isFinite(data.info.duration)?data.info.duration:previous.duration
+  });
+  return;
+ }
+ if(!data||data.event!=='onStateChange'||![1,2].includes(data.info))return;
+ const origin=source;
  if(!origin||Date.now()<(linkedEchoUntil.get(origin)||0))return;
  const command=data.info===1?'playVideo':'pauseVideo';
  for(const iframe of iframes){
   if(iframe===origin)continue;
+  if(data.info===1&&verifiedTimelineComplete()&&!alignVerifiedFollower(iframe,origin)){
+   linkedEchoUntil.set(iframe,Date.now()+1000);
+   youtubeCommand(iframe,'pauseVideo');
+   continue;
+  }
   linkedEchoUntil.set(iframe,Date.now()+1000);
   youtubeCommand(iframe,command);
  }
@@ -521,7 +560,7 @@ function selectWatchRailVideo(id,title){
  if(!/^[A-Za-z0-9_-]{11}$/.test(id)||!viewing.ids.length)return;
  if(watchMode==='multi'){
   if(viewing.ids.includes(id))return;
-  const index=viewing.ids.length;viewing.ids.push(id);if(viewing.ids.length>1)$('syncPlayback').checked=true;
+  const index=viewing.ids.length;viewing.ids.push(id);verifiedTimelineStarts.delete(id);if(viewing.ids.length>1)$('syncPlayback').checked=true;
   $('stage').append(makeWatchCard(id,index));
   const option=node('option',String(index+1)+' · '+id);option.value=String(index);$('session-audio').append(option);
   renderFocusChoices();sessionLayout();sessionAudio();refreshWatchRail();
@@ -530,10 +569,11 @@ function selectWatchRailVideo(id,title){
  }
  const index=viewing.ids.length===1?0:Math.min(replacementTarget,viewing.ids.length-1);
  if(viewing.ids[index]===id||viewing.ids.some((v,i)=>i!==index&&v===id))return;
- viewing.ids[index]=id;
+ viewing.ids[index]=id;verifiedTimelineStarts.delete(id);
  const card=$('stage').querySelectorAll('.player-card')[index];if(!card)return;
  const iframe=card.querySelector('iframe');if(!iframe)return;
  // Only the replaced player may navigate. Other iframes stay mounted and playing.
+ viewerTimeline.delete(iframe);
  iframe.src=youtubeEmbedUrl(id);
  card.querySelector('.player-label').textContent=title;
  card.querySelector('.player-youtube-link').href='https://www.youtube.com/watch?v='+id;
@@ -563,10 +603,19 @@ window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
  stopFocusCarousel();
+ verifiedTimelineStarts=new Map();
+ const timeline=opts.verifiedTimelineStarts;
+ if(timeline&&typeof timeline==='object'){
+  clean.forEach(id=>{
+   const value=timeline[id];
+   // Missing/null/boolean values are not verified timestamp evidence.
+   if(typeof value==='number'&&Number.isFinite(value))verifiedTimelineStarts.set(id,value);
+  });
+ }
  viewing.ids=clean;viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
  viewing.primary=Math.max(0,Math.min(clean.length-1,Number(opts.primary)||0));
  viewing.audio=Math.max(0,Math.min(clean.length-1,Number(opts.audio)||0));
- const box=$('stage');box.replaceChildren();const audio=$('session-audio');audio.replaceChildren();
+ const box=$('stage');viewerTimeline.clear();box.replaceChildren();const audio=$('session-audio');audio.replaceChildren();
  clean.forEach((id,i)=>{
   box.append(makeWatchCard(id,i));
   const option=node('option',String(i+1)+' · '+id);option.value=String(i);audio.append(option);

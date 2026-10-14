@@ -267,6 +267,19 @@ class ParityContract(unittest.TestCase):
         self.assertIn("registerViewerPlayer(player)",js)
         self.assertNotIn("setInterval(",js)
 
+    def test_verified_timeline_engine_is_fail_closed_and_uses_4174_offset_formula(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('let verifiedTimelineStarts=new Map();',js)
+        self.assertIn('function verifiedTimelineComplete()',js)
+        self.assertIn("const timeline=opts.verifiedTimelineStarts;",js)
+        self.assertIn("typeof value==='number'&&Number.isFinite(value)",js)
+        self.assertIn('verifiedTimelineStarts.get(viewing.ids[masterIndex])+masterNow-verifiedTimelineStarts.get(viewing.ids[followerIndex])',js)
+        self.assertIn("youtubeCommand(iframe,'seekTo',[expected,true])",js)
+        self.assertIn('if(expected<0)return false;',js)
+        self.assertIn('expected>=duration)return false;',js)
+        self.assertIn("data?.event==='infoDelivery'",js)
+        self.assertNotIn('start_at',js)
+
     def test_live_rail_preserves_group_and_selection_filter(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn("function refreshWatchRail()",js)
