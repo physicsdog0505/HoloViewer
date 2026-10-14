@@ -27,7 +27,7 @@ class SidebarParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag == "button" and "data-route" in attrs:
+        if tag == "a" and "data-route" in attrs:
             self.route = attrs["data-route"]
             self.icon = self.label = ""
         elif tag == "span" and self.route and "rail-icon" in attrs.get("class", ""):
@@ -45,7 +45,7 @@ class SidebarParser(HTMLParser):
     def handle_endtag(self, tag):
         if tag == "span":
             self.capture = None
-        if tag == "button" and self.route:
+        if tag == "a" and self.route:
             self.items.append((self.route, self.icon.strip(), self.label.strip()))
             self.route = None
 
@@ -54,6 +54,12 @@ class ParityContract(unittest.TestCase):
         parser = SidebarParser()
         parser.feed((ROOT / "site/index.html").read_text(encoding="utf-8"))
         self.assertEqual(parser.items, EXPECTED)
+
+    def test_4174_shell_css_is_pinned(self):
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        self.assertIn("Verbatim accepted 4174 CLIENT_CSS", css)
+        self.assertIn("body:has(.client-rail:hover) .client-topbar", css)
+        self.assertIn(".mobile-nav[hidden]{display:none}", css)
 
     def test_no_unapproved_english_page_eyebrows(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
