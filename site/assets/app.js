@@ -92,19 +92,25 @@ function historyChrome(){const b=historyBounds();const input=$('historyDate');in
  [['昨天',b.latest],['前天',shiftDay(b.latest,-1)],['7 天前',shiftDay(b.latest,-6)],['← 前一天',shiftDay(selected,-1)],['後一天 →',shiftDay(selected,1)]].forEach(([label,day])=>{if(historyDateValid(day))shortcuts.append(historyLink(label,day))});
  $('history-heading').textContent=selected.replaceAll('-','/');
 }
+const HISTORY_DAYS=30;
+function taipeiDay(back=0){return new Date(Date.now()+8*3600000-back*86400000).toISOString().slice(0,10)}
+function historyDayDelta(day,delta){const date=new Date(day+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+delta);return date.toISOString().slice(0,10)}
+function historyButton(label,day){const a=node('a',label,'subtle-action');a.href='/history?date='+encodeURIComponent(day);a.addEventListener('click',e=>{e.preventDefault();$('history-day').value=day;state.offset=0;loadHistory()});return a}
+function historyShortcuts(day){const box=$('history-shortcuts');box.replaceChildren();const oldest=taipeiDay(HISTORY_DAYS),latest=taipeiDay(1);const options=[['昨天',latest],['前天',taipeiDay(2)],['7 天前',taipeiDay(7)],['← 前一天',historyDayDelta(day,-1)],['後一天 →',historyDayDelta(day,1)]];for(const [label,d] of options)if(d>=oldest&&d<=latest)box.append(historyButton(label,d))}
 async function loadHistory(){
- historyChrome();const day=$('historyDate').value;const error=$('history-error');error.hidden=true;error.textContent='';
- const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;
- if(!config.apiBase){error.textContent='History 正式 API 尚未接通。';error.hidden=false;return}
+ const day=$('history-day').value;const oldest=taipeiDay(HISTORY_DAYS),latest=taipeiDay(1);const error=$('history-error');error.hidden=true;
+ if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(day)||day<oldest||day>latest){error.textContent='僅能瀏覽最近 30 天已結束的日期。';error.hidden=false;return}
+ $('history-heading').textContent=day.replaceAll('-','/');historyShortcuts(day);
+ $('history-prev').hidden=state.offset===0;$('history-next').hidden=true;
  try{
-  const data=await api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+state.offset);
-  if(!Array.isArray(data.items))throw Error('資料格式錯誤');
-  data.items.forEach(item=>homeCard(item,list));
-  const ids=new Set(data.items.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
- const total=Number(data.total||0);if(!data.items.length)$('history-empty').hidden=false;
-  const page=Math.floor(state.offset/50)+1;if(page>1)pagination.append(historyLink('上一頁',day,page-1));
-  if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
- }catch(e){error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false}
+ const data=await api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+state.offset);
+ if(!Array.isArray(data.items))throw Error('資料格式錯誤');
+ const box=$('history-list');box.replaceChildren();
+ data.items.forEach(item=>homeCard({...item,lifecycle_state:'ended'},box));
+ $('history-empty').hidden=!!data.items.length;
+ const total=Number(data.total||0);
+ $('history-next').hidden=!(data.has_more===true||state.offset+data.items.length<total);
+ }catch(e){$('history-list').replaceChildren();$('history-empty').hidden=true;error.textContent='無法讀取 History：'+e.message;error.hidden=false}
 }
 async function loadPtt(){if(!config.apiBase){message('ptt-status','PTT 正式 Worker API 尚未接通。');return}message('ptt-status','PTT 需要經來源驗證的文章識別碼與游標；不會混用不同專串。')}
 document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('single-add').onclick=()=>single(videoId($('single-url').value));$('multi-add').onclick=()=>{const id=videoId($('multi-url').value);if(!id)return alert('請輸入有效的 YouTube 網址或 ID');if(!state.multi.includes(id)&&state.multi.length<12)state.multi.push(id);renderMulti()};$('multi-clear').onclick=()=>{state.multi=[];renderMulti()};$('watch-add').onclick=()=>single(videoId($('watch-url').value),'watch-player');$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();route(location.hash.substring(1)||'home');
