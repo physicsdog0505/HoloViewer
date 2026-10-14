@@ -142,6 +142,16 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('id="multi-url"', html)
         self.assertIn('function loadCollab()', js)
 
+    def test_original_4174_home_highlights_have_verified_rules(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('id="home-highlights"',html)
+        self.assertIn('id="home-announcements"',html)
+        for name in ('三期生告知','重大告知','初配信','周年','新衣裝','生日','3D LIVE','大型聯動','歌回','新造型'):
+            self.assertIn(name,js)
+        self.assertIn('renderHomeHighlights(rows)',js)
+        self.assertNotIn('setInterval(',js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
