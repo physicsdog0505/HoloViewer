@@ -267,6 +267,13 @@ class ParityContract(unittest.TestCase):
         self.assertIn("registerViewerPlayer(player)",js)
         self.assertNotIn("setInterval(",js)
 
+    def test_live_rail_preserves_group_and_selection_filter(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("function refreshWatchRail()",js)
+        self.assertIn("homeFilter()!=='all'&&link.dataset.group!==homeFilter()",js)
+        self.assertIn("watchMode==='multi'&&ids.has(link.dataset.liveVideoId)",js)
+        self.assertIn("watchMode==='multi'&&viewing.ids.includes(card.dataset.liveVideoId)",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
