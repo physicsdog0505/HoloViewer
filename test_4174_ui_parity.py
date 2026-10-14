@@ -280,7 +280,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("sessionStorage.setItem('hvCustomViewing'",js)
         self.assertIn('function restoreCustomSession()',js)
         self.assertIn("if(!recovered.length){route('single');return;}",js)
-        self.assertIn('window.hvOpenCustomSession(ids,',js)
+        self.assertIn('window.hvOpenCustomSession(recovered,',js)
 
     def test_immersive_overrides_watch_shell_and_has_exit(self):
         css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
