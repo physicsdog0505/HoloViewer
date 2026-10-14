@@ -80,6 +80,20 @@
    </aside>
   </div>
  </section>
+ <section id="custom-session" class="page">
+  <div class="viewer-workspace">
+   <div class="viewer-head"><h1>自訂觀看</h1><a href="/custom-view" class="subtle-action" data-page-link="single">返回自訂觀看</a></div>
+   <div class="player-toolbar" id="custom-player-toolbar">
+    <button type="button" data-session-layout="auto">自動</button>
+    <button type="button" data-session-layout="equal">平均排列</button>
+    <button type="button" data-session-layout="primary">主視角</button>
+    <label>主要聲音 <select id="session-audio" aria-label="主要聲音"></select></label>
+    <span id="session-status" class="player-status"></span>
+   </div>
+   <div class="custom-content-grid video-only"><div class="custom-player-column"><main id="stage"></main></div></div>
+   <p id="custom-session-ptt-note" class="empty-note" hidden></p>
+  </div>
+ </section>
  <section id="multi" class="page"><div class="page-head"><div><h1>多人連動</h1><p>現階段手動加入；4174 的自動 POV 偵測尚未移植</p></div></div><div class="entry"><input id="multi-url" aria-label="多人觀看影片網址" placeholder="YouTube 網址或影片 ID"><button id="multi-add">加入畫面</button><button id="multi-clear" class="secondary">清空</button></div><div id="multi-players" class="multi-grid"></div></section>
  <section id="history" class="page">
   <div id="historyDynamic">
