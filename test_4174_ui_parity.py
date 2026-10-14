@@ -240,7 +240,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("viewing.ids.push(id)",js)
         self.assertIn("box.append(makeWatchCard(id,i))",js)
         self.assertIn("link.dataset.liveVideoId=id",js)
-        self.assertIn("iframe.src='https://www.youtube-nocookie.com/embed/'",js)
+        self.assertIn("iframe.src=youtubeEmbedUrl(id)",js)
         self.assertNotIn("route('multi')",js)
 
     def test_no_public_only_multiview_limit(self):
@@ -279,6 +279,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn("(!$('home').classList.contains('active')&&!$('custom-session').classList.contains('active'))",js)
         self.assertIn("applyHomeFilter();refreshWatchRail();",js)
         self.assertIn("selectWatchRailVideo(id,name)",js)
+
+    def test_youtube_embed_origin_matches_current_host(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('function youtubeEmbedUrl(id)',js)
+        self.assertIn("url.searchParams.set('enablejsapi','1')",js)
+        self.assertIn("url.searchParams.set('origin',window.location.origin)",js)
+        self.assertIn("f.src=youtubeEmbedUrl(id)",js)
+        self.assertIn("iframe.src=youtubeEmbedUrl(id)",js)
 
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
