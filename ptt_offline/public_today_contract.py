@@ -49,7 +49,7 @@ def canonical_id(push: dict[str, Any]) -> str:
     return sha256(wire.encode("utf-8")).hexdigest()
 
 
-def history_completeness(manifest: dict[str, Any] | None, claimed_complete: bool = False) -> str:
+def history_completeness(manifest: dict[str, Any] | None, claimed_complete: bool = False, *, expected_day: str | None = None, expected_aids: set[str] | None = None) -> str:
     """Never trust caller claims/checksum alone; only external accepted evidence.
 
     Synthetic accepted manifests must explicitly bind day and all relevant AIDs.
@@ -64,7 +64,7 @@ def history_completeness(manifest: dict[str, Any] | None, claimed_complete: bool
             or not manifest["aids"]
             or len(manifest["aids"]) != len(set(manifest["aids"]))):
         return "partial"
-    return "complete" if claimed_complete else "partial"
+    if expected_day is None or expected_aids is None or not expected_aids:\n        return "partial"\n    if manifest["day"] != expected_day or set(manifest["aids"]) != expected_aids:\n        return "partial"\n    return "complete" if claimed_complete else "partial"
 
 
 @dataclass
