@@ -157,6 +157,12 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("[\\\\w-]", js, "Double escaped regex rejects real YouTube IDs")
         self.assertGreaterEqual(js.count("[A-Za-z0-9_-]{11}"), 3)
 
+    def test_multiview_has_no_public_only_twelve_video_cap(self):
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        self.assertNotIn('.slice(0,12)', js)
+        self.assertNotIn('state.multi.length<12', js)
+        self.assertIn('const clean=[...new Set(ids.map(id=>videoId', js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
