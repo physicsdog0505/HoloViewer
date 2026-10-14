@@ -80,6 +80,106 @@ function homeRail(items){const box=$('live-channel-list');box.replaceChildren();
  link.onclick=event=>{event.preventDefault();const card=$('stream-'+id);card?.scrollIntoView({block:'center',behavior:'smooth'})};box.append(link)});
  $('live-channel-rail').hidden=!box.children.length||!$('home').classList.contains('active');
 }
+
+/* Accepted 4174 high-signal carousel selection rules from pinned client_home.py. */
+const HOME_HIGHLIGHT_RULES=[
+ [120,'三期生告知',['3期生','三期生']],
+ [105,'重大告知',['重大告知','重要告知','IMPORTANT ANNOUNCEMENT','BIG ANNOUNCEMENT']],
+ [100,'初配信',['DEBUT','RE-DEBUT','初配信','デビュー']],
+ [95,'周年',['ANNIVERSARY','周年','記念配信']],
+ [92,'新衣裝',['NEW OUTFIT','OUTFIT REVEAL','新衣装','新衣裝','衣装お披露目','新衣装お披露目']],
+ [90,'生日',['誕生日','BIRTHDAY','生日']],
+ [85,'3D LIVE',['3D LIVE','3DLIVE','3Dライブ']],
+ [75,'大型聯動',['大型コラボ','大型聯動','COLLAB','コラボ']],
+ [65,'歌回',['歌枠','歌回','KARAOKE','SINGING STREAM','SINGING']],
+ [60,'新造型',['NEW HAIRSTYLE','髪型お披露目','NEW MODEL','MODEL REVEAL','LIVE2D']]
+];
+function homeHighlightMatch(item){
+ const title=String(item.title||'')+' '+String(item.source_label||'');
+ const upper=title.toUpperCase();let bestScore=0,bestLabel='';
+ for(const [score,label,keys] of HOME_HIGHLIGHT_RULES){
+  let found=keys.some(x=>upper.includes(x.toUpperCase()));
+  if(label==='三期生告知')found=found&&['告知','重大','終了','結束','ANNOUNCEMENT'].some(x=>upper.includes(x));
+  if(found&&score>bestScore){bestScore=score;bestLabel=label}
+ }
+ if(bestScore&&String(item.lifecycle_state||item.state||'').toLowerCase()==='live')bestScore+=5;
+ return {score:bestScore,label:bestLabel};
+}
+function chooseHomeHighlights(rows){
+ const seen=new Set();const candidates=[];
+ for(const row of rows){
+  const id=String(row?.video_id||'');
+  if(!/^[A-Za-z0-9_-]{11}$/.test(id)||seen.has(id))continue;
+  seen.add(id);
+  const state=String(row.lifecycle_state||row.state||'').toLowerCase();
+  if(!['live','waiting','upcoming'].includes(state))continue;
+  const match=homeHighlightMatch(row);
+  if(match.score)candidates.push({row,label:match.label,score:match.score});
+ }
+ candidates.sort((a,b)=>b.score-a.score||String(a.row.video_id).localeCompare(String(b.row.video_id)));
+ // Public does not currently expose verified collab-candidate IDs; dedupe by
+ // video ID only, never invent shared event identity from titles or dates.
+ return candidates.slice(0,6);
+}
+function renderHomeHighlights(rows){
+ const picks=chooseHomeHighlights(rows);
+ const highlights=$('home-highlights'),announcement=$('home-announcements');
+ highlights.replaceChildren();announcement.replaceChildren();
+ const announce=picks.filter(x=>['生日','重大告知','三期生告知'].includes(x.label));
+ if(announce.length){
+  const aside=node('aside',undefined,'home-announcements');aside.setAttribute('aria-label','生日及重要直播消息');
+  aside.append(node('span','📣 最新提醒','announcement-heading'));
+  const messages=node('div',undefined,'announcement-messages');
+  messages.dataset.announcementCount=String(announce.length);
+  const track=node('div',undefined,'announcement-track');
+  announce.forEach((pick,i)=>{
+   const message=node('span',undefined,'announcement-entry');message.dataset.announcementIndex=String(i);message.hidden=i!==0;
+   const link=node('a');link.href='/custom-view/session?stream='+encodeURIComponent(pick.row.video_id);
+   link.append(node('strong',pick.label),document.createTextNode(' · '+String(pick.row.channel_title||pick.row.channel_name||'Hololive')+'：'+String(pick.row.title||'')));
+   link.onclick=e=>{e.preventDefault();window.hvOpenCustomSession?.([pick.row.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};
+   message.append(link);track.append(message);
+  });
+  messages.append(track);aside.append(messages);announcement.append(aside);
+ }
+ if(!picks.length)return;
+ const section=node('section',undefined,'section highlight-section');
+ const heading=node('div',undefined,'section-head');const title=node('div');title.append(node('h2','近期焦點'));heading.append(title);section.append(heading);
+ const carousel=node('div',undefined,'highlight-carousel');carousel.setAttribute('aria-label','近期焦點輪播');carousel.dataset.activeSlide='0';
+ picks.forEach((pick,i)=>{
+  const row=pick.row,id=row.video_id;const state=String(row.lifecycle_state||row.state||'').toLowerCase();
+  const slide=node('div',undefined,'highlight-slide');slide.dataset.slide=String(i);slide.hidden=i!==0;
+  const card=node('a',undefined,'home-highlight');card.href='/custom-view/session?stream='+encodeURIComponent(id);
+  card.onclick=e=>{if(e.target.closest('[data-youtube-href]'))return;e.preventDefault();window.hvOpenCustomSession?.([id],{layout:'auto',ptt:'video',primary:0,audio:0})};
+  const thumb=node('div',undefined,'highlight-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
+  const source=node('span','YouTube ↗','youtube-source-link');source.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;source.setAttribute('role','link');source.tabIndex=0;
+  source.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')});
+  source.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')}});
+  thumb.append(source);card.append(thumb);
+  const copy=node('div',undefined,'highlight-copy');const badges=node('div',undefined,'highlight-badges');
+  badges.append(node('span',pick.label,'highlight-type'));
+  badges.append(node('span',state==='live'?'LIVE':state==='ended'?'已結束':'即將開始','highlight-state'+(state==='live'?' is-live':'')));
+  copy.append(badges);copy.append(node('h3',String(row.title||id)));
+  copy.append(node('p',String(row.channel_title||row.channel_name||'頻道資訊待補')+' · '+String(row.start_label||''),'highlight-channel'));
+  copy.append(node('span','前往觀看 →','highlight-cta'));card.append(copy);slide.append(card);carousel.append(slide);
+ });
+ if(picks.length>1){
+  const controls=node('div',undefined,'highlight-controls');
+  const prev=node('button','‹','highlight-prev');prev.type='button';prev.setAttribute('aria-label','上一則重點');
+  const dots=node('div',undefined,'highlight-dots');
+  const next=node('button','›','highlight-next');next.type='button';next.setAttribute('aria-label','下一則重點');
+  const show=index=>{
+   const n=(index+picks.length)%picks.length;carousel.dataset.activeSlide=String(n);
+   carousel.querySelectorAll('.highlight-slide').forEach((el,i)=>el.hidden=i!==n);
+   carousel.querySelectorAll('.highlight-dot').forEach((el,i)=>el.classList.toggle('active',i===n));
+  };
+  picks.forEach((_,i)=>{const dot=node('button',undefined,'highlight-dot'+(i===0?' active':''));dot.type='button';dot.dataset.slideTo=String(i);dot.setAttribute('aria-label','顯示第 '+(i+1)+' 則重點');dot.onclick=()=>show(i);dots.append(dot)});
+  prev.onclick=()=>show(Number(carousel.dataset.activeSlide||0)-1);
+  next.onclick=()=>show(Number(carousel.dataset.activeSlide||0)+1);
+  controls.append(prev,dots,next);carousel.append(controls);
+ }
+ section.append(carousel);highlights.append(section);
+}
+
 async function loadHome(){
  if(!config.apiBase){$('home-empty').textContent='正式直播資料 API 尚未接通。';return}
  try{
@@ -91,7 +191,7 @@ async function loadHome(){
  rows.forEach(item=>{const state=String(item.lifecycle_state||item.state||'unknown').toLowerCase();const bucket=state==='live'?'live':['waiting','upcoming'].includes(state)?'upcoming':state==='ended'?'ended':'unknown';buckets[bucket].push(item)});
  for(const key of Object.keys(buckets)){const el=$('home-'+key);el.replaceChildren();buckets[key].forEach(item=>homeCard(item,el));$('home-'+key+'-section').hidden=!el.children.length}
  const allowed=new Set(rows.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!allowed.has(id))selectedHomeVideos.delete(id)}
- homeSelection();homeRail(buckets.live);applyHomeFilter();
+ homeSelection();homeRail(buckets.live);renderHomeHighlights(rows);applyHomeFilter();
  $('home-empty').textContent=rows.length?'':'目前沒有今天的直播資料。';
  $('connection').textContent='API 已連線';
  }catch(e){$('home-empty').textContent='無法讀取正式直播資料：'+e.message}
