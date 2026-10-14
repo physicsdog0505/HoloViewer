@@ -100,6 +100,8 @@
     <button type="button" data-session-layout="equal">平均排列</button>
     <button type="button" data-session-layout="primary">主視角</button>
     <span id="focusChoices" class="focus-choices" aria-label="切換主視角"></span>
+    <button type="button" id="focusCarousel" aria-pressed="false">輪播 10s</button>
+    <label class="player-sync-label" id="focusCarouselIntervalLabel">間隔 <input id="focusCarouselInterval" type="range" min="10" max="60" step="5" value="10"><output id="focusCarouselIntervalOutput">10 秒</output></label>
     <label class="player-sync-label" id="videoHeightLabel">播放器高度上限 <input id="videoHeight" type="range" min="360" max="1000" step="40" value="1000"><output id="videoHeightValue">1000px</output></label>
     <label class="player-sync-label" id="audioFollowLabel"><input id="audioFollowFocus" type="checkbox"> 聲音跟隨主視角</label>
     <label class="player-sync-label" id="playerSyncLabel"><input id="syncPlayback" type="checkbox"> 連動播放／暫停</label>
