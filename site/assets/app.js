@@ -353,6 +353,7 @@ function sessionMute(iframe,mute){
  iframe.contentWindow.postMessage(JSON.stringify({event:'command',func:mute?'mute':'unMute',args:[]}), 'https://www.youtube-nocookie.com');
 }
 const viewing={ids:[],layout:'auto',primary:0,audio:0};
+const viewerPttPanel=$('custom-session-ptt-panel');
 function sessionLayout(){
  const stage=$('stage');const n=viewing.ids.length;
  stage.style.setProperty('--columns',String(viewing.layout==='equal'?Math.max(1,Math.ceil(Math.sqrt(n))):viewing.layout==='primary'&&n>1?2:Math.max(1,Math.ceil(Math.sqrt(n)))));
@@ -382,8 +383,16 @@ window.hvOpenCustomSession=function(ids,opts={}){
   player.addEventListener('load',()=>sessionMute(player,i!==viewing.audio));
  });
  audio.value=String(viewing.audio);
- $('custom-session-ptt-note').hidden=opts.ptt!=='live';
- if(opts.ptt==='live')$('custom-session-ptt-note').textContent='PTT 尚未對齊：目前沒有足夠的專串來源與影片時間證據。';
+ const showPtt=opts.ptt==='live';
+ $('customContentGrid').classList.toggle('video-only',!showPtt);
+ if(showPtt){
+  if(!viewerPttPanel.isConnected)$('customContentGrid').append(viewerPttPanel);
+  viewerPttPanel.hidden=false;
+  $('custom-session-ptt-note').textContent='目前沒有足夠的專串來源與影片時間證據。';
+ }else{
+  viewerPttPanel.hidden=true;
+  viewerPttPanel.remove();
+ }
  $('session-status').textContent=clean.length+' 個影片';
  route('custom-session');sessionLayout();sessionAudio();
 };
