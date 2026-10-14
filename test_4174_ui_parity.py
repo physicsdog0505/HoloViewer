@@ -306,6 +306,14 @@ class ParityContract(unittest.TestCase):
         ):
             self.assertIn(rule, css)
 
+    def test_focus_sets_accepted_primary_layout(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        start=js.index('function setViewerPrimary(index){')
+        end=js.index('function renderFocusChoices()',start)
+        focus=js[start:end]
+        self.assertIn("viewing.layout='primary';",focus)
+        self.assertIn('sessionLayout();',focus)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
