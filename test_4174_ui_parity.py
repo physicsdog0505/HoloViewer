@@ -267,6 +267,16 @@ class ParityContract(unittest.TestCase):
         self.assertIn("registerViewerPlayer(player)",js)
         self.assertNotIn("setInterval(",js)
 
+    def test_custom_url_entry_reports_add_and_start_failures(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        self.assertIn('id="custom-selection-status"',html)
+        self.assertIn('aria-live="polite"',html)
+        self.assertIn('已加入 ',js)
+        self.assertIn("typeof window.hvOpenCustomSession!=='function'",js)
+        self.assertIn("document.querySelectorAll('#stage .player-card iframe').length!==items.length",js)
+        self.assertIn('觀看尚未開始，已保留所選影片。',js)
+
     def test_verified_timeline_engine_is_fail_closed_and_uses_4174_offset_formula(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn('let verifiedTimelineStarts=new Map();',js)
