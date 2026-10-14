@@ -26,11 +26,17 @@ class PublicSmokeTests(unittest.TestCase):
                 imports += [a.name for a in n.names]
             if isinstance(n, ast.ImportFrom):
                 imports.append(n.module or "")
-        self.assertEqual(imports, ["__future__", "pathlib", "streamlit", "public_snapshot"])
+        self.assertEqual(imports, ["__future__", "pathlib", "re", "urllib.parse", "streamlit", "public_snapshot"])
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         for bad in ("BackfillJobQueue", "sqlite3", "subprocess", "requests", "Gemini",
-                    "st.navigation", "st.Page", "playVideo", "st.video"):
+                    "st.navigation", "st.Page", "playVideo"):
             self.assertNotIn(bad, source)
+
+    def test_player_is_real_but_without_secret_paths(self):
+        source = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("st.video(", source)
+        self.assertIn("canonical_video_id", source)
+        self.assertNotIn("PTT_CLIENT_RUNTIME_ROOT", source)
 
     def test_absent_snapshot(self):
         with tempfile.TemporaryDirectory() as t:
