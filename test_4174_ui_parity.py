@@ -134,6 +134,20 @@ class ParityContract(unittest.TestCase):
         self.assertIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
         self.assertNotIn("watch-add').onclick", js)
 
+    def test_collab_hub_matches_accepted_4174_sections_not_manual_entry(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        collab = html.split('<section id="multi" class="page">', 1)[1].split('</section>', 1)[0]
+        self.assertIn('正在進行的連動優先；稍後場次與過去活動依時間排列。', collab)
+        self.assertIn('id="collab-sections"', collab)
+        self.assertNotIn('id="multi-url"', collab)
+        for label in ("['live','現在直播中']", "['upcoming','稍後']", "['ended','過去連動']"):
+            self.assertIn(label, js)
+        self.assertIn('.collab-event-grid{display:grid', css)
+        self.assertIn('function collabGroups(rows)', js)
+        self.assertNotIn('const state=states.includes', js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
