@@ -60,10 +60,13 @@ $('customImmerse').addEventListener('click',async()=>{
 });
 
 function route(r){
+ // Hash query belongs to the session, not the route key.
+ r=String(r||'').split('?')[0];
  if(!names[r])r='home';
  // A viewing route without mounted players must never display an empty workspace.
  if(r==='custom-session'&&!viewing.ids.length){
-  let recoverable=false;
+  const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
+  let recoverable=params.getAll('stream').some(id=>/^[A-Za-z0-9_-]{11}$/.test(id));
   try{const saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null');recoverable=Array.isArray(saved?.ids)&&saved.ids.some(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id));}catch{}
   if(!recoverable)r='single';
  }
@@ -73,7 +76,15 @@ function route(r){
  document.querySelectorAll('[data-route]').forEach(el=>el.classList.toggle('active',el.dataset.route===activeNav));
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
  updateClientTopbar(r);$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
- history.replaceState(null,'','#'+r);
+ // Preserve session stream parameters while entering the player.
+ const sessionHash=r==='custom-session'&&viewing.ids.length
+  ?'#custom-session?'+new URLSearchParams([
+    ...viewing.ids.map(id=>['stream',id]),
+    ['layout',viewing.layout],['primary',String(viewing.primary)],
+    ['audio',String(viewing.audio)],['ptt',viewing.ptt||'video']
+   ]).toString()
+  :'#'+r;
+ history.replaceState(null,'',sessionHash);
  const viewerActive=r==='custom-session';
  if(!viewerActive)window.hvStopFocusCarousel?.();
  $('viewer-4174-css').media=viewerActive?'all':'not all';
@@ -369,7 +380,7 @@ function sessionMute(iframe,mute){
  if(!iframe?.contentWindow)return;
  iframe.contentWindow.postMessage(JSON.stringify({event:'command',func:mute?'mute':'unMute',args:[]}), 'https://www.youtube-nocookie.com');
 }
-const viewing={ids:[],layout:'auto',primary:0,audio:0};
+const viewing={ids:[],layout:'auto',primary:0,audio:0,ptt:'video'};
 const viewerPttPanel=$('custom-session-ptt-panel');
 // 4174 watching controls — preserve mounted YouTube iframe instances.
 let watchMode='single';
@@ -621,7 +632,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
    if(typeof value==='number'&&Number.isFinite(value))verifiedTimelineStarts.set(id,value);
   });
  }
- viewing.ids=clean;viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
+ viewing.ids=clean;viewing.ptt=opts.ptt==='live'?'live':'video';viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
  viewing.primary=Math.max(0,Math.min(clean.length-1,Number(opts.primary)||0));
  viewing.audio=Math.max(0,Math.min(clean.length-1,Number(opts.audio)||0));
  const box=$('stage');viewerTimeline.clear();box.replaceChildren();const audio=$('session-audio');audio.replaceChildren();
@@ -646,7 +657,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();route(location.hash.substring(1)||'home');
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();route(location.hash.substring(1).split('?')[0]||'home');
 
 /* Accepted 4174 custom-view selection controller with public read-only catalog adapter. */
 (function(){
@@ -840,9 +851,20 @@ watchForm.addEventListener('submit',event=>{
 // Recover the last explicitly opened session after a tab reload/deep link.
 // Without saved valid IDs, route to selection rather than an empty player shell.
 (function restoreCustomSession(){
- if(location.hash!=='#custom-session')return;
+ if(location.hash.split('?')[0]!=='#custom-session')return;
+ const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
+ const urls=params.getAll('stream');
+ // An explicit URL is authoritative: never substitute an unrelated saved session.
+ const ids=urls.length
+  ?[...new Set(urls.filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))]
+  :[];
  let saved=null;try{saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null')}catch{}
- const ids=Array.isArray(saved?.ids)?saved.ids.filter(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id)):[];
- if(!ids.length){route('single');return;}
- window.hvOpenCustomSession(ids,{layout:saved.layout,ptt:saved.ptt,primary:saved.primary,audio:saved.audio});
+ const recovered=urls.length?ids:(Array.isArray(saved?.ids)?saved.ids.filter(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id)):[]);
+ if(!recovered.length){route('single');return;}
+ window.hvOpenCustomSession(recovered,{
+  layout:urls.length?params.get('layout'):saved.layout,
+  ptt:urls.length?params.get('ptt'):saved.ptt,
+  primary:urls.length?Number(params.get('primary')||0):saved.primary,
+  audio:urls.length?Number(params.get('audio')||0):saved.audio
+ });
 })();
