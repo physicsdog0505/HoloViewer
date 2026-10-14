@@ -86,6 +86,27 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('id="history-prev"', html)
         self.assertNotIn('id="history-next"', html)
 
+    def test_custom_builder_matches_accepted_4174_controls(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        for part in ('class="custom-layout"', 'class="selection-panel"', 'id="liveLibrary"',
+                     'id="historyLibrary"', 'id="layout"', 'id="primary"', 'id="audio"',
+                     'id="pttMode"', 'id="selectedCount"', 'id="custom-session"'):
+            self.assertIn(part, html)
+        for part in ('moveStream(from,to)', "className='drag-handle'",
+                     "radio.name='mainVideo'", "window.hvCustomCatalog=function(rows)",
+                     'window.hvOpenCustomSession=function(ids,opts={})'):
+            self.assertIn(part, js)
+        self.assertIn('.selected-item{display:grid', css)
+        self.assertIn('.live-picker-list{display:grid', css)
+
+    def test_route_handlers_are_not_registered_on_every_navigation(self):
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        route_body = js.split('function route(r){', 1)[1].split('async function api(', 1)[0]
+        self.assertNotIn('addEventListener', route_body)
+        self.assertNotIn("multiWatch').onclick", route_body)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
