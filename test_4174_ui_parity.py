@@ -167,6 +167,17 @@ class ParityContract(unittest.TestCase):
         self.assertIn('homeAvatarChild(item,name)',js)
         self.assertIn("style.setProperty('--member-accent',accent)",js)
 
+    def test_live_channel_rail_uses_original_4174_position_and_expansion(self):
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        self.assertIn("Verbatim accepted 4174 LIVE_RAIL_CSS", css)
+        self.assertIn("position:fixed;left:2px;top:270px;z-index:65;width:64px", css)
+        self.assertIn(".live-channel-rail:hover,.live-channel-rail:focus-within{width:222px", css)
+        self.assertIn("body:has(.client-rail:hover) .live-channel-rail", css)
+        self.assertIn("@media(max-width:760px){.live-channel-rail{display:none}}", css)
+        self.assertIn(".live-channel-rail[hidden]{display:none!important}", css)
+        self.assertIn('id="live-channel-rail"', html)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
