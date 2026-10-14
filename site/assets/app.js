@@ -7,7 +7,14 @@ const state={multi:Array.isArray(stored)?stored.filter(x=>typeof x==='string'&&/
 function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el}
 function message(target,text){const box=$(target);box.replaceChildren(node('div',text,'notice'))}
 function videoId(input){let t=input.trim();if(/^[\w-]{11}$/.test(t))return t;try{const u=new URL(t);if(!['youtube.com','www.youtube.com','m.youtube.com','youtu.be','www.youtu.be'].includes(u.hostname))return null;t=u.hostname.includes('youtu.be')?u.pathname.split('/')[1]:u.pathname==='/watch'?u.searchParams.get('v'):['live','embed','shorts'].includes(u.pathname.split('/')[1])?u.pathname.split('/')[2]:null;return /^[\w-]{11}$/.test(t||'')?t:null}catch{return null}}
-function frame(id){const f=document.createElement('iframe');f.className='frame';f.title='YouTube player '+id;f.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?enablejsapi=1';f.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';f.referrerPolicy='strict-origin-when-cross-origin';f.allowFullscreen=true;return f}
+function youtubeEmbedUrl(id){
+ const url=new URL('https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id));
+ url.searchParams.set('enablejsapi','1');
+ // Tie iframe API commands to this Public site; never copy a fixed test origin.
+ if(/^https?:$/.test(window.location.protocol))url.searchParams.set('origin',window.location.origin);
+ return url.toString();
+}
+function frame(id){const f=document.createElement('iframe');f.className='frame';f.title='YouTube player '+id;f.src=youtubeEmbedUrl(id);f.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';f.referrerPolicy='strict-origin-when-cross-origin';f.allowFullscreen=true;return f}
 function single(id,target='single-player'){if(!id){if($(target))message(target,'請輸入有效的 YouTube 網址或影片 ID。');return}if(!$(target)){window.hvOpenCustomSession?.([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}$(target).replaceChildren(frame(id))}
 function renderMulti(){sessionStorage.setItem('hvMulti',JSON.stringify(state.multi))}
 
@@ -478,7 +485,7 @@ function selectWatchRailVideo(id,title){
  const card=$('stage').querySelectorAll('.player-card')[index];if(!card)return;
  const iframe=card.querySelector('iframe');if(!iframe)return;
  // Only the replaced player may navigate. Other iframes stay mounted and playing.
- iframe.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?enablejsapi=1';
+ iframe.src=youtubeEmbedUrl(id);
  card.querySelector('.player-label').textContent=title;
  card.querySelector('.player-youtube-link').href='https://www.youtube.com/watch?v='+id;
  const option=$('session-audio').options[index];if(option)option.textContent=String(index+1)+' · '+id;
