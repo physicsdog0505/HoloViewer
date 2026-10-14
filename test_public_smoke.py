@@ -47,6 +47,14 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
         self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
 
+    def test_static_response_content_security_policy(self):
+        headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
+        self.assertIn("Content-Security-Policy:", headers)
+        for directive in ("default-src 'none'", "script-src 'self'", "connect-src https://holoviewer-public-api.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
+            self.assertIn(directive, headers)
+        self.assertNotIn("'unsafe-inline'", headers)
+        self.assertNotIn("'unsafe-eval'", headers)
+
     def test_manual_deployment_release_gate(self):
         workflow = (ROOT / ".github/workflows/deploy-cloudflare-production.yml").read_text()
         for token in ("workflow_dispatch:", "BASELINE-CHECKED", "release_sha", "git rev-parse HEAD", "cloudflare-production", "refs/heads/main", "persist-credentials: false"):
