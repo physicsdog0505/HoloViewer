@@ -288,6 +288,13 @@ class ParityContract(unittest.TestCase):
         self.assertIn("f.src=youtubeEmbedUrl(id)",js)
         self.assertIn("iframe.src=youtubeEmbedUrl(id)",js)
 
+    def test_original_home_typography_not_overridden_by_public_globals(self):
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        self.assertNotIn('button:not(.rail-nav button):not(#menu)',css)
+        self.assertEqual(css.count('.page-head h1{margin:0 0 8px;font-size:34px'),1)
+        self.assertIn('body.home-wide .page-head h1{font-size:30px;margin-bottom:0}',css)
+        self.assertIn('.entry > button,.actions > button{',css)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
