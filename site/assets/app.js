@@ -10,6 +10,22 @@ function videoId(input){let t=input.trim();if(/^[\w-]{11}$/.test(t))return t;try
 function frame(id){const f=document.createElement('iframe');f.className='frame';f.title='YouTube player '+id;f.src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?enablejsapi=1';f.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';f.referrerPolicy='strict-origin-when-cross-origin';f.allowFullscreen=true;return f}
 function single(id,target='single-player'){if(!id){if($(target))message(target,'請輸入有效的 YouTube 網址或影片 ID。');return}if(!$(target)){window.hvOpenCustomSession?.([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}$(target).replaceChildren(frame(id))}
 function renderMulti(){sessionStorage.setItem('hvMulti',JSON.stringify(state.multi))}
+
+/* 4174 client_home._english_home_date: %a · %b %d, %Y, uppercase. */
+function clientTopbarDate(day){
+ if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(day||''))return '';
+ const date=new Date(day+'T12:00:00Z');
+ if(!Number.isFinite(date.getTime()))return '';
+ const pieces=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',weekday:'short',month:'short',day:'2-digit',year:'numeric'}).formatToParts(date);
+ const parts=Object.fromEntries(pieces.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return (parts.weekday+' · '+parts.month+' '+parts.day+', '+parts.year).toUpperCase();
+}
+function updateClientTopbar(routeName){
+ const label=routeName==='home'?clientTopbarDate(taipeiDay()):
+  routeName==='history'?clientTopbarDate($('historyDate').value||historyBounds().latest):'';
+ $('page-title').textContent=label;
+}
+
 function route(r){
  if(!names[r])r='home';
  const pageId=r==='ptt-focus'?'ptt':r;
@@ -17,7 +33,7 @@ function route(r){
  const activeNav=r==='custom-session'?'single':pageId;
  document.querySelectorAll('[data-route]').forEach(el=>el.classList.toggle('active',el.dataset.route===activeNav));
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
- $('page-title').textContent=names[r];$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
+ updateClientTopbar(r);$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
  history.replaceState(null,'','#'+r);
  document.body.classList.toggle('home-wide',r==='home'||r==='history');
  document.body.classList.toggle('ptt-focus-mode',r==='ptt-focus');
@@ -255,6 +271,7 @@ function historyChrome(){const b=historyBounds();const input=$('historyDate');in
  const selected=input.value;const shortcuts=$('history-shortcuts');shortcuts.replaceChildren();
  [['昨天',b.latest],['前天',shiftDay(b.latest,-1)],['7 天前',shiftDay(b.latest,-6)],['← 前一天',shiftDay(selected,-1)],['後一天 →',shiftDay(selected,1)]].forEach(([label,day])=>{if(historyDateValid(day))shortcuts.append(historyLink(label,day))});
  $('history-heading').textContent=selected.replaceAll('-','/');
+ if($('history').classList.contains('active'))updateClientTopbar('history');
 }
 async function loadHistory(){
  historyChrome();const day=$('historyDate').value;const error=$('history-error');error.hidden=true;error.textContent='';
