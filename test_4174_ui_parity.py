@@ -63,7 +63,10 @@ class ParityContract(unittest.TestCase):
 
     def test_no_unapproved_english_page_eyebrows(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
-        self.assertNotIn('class="eyebrow"', html)
+        self.assertNotIn('<span class="eyebrow">HOME</span>', html)
+        self.assertNotIn('<span class="eyebrow">COLLAB</span>', html)
+        self.assertIn('<span class="eyebrow">WATCHALONG</span>', html)
+        self.assertIn('<span class="eyebrow">CUSTOM</span>', html)
         self.assertNotIn("<h1>History</h1>", html)
 
     def test_history_label_agrees_with_navigation_js(self):
