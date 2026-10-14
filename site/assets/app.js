@@ -382,6 +382,31 @@ function youtubeCommand(iframe,command,args=[]){
  if(!iframe?.contentWindow)return;
  iframe.contentWindow.postMessage(JSON.stringify({event:'command',func:command,args}),'https://www.youtube-nocookie.com');
 }
+// 4174-style linked play/pause. Player state is accepted only from the
+// specific mounted YouTube iframe; no polling, guessed seek offsets or reloads.
+const ytOrigins=new Set(['https://www.youtube-nocookie.com','https://www.youtube.com']);
+const linkedEchoUntil=new WeakMap();
+function registerViewerPlayer(iframe){
+ if(!iframe?.contentWindow)return;
+ iframe.contentWindow.postMessage(JSON.stringify({event:'listening',id:String(iframe.closest('.player-card')?.dataset.index||'0')}),'https://www.youtube-nocookie.com');
+}
+function linkedPlayPause(event){
+ if(!$('syncPlayback').checked||!$('custom-session').classList.contains('active'))return;
+ if(!ytOrigins.has(event.origin)||typeof event.data!=='string')return;
+ let data;try{data=JSON.parse(event.data)}catch{return}
+ if(!data||data.event!=='onStateChange'||![1,2].includes(data.info))return;
+ const iframes=[...$('stage').querySelectorAll('.player-card iframe')];
+ const origin=iframes.find(iframe=>iframe.contentWindow===event.source);
+ if(!origin||Date.now()<(linkedEchoUntil.get(origin)||0))return;
+ const command=data.info===1?'playVideo':'pauseVideo';
+ for(const iframe of iframes){
+  if(iframe===origin)continue;
+  linkedEchoUntil.set(iframe,Date.now()+1000);
+  youtubeCommand(iframe,command);
+ }
+}
+window.addEventListener('message',linkedPlayPause);
+
 function globalVolume(value){
  const volume=Math.max(0,Math.min(100,Number(value)||0));
  $('globalVolume').value=String(volume);$('immersiveGlobalVolume').value=String(volume);
@@ -425,7 +450,7 @@ function makeWatchCard(id,index){
  primary.onclick=()=>setViewerPrimary(index);
  const youtube=node('a','YouTube ↗','player-youtube-link');youtube.href='https://www.youtube.com/watch?v='+id;youtube.target='_blank';youtube.rel='noopener noreferrer';
  actions.append(primary,youtube);controls.append(copy,actions);card.append(controls);
- player.addEventListener('load',()=>{sessionMute(player,index!==viewing.audio);globalVolume($('globalVolume').value)});
+ player.addEventListener('load',()=>{registerViewerPlayer(player);sessionMute(player,index!==viewing.audio);globalVolume($('globalVolume').value)});
  return card;
 }
 let replacementTarget=0;
@@ -439,7 +464,7 @@ function selectWatchRailVideo(id,title){
  if(!/^[A-Za-z0-9_-]{11}$/.test(id)||!viewing.ids.length)return;
  if(watchMode==='multi'){
   if(viewing.ids.includes(id))return;
-  const index=viewing.ids.length;viewing.ids.push(id);
+  const index=viewing.ids.length;viewing.ids.push(id);if(viewing.ids.length>1)$('syncPlayback').checked=true;
   $('stage').append(makeWatchCard(id,index));
   const option=node('option',String(index+1)+' · '+id);option.value=String(index);$('session-audio').append(option);
   renderFocusChoices();sessionLayout();sessionAudio();refreshWatchRail();
@@ -500,7 +525,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
   viewerPttPanel.remove();
  }
  $('session-status').textContent=clean.length+' 個影片';
- replacementTarget=0;watchMode=clean.length>1?'multi':'single';refreshWatchMode();
+ replacementTarget=0;watchMode=clean.length>1?'multi':'single';$('syncPlayback').checked=clean.length>1;refreshWatchMode();
  renderFocusChoices();route('custom-session');sessionLayout();sessionAudio();globalVolume($('globalVolume').value);
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
