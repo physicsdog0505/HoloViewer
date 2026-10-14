@@ -152,6 +152,11 @@ class ParityContract(unittest.TestCase):
         self.assertIn('renderHomeHighlights(rows)',js)
         self.assertNotIn('setInterval(',js)
 
+    def test_stream_id_validator_keeps_ascii_ids(self):
+        js=(ROOT/"site/assets/app.js").read_text(encoding="utf-8")
+        self.assertNotIn("[\\\\w-]", js, "Double escaped regex rejects real YouTube IDs")
+        self.assertGreaterEqual(js.count("[A-Za-z0-9_-]{11}"), 3)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)

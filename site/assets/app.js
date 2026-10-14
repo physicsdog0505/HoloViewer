@@ -49,7 +49,7 @@ function homeSelection(){
  }
 }
 function homeCard(item,container){
- if(!item||! /^[\\w-]{11}$/.test(item.video_id||''))return;
+ if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
  const id=item.video_id;const lifecycle=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
  const group=String(item.group||item.channel_group||'other').toLowerCase();
  const href='/custom-view/session?stream='+encodeURIComponent(id)+'&layout=auto&primary=0&audio=0';
@@ -74,7 +74,7 @@ function homeCard(item,container){
  container.append(card);
 }
 function homeRail(items){const box=$('live-channel-list');box.replaceChildren();const seen=new Set();
- items.forEach(item=>{const id=item.video_id;if(!/^[\\w-]{11}$/.test(id||''))return;const key=item.channel_id||item.channel_name||item.channel_title||id;if(seen.has(key))return;seen.add(key);
+ items.forEach(item=>{const id=item.video_id;if(!/^[A-Za-z0-9_-]{11}$/.test(id||''))return;const key=item.channel_id||item.channel_name||item.channel_title||id;if(seen.has(key))return;seen.add(key);
  const link=node('a',undefined,'live-channel-rail-item');link.href='#stream-'+id;link.dataset.group=String(item.group||item.channel_group||'other').toLowerCase();
  const avatar=node('span',undefined,'live-channel-avatar');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');avatar.append(node('span',([...name].find(c=>/[a-zA-Z0-9]/.test(c))||'H').toUpperCase()));avatar.append(node('i'));link.append(avatar);link.append(node('strong',name));
  link.onclick=event=>{event.preventDefault();const card=$('stream-'+id);card?.scrollIntoView({block:'center',behavior:'smooth'})};box.append(link)});
