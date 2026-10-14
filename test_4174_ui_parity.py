@@ -186,6 +186,21 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("$('page-title').textContent=names[r]",js)
         self.assertIn("/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/",js)
 
+    def test_accepted_full_viewer_css_and_immersive_lifecycle(self):
+        css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertGreater(len(css),100000)
+        self.assertIn('body.custom-immersive',css)
+        self.assertIn('body.custom-session-watching',css)
+        self.assertNotIn('@import',css)
+        self.assertNotIn('url(',css)
+        self.assertIn('id="viewer-4174-css"',html)
+        self.assertIn('id="customImmerse"',html)
+        self.assertIn('requestFullscreen()',js)
+        self.assertIn('fullscreenchange',js)
+        self.assertIn("viewerActive?'all':'not all'",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)

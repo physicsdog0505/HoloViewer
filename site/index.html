@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HoloViewer</title><link rel="stylesheet" href="assets/app.css"></head>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HoloViewer</title><link rel="stylesheet" href="assets/app.css"><link id="viewer-4174-css" rel="stylesheet" href="assets/viewer-4174.css" media="not all"></head>
 <body>
 <aside class="client-rail" aria-label="主要功能">
 <a class="rail-brand" href="/" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloViewer</span></a>
@@ -84,6 +84,7 @@
   <div class="viewer-workspace">
    <div class="viewer-head"><h1>自訂觀看</h1><a href="/custom-view" class="subtle-action" data-page-link="single">返回自訂觀看</a></div>
    <div class="player-toolbar" id="custom-player-toolbar">
+    <div class="custom-immersive-controls"><button type="button" id="customImmerse" aria-pressed="false">沉浸模式</button></div>
     <button type="button" data-session-layout="auto">自動</button>
     <button type="button" data-session-layout="equal">平均排列</button>
     <button type="button" data-session-layout="primary">主視角</button>
