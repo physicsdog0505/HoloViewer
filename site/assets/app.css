@@ -336,3 +336,22 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .inline-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.helper{color:var(--muted);font-size:11px;line-height:1.55}
 @media(max-width:760px){.manual-grid,.watch-grid,.source-choice,.inline-grid{grid-template-columns:1fr}}
 
+
+/* Accepted 4174 Collab hub CSS from client_home.py (cab0adb51). */
+
+.collab-event-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.collab-event-card{display:grid;grid-template-columns:minmax(220px,42%) 1fr;min-height:190px;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:var(--surface);transition:.15s ease}
+.collab-event-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.collab-event-thumb{position:relative;min-height:190px;background:var(--surface-2)}
+.collab-event-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.collab-event-thumb .status-pill{position:absolute;left:12px;top:12px}
+.collab-event-copy{padding:20px;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.collab-event-kicker{display:flex;gap:8px;color:var(--muted);font-size:11px;font-weight:800}
+.collab-event-copy h3{margin:8px 0 14px;font-size:20px}
+.collab-event-copy p{margin:12px 0 0;color:var(--muted);font-size:13px}
+.collab-avatars{display:flex;align-items:center;padding-left:5px}
+.collab-avatar{width:38px;height:38px;margin-left:-5px;border-radius:50%;overflow:hidden;border:2px solid var(--surface);background:var(--surface-2);display:grid;place-items:center;font-size:11px;font-weight:800}
+.collab-avatar img{width:100%;height:100%;object-fit:cover}
+@media(max-width:1040px){.collab-event-grid{grid-template-columns:1fr}}
+@media(max-width:620px){.collab-event-card{grid-template-columns:1fr}.collab-event-thumb{min-height:0;aspect-ratio:16/9}}
+

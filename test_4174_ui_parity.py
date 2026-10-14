@@ -134,6 +134,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
         self.assertNotIn("watch-add').onclick", js)
 
+    def test_original_4174_collab_hub_structure(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        for name in ('collab-live','collab-upcoming','collab-ended'):
+            self.assertIn('id="'+name+'"', html)
+        self.assertNotIn('id="multi-url"', html)
+        self.assertIn('function loadCollab()', js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
