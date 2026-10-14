@@ -208,3 +208,8 @@ body.home-wide .section-head{margin-bottom:9px}
 .history-picker,.history-shortcuts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
 .history-picker input{min-height:40px;padding:6px 10px;border:1px solid var(--line);border-radius:9px}
 .history-shortcuts .subtle-action{min-height:34px;padding:6px 11px}
+
+/* 4174 accepted History date navigation from client_home.py */
+.history-picker,.history-shortcuts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.history-picker input{min-height:40px;padding:6px 10px;border:1px solid var(--line);border-radius:9px;width:auto}
+.history-shortcuts .subtle-action{min-height:34px;padding:6px 11px}
