@@ -257,6 +257,16 @@ class ParityContract(unittest.TestCase):
         self.assertIn('primary.onclick=()=>setViewerPrimary(index)',js)
         self.assertIn("el.classList.toggle('replacement-target',i===replacementTarget)",js)
 
+    def test_linked_playback_has_explicit_toggle_and_origin_guard(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("function linkedPlayPause(event)",js)
+        self.assertIn("if(!$('syncPlayback').checked",js)
+        self.assertIn("ytOrigins.has(event.origin)",js)
+        self.assertIn("iframe.contentWindow===event.source",js)
+        self.assertIn("linkedEchoUntil.set(iframe",js)
+        self.assertIn("registerViewerPlayer(player)",js)
+        self.assertNotIn("setInterval(",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
