@@ -314,6 +314,15 @@ class ParityContract(unittest.TestCase):
         self.assertIn("viewing.layout='primary';",focus)
         self.assertIn('sessionLayout();',focus)
 
+    def test_focus_carousel_matches_accepted_4174_controls(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        for value in ('id="focusCarousel"', 'id="focusCarouselInterval"', 'id="focusCarouselIntervalOutput"'):
+            self.assertIn(value,html)
+        for value in ('function startFocusCarousel()', 'function stopFocusCarousel()', "setViewerPrimary((viewing.primary+1)%viewing.ids.length,true)", "if(!fromCarousel)stopFocusCarousel();", "if(!viewerActive)window.hvStopFocusCarousel?.();"):
+            self.assertIn(value,js)
+        self.assertIn("document.addEventListener('visibilitychange'",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
