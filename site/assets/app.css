@@ -235,3 +235,33 @@ body:has(#single.active) .client-main{max-width: min(1920px,100%);width:100%;pad
 .library-tabs{display:flex;gap:8px;margin-bottom:8px}.library-tabs button{padding:9px 15px;border:1px solid var(--line);background:var(--surface);border-radius:10px;cursor:pointer;font-weight:700}.library-tabs button[aria-selected="true"]{background:var(--surface-2);border-color:#83aabe}.library-empty{padding:24px 14px;color:var(--muted);font-size:13px}.drag-handle{border:0;background:transparent;cursor:grab;color:var(--muted);font-size:21px;touch-action:none}.selected-item.dragging{opacity:.5}.selected-item.drag-over{outline:2px solid #83aabe}.primary-choice{display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}.primary-choice input{accent-color:#367c9f}.selected-item.is-primary{border-color:#83aabe}.primary-tag{font-size:10px;color:#367c9f;font-weight:800}.library-display{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:10px}.library-display button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 9px;cursor:pointer}.live-picker-list.compact .live-picker-item{flex-direction:row}.live-picker-list.compact .live-picker-item img{width:92px}.builder-note{padding:14px 16px;border-radius:14px;background:#eef6f8;color:#4f6f7b;font-size:12px;line-height:1.6}
 @media(max-width:900px){.custom-layout{grid-template-columns:1fr}.selection-panel{position:static}.search-box{display:grid;grid-template-columns:1fr}}
 
+
+
+/* Exact 4174 shared viewer base CSS from accepted shared_viewing_core.py; renderer interactions still staged. */
+
+.viewer-workspace{display:grid;gap:12px}
+.player-toolbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow-x:auto}
+.player-toolbar button{border:1px solid var(--line);background:var(--surface-2);color:var(--text);border-radius:9px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+.player-toolbar button.active{background:var(--text);color:#fff;border-color:var(--text)}
+.player-status{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
+#stage{min-height:0;display:grid;gap:10px;grid-template-columns:repeat(var(--columns),minmax(0,1fr))}
+.player-card{min-width:0;background:#111;border:1px solid #252525;border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 5px 18px rgba(0,0,0,.09)}
+.video-wrap{position:relative;aspect-ratio:16/9;background:#000}.player{position:absolute;inset:0;width:100%;height:100%}
+.player-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 9px;background:#151515;color:#eee}
+.player-label{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.audio-row{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:10px;color:#aaa}.audio-row input{flex:1;min-width:70px}
+.player-actions{display:flex;gap:6px}.player-actions button,.player-actions .player-youtube-link{border:1px solid #3a3a3a;background:#202020;color:#eee;border-radius:7px;padding:6px 8px;cursor:pointer;white-space:nowrap;text-decoration:none;font-size:12px;display:inline-flex;align-items:center}
+.player-actions .master{transition:background .14s ease,color .14s ease,border-color .14s ease,box-shadow .14s ease}
+.player-actions .master.active{background:#7650cf;color:#fff;border-color:#8b6bdd;box-shadow:0 0 0 2px rgba(118,80,207,.22);font-weight:850}
+body.layout-primary #stage{grid-template-columns:minmax(0,2.25fr) minmax(240px,.9fr);align-items:start}
+body.layout-primary .player-card.primary{grid-column:1;grid-row:1 / span var(--side-count,1);align-self:start}
+body.layout-primary .player-card:not(.primary){grid-column:2;align-self:start}
+
+.viewer-workspace{display:grid;gap:12px}
+.custom-content-grid.video-only{display:block}
+#stage{--columns:2}
+.player-card .video-wrap iframe{width:100%;height:100%;border:0;position:absolute;inset:0}
+.player-toolbar label{display:flex;align-items:center;gap:8px;font-size:12px}
+.player-toolbar select{width:auto;min-width:120px}
+body:has(#custom-session.active) .client-main{max-width:none;padding-right:18px}
+@media(max-width:760px){#stage{grid-template-columns:1fr!important}}
