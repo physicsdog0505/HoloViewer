@@ -178,6 +178,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn(".live-channel-rail[hidden]{display:none!important}", css)
         self.assertIn('id="live-channel-rail"', html)
 
+    def test_4174_topbar_uses_date_not_invented_page_title(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('clientTopbarDate(',js)
+        self.assertIn("updateClientTopbar(r)",js)
+        self.assertIn("updateClientTopbar('history')",js)
+        self.assertNotIn("$('page-title').textContent=names[r]",js)
+        self.assertIn("/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
