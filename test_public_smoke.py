@@ -10,7 +10,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".gitignore"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/config.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", ".gitignore"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
@@ -31,6 +31,36 @@ class PublicSmokeTests(unittest.TestCase):
         for bad in ("BackfillJobQueue", "sqlite3", "subprocess", "requests", "Gemini",
                     "st.navigation", "st.Page", "playVideo", "st.video"):
             self.assertNotIn(bad, source)
+
+
+    def test_static_deploy_security_boundary(self):
+        config = json.loads((ROOT / "cloudflare/wrangler.json").read_text())
+        self.assertEqual(set(config), {"name", "compatibility_date", "assets"})
+        self.assertEqual(config["name"], "holoviewer-public")
+        self.assertEqual(config["assets"], {"directory": "../site"})
+        js = (ROOT / "site/assets/app.js").read_text()
+        for token in ("setInterval(", "setTimeout(", "location.reload(", "eval(", "innerHTML", "document.write("):
+            self.assertNotIn(token, js)
+        self.assertIn("credentials:'omit'", js)
+        self.assertIn("textContent=", js)
+        frontend_config = (ROOT / "site/assets/config.js").read_text()
+        self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
+        self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
+
+    def test_static_response_content_security_policy(self):
+        headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
+        self.assertIn("Content-Security-Policy:", headers)
+        for directive in ("default-src 'none'", "script-src 'self'", "connect-src https://holoviewer-public-api.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
+            self.assertIn(directive, headers)
+        self.assertNotIn("'unsafe-inline'", headers)
+        self.assertNotIn("'unsafe-eval'", headers)
+
+    def test_manual_deployment_release_gate(self):
+        workflow = (ROOT / ".github/workflows/deploy-cloudflare-production.yml").read_text()
+        for token in ("workflow_dispatch:", "BASELINE-CHECKED", "release_sha", "git rev-parse HEAD", "cloudflare-production", "refs/heads/main", "persist-credentials: false"):
+            self.assertIn(token, workflow)
+        self.assertNotIn("  push:", workflow)
+        self.assertNotIn("  schedule:", workflow)
 
     def test_absent_snapshot(self):
         with tempfile.TemporaryDirectory() as t:
