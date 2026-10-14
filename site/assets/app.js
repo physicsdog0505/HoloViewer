@@ -436,6 +436,8 @@ function setViewerPrimary(index){
  // Original 4174 primary selection is also the target for single-mode rail replacement.
  replacementTarget=index;
  viewing.primary=index;
+ // Accepted 4174 setPrimary() selects primary geometry, not merely a badge.
+ viewing.layout='primary';
  if($('audioFollowFocus').checked){viewing.audio=index;sessionAudio()}
  sessionLayout();
 }
