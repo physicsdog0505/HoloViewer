@@ -3,6 +3,7 @@
 Only tests the frozen shared-sidebar contract, NOT full parity.
 """
 from html.parser import HTMLParser
+import re
 from pathlib import Path
 import unittest
 
@@ -210,6 +211,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn('viewerPttPanel.remove()',js)
         self.assertIn("classList.toggle('video-only',!showPtt)",js)
         self.assertIn('目前沒有足夠的專串來源與影片時間證據。',js)
+
+    def test_shared_shell_has_no_invented_footer_or_dead_id_bindings(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertNotIn('<footer',html)
+        element_ids=set(re.findall(r'\bid="([^"]+)"',html))
+        required_ids=set(re.findall(r"\$\('([^']+)'\)",js))
+        self.assertEqual(required_ids-element_ids,set(),"JS required ID missing in Public HTML")
 
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
