@@ -220,6 +220,29 @@ class ParityContract(unittest.TestCase):
         required_ids=set(re.findall(r"\$\('([^']+)'\)",js))
         self.assertEqual(required_ids-element_ids,set(),"JS required ID missing in Public HTML")
 
+    def test_4174_watching_controls_and_no_iframe_remount_on_mode_toggle(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        for name in ('watchSingleMode','watchMultiMode','watchModeToggle','globalVolume','watchSettings','watchImmersive','focusChoices','playAll','pauseAll'):
+            self.assertIn('id="'+name+'"',html)
+        self.assertIn('function refreshWatchMode()',js)
+        self.assertIn('function renderFocusChoices()',js)
+        self.assertIn("youtubeCommand(iframe,'setVolume'",js)
+        self.assertIn("youtubeCommand(iframe,'playVideo'",js)
+        self.assertIn("youtubeCommand(iframe,'pauseVideo'",js)
+        self.assertNotIn("renderMulti();route('multi')",js)
+
+    def test_4174_live_rail_replaces_only_target_and_appends_in_multi(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('function selectWatchRailVideo(id,title)',js)
+        self.assertIn('function makeWatchCard(id,index)',js)
+        self.assertIn("watchMode==='multi'",js)
+        self.assertIn("viewing.ids.push(id)",js)
+        self.assertIn("box.append(makeWatchCard(id,i))",js)
+        self.assertIn("link.dataset.liveVideoId=id",js)
+        self.assertIn("iframe.src='https://www.youtube-nocookie.com/embed/'",js)
+        self.assertNotIn("route('multi')",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)

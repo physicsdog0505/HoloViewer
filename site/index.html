@@ -83,11 +83,28 @@
  <section id="custom-session" class="page">
   <div class="viewer-workspace">
    <div class="viewer-head"><h1>自訂觀看</h1><a href="/custom-view" class="subtle-action" data-page-link="single">返回自訂觀看</a></div>
+   <div class="watch-actions">
+    <div class="watch-mode-switch" role="group" aria-label="觀看模式">
+     <button type="button" id="watchSingleMode" aria-pressed="true">單人</button>
+     <button type="button" id="watchModeToggle" class="watch-mode-toggle" role="switch" aria-checked="false" aria-label="切換單人／多人模式"></button>
+     <button type="button" id="watchMultiMode" aria-pressed="false">多人</button>
+    </div>
+    <label class="global-volume-label">總音量 <input id="globalVolume" type="range" min="0" max="100" value="100" aria-label="所有視角總音量"><output id="globalVolumeValue">100%</output></label>
+    <button type="button" id="watchSettings" aria-expanded="false">設定</button>
+    <button type="button" id="watchImmersive">沉浸模式</button>
+   </div>
+   <label class="immersive-global-volume">總音量 <input id="immersiveGlobalVolume" type="range" min="0" max="100" value="100" aria-label="沉浸模式總音量"><output id="immersiveGlobalVolumeValue">100%</output></label>
    <div class="player-toolbar" id="custom-player-toolbar">
     <div class="custom-immersive-controls"><button type="button" id="customImmerse" aria-pressed="false">沉浸模式</button></div>
     <button type="button" data-session-layout="auto">自動</button>
     <button type="button" data-session-layout="equal">平均排列</button>
     <button type="button" data-session-layout="primary">主視角</button>
+    <span id="focusChoices" class="focus-choices" aria-label="切換主視角"></span>
+    <label class="player-sync-label" id="videoHeightLabel">播放器高度上限 <input id="videoHeight" type="range" min="360" max="1000" step="40" value="1000"><output id="videoHeightValue">1000px</output></label>
+    <label class="player-sync-label" id="audioFollowLabel"><input id="audioFollowFocus" type="checkbox"> 聲音跟隨主視角</label>
+    <label class="player-sync-label" id="playerSyncLabel"><input id="syncPlayback" type="checkbox"> 連動播放／暫停</label>
+    <button type="button" id="playAll">全部播放</button>
+    <button type="button" id="pauseAll">全部暫停</button>
     <label>主要聲音 <select id="session-audio" aria-label="主要聲音"></select></label>
     <span id="session-status" class="player-status"></span>
    </div>
