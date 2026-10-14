@@ -1,0 +1,1562 @@
+
+.viewer-workspace{display:grid;gap:12px}
+.player-toolbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow-x:auto}
+.player-toolbar button{border:1px solid var(--line);background:var(--surface-2);color:var(--text);border-radius:9px;padding:7px 10px;cursor:pointer;white-space:nowrap}
+.player-toolbar button.active{background:var(--text);color:#fff;border-color:var(--text)}
+.player-status{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
+#stage{min-height:0;display:grid;gap:10px;grid-template-columns:repeat(var(--columns),minmax(0,1fr))}
+.player-card{min-width:0;background:#111;border:1px solid #252525;border-radius:14px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 5px 18px rgba(0,0,0,.09)}
+.video-wrap{position:relative;aspect-ratio:16/9;background:#000}.player{position:absolute;inset:0;width:100%;height:100%}
+.player-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 9px;background:#151515;color:#eee}
+.player-label{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.audio-row{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:10px;color:#aaa}.audio-row input{flex:1;min-width:70px}
+.player-actions{display:flex;gap:6px}.player-actions button,.player-actions .player-youtube-link{border:1px solid #3a3a3a;background:#202020;color:#eee;border-radius:7px;padding:6px 8px;cursor:pointer;white-space:nowrap;text-decoration:none;font-size:12px;display:inline-flex;align-items:center}
+.player-actions .master{transition:background .14s ease,color .14s ease,border-color .14s ease,box-shadow .14s ease}
+.player-actions .master.active{background:#7650cf;color:#fff;border-color:#8b6bdd;box-shadow:0 0 0 2px rgba(118,80,207,.22);font-weight:850}
+body.layout-primary #stage{grid-template-columns:minmax(0,2.25fr) minmax(240px,.9fr);align-items:start}
+body.layout-primary .player-card.primary{grid-column:1;grid-row:1 / span var(--side-count,1);align-self:start}
+body.layout-primary .player-card:not(.primary){grid-column:2;align-self:start}
+.custom-immersive-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.custom-immersive-controls button{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--surface);cursor:pointer}
+.custom-content-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,28%);gap:10px;align-items:start}
+.custom-content-grid.video-only{display:block}
+.viewer-workspace:has(.ptt-live-panel){width:100%}
+body:has(.ptt-live-panel) .client-main{max-width:1560px}
+.player-toolbar{flex-wrap:wrap;overflow:visible}
+.player-toolbar [hidden],.player-actions [hidden]{display:none!important}
+.custom-content-grid{grid-template-columns:minmax(0,1fr) minmax(240px,var(--ptt-width,28%));gap:8px}
+.custom-content-grid:has(.ptt-live-panel) #stage{grid-template-columns:repeat(var(--columns),minmax(0,1fr))}
+body.layout-primary .custom-content-grid:has(.ptt-live-panel) #stage{grid-template-columns:minmax(0,2.25fr) minmax(200px,.9fr)}
+.ptt-live-panel{position:sticky;top:74px}
+.ptt-panel-heading{gap:12px;line-height:1.4}.ptt-heading-controls{display:flex;align-items:center;gap:10px;margin-left:auto}.ptt-floor-quick{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.ptt-panel-heading small{display:block;color:#a5aeb3;font-size:11px;font-weight:500;margin-top:3px}
+.ptt-panel-heading a{white-space:nowrap}.ptt-embed-controls{display:inline-flex;align-items:center;gap:10px;margin-left:auto}.ptt-embed-floor,.ptt-embed-font{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;white-space:nowrap}.ptt-embed-font input{width:92px}.ptt-embed-font output{min-width:34px}
+.translation-slot{font-size:12px;line-height:1.5}
+body.custom-immersive .custom-content-grid{grid-template-columns:minmax(0,1fr) minmax(240px,var(--ptt-width,28%));align-items:start}
+body.custom-immersive .ptt-live-panel{top:0}
+body.custom-immersive .ptt-panel-heading,body.custom-immersive .ptt-worker-options{display:none!important}
+body.custom-immersive .ptt-live-panel iframe{border:0!important}
+body.custom-immersive .ptt-live-panel iframe[src*="focus=1"]{pointer-events:auto}
+body.custom-immersive #ptt-worker-feed{height:100%;max-height:none;min-height:0;padding-top:4px}
+body.custom-immersive .viewer-workspace{gap:6px}
+body.custom-immersive .player-toolbar{padding:6px 10px}
+@media(max-width:1100px){.custom-content-grid{grid-template-columns:minmax(0,1fr) minmax(240px,var(--ptt-width,28%))}}
+@media(max-width:900px){.custom-content-grid,body.custom-immersive .custom-content-grid{grid-template-columns:1fr}.ptt-live-panel{position:static}.ptt-live-panel iframe{height:50vh;min-height:320px}}
+
+.custom-player-column{min-width:0}
+.ptt-live-panel{min-width:0;background:#101010;border-radius:12px;overflow:hidden;border:1px solid #303030;color:#eee}
+.ptt-live-panel [hidden],body.custom-session-watching.custom-immersive .ptt-live-panel [hidden]{display:none!important}
+.ptt-unavailable{padding:28px 18px;color:#aeb5b8;font-size:13px;line-height:1.6}
+.ptt-panel-heading{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:13px;font-weight:700}
+.ptt-panel-heading a{color:#b5d7e5;text-decoration:none;font-size:11px}
+.ptt-live-panel iframe{width:100%;height:min(72vh,720px);min-height:320px;border:0;display:block}
+#ptt-worker-feed{height:min(72vh,720px);min-height:320px;overflow:auto;padding:6px 10px;background:#0c0d0f;color:#eee;font-size:14px;line-height:1.45}
+.ptt-worker-options{display:flex;gap:12px;align-items:center;padding:2px 12px 7px;color:#ccc;font-size:11px}
+.ptt-worker-options label{display:inline-flex;gap:5px;align-items:center}
+.ptt-worker-options.live-ptt-controls label:not(:first-child){display:none}
+.ptt-worker-options select{max-width:85px;background:#222;color:#eee;border:1px solid #555;border-radius:4px}
+.ptt-worker-row{display:grid;grid-template-columns:1.3em 4.1em 3.4em minmax(0,1fr);column-gap:6px;align-items:start;padding:4px 2px;border-bottom:1px solid #25282a;overflow-wrap:anywhere;font-size:var(--ptt-font-size,14px);line-height:1.45}
+.ptt-worker-kind{text-align:center;font-weight:800;color:#f4f4f4}
+.ptt-worker-clock{color:#dedede;font-size:.72em;white-space:nowrap;padding-top:.25em}
+.ptt-worker-floor{color:#777;font-size:.72em;white-space:nowrap;padding-top:.25em}
+.ptt-worker-body{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.ptt-worker-author{color:#ffff00;font-weight:650}
+.ptt-worker-content{color:#a9a900}
+#ptt-worker-feed.ptt-worker-original{background:#080808}
+#ptt-worker-feed:not(.ptt-worker-original) .ptt-worker-author{color:#64ccea}
+#ptt-worker-feed:not(.ptt-worker-original) .ptt-worker-content{color:#eee}
+#ptt-worker-feed.ptt-worker-hide-floor .ptt-worker-row{grid-template-columns:1.3em 4.1em minmax(0,1fr)}
+#ptt-worker-feed.ptt-worker-hide-floor .ptt-worker-floor{display:none}
+
+.translation-slot{margin-top:6px;min-height:54px;padding:7px 10px;background:#0d0d0d;border:1px solid #303030;border-radius:10px;color:#eee;font-size:13px}.translation-track-controls{display:flex;gap:5px;justify-content:flex-end;margin-bottom:4px}.translation-track-controls button{border:1px solid #444;background:#1c1c1c;color:#bbb;border-radius:5px;padding:3px 7px;cursor:pointer}.translation-track-controls button.active{background:#eee;color:#111;font-weight:800}.translation-text{text-align:center;font-size:15px;line-height:1.45;min-height:1.5em}
+body.custom-immersive .client-rail,body.custom-immersive .client-topbar,body.custom-immersive .viewer-head{display:none!important}
+body.custom-immersive .client-main{margin-left:0!important;max-width:none!important;padding:10px!important}
+body.custom-immersive .player-toolbar,body.custom-immersive .viewer-head,body.custom-immersive .client-rail,body.custom-immersive .client-topbar{display:none!important}
+body.custom-immersive .watch-actions{display:none!important}
+body.custom-immersive .client-main{padding:0!important;max-width:none!important}
+body.custom-immersive .viewer-workspace{gap:0;background:#080808;min-height:100vh}
+body.custom-immersive .custom-content-grid{gap:2px!important}
+body.custom-immersive .player-card{border-radius:0;box-shadow:none}
+body.custom-immersive .ptt-live-panel{position:static;border-radius:0;border:0}
+/* A single archived stream needs a readable PTT rail in immersive mode.  Multi-view
+   keeps the owner-accepted width above. */
+body.custom-immersive:not(.single-ptt):has(#stage .player-card:only-child) .custom-content-grid:has(.ptt-live-panel){grid-template-columns:minmax(0,1fr) minmax(320px,30vw)!important}
+body.custom-immersive:not(.single-ptt):has(#stage .player-card:only-child) .ptt-live-panel{height:100vh;max-height:100vh}
+body.custom-immersive:not(.single-ptt):has(#stage .player-card:only-child) #ptt-worker-feed{height:100vh;max-height:100vh;min-height:0}
+body.custom-immersive .translation-slot:not([hidden]){position:fixed;left:12px;bottom:10px;z-index:45;width:min(760px,calc(66vw - 24px));margin:0;background:rgba(13,13,13,.94);backdrop-filter:blur(8px)}
+.ptt-font-label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.player-sync-label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap}
+.player-sync-label input{accent-color:#367c9f}
+#videoHeight{width:110px}
+#videoHeightValue{min-width:50px;font-variant-numeric:tabular-nums}
+body.custom-immersive #videoHeightLabel{display:none}
+.custom-player-column{--custom-video-height:1000px}
+.custom-player-column .video-wrap{max-height:var(--custom-video-height)}
+.custom-player-column .video-wrap iframe{max-height:var(--custom-video-height)}
+.focus-choices{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.focus-choices button{font-size:12px}
+.focus-choices button.active{background:var(--text);color:#fff}
+#focusCarouselInterval{width:85px;accent-color:#367c9f}
+#focusCarouselIntervalOutput{min-width:38px}
+body.layout-primary .player-card{min-width:0}
+.ptt-font-label input{width:100px;accent-color:var(--text)}
+.ptt-font-label output{min-width:34px;font-variant-numeric:tabular-nums}
+body.custom-immersive .translation-slot[hidden]{display:none!important}
+@media(max-width:900px){.custom-content-grid{grid-template-columns:1fr}.ptt-live-panel iframe{height:55vh;min-height:360px}}
+
+/* Match the accepted 8501 two-view Focus composition: main A/B left,
+   the other video upper-right, PTT immediately beneath it. */
+@media(min-width:761px){
+ body.layout-primary:has(.ptt-live-panel) .custom-content-grid{display:block}
+ body.layout-primary:has(.ptt-live-panel) #stage{
+  display:grid;grid-template-columns:minmax(0,2.25fr) minmax(260px,.9fr);
+  grid-template-rows:auto auto minmax(240px,1fr);align-items:stretch;gap:6px;
+  min-height:calc(100vh - 155px)
+ }
+ body.layout-primary:has(.ptt-live-panel) #stage .player-card.primary{
+  grid-column:1;grid-row:1 / 4;align-self:stretch;min-height:0
+ }
+ body.layout-primary:has(.ptt-live-panel) #stage .player-card:not(.primary){
+  grid-column:2;min-height:0
+ }
+ body.layout-primary:has(.ptt-live-panel) #stage .player-card.focus-hidden{display:none!important}
+ body.layout-primary:has(.ptt-live-panel) #stage .player-card.focus-side-1{grid-row:1}
+ body.layout-primary:has(.ptt-live-panel) #stage .player-card.focus-side-2{grid-row:2}
+ body.layout-primary:has(.ptt-live-panel) #stage .ptt-live-panel{
+  grid-column:2;grid-row:3;min-height:0;position:static;display:flex;flex-direction:column
+ }
+ body.layout-primary:has(.ptt-live-panel) #stage .ptt-live-panel iframe{
+  flex:1;min-height:0;height:100%;width:100%
+ }
+ body.layout-primary:has(.ptt-live-panel) #stage .player-card.primary .video-wrap{
+  flex:1;min-height:0;aspect-ratio:auto;max-height:none
+ }
+ body.layout-primary:has(.ptt-live-panel) #stage .player-card.primary .video-wrap iframe{max-height:none}
+ body.layout-primary:has(.ptt-live-panel) #stage .player-card:not(.primary) .video-wrap{max-height:none}
+ body.layout-primary:has(.ptt-live-panel) .translation-slot[hidden]{display:none!important}
+}
+body.custom-immersive .client-rail,body.custom-immersive .client-sidebar,
+body.custom-immersive .channel-rail,body.custom-immersive .avatar-rail,
+body.custom-immersive .sidebar,body.custom-immersive .left-rail{display:none!important}
+body.custom-immersive .client-main{width:100vw!important;max-width:100vw!important}
+body.custom-immersive .viewer-workspace{width:100vw!important}
+body.custom-immersive .player-card .player-controls{display:none!important}
+body.custom-immersive .custom-content-grid:has(.ptt-live-panel){display:block}
+
+/* Watching is the default: maximize the existing viewport, reserve a
+   narrow left channel-switching rail instead of overlaying the video. */
+body.custom-session-watching .client-main{
+ margin-left:calc(var(--rail-collapsed,72px) + var(--watch-rail,64px))!important;
+ width:calc(100vw - var(--rail-collapsed,72px) - var(--watch-rail,64px))!important;
+ max-width:none!important;padding:4px 8px 8px!important
+}
+body.custom-session-watching .viewer-head{display:none}
+body.custom-session-watching .viewer-workspace{gap:4px}
+body.custom-session-watching .custom-content-grid{gap:5px}
+body.custom-session-watching .player-toolbar{padding:4px 8px;gap:5px}
+/* Keep the shared navigation rail: home/watchalong/custom/PTT remain reachable.
+   The stream-avatar rail starts beneath the global navigation, as on other pages. */
+body.custom-session-watching .client-topbar{display:none!important}
+body.custom-session-watching .client-rail{display:block!important;z-index:90}
+body.custom-session-watching .live-channel-rail{
+ left:var(--rail-collapsed,72px);top:0;bottom:0;max-height:100dvh;width:64px;
+ border-radius:0;z-index:70;padding-top:8px
+}
+body.custom-session-watching .live-channel-rail:hover,
+body.custom-session-watching .live-channel-rail:focus-within{width:222px}
+/* Expanded channel picker changes reserved space, never covers the video. */
+body.custom-session-watching:has(.live-channel-rail:hover):not(.custom-immersive),
+body.custom-session-watching:has(.live-channel-rail:focus-within):not(.custom-immersive){
+ --watch-rail:222px
+}
+body.custom-session-watching:has(.live-channel-rail:hover) .client-main,
+body.custom-session-watching:has(.live-channel-rail:focus-within) .client-main{
+ margin-left:calc(var(--rail-collapsed,72px) + 222px)!important;
+ width:calc(100vw - var(--rail-collapsed,72px) - 222px)!important;
+ padding-left:8px!important;max-width:none!important
+}
+body.custom-session-watching .custom-player-column{--custom-video-height:1000px}
+body.custom-session-watching .player-toolbar .ptt-width-label input{width:80px}
+body.custom-session-watching .player-toolbar #status{display:none}
+body.custom-session-watching .translation-slot[hidden]{display:none!important}
+
+/* 8501 parity: watching is full-viewport without being fullscreen. */
+body.custom-session-watching{--watch-rail:64px}
+body.custom-session-watching .client-main{
+ margin-left:calc(var(--rail-collapsed,72px) + var(--watch-rail))!important;
+ width:calc(100vw - var(--rail-collapsed,72px) - var(--watch-rail))!important
+}
+body.custom-session-watching .custom-content-grid:has(#stage .ptt-live-panel){display:block}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel){display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,var(--ptt-width,28%));align-items:stretch}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) .ptt-live-panel{height:calc(100dvh - 56px);display:flex;flex-direction:column;position:static}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) .ptt-live-panel iframe{height:100%;min-height:0;flex:1}
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel) .ptt-live-panel{height:100dvh}
+body.custom-session-watching:not(.single-ptt) #stage{min-height:0}
+body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage{display:grid;gap:6px}
+body.custom-session-watching:not(.single-ptt).layout-auto:has(.ptt-live-panel) #stage,
+body.custom-session-watching:not(.single-ptt).layout-equal:has(.ptt-live-panel) #stage{
+ grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto minmax(220px,1fr);
+}
+body.custom-session-watching:not(.single-ptt).layout-auto:has(.ptt-live-panel) #stage .ptt-live-panel,
+body.custom-session-watching:not(.single-ptt).layout-equal:has(.ptt-live-panel) #stage .ptt-live-panel{
+ grid-column:1 / -1;grid-row:2;min-height:220px;position:static
+}
+body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage{
+ grid-template-columns:minmax(0,2.25fr) minmax(260px,.9fr);
+ grid-template-rows:auto minmax(220px,1fr);min-height:calc(100vh - 85px);
+}
+body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .ptt-live-panel{
+ grid-column:2;grid-row:2;position:static;min-height:220px
+}
+body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .ptt-live-panel iframe{height:100%;min-height:220px}
+body.custom-session-watching .player-toolbar{display:none}
+body.custom-session-watching.settings-open .player-toolbar{display:flex}
+body.custom-session-watching .watch-actions{display:flex;justify-content:flex-end;gap:6px;align-items:center;padding:3px 6px}
+body.custom-session-watching .watch-actions button{font:inherit;border:1px solid var(--line);border-radius:7px;padding:5px 9px;background:var(--surface);color:var(--text);cursor:pointer}
+body.custom-session-watching.custom-immersive{--watch-rail:0px}
+body.custom-session-watching.custom-immersive .live-channel-rail,
+body.custom-session-watching.custom-immersive .watch-actions,
+body.custom-session-watching.custom-immersive .ptt-focus-toolbar,
+body.custom-session-watching.custom-immersive .focus-toolbar,
+body.custom-session-watching.custom-immersive .focus-exit,
+body.custom-session-watching.custom-immersive [data-focus-exit],
+body.custom-session-watching.custom-immersive .player-toolbar,
+body.custom-session-watching.custom-immersive .immersive-ptt-width{display:none!important}
+body.custom-session-watching.custom-immersive .client-main{
+ margin-left:0!important;width:100vw!important;padding:0!important
+}
+body.custom-session-watching:not(.single-ptt).custom-immersive #stage{min-height:100vh}
+body.custom-session-watching.custom-immersive .player-controls{display:flex!important;padding:2px 6px}
+body.custom-session-watching.custom-immersive .player-actions,
+body.custom-session-watching.custom-immersive .player-label{display:none!important}
+body.custom-session-watching.custom-immersive .audio-row{margin:0;width:180px}
+body.custom-session-watching.custom-immersive .player-card{border:0;border-radius:0}
+body.custom-session-watching.custom-immersive .video-wrap{max-height:none}
+@media(max-width:760px){
+ body.custom-session-watching:not(.single-ptt).layout-auto #stage,
+ body.custom-session-watching:not(.single-ptt).layout-equal #stage,
+ body.custom-session-watching:not(.single-ptt).layout-primary #stage{grid-template-columns:1fr!important;grid-template-rows:auto!important;min-height:0}
+ body.custom-session-watching:not(.single-ptt) #stage .ptt-live-panel,
+ body.custom-session-watching:not(.single-ptt) #stage .player-card{grid-column:1!important;grid-row:auto!important}
+}
+
+/* 8501 grid also keeps the feed below three/four equal streams and
+   beneath the secondary video column in Focus A/B/C/D. */
+@media(min-width:761px){
+ body.custom-session-watching.layout-equal:has(.ptt-live-panel) #stage:has(> .player-card:nth-child(3)),
+ body.custom-session-watching.layout-auto:has(.ptt-live-panel) #stage:has(> .player-card:nth-child(3)){
+  grid-template-rows:auto auto minmax(0,1fr)
+ }
+ body.custom-session-watching.layout-equal:has(.ptt-live-panel) #stage:has(> .player-card:nth-child(3)) .ptt-live-panel,
+ body.custom-session-watching.layout-auto:has(.ptt-live-panel) #stage:has(> .player-card:nth-child(3)) .ptt-live-panel{
+  grid-column:1/-1;grid-row:3
+ }
+ body.custom-session-watching.layout-equal:has(.ptt-live-panel) #stage > .player-card:nth-child(3):nth-last-child(2){
+  grid-column:1/-1
+ }
+ body.custom-session-watching.layout-primary:has(.ptt-live-panel) #stage:has(> .player-card:nth-child(3)){
+  grid-template-rows:repeat(var(--side-count),auto) minmax(0,1fr)
+ }
+ body.custom-session-watching.layout-primary:has(.ptt-live-panel) #stage:has(> .player-card:nth-child(3)) .player-card.primary{
+  grid-column:1;grid-row:1 / span calc(var(--side-count) + 1)
+ }
+ body.custom-session-watching.layout-primary:has(.ptt-live-panel) #stage:has(> .player-card:nth-child(3)) .ptt-live-panel{
+  grid-column:2;grid-row:calc(var(--side-count) + 1)
+ }
+}
+/* PTT must take the full remaining viewport height in both 8501 layouts. */
+body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage{
+ height:calc(100dvh - 56px);
+ grid-template-rows:minmax(0,auto) minmax(0,1fr);
+ align-content:stretch;overflow:hidden
+}
+body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .ptt-live-panel{
+ height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column
+}
+body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .ptt-panel-heading{flex:0 0 auto}
+body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .ptt-live-panel iframe{
+ height:100%;min-height:0;flex:1 1 auto
+}
+body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage{
+ grid-template-rows:minmax(0,auto) minmax(0,1fr)
+}
+body.custom-session-watching:not(.single-ptt).custom-immersive:has(.ptt-live-panel) #stage{height:100dvh}
+/* Focus 1+2 owns the final desktop geometry. Keep the whole stage inside the
+   viewport (including player control bars), and let PTT consume only the
+   remaining right-column height. */
+@media(min-width:761px){
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage{
+  height:calc(100dvh - 56px)!important;min-height:0!important;
+  grid-template-columns:minmax(0,2.25fr) minmax(260px,.9fr)!important;
+  grid-template-rows:minmax(0,auto) minmax(0,auto) minmax(0,1fr)!important;
+  align-content:stretch;overflow:hidden
+ }
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .player-card.primary{
+  grid-column:1!important;grid-row:1 / 4!important;height:100%;min-height:0;overflow:hidden
+ }
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .player-card.primary .video-wrap{
+  flex:1 1 auto;min-height:0
+ }
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .player-card.focus-side-1{grid-column:2;grid-row:1!important}
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .player-card.focus-side-2{grid-column:2;grid-row:2!important}
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .ptt-live-panel{
+  grid-column:2!important;grid-row:3!important;height:100%;min-height:0!important
+ }
+}
+.player-card.replacement-target .replacement-choice{background:#eef1f2;color:#111;font-weight:700}
+body.custom-session-watching:not(.settings-open) .player-card .replacement-choice{opacity:.25}
+body.custom-session-watching .player-card .replacement-choice:hover,
+body.custom-session-watching .player-card .replacement-choice:focus-visible{opacity:1}
+.global-volume-label,.immersive-global-volume{display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}
+.global-volume-label input,.immersive-global-volume input{width:110px;accent-color:#5799cf}
+.global-volume-label output,.immersive-global-volume output{min-width:34px;font-variant-numeric:tabular-nums}
+.immersive-global-volume{display:none}
+body.custom-session-watching.custom-immersive .immersive-global-volume{display:flex;position:fixed;bottom:12px;left:12px;z-index:120;color:#fff;padding:6px 10px;border-radius:7px;background:rgba(0,0,0,.7)}
+
+/* Narrow viewing: retain two video controls in settings, not below videos.
+   Give the PTT reader the leftover fixed viewport, and scroll only inside it. */
+@media(max-width:760px){
+ html:has(body.custom-session-watching),body.custom-session-watching{height:100%;overflow:hidden}
+ body.custom-session-watching .client-main{height:100dvh;overflow:hidden}
+ body.custom-session-watching .viewer-workspace{height:100%;min-height:0;display:flex;flex-direction:column}
+ body.custom-session-watching .watch-actions{flex:0 0 auto}
+ body.custom-session-watching:not(.single-ptt) .custom-content-grid,
+ body.custom-session-watching:not(.single-ptt) .custom-player-column{min-height:0;flex:1;display:flex;flex-direction:column}
+ body.custom-session-watching:not(.single-ptt) #stage,
+ body.custom-session-watching:not(.single-ptt).layout-equal #stage,
+ body.custom-session-watching:not(.single-ptt).layout-primary #stage{
+  display:flex!important;flex-direction:column;flex:1;min-height:0;
+  height:auto!important;gap:3px;overflow:hidden
+ }
+ body.custom-session-watching:not(.single-ptt) #stage .player-card{flex:0 0 auto;min-height:0}
+ body.custom-session-watching:not(.single-ptt) #stage .player-card .player-controls{display:none!important}
+ body.custom-session-watching:not(.single-ptt) #stage .video-wrap{aspect-ratio:16/9;max-height:none}
+ body.custom-session-watching:not(.single-ptt) #stage .ptt-live-panel{
+  display:flex!important;flex:1 1 auto;height:auto!important;min-height:0!important;
+  width:100%;overflow:hidden;grid-column:auto!important;grid-row:auto!important
+ }
+ body.custom-session-watching:not(.single-ptt) #stage .ptt-panel-heading{display:none!important}
+ body.custom-session-watching:not(.single-ptt) #stage .ptt-live-panel iframe{
+  display:block;flex:1 1 auto;height:100%!important;min-height:0!important
+ }
+ body.custom-session-watching .watch-actions{padding:2px 4px}
+ body.custom-session-watching .watch-actions .global-volume-label{margin-right:auto}
+ body.custom-session-watching .watch-actions .global-volume-label input{width:95px}
+}
+
+/* Single-view acceptance: one full-width player alongside one narrow PTT
+   column. Primary mode must NOT reserve a phantom second player column. */
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage{
+ display:grid;grid-template-columns:minmax(0,1fr)!important;
+ width:100%;min-width:0;height:auto;overflow:visible
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage .player-card{
+ grid-column:1!important;grid-row:1!important;width:100%;min-width:0;
+ align-self:start
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage .video-wrap{
+ width:100%;aspect-ratio:16/9;max-height:none
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage .player-controls{
+ display:none!important
+}
+/* Preserve the sole visible total volume in both normal/immersive view. */
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel) #stage .player-controls{
+ display:none!important
+}
+body.custom-session-watching .live-channel-rail:not(:hover):not(:focus-within){
+ width:64px!important
+}
+body.custom-session-watching .live-channel-rail:not(:hover):not(:focus-within) .live-channel-label{
+ display:none!important
+}
+body.custom-session-watching .live-channel-rail:not(:hover):not(:focus-within) .live-channel-rail-item strong{
+ opacity:0!important
+}
+
+.watch-mode-switch{display:flex;align-items:center;gap:9px;min-height:36px}
+.watch-mode-switch button{border:0;background:transparent;color:#817c86;cursor:pointer;font-size:12px;font-weight:750;white-space:nowrap;padding:5px 2px;transition:color .16s ease,font-weight .16s ease}
+.watch-mode-switch button:hover{color:#56385f}
+.watch-mode-switch button[aria-pressed="true"]{color:#61346e;font-weight:900}
+.watch-mode-toggle{position:relative;width:46px;height:25px;border:0;border-radius:999px;background:#d8d4dc;box-shadow:inset 0 1px 3px rgba(34,24,39,.16);cursor:pointer;padding:0;transition:background .18s ease,box-shadow .18s ease}
+.watch-mode-toggle::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(34,24,39,.28);transition:transform .18s ease}
+.watch-mode-toggle[aria-checked="true"]{background:#7650cf;box-shadow:inset 0 1px 3px rgba(52,31,99,.24)}
+.watch-mode-toggle[aria-checked="true"]::after{transform:translateX(21px)}
+.watch-mode-toggle:focus-visible{outline:2px solid #7650cf;outline-offset:2px}
+@media(max-width:800px){.watch-mode-switch{gap:7px}}
+.player-actions .replacement-choice{display:none!important}
+.player-actions .remove-stream{background:#9f322e;color:white}
+body.custom-session-watching.watch-grid .custom-content-grid:has(.ptt-live-panel){display:block!important}
+/* Grid dimensions follow the actual number of occupied tiles (video + PTT),
+   so a six-tile view is 3x2 rather than a visually undersized 3x3 layout. */
+body.custom-session-watching.watch-grid #stage:has(.ptt-live-panel){
+ display:grid!important;
+ grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important;
+ grid-template-rows:repeat(var(--tile-rows,2),max-content)!important;
+ grid-auto-rows:max-content!important;
+ height:auto!important;min-height:0!important;max-height:none!important;
+ overflow:visible!important;align-items:start!important;align-content:start!important
+}
+body.custom-session-watching.watch-grid #stage .player-card,
+body.custom-session-watching.watch-grid #stage .ptt-live-panel{
+ grid-column:auto!important;grid-row:auto!important;min-width:0;min-height:0;align-self:start
+}
+body.custom-session-watching.watch-grid #stage .player-card.primary{grid-row:auto!important}
+body.custom-session-watching.watch-grid #stage .ptt-live-panel{height:auto!important;min-height:0!important}
+body.custom-session-watching.watch-grid #stage .ptt-live-panel iframe{height:calc(100% - 44px)!important;min-height:220px!important}
+body.custom-session-watching.watch-grid .video-wrap{aspect-ratio:16/9!important;max-height:none}
+@media(max-width:760px){
+ body.custom-session-watching.watch-grid #stage:has(.ptt-live-panel){display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:none!important;grid-auto-rows:max-content!important;height:auto!important;overflow:visible!important}
+}
+
+/* Fullscreen is a layout state, not a separate unmounted video experience. */
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid{height:auto!important;min-height:100dvh;overflow:visible!important}
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel){display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,var(--ptt-width,28%));align-items:start}
+body.custom-session-watching:not(.single-ptt).custom-immersive #stage .player-card .player-controls{display:none!important}
+body.custom-session-watching:not(.single-ptt).custom-immersive.watch-grid .custom-content-grid:has(.ptt-live-panel){display:block!important;height:auto!important;overflow:visible!important}
+body.custom-session-watching:not(.single-ptt).custom-immersive.watch-grid #stage,
+body.custom-session-watching:not(.single-ptt).custom-immersive.watch-grid #stage:has(.ptt-live-panel){
+ height:auto!important;max-height:none!important;min-height:0!important;
+ overflow:visible!important;align-content:start!important;
+ grid-template-rows:repeat(var(--tile-rows,2),max-content)!important
+}
+body.custom-session-watching:not(.single-ptt).custom-immersive.watch-grid .custom-content-grid{display:block!important;height:auto!important;overflow:visible!important}
+body.custom-session-watching:not(.single-ptt).custom-immersive.watch-grid .player-card{align-self:start}
+body.custom-session-watching:not(.single-ptt).custom-immersive .immersive-global-volume{display:flex!important}
+/* Two distinct left rails: site navigation, then live-channel avatars. */
+body.custom-session-watching .client-rail{z-index:90}
+body.custom-session-watching .live-channel-rail{z-index:70!important}
+body.custom-session-watching:not(.single-ptt).custom-immersive .client-rail{display:none!important}
+body.custom-session-watching:not(.single-ptt).custom-immersive .live-channel-rail{display:none!important}
+/* Immersive is an explicit UI state: always hide both left rails and global nav. */
+body.custom-session-watching:not(.single-ptt).custom-immersive .client-rail,
+body.custom-session-watching:not(.single-ptt).custom-immersive .live-channel-rail,
+body.custom-session-watching:not(.single-ptt).custom-immersive .client-topbar,
+body.custom-session-watching:not(.single-ptt).custom-immersive #mobileNav{display:none!important}
+body.custom-session-watching:not(.single-ptt).custom-immersive .client-main{
+ margin-left:0!important;width:100vw!important;max-width:100vw!important;padding:0!important
+}
+body.custom-session-watching:not(.single-ptt).custom-immersive .watch-actions{display:none!important}
+body.custom-session-watching:not(.single-ptt).custom-immersive .immersive-global-volume{display:flex!important}
+
+/* Authoritative responsive fit: custom viewing owns one browser viewport;
+   scroll only inside the PTT reader, never on the outer document. */
+html:has(body.custom-session-watching),
+body.custom-session-watching{
+ width:100%;height:100%;min-height:0;max-height:100dvh;
+ overflow:hidden!important;overscroll-behavior:none
+}
+body.custom-session-watching .client-main{
+ box-sizing:border-box;height:100dvh!important;min-height:0!important;max-height:100dvh!important;
+ overflow:hidden!important;padding-top:4px!important;padding-bottom:4px!important
+}
+body.custom-session-watching .viewer-workspace{
+ display:flex!important;flex-direction:column!important;gap:4px!important;
+ width:100%;height:100%!important;min-width:0;min-height:0!important;
+ max-height:100%!important;overflow:hidden!important
+}
+body.custom-session-watching .watch-actions{
+ flex:0 0 auto;min-width:0;max-width:100%;min-height:40px;
+ overflow:hidden;flex-wrap:nowrap
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid{
+ flex:1 1 0!important;width:100%!important;height:auto!important;
+ min-width:0!important;min-height:0!important;max-height:none!important;
+ overflow:hidden!important;align-items:stretch!important;gap:5px!important
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:not(:has(.ptt-live-panel)){display:block!important}
+body.custom-session-watching:not(.single-ptt) .custom-player-column{
+ display:flex;flex-direction:column;min-width:0;min-height:0;height:100%;max-height:100%;overflow:hidden
+}
+body.custom-session-watching:not(.single-ptt) #stage{
+ width:100%;height:100%!important;min-height:0!important;max-height:100%!important;
+ overflow:hidden!important;align-content:stretch!important;grid-auto-rows:minmax(0,1fr)!important
+}
+body.custom-session-watching:not(.single-ptt) #stage .player-card{
+ min-width:0;min-height:0!important;height:100%;max-height:100%;overflow:hidden
+}
+body.custom-session-watching:not(.single-ptt) #stage .video-wrap{
+ flex:1 1 0;min-width:0;min-height:0!important;height:auto!important;max-height:none!important;
+ aspect-ratio:auto!important;overflow:hidden
+}
+body.custom-session-watching:not(.single-ptt) #stage .video-wrap iframe,
+body.custom-session-watching:not(.single-ptt) #stage .video-wrap .player{
+ width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important
+}
+body.custom-session-watching:not(.single-ptt) .ptt-live-panel{
+ display:flex!important;flex-direction:column!important;min-width:0!important;min-height:0!important;
+ width:100%;height:100%!important;max-height:100%!important;overflow:hidden!important;position:static!important
+}
+body.custom-session-watching:not(.single-ptt) .ptt-live-panel iframe,
+body.custom-session-watching #ptt-worker-feed{
+ flex:1 1 0!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+ overflow:auto!important
+}
+body.custom-session-watching.watch-grid .custom-content-grid:has(.ptt-live-panel){
+ display:block!important;height:auto!important;min-height:0!important;overflow:hidden!important
+}
+body.custom-session-watching.watch-grid #stage:has(.ptt-live-panel){
+ display:grid!important;
+ grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important;
+ grid-template-rows:repeat(var(--tile-rows,2),minmax(0,1fr))!important;
+ grid-auto-rows:minmax(0,1fr)!important;height:100%!important;min-height:0!important;
+ max-height:100%!important;overflow:hidden!important;align-content:stretch!important
+}
+body.custom-session-watching.watch-grid #stage .player-card,
+body.custom-session-watching.watch-grid #stage .ptt-live-panel{
+ grid-column:auto!important;grid-row:auto!important;height:100%!important;
+ min-height:0!important;max-height:100%!important;overflow:hidden!important
+}
+body.custom-session-watching.watch-grid #stage .ptt-live-panel iframe{
+ flex:1 1 0!important;height:auto!important;min-height:0!important;max-height:none!important
+}
+/* Immersive keeps the exact same fit rules, without nav or settings taking space. */
+body.custom-session-watching.custom-immersive .client-main{
+ margin:0!important;width:100vw!important;height:100dvh!important;max-height:100dvh!important;padding:0!important
+}
+body.custom-session-watching.custom-immersive .viewer-workspace{
+ height:100dvh!important;max-height:100dvh!important;gap:0!important
+}
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid{
+ height:100%!important;min-height:0!important;max-height:100%!important;overflow:hidden!important
+}
+body.custom-session-watching.custom-immersive.watch-grid #stage:has(.ptt-live-panel){
+ height:100%!important;grid-template-rows:repeat(var(--tile-rows,2),minmax(0,1fr))!important;overflow:hidden!important
+}
+/* Definite flex/grid height chain: prevents the single-player stage collapsing
+   to a one-pixel row when PTT is beside (not inside) the stage. */
+body.custom-session-watching:not(.single-ptt) .custom-content-grid{
+ height:0!important;flex:1 1 0!important;min-height:0!important;
+ grid-template-rows:minmax(0,1fr)!important
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel){
+ display:grid!important;grid-template-rows:minmax(0,1fr)!important;
+ align-items:stretch!important
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) .custom-player-column{
+ height:100%!important;min-height:0!important;min-width:0!important
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage{
+ height:100%!important;min-height:0!important;grid-template-rows:minmax(0,1fr)!important
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage .player-card{
+ height:100%!important;min-height:0!important;align-self:stretch!important
+}
+@media(max-width:760px){
+ body.custom-session-watching .watch-actions{overflow-x:auto;overflow-y:hidden}
+ body.custom-session-watching:not(.single-ptt) .custom-content-grid{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr)!important}
+ body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) .ptt-live-panel{display:none!important}
+}
+
+/* Final layout arbitration: prevent legacy auto rows from collapsing the
+   default one/two-player layout after viewport-fit constraints are applied. */
+body.custom-session-watching:not(.single-ptt):not(.watch-grid):not(.layout-primary) #stage:has(.ptt-live-panel){
+ display:grid!important;
+ grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important;
+ grid-template-rows:repeat(var(--tile-rows,2),minmax(0,1fr))!important;
+ grid-auto-rows:minmax(0,1fr)!important;
+ height:100%!important;min-height:0!important;max-height:100%!important;
+ overflow:hidden!important;align-content:stretch!important
+}
+body.custom-session-watching:not(.single-ptt):not(.watch-grid):not(.layout-primary) #stage > .player-card{
+ grid-column:auto!important;grid-row:1!important;height:100%!important;
+ min-height:0!important;max-height:100%!important;align-self:stretch!important
+}
+body.custom-session-watching:not(.single-ptt):not(.watch-grid):not(.layout-primary) #stage > .ptt-live-panel{
+ grid-column:1 / -1!important;grid-row:2!important;height:100%!important;
+ min-height:0!important;max-height:100%!important;overflow:hidden!important
+}
+body.custom-session-watching:not(.single-ptt):not(.watch-grid):not(.layout-primary) #stage .ptt-live-panel iframe{
+ height:auto!important;min-height:0!important;max-height:none!important;flex:1 1 0!important
+}
+/* Focus layout remains independent of the equal-grid preset: main stream spans
+   the left side; secondary streams and PTT fill successive right-side rows. */
+body.custom-session-watching:not(.single-ptt).layout-primary #stage:has(.ptt-live-panel){
+ display:grid!important;grid-template-columns:minmax(0,2.25fr) minmax(200px,.9fr)!important;
+ grid-template-rows:none!important;grid-auto-rows:minmax(0,1fr)!important;
+ height:100%!important;min-height:0!important;max-height:100%!important;
+ overflow:hidden!important;align-content:stretch!important
+}
+body.custom-session-watching:not(.single-ptt).layout-primary #stage > .player-card.primary{
+ grid-column:1!important;grid-row:1 / span calc(var(--side-count,1) + 1)!important;
+ height:100%!important;min-height:0!important;max-height:100%!important
+}
+body.custom-session-watching:not(.single-ptt).layout-primary #stage > .player-card:not(.primary){
+ grid-column:2!important;grid-row:auto!important;height:100%!important;min-height:0!important
+}
+body.custom-session-watching:not(.single-ptt).layout-primary #stage > .ptt-live-panel{
+ grid-column:2!important;grid-row:auto!important;height:100%!important;min-height:0!important;max-height:100%!important
+}
+body.custom-session-watching:not(.single-ptt).layout-primary #stage .ptt-live-panel iframe{
+ height:auto!important;min-height:0!important;max-height:none!important;flex:1 1 0!important
+}
+/* Single player with PTT beside it: the player must have an actual fill height. */
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) .custom-player-column,
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage{
+ height:100%!important;min-height:0!important;max-height:100%!important
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage > .player-card{
+ grid-column:1!important;grid-row:1!important;width:100%!important;height:100%!important;
+ min-height:0!important;max-height:100%!important
+}
+/* Single-player live/VOD: PTT is a side rail, never a second stage row.
+   Immersive removes chrome, so the video must grow to the full remaining viewport. */
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage:has(> .player-card:only-child){
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+ grid-template-rows:minmax(0,1fr)!important;height:100%!important
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage:has(> .player-card:only-child) > .player-card{
+ grid-column:1!important;grid-row:1!important;height:100%!important;min-height:0!important
+}
+body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage:has(> .player-card:only-child) .video-wrap{
+ flex:1 1 0!important;height:100%!important;min-height:0!important;max-height:none!important;aspect-ratio:auto!important
+}
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel){
+ display:grid!important;grid-template-columns:minmax(0,1fr) minmax(360px,34vw)!important;
+ grid-template-rows:minmax(0,1fr)!important;height:100%!important;min-height:0!important
+}
+/* In immersive mode the grid already lives inside the definite 100dvh workspace.
+   Children must fill that remaining grid track, not request another 100dvh and
+   compete with the translation/player chrome. */
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel) .custom-player-column,
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel) #stage,
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel) #stage > .player-card,
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel) .ptt-live-panel{
+ height:100%!important;max-height:100%!important;min-height:0!important
+}
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel) #stage > .player-card .video-wrap{
+ flex:1 1 0!important;height:auto!important;min-height:0!important;max-height:none!important;aspect-ratio:auto!important
+}
+body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid:has(> .ptt-live-panel) #ptt-worker-feed{
+ flex:1 1 0!important;height:auto!important;min-height:0!important;max-height:none!important
+}
+body.custom-session-watching.watch-grid #stage:has(.ptt-live-panel){
+ grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important;
+ grid-template-rows:repeat(var(--tile-rows,2),minmax(0,1fr))!important;
+ grid-auto-rows:minmax(0,1fr)!important
+}
+body.custom-session-watching.watch-grid #stage > .player-card,
+body.custom-session-watching.watch-grid #stage > .ptt-live-panel{
+ grid-column:auto!important;grid-row:auto!important
+}
+body.custom-session-watching.watch-grid #stage .video-wrap{
+ aspect-ratio:auto!important;flex:1 1 0;min-height:0!important
+}
+/* Re-assert Focus after the equal-grid tile auto-placement overrides. */
+body.custom-session-watching:not(.single-ptt).layout-primary #stage:has(.ptt-live-panel){
+ grid-template-columns:minmax(0,2.25fr) minmax(200px,.9fr)!important;
+ grid-template-rows:none!important;grid-auto-rows:minmax(0,1fr)!important
+}
+body.custom-session-watching:not(.single-ptt).layout-primary #stage > .player-card.primary{
+ grid-column:1!important;grid-row:1 / span calc(var(--side-count,1) + 1)!important
+}
+body.custom-session-watching:not(.single-ptt).layout-primary #stage > .player-card:not(.primary){
+ grid-column:2!important;grid-row:auto!important
+}
+body.custom-session-watching:not(.single-ptt).layout-primary #stage > .ptt-live-panel{
+ grid-column:2!important;grid-row:auto!important
+}
+.ptt-unavailable{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff8e8;color:#715f31;font-size:12px}
+@media(max-width:760px){
+  #stage,body.layout-primary #stage{grid-template-columns:1fr!important}
+  body.layout-primary .player-card.primary,body.layout-primary .player-card:not(.primary){grid-column:1;grid-row:auto}
+  .player-status{display:none}.player-controls{grid-template-columns:1fr}.player-actions{justify-content:flex-start}
+}
+ /* Narrow screens: stack each live stream vertically, with PTT as the next tile. */
+ @media(max-width:760px){
+  body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel){
+   display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+   grid-template-rows:minmax(0,1fr) minmax(0,1fr)!important
+  }
+  body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) .custom-player-column{height:100%!important;min-height:0!important}
+  body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) .ptt-live-panel{
+   display:flex!important;grid-column:1!important;grid-row:2!important;
+   height:100%!important;min-height:0!important;max-height:100%!important
+  }
+  body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(> .ptt-live-panel) #stage{
+   display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+   grid-template-rows:minmax(0,1fr)!important;height:100%!important;
+   min-height:0!important;overflow:hidden!important
+  }
+  body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage{
+   display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+   grid-template-rows:repeat(var(--tile-count,3),minmax(0,1fr))!important;
+   grid-auto-rows:minmax(0,1fr)!important;height:100%!important;
+   min-height:0!important;max-height:100%!important;overflow:hidden!important
+  }
+  body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage > .player-card,
+  body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage > .ptt-live-panel{
+   grid-column:1!important;grid-row:auto!important;
+   height:100%!important;min-height:0!important;max-height:100%!important;
+   width:100%!important;overflow:hidden!important;align-self:stretch!important
+  }
+  body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .video-wrap{
+   height:auto!important;min-height:0!important;max-height:none!important;
+   aspect-ratio:auto!important;flex:1 1 0!important
+  }
+  body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .video-wrap iframe,
+  body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .video-wrap .player{
+   height:100%!important;width:100%!important
+  }
+  body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .ptt-live-panel{
+   display:flex!important;flex-direction:column!important;min-height:0!important
+  }
+  body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage .ptt-live-panel iframe{
+   flex:1 1 0!important;height:auto!important;min-height:0!important;max-height:none!important
+  }
+}
+/* Highest-specificity responsive override: legacy .layout-auto/.layout-equal
+   desktop selectors otherwise win over the earlier narrow-screen rules. */
+@media(max-width:1024px){
+ /* Use the full post-rail width. At tablet/portrait sizes a desktop PTT column
+    must not reserve 220px beside a narrow player column. */
+ body.custom-session-watching:not(.single-ptt) .client-main{
+  box-sizing:border-box!important;
+  width:calc(100vw - var(--rail-collapsed,72px) - var(--watch-rail,64px))!important;
+  max-width:none!important;min-width:0!important
+ }
+ body.custom-session-watching:not(.single-ptt) .custom-content-grid:has(#stage .ptt-live-panel){
+  display:block!important;width:100%!important;min-width:0!important
+ }
+ body.custom-session-watching:not(.single-ptt) .custom-player-column{
+  width:100%!important;max-width:100%!important;min-width:0!important
+ }
+ body.custom-session-watching:not(.single-ptt).layout-auto:has(.ptt-live-panel) #stage,
+ body.custom-session-watching:not(.single-ptt).layout-equal:has(.ptt-live-panel) #stage,
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage,
+ body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage{
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:repeat(var(--tile-count,3),minmax(0,1fr))!important;
+  grid-auto-rows:minmax(0,1fr)!important;height:100%!important;
+  min-height:0!important;max-height:100%!important;overflow:hidden!important
+ }
+ body.custom-session-watching:not(.single-ptt).layout-auto:has(.ptt-live-panel) #stage > .player-card,
+ body.custom-session-watching:not(.single-ptt).layout-equal:has(.ptt-live-panel) #stage > .player-card,
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage > .player-card,
+ body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage > .player-card,
+ body.custom-session-watching:not(.single-ptt):has(.ptt-live-panel) #stage > .ptt-live-panel{
+  grid-column:1!important;grid-row:auto!important;width:100%!important;
+  height:100%!important;min-height:0!important;max-height:100%!important;
+  align-self:stretch!important;overflow:hidden!important
+ }
+ body.custom-session-watching:not(.single-ptt).layout-auto:has(.ptt-live-panel) #stage .video-wrap,
+ body.custom-session-watching:not(.single-ptt).layout-equal:has(.ptt-live-panel) #stage .video-wrap,
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .video-wrap{
+  aspect-ratio:auto!important;max-height:none!important;min-height:0!important;flex:1 1 0!important
+ }
+ body.custom-session-watching:not(.single-ptt).layout-auto:has(.ptt-live-panel) #stage .ptt-live-panel,
+ body.custom-session-watching:not(.single-ptt).layout-equal:has(.ptt-live-panel) #stage .ptt-live-panel,
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .ptt-live-panel{
+  grid-column:1!important;grid-row:auto!important;display:flex!important;
+  flex-direction:column!important;height:100%!important;min-height:0!important;max-height:100%!important
+ }
+ body.custom-session-watching:not(.single-ptt).layout-auto:has(.ptt-live-panel) #stage .ptt-live-panel iframe,
+ body.custom-session-watching:not(.single-ptt).layout-equal:has(.ptt-live-panel) #stage .ptt-live-panel iframe,
+ body.custom-session-watching:not(.single-ptt).layout-primary:has(.ptt-live-panel) #stage .ptt-live-panel iframe{
+  flex:1 1 0!important;height:auto!important;min-height:0!important;max-height:none!important
+ }
+}
+
+/* Narrow RWD: exactly two videos stack at full width rather than squeezing
+   the secondary player into the desktop Focus column. Let the page scroll so
+   both 16:9 players retain their natural width and height. */
+@media(max-width:1024px){
+ body.custom-session-watching:not(.single-ptt):has(#stage > .player-card:only-child):has(.ptt-live-panel) .custom-content-grid{
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto!important;
+  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+  overflow:visible!important;gap:6px!important
+ }
+ body.custom-session-watching:not(.single-ptt):has(#stage > .player-card:only-child):has(.ptt-live-panel) .custom-player-column,
+ body.custom-session-watching:not(.single-ptt):has(#stage > .player-card:only-child):has(.ptt-live-panel) #stage,
+ body.custom-session-watching:not(.single-ptt):has(#stage > .player-card:only-child):has(.ptt-live-panel) #stage > .player-card{
+  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important
+ }
+ body.custom-session-watching:not(.single-ptt):has(#stage > .player-card:only-child):has(.ptt-live-panel) #stage .video-wrap{
+  width:100%!important;height:auto!important;aspect-ratio:16/9!important;max-height:none!important
+ }
+ body.custom-session-watching:not(.single-ptt):has(#stage > .player-card:only-child):has(.ptt-live-panel) .ptt-live-panel{
+  display:flex!important;flex-direction:column!important;position:static!important;
+  width:100%!important;height:55vh!important;min-height:320px!important;max-height:none!important;overflow:hidden!important
+ }
+ body.custom-session-watching:not(.single-ptt):has(#stage > .player-card:only-child):has(.ptt-live-panel) .ptt-live-panel iframe,
+ body.custom-session-watching:not(.single-ptt):has(#stage > .player-card:only-child):has(.ptt-live-panel) #ptt-worker-feed{
+  flex:1 1 0!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important
+ }
+ body.custom-session-watching:has(#stage > .player-card:nth-child(2)):not(:has(#stage > .player-card:nth-child(3))) .client-rail,
+ body.custom-session-watching:has(#stage > .player-card:nth-child(2)):not(:has(#stage > .player-card:nth-child(3))) .live-channel-rail{
+  display:none!important
+ }
+ body.custom-session-watching:has(#stage > .player-card:nth-child(2)):not(:has(#stage > .player-card:nth-child(3))) .client-topbar{
+  display:flex!important;margin:0!important;width:100%!important;height:52px;padding:0 12px
+ }
+ html:has(body.custom-session-watching #stage > .player-card:nth-child(2)):not(:has(body.custom-session-watching #stage > .player-card:nth-child(3))),
+ body.custom-session-watching:has(#stage > .player-card:nth-child(2)):not(:has(#stage > .player-card:nth-child(3))){
+  width:100%!important;height:auto!important;min-height:100%!important;max-height:none!important;
+  overflow-x:hidden!important;overflow-y:auto!important
+ }
+ body.custom-session-watching:has(#stage > .player-card:nth-child(2)):not(:has(#stage > .player-card:nth-child(3))) .client-main{
+  box-sizing:border-box;margin:0!important;width:100vw!important;height:auto!important;
+  min-height:0!important;max-height:none!important;padding:4px!important;overflow:visible!important
+ }
+ body.custom-session-watching:has(#stage > .player-card:nth-child(2)):not(:has(#stage > .player-card:nth-child(3))) .viewer-workspace{
+  height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important
+ }
+ body.custom-session-watching:has(#stage > .player-card:nth-child(2)):not(:has(#stage > .player-card:nth-child(3))) .custom-content-grid,
+ body.custom-session-watching:has(#stage > .player-card:nth-child(2)):not(:has(#stage > .player-card:nth-child(3))) .custom-player-column{
+  display:block!important;flex:none!important;width:100%!important;height:auto!important;
+  min-height:0!important;max-height:none!important;overflow:visible!important
+ }
+ body.custom-session-watching #stage:has(> .player-card:nth-child(2)):not(:has(> .player-card:nth-child(3))){
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:none!important;grid-auto-rows:auto!important;
+  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+  overflow:visible!important;align-content:start!important;gap:8px!important
+ }
+ body.custom-session-watching #stage:has(> .player-card:nth-child(2)):not(:has(> .player-card:nth-child(3))) > .player-card{
+  grid-column:1!important;grid-row:auto!important;width:100%!important;height:auto!important;
+  min-width:0!important;min-height:0!important;max-height:none!important;align-self:start!important
+ }
+ body.custom-session-watching #stage:has(> .player-card:nth-child(2)):not(:has(> .player-card:nth-child(3))) > .player-card .video-wrap{
+  flex:none!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+  aspect-ratio:16/9!important
+ }
+ body.custom-session-watching #stage:has(> .player-card:nth-child(2)):not(:has(> .player-card:nth-child(3))) > .player-card .video-wrap iframe,
+ body.custom-session-watching #stage:has(> .player-card:nth-child(2)):not(:has(> .player-card:nth-child(3))) > .player-card .video-wrap .player{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important
+ }
+ body.custom-session-watching #stage:has(> .player-card:nth-child(2)):not(:has(> .player-card:nth-child(3))) > .ptt-live-panel{
+  grid-column:1!important;grid-row:auto!important;width:100%!important;height:60vh!important;
+  min-height:340px!important;max-height:none!important;overflow:hidden!important
+ }
+}
+
+
+/* 4174 final single-player + PTT arbitration.
+   This is the sole desktop authority for single Live/VOD + PTT.  Normal mode
+   is width-driven 16:9 and never inherits a viewport/percentage height chain;
+   immersive mode alone owns the definite 100dvh chain. */
+@media(min-width:1025px){
+ html:has(body.custom-session-watching.single-ptt:not(.custom-immersive)){
+  height:auto!important;min-height:100%!important;max-height:none!important;overflow-y:auto!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive){
+  height:auto!important;min-height:100vh!important;max-height:none!important;overflow-y:auto!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .client-main,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .viewer-workspace{
+  height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .custom-content-grid{
+  display:grid!important;grid-template-columns:minmax(0,1fr) minmax(320px,var(--ptt-width,28%))!important;
+  grid-template-rows:auto!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+  flex:none!important;align-items:start!important;overflow:visible!important;gap:6px!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .custom-player-column,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-card{
+  display:block!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+  align-self:start!important;overflow:visible!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage .video-wrap{
+  display:block!important;position:relative!important;flex:none!important;
+  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;aspect-ratio:16/9!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .ptt-live-panel{
+  position:static!important;display:flex!important;flex-direction:column!important;align-self:start!important;
+  width:100%!important;height:calc(100dvh - 48px)!important;min-height:320px!important;max-height:none!important;overflow:hidden!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .ptt-live-panel iframe,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #ptt-worker-feed{
+  flex:1 1 auto!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:auto!important
+ }
+
+ body.custom-session-watching.single-ptt.custom-immersive .client-main,
+ body.custom-session-watching.single-ptt.custom-immersive .viewer-workspace,
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid{
+  height:100dvh!important;min-height:0!important;max-height:100dvh!important;overflow:hidden!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid{
+  display:grid!important;grid-template-columns:minmax(0,1fr) minmax(320px,var(--ptt-width,28%))!important;
+  grid-template-rows:minmax(0,1fr)!important;align-items:stretch!important;gap:2px!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-player-column,
+ body.custom-session-watching.single-ptt.custom-immersive #stage,
+ body.custom-session-watching.single-ptt.custom-immersive #stage > .player-card,
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel{
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-height:100%!important;overflow:hidden!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage > .player-card{
+  display:flex!important;flex-direction:column!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap{
+  position:relative!important;flex:0 1 auto!important;width:min(100%,calc(100dvh * 16 / 9))!important;
+  height:auto!important;min-height:0!important;max-height:100%!important;aspect-ratio:16/9!important;align-self:center!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel{
+  display:flex!important;flex-direction:column!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel iframe:not([hidden]),
+ body.custom-session-watching.single-ptt.custom-immersive #ptt-worker-feed:not([hidden]){
+  flex:1 1 0!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:auto!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-worker-clock{display:block!important}
+ body.custom-session-watching.single-ptt.custom-immersive #ptt-worker-feed:not(.ptt-worker-hide-floor) .ptt-worker-floor{display:block!important}
+ body.custom-session-watching.single-ptt.custom-immersive #ptt-worker-feed .ptt-worker-row{
+  grid-template-columns:1.3em 4.1em 3.4em minmax(0,1fr)!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #ptt-worker-feed.ptt-worker-hide-floor .ptt-worker-row{
+  grid-template-columns:1.3em 4.1em minmax(0,1fr)!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #ptt-worker-feed.ptt-worker-hide-floor .ptt-worker-floor{display:none!important}
+}
+/* Single-player viewport ownership: the shared shell normally caps
+   .client-main to --content + rail.  Watching must not inherit that desktop
+   document width; otherwise the video/PTT pair is centered inside grey gutters. */
+@media(min-width:1025px){
+ body.custom-session-watching.single-ptt .client-main{
+  box-sizing:border-box!important;max-width:none!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .client-main,
+ body.custom-session-watching.single-ptt.custom-immersive .viewer-workspace,
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid{
+  left:0!important;right:0!important;margin-left:0!important;margin-right:0!important;
+  width:100%!important;max-width:none!important
+ }
+}
+
+/* Final immersive single-player authority.
+   Immersive is true browser fullscreen: no app/navigation rails survive, and
+   the player column fills the available height while preserving 16:9. */
+@media(min-width:1025px){
+ html:has(body.custom-session-watching.single-ptt.custom-immersive),
+ body.custom-session-watching.single-ptt.custom-immersive{
+  width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;
+  margin:0!important;padding:0!important;overflow:hidden!important;background:#080808!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .client-rail,
+ body.custom-session-watching.single-ptt.custom-immersive .live-channel-rail,
+ body.custom-session-watching.single-ptt.custom-immersive .client-sidebar,
+ body.custom-session-watching.single-ptt.custom-immersive .channel-rail,
+ body.custom-session-watching.single-ptt.custom-immersive .avatar-rail,
+ body.custom-session-watching.single-ptt.custom-immersive .sidebar,
+ body.custom-session-watching.single-ptt.custom-immersive .left-rail,
+ body.custom-session-watching.single-ptt.custom-immersive .client-topbar,
+ body.custom-session-watching.single-ptt.custom-immersive #mobileNav{
+  display:none!important;width:0!important;min-width:0!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .client-main{
+  position:fixed!important;inset:0!important;margin:0!important;padding:0!important;
+  width:100vw!important;height:100dvh!important;max-width:none!important;max-height:100dvh!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .viewer-workspace,
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid{
+  width:100vw!important;height:100dvh!important;max-width:none!important;max-height:100dvh!important;
+  margin:0!important;padding:0!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid{
+  /* Anchor the actual video/PTT surface to the viewport itself.  This bypasses
+     every centered/max-width shell ancestor; 72/28 then matches the familiar
+     YouTube video + chat geometry instead of applying inside a narrow island. */
+  position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;z-index:80!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,min(calc(100dvh * 16 / 9),calc(100vw - 320px))) minmax(320px,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;
+  box-sizing:border-box!important;width:100vw!important;height:100dvh!important;max-width:100vw!important;max-height:100dvh!important;
+  margin:0!important;padding:0!important;gap:2px!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-player-column,
+ body.custom-session-watching.single-ptt.custom-immersive #stage,
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card{
+  display:flex!important;flex-direction:column!important;width:100%!important;height:100%!important;
+  min-width:0!important;min-height:0!important;max-width:none!important;max-height:100%!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap{
+  position:absolute!important;inset:0 0 0 0!important;
+  display:block!important;flex:none!important;
+  width:100%!important;height:100%!important;min-height:0!important;max-height:100%!important;
+  margin:0!important;padding:0!important;aspect-ratio:16/9!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card{
+  position:relative!important;padding:0!important;margin:0!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card>.player-meta,
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card>.player-controls{
+  position:absolute!important;left:0!important;right:0!important;bottom:0!important;z-index:4!important;
+  margin:0!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  max-width:none!important;max-height:none!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card>.player-controls{
+  flex:0 0 auto!important
+ }
+}
+
+/* Final desktop single + PTT immersive authority.
+   The fullscreen surface is only two boxes: video and PTT.  The player fills
+   the video box; no centering/aspect-ratio wrapper is allowed to create
+   top/bottom gutters. */
+@media(min-width:1025px){
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid,
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid:fullscreen{
+  position:fixed!important;inset:0!important;z-index:80!important;
+  display:grid!important;
+  /* A YouTube iframe must itself be 16:9.  Stretching a narrower iframe to
+     100dvh only makes YouTube letterbox inside it (the two black bars the
+     acceptance screenshot exposed).  Give the player exactly the width that
+     corresponds to the fullscreen height; PTT receives the remainder. */
+  /* Keep the 16:9 player flush left.  Reserve a real PTT rail instead of
+     letting the player consume the entire viewport when 100dvh*16/9 is wider
+     than the available video column. */
+  grid-template-columns:minmax(0,min(calc(100dvh * 16 / 9),calc(100vw - 320px))) minmax(320px,1fr)!important;
+  grid-template-rows:100dvh!important;
+  width:100vw!important;height:100dvh!important;min-width:100vw!important;min-height:100dvh!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  gap:2px!important;overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-player-column,
+ body.custom-session-watching.single-ptt.custom-immersive #stage,
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card{
+  position:relative!important;display:block!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap{
+  position:absolute!important;inset:0!important;display:block!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  aspect-ratio:auto!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;display:block!important;
+  width:100%!important;height:100%!important;min-width:100%!important;min-height:100%!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;border:0!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel{
+  position:relative!important;inset:auto!important;display:flex!important;flex-direction:column!important;
+  width:100%!important;height:100dvh!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;border-radius:0!important;
+  overflow:hidden!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel iframe:not([hidden]),
+ body.custom-session-watching.single-ptt.custom-immersive #ptt-worker-feed:not([hidden]){
+  width:100%!important;height:100%!important;min-height:0!important;max-height:none!important
+ }
+}
+
+/* Single immersive DOM authority: CSS immersive remains valid even when
+   browser fullscreen is not active. Keep the PTT node visible beside one player. */
+@media(min-width:901px){
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child){
+  position:fixed!important;inset:0!important;z-index:80!important;display:grid!important;
+  grid-template-columns:minmax(0,min(calc(100dvh * 16 / 9),calc(100vw - 320px))) minmax(320px,1fr)!important;
+  grid-template-rows:100dvh!important;width:100vw!important;height:100dvh!important;
+  min-width:100vw!important;min-height:100dvh!important;max-width:none!important;max-height:none!important;
+  margin:0!important;padding:0!important;gap:2px!important;overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child) #stage,
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child) #stage>.player-card{
+  position:relative!important;display:block!important;width:100%!important;height:100%!important;
+  min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+  margin:0!important;padding:0!important;overflow:hidden!important
+ }
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child) .video-wrap{
+  position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;
+  min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+  margin:0!important;padding:0!important;aspect-ratio:auto!important
+ }
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child) .video-wrap iframe,
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child) .video-wrap .player{
+  position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;
+  max-width:none!important;max-height:none!important
+ }
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child)>.ptt-live-panel{
+  position:relative!important;inset:auto!important;display:flex!important;visibility:visible!important;
+  flex-direction:column!important;width:100%!important;height:100dvh!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;opacity:1!important;
+  overflow:hidden!important;border:0!important;border-radius:0!important
+ }
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child)>.ptt-live-panel iframe:not([hidden]),
+ body.custom-session-watching.custom-immersive .custom-content-grid:has(> .ptt-live-panel):has(#stage > .player-card:only-child)>.ptt-live-panel #ptt-worker-feed:not([hidden]){
+  display:block!important;visibility:visible!important;flex:1 1 0!important;width:100%!important;height:100%!important;
+  min-height:0!important;max-height:none!important;opacity:1!important;overflow:auto!important
+ }
+}
+
+/* 4174 single immersive viewport model.
+   Keep the YouTube surface at a real 16:9 viewport-sized box so the iframe
+   never invents top/bottom letterboxing.  PTT is a persistent right overlay:
+   this is the only geometry that can maximize a 16:9 video vertically while
+   keeping a useful chat rail on a normal desktop viewport. */
+@media(min-width:1025px){
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid,
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid:fullscreen{
+  position:fixed!important;inset:0!important;display:block!important;
+  width:100vw!important;height:100dvh!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-player-column{
+  position:absolute!important;inset:0!important;display:flex!important;
+  align-items:center!important;justify-content:flex-start!important;
+  width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;
+  margin:0!important;padding:0!important;overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage,
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card{
+  position:relative!important;display:block!important;
+  width:min(100vw,calc(100dvh * 16 / 9))!important;
+  height:min(100dvh,calc(100vw * 9 / 16))!important;
+  min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+  margin:0!important;padding:0!important;overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;display:block!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  aspect-ratio:16/9!important;border:0!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card>.player-controls{
+  display:none!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid>.ptt-live-panel{
+  position:absolute!important;top:0!important;right:0!important;bottom:0!important;z-index:90!important;
+  display:flex!important;visibility:visible!important;flex-direction:column!important;
+  width:clamp(320px,22vw,420px)!important;height:100dvh!important;
+  min-width:320px!important;min-height:0!important;max-width:420px!important;max-height:none!important;
+  margin:0!important;padding:0!important;opacity:1!important;overflow:hidden!important;
+  border:0!important;border-left:1px solid #252525!important;border-radius:0!important;
+  background:var(--surface,#111)!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid>.ptt-live-panel iframe:not([hidden]),
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid>.ptt-live-panel #ptt-worker-feed:not([hidden]){
+  display:block!important;visibility:visible!important;flex:1 1 0!important;
+  width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;
+  opacity:1!important;overflow:auto!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid>.ptt-live-panel [hidden]{
+  display:none!important;visibility:hidden!important
+ }
+ /* The previous rule sized #stage to a 16:9 box, then absolutely filled it.
+    On a 16:9 desktop viewport that should reach the bottom, but legacy stage/card
+    sizing can still win through intrinsic grid height. Make the immersive video
+    box itself own the full viewport height; its width follows 16:9. */
+ body.custom-session-watching.single-ptt.custom-immersive #stage,
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card{
+  position:absolute!important;top:0!important;left:0!important;bottom:0!important;
+  width:min(100vw,calc(100dvh * 16 / 9))!important;height:100dvh!important;
+  min-width:0!important;min-height:100dvh!important;max-width:none!important;max-height:100dvh!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  min-width:100%!important;min-height:100%!important;max-width:none!important;max-height:none!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .translation-slot{display:none!important}
+}
+
+/* 4174 immersive acceptance override.
+   The fullscreen element is .custom-content-grid itself. Rules that only hide
+   rails through body descendants cannot affect shell siblings outside that
+   fullscreen subtree. Hide those siblings whenever the document owns a
+   fullscreen custom-view surface, and make the video surface consume the
+   viewport below/behind no legacy player controls. */
+html:has(.custom-content-grid:fullscreen) .client-rail,
+html:has(.custom-content-grid:fullscreen) .live-channel-rail,
+html:has(.custom-content-grid:fullscreen) .client-sidebar,
+html:has(.custom-content-grid:fullscreen) .channel-rail,
+html:has(.custom-content-grid:fullscreen) .avatar-rail,
+html:has(.custom-content-grid:fullscreen) .sidebar,
+html:has(.custom-content-grid:fullscreen) .left-rail,
+html:has(.custom-content-grid:fullscreen) .client-topbar,
+html:has(.custom-content-grid:fullscreen) #mobileNav{
+ display:none!important;visibility:hidden!important;width:0!important;min-width:0!important
+}
+@media(min-width:1025px){
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid,
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid:fullscreen{
+  position:fixed!important;inset:0!important;display:grid!important;
+  grid-template-columns:minmax(0,1fr) clamp(320px,24vw,420px)!important;
+  grid-template-rows:100dvh!important;width:100vw!important;height:100dvh!important;
+  margin:0!important;padding:0!important;gap:0!important;overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-player-column{
+  position:relative!important;inset:auto!important;display:block!important;
+  width:100%!important;height:100dvh!important;min-width:0!important;min-height:0!important;
+  margin:0!important;padding:0!important;overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage,
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;display:block!important;
+  width:100%!important;height:100dvh!important;min-width:100%!important;min-height:100dvh!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  border:0!important;aspect-ratio:auto!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card>.player-controls{
+  display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;
+  margin:0!important;padding:0!important;overflow:hidden!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid>.ptt-live-panel{
+  position:relative!important;inset:auto!important;grid-column:2!important;grid-row:1!important;
+  display:flex!important;visibility:visible!important;flex-direction:column!important;
+  width:100%!important;height:100dvh!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  opacity:1!important;overflow:hidden!important;border-radius:0!important
+ }
+}
+
+/* 4174 single immersive tuning surface.
+   Keep the shell out of immersive geometry.  The two owner-facing knobs are
+   --immersive-ptt-width and --immersive-player-max-width; they can be edited
+   live in DevTools on .custom-content-grid while we tune acceptance. */
+@media(min-width:1025px){
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid,
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid:fullscreen{
+  --immersive-ptt-width:clamp(320px,24vw,420px);
+  --immersive-player-max-width:none;
+  position:fixed!important;inset:0!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) var(--immersive-ptt-width)!important;
+  grid-template-rows:100%!important;
+  width:100vw!important;height:100dvh!important;
+  min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+  margin:0!important;padding:0!important;gap:0!important;
+  overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-player-column{
+  position:relative!important;inset:auto!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:var(--immersive-player-max-width)!important;
+  margin:0!important;padding:0!important;overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive #stage,
+ body.custom-session-watching.single-ptt.custom-immersive #stage>.player-card,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt.custom-immersive #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;
+  display:block!important;width:100%!important;height:100%!important;
+  min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+  margin:0!important;padding:0!important;border:0!important;aspect-ratio:auto!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .custom-content-grid>.ptt-live-panel{
+  position:relative!important;inset:auto!important;grid-column:2!important;grid-row:1!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important
+ }
+}
+
+/* Absolute final PTT child authority for single immersive.
+   Only the active live/archive surface may participate in layout; hidden
+   siblings must consume zero space. */
+@media(min-width:901px){
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel{
+  display:flex!important;flex-direction:column!important;background:#080808!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel > iframe:not([hidden]),
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel > #ptt-worker-feed:not([hidden]){
+  position:relative!important;inset:auto!important;display:block!important;visibility:visible!important;
+  flex:1 1 0!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;
+  margin:0!important;padding:0!important;opacity:1!important;overflow:auto!important
+ }
+ body.custom-session-watching.single-ptt.custom-immersive .ptt-live-panel > [hidden]{
+  display:none!important;visibility:hidden!important;flex:0 0 0!important;
+  width:0!important;height:0!important;min-width:0!important;min-height:0!important;
+  margin:0!important;padding:0!important;border:0!important;overflow:hidden!important
+ }
+}
+
+/* Final narrow single-player authority.  The desktop arbitration above is
+   intentionally min-width:1025px; without this block old generic RWD rules
+   can reintroduce fill-height/aspect-ratio:auto behavior on tablets/phones. */
+@media(max-width:1024px){
+ html:has(body.custom-session-watching.single-ptt){
+  height:auto!important;min-height:100%!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important
+ }
+ body.custom-session-watching.single-ptt{
+  width:100%!important;height:auto!important;min-height:100vh!important;max-height:none!important;
+  overflow-x:hidden!important;overflow-y:auto!important
+ }
+ body.custom-session-watching.single-ptt .client-main{
+  box-sizing:border-box!important;width:100%!important;height:auto!important;min-height:0!important;
+  max-height:none!important;margin:0!important;padding:4px!important;overflow:visible!important
+ }
+ body.custom-session-watching.single-ptt .viewer-workspace,
+ body.custom-session-watching.single-ptt .custom-player-column,
+ body.custom-session-watching.single-ptt #stage,
+ body.custom-session-watching.single-ptt #stage > .player-card{
+  display:block!important;width:100%!important;height:auto!important;min-height:0!important;
+  max-height:none!important;overflow:visible!important
+ }
+ body.custom-session-watching.single-ptt .custom-content-grid{
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto!important;
+  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+  flex:none!important;align-items:start!important;overflow:visible!important;gap:6px!important
+ }
+ body.custom-session-watching.single-ptt #stage .video-wrap{
+  display:block!important;position:relative!important;flex:none!important;width:100%!important;height:auto!important;
+  min-height:0!important;max-height:none!important;aspect-ratio:16/9!important
+ }
+ body.custom-session-watching.single-ptt #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  max-width:100%!important;max-height:100%!important
+ }
+ body.custom-session-watching.single-ptt .ptt-live-panel{
+  display:flex!important;flex-direction:column!important;position:static!important;grid-column:1!important;grid-row:2!important;
+  width:100%!important;height:55vh!important;min-height:320px!important;max-height:none!important;overflow:hidden!important
+ }
+ body.custom-session-watching.single-ptt .ptt-live-panel iframe,
+ body.custom-session-watching.single-ptt #ptt-worker-feed{
+  flex:1 1 auto!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:auto!important
+ }
+ body.custom-session-watching.single-ptt #ptt-worker-feed .ptt-worker-row{
+  grid-template-columns:1.3em 4.1em 3.4em minmax(0,1fr)!important
+ }
+ body.custom-session-watching.single-ptt #ptt-worker-feed.ptt-worker-hide-floor .ptt-worker-row{
+  grid-template-columns:1.3em 4.1em minmax(0,1fr)!important
+ }
+ body.custom-session-watching.single-ptt #ptt-worker-feed.ptt-worker-hide-floor .ptt-worker-floor{display:none!important}
+}
+
+
+
+/* Final multi-view immersive authority.
+   Multi-view PTT is mounted inside #stage. In immersive mode the stage owns
+   the whole viewport; every player tile and the PTT tile receives a definite
+   grid area instead of inheriting the earlier auto/max-content rows that can
+   collapse the YouTube iframes to nearly zero height. */
+@media(min-width:761px){
+ body.custom-session-watching:not(.single-ptt).custom-immersive .custom-content-grid{
+  position:fixed!important;inset:0!important;display:block!important;
+  width:100vw!important;height:100dvh!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive .custom-player-column{
+  position:absolute!important;inset:0!important;display:block!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  overflow:hidden!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage{
+  position:absolute!important;inset:0!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;
+  gap:4px!important;overflow:hidden!important;align-items:stretch!important;align-content:stretch!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-auto #stage,
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-equal #stage{
+  display:grid!important;
+  grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important;
+  grid-template-rows:repeat(var(--tile-rows,2),minmax(0,1fr))!important;
+  grid-auto-rows:minmax(0,1fr)!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage{
+  display:grid!important;
+  grid-template-columns:minmax(0,2.25fr) minmax(260px,.9fr)!important;
+  grid-template-rows:repeat(3,minmax(0,1fr))!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage:has(> .player-card:nth-child(2):nth-last-child(2)){
+  /* Keep the side player on one unchanged Focus slot; PTT spans two slots. */
+  grid-template-rows:repeat(3,minmax(0,1fr))!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage:has(> .player-card:nth-child(2):nth-last-child(2)) > .player-card.primary{
+  grid-row:1 / 4!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage:has(> .player-card:nth-child(2):nth-last-child(2)) > .ptt-live-panel{
+  grid-row:2 / 4!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage .player-card.primary{
+  grid-column:1!important;grid-row:1 / 4!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage .player-card.focus-side-1{
+  grid-column:2!important;grid-row:1!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage .player-card.focus-side-2{
+  grid-column:2!important;grid-row:2!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage .player-card.focus-hidden{
+  display:none!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive.layout-primary #stage .ptt-live-panel{
+  grid-column:2!important;grid-row:3!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .player-card,
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .ptt-live-panel{
+  position:relative!important;width:100%!important;height:100%!important;
+  min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+  margin:0!important;overflow:hidden!important;align-self:stretch!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .player-card{
+  display:flex!important;flex-direction:column!important;background:#000!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .video-wrap{
+  position:relative!important;display:block!important;flex:1 1 0!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;margin:0!important;
+  aspect-ratio:auto!important;overflow:hidden!important;background:#000!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .video-wrap .player,
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .video-wrap iframe{
+  position:absolute!important;inset:0!important;display:block!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;border:0!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .player-controls{
+  display:none!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .ptt-live-panel{
+  display:flex!important;flex-direction:column!important;border-radius:0!important
+ }
+ /* Only the active PTT surface may take space. The inactive iframe/feed
+    has a hidden attribute; never override it with display:block!important. */
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .ptt-live-panel iframe:not([hidden]),
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage #ptt-worker-feed:not([hidden]){
+  display:block!important;flex:1 1 0!important;width:100%!important;height:100%!important;
+  min-height:0!important;max-height:none!important;overflow:auto!important
+ }
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage .ptt-live-panel iframe[hidden],
+ body.custom-session-watching:not(.single-ptt).custom-immersive #stage #ptt-worker-feed[hidden]{
+  display:none!important;flex:0 0 0!important;height:0!important;min-height:0!important
+ }
+}
+
+/* A two-player Focus stage has one side video, not two. Collapse the unused
+   second side-video row and place PTT directly beneath the actual side video.
+   Keep the three-player layout and immersive geometry unchanged. */
+@media(min-width:761px){
+ body.custom-session-watching:not(.single-ptt):not(.custom-immersive).layout-primary #stage:has(> .player-card:nth-child(2):nth-last-child(2)){
+  grid-template-rows:minmax(0,46fr) minmax(0,54fr)!important;
+  grid-auto-rows:minmax(0,1fr)!important
+ }
+ body.custom-session-watching:not(.single-ptt):not(.custom-immersive).layout-primary #stage:has(> .player-card:nth-child(2):nth-last-child(2)) > .player-card.primary{
+  grid-row:1 / 3!important
+ }
+ body.custom-session-watching:not(.single-ptt):not(.custom-immersive).layout-primary #stage:has(> .player-card:nth-child(2):nth-last-child(2)) > .player-card.focus-side-1{
+  grid-column:2!important;grid-row:1!important;
+  min-height:0!important;height:100%!important
+ }
+ body.custom-session-watching:not(.single-ptt):not(.custom-immersive).layout-primary #stage:has(> .player-card:nth-child(2):nth-last-child(2)) > .player-card.focus-side-1 .video-wrap{
+  flex:1 1 0!important;min-height:0!important;height:100%!important;
+  max-height:none!important;aspect-ratio:auto!important
+ }
+ body.custom-session-watching:not(.single-ptt):not(.custom-immersive).layout-primary #stage:has(> .player-card:nth-child(2):nth-last-child(2)) > .ptt-live-panel{
+  grid-column:2!important;grid-row:2!important
+ }
+}
+
+
+/* Single LIVE/VOD normal mode: only the outer card owns the rounded frame.
+   Clip the YouTube iframe at that same frame so square iframe corners cannot
+   protrude behind the rounded controls/card. Immersive remains square. */
+body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-card{
+ border-radius:14px!important;overflow:hidden!important
+}
+body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-card .video-wrap{
+ overflow:hidden!important;border-radius:13px 13px 0 0!important
+}
+body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-card .video-wrap iframe,
+body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-card .video-wrap .player{
+ border-radius:13px 13px 0 0!important
+}
+
+/* Single LIVE/VOD narrow viewport: restore the page scroll chain; the old
+   @media(max-width:760px) fixed viewport / hidden overflow cropped both the
+   player and PTT. This only governs the one-player normal viewing page. */
+@media(max-width:1024px){
+ html:has(body.custom-session-watching.single-ptt:not(.custom-immersive)),
+ body.custom-session-watching.single-ptt:not(.custom-immersive){
+  height:auto!important;min-height:100%!important;max-height:none!important;
+  overflow-x:hidden!important;overflow-y:auto!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .client-main,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .viewer-workspace{
+  height:auto!important;min-height:0!important;max-height:none!important;
+  overflow:visible!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .custom-content-grid{
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:auto auto!important;width:100%!important;height:auto!important;
+  min-height:0!important;max-height:none!important;align-items:start!important;
+  overflow:visible!important;gap:6px!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .custom-player-column,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage{
+  display:block!important;width:100%!important;height:auto!important;
+  min-height:0!important;max-height:none!important;overflow:visible!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-card{
+  display:flex!important;flex-direction:column!important;
+  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage .video-wrap{
+  display:block!important;position:relative!important;flex:none!important;
+  width:100%!important;height:auto!important;min-height:0!important;
+  max-height:none!important;aspect-ratio:16/9!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage .video-wrap iframe,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage .video-wrap .player{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  max-width:100%!important;max-height:100%!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .ptt-live-panel{
+  display:flex!important;flex-direction:column!important;position:static!important;
+  grid-column:1!important;grid-row:2!important;
+  width:100%!important;height:clamp(320px,65dvh,720px)!important;
+  min-height:320px!important;max-height:none!important;overflow:hidden!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .ptt-live-panel iframe:not([hidden]),
+ body.custom-session-watching.single-ptt:not(.custom-immersive) #ptt-worker-feed:not([hidden]){
+  display:block!important;flex:1 1 0!important;width:100%!important;height:auto!important;
+  min-height:0!important;max-height:none!important;overflow:auto!important
+ }
+}
+
+
+/* At phone widths the desktop navigation rail was forcibly re-shown by the
+   watch page, and its fixed left margin squeezed/cropped the player and controls.
+   Restore the shared Client mobile navigation and use the entire viewport. */
+@media(max-width:760px){
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .client-rail,
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .live-channel-rail{
+  display:none!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .client-topbar{
+  display:flex!important;position:relative!important;top:auto!important;
+  margin:0!important;width:100%!important;height:52px!important;
+  min-height:52px!important;padding:0 12px!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .mobile-nav-button{
+  display:block!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .client-main{
+  box-sizing:border-box!important;margin:0!important;
+  width:100%!important;max-width:none!important;
+  padding:4px 8px 24px!important
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .watch-actions{
+  display:flex!important;flex-wrap:nowrap!important;
+  overflow-x:auto!important;overflow-y:hidden!important;
+  max-width:100%!important;min-width:0!important;
+  scrollbar-width:thin
+ }
+ body.custom-session-watching.single-ptt:not(.custom-immersive) .watch-actions > *{
+  flex-shrink:0!important
+ }
+}
+
