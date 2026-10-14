@@ -1,7 +1,7 @@
 'use strict';
 const config=window.HOLOVIEWER_CONFIG||{};
 const $=id=>document.getElementById(id);
-const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'歷史直播',ptt:'PTT 今日專串',watchalong:'同時視聽','custom-session':'自訂觀看'};
+const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'歷史直播',ptt:'PTT 今日專串',watchalong:'同時視聽','custom-session':'自訂觀看','ptt-focus':'PTT 今日專串'};
 const stored=(()=>{try{return JSON.parse(sessionStorage.getItem('hvMulti')||'[]')}catch{return []}})();
 const state={multi:Array.isArray(stored)?stored.filter(x=>typeof x==='string'&&/^[\w-]{11}$/.test(x)).slice(0,12):[],offset:0};
 function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el}
@@ -12,17 +12,20 @@ function single(id,target='single-player'){if(!id){if($(target))message(target,'
 function renderMulti(){const box=$('multi-players');box.replaceChildren();state.multi.forEach(id=>{const wrap=node('div',undefined,'multi-item');wrap.append(frame(id));const actions=node('div',undefined,'entry');const remove=node('button','移除 '+id,'secondary');remove.onclick=()=>{state.multi=state.multi.filter(x=>x!==id);renderMulti()};actions.append(remove);wrap.append(actions);box.append(wrap)});sessionStorage.setItem('hvMulti',JSON.stringify(state.multi));if(!state.multi.length)message('multi-players','新增影片後可在同一頁觀看。')}
 function route(r){
  if(!names[r])r='home';
- document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id===r));
- const activeNav=r==='custom-session'?'single':r;
+ const pageId=r==='ptt-focus'?'ptt':r;
+ document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id===pageId));
+ const activeNav=r==='custom-session'?'single':pageId;
  document.querySelectorAll('[data-route]').forEach(el=>el.classList.toggle('active',el.dataset.route===activeNav));
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
  $('page-title').textContent=names[r];$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
  history.replaceState(null,'','#'+r);
  document.body.classList.toggle('home-wide',r==='home'||r==='history');
+ document.body.classList.toggle('ptt-focus-mode',r==='ptt-focus');
+ $('ptt-focus').textContent=r==='ptt-focus'?'退出專注':'⛶ 專注模式';
  $('live-channel-rail').hidden=r!=='home'||!$('live-channel-list').childElementCount;
  if(r==='home')loadHome();
  if(r==='history')loadHistory();
- if(r==='ptt')loadPtt();
+ if(r==='ptt'||r==='ptt-focus')loadPtt();
  if(r==='single')loadCustomLibrary();
 }
 async function api(path){if(!config.apiBase||!/^https:\/\//.test(config.apiBase))throw Error('尚未設定正式 Worker API');const base=config.apiBase.replace(/\/$/,'');const response=await fetch(base+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}});if(!response.ok)throw Error('API HTTP '+response.status);return response.json()}
@@ -115,13 +118,20 @@ async function loadHistory(){
   if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
  }catch(e){error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false}
 }
-async function loadPtt(){if(!config.apiBase){message('ptt-status','PTT 正式 Worker API 尚未接通。');return}message('ptt-status','PTT 需要經來源驗證的文章識別碼與游標；不會混用不同專串。')}
+async function loadPtt(){
+ const today=taipeiDay();$('ptt-today-meta').textContent=today.replaceAll('-','/')+' · 推文資料尚未接通 · 純 PTT 閱讀';
+ $('ptt-list').hidden=true;
+ $('ptt-empty').hidden=false;
+ $('ptt-empty').textContent='目前尚未接通經過驗證的公開 PTT 專串資料。';
+}
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids.slice(0,12);renderMulti();route('multi')}};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids.slice(0,12);renderMulti();route('multi')}};
+$('ptt-refresh').onclick=event=>{event.preventDefault();loadPtt()};
+$('ptt-focus').onclick=event=>{event.preventDefault();route($('ptt').classList.contains('active')&&document.body.classList.contains('ptt-focus-mode')?'ptt':'ptt-focus')};
 document.querySelectorAll('[data-page-link]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.pageLink)}));
 let customCatalogCache=null;
 async function loadCustomLibrary(){
