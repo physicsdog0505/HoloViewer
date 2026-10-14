@@ -606,8 +606,9 @@ window.hvOpenCustomSession=function(ids,opts={}){
  const timeline=opts.verifiedTimelineStarts;
  if(timeline&&typeof timeline==='object'){
   clean.forEach(id=>{
-   const value=Number(timeline[id]);
-   if(Number.isFinite(value))verifiedTimelineStarts.set(id,value);
+   const value=timeline[id];
+   // Missing/null/boolean values are not verified timestamp evidence.
+   if(typeof value==='number'&&Number.isFinite(value))verifiedTimelineStarts.set(id,value);
   });
  }
  viewing.ids=clean;viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
