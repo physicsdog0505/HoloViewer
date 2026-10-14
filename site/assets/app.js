@@ -175,7 +175,8 @@ function homeRail(items){const box=$('live-channel-list');box.replaceChildren();
  const accent=homeChannelAccent(item);if(accent)link.style.setProperty('--member-accent',accent);
  const avatarNode=homeAvatarChild(item,name);if(!avatarNode.matches('img'))avatarNode.className='';avatar.append(avatarNode);avatar.append(node('i'));link.append(avatar);link.append(node('strong',name));
  link.onclick=event=>{event.preventDefault();if($('custom-session').classList.contains('active')){selectWatchRailVideo(id,name);return}const card=$('stream-'+id);card?.scrollIntoView({block:'center',behavior:'smooth'})};box.append(link)});
- $('live-channel-rail').hidden=!box.children.length||!$('home').classList.contains('active');
+ $('live-channel-rail').hidden=!box.children.length||(!$('home').classList.contains('active')&&!$('custom-session').classList.contains('active'));
+ applyHomeFilter();refreshWatchRail();
 }
 
 /* Accepted 4174 high-signal carousel selection rules from pinned client_home.py. */
