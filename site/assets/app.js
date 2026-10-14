@@ -67,7 +67,7 @@ function route(r){
  if(r==='custom-session'&&!viewing.ids.length){
   const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
   let recoverable=params.getAll('stream').some(id=>/^[A-Za-z0-9_-]{11}$/.test(id));
-  try{const saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null');recoverable=Array.isArray(saved?.ids)&&saved.ids.some(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id));}catch{}
+  try{const saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null');recoverable=recoverable||(Array.isArray(saved?.ids)&&saved.ids.some(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id)));}catch{}
   if(!recoverable)r='single';
  }
  const pageId=r==='ptt-focus'?'ptt':r;
@@ -83,7 +83,7 @@ function route(r){
     ['layout',viewing.layout],['primary',String(viewing.primary)],
     ['audio',String(viewing.audio)],['ptt',viewing.ptt||'video']
    ]).toString()
-  :'#'+r;
+  :r==='custom-session'&&location.hash.startsWith('#custom-session?')?location.hash:'#'+r;
  history.replaceState(null,'',sessionHash);
  const viewerActive=r==='custom-session';
  if(!viewerActive)window.hvStopFocusCarousel?.();
