@@ -86,7 +86,7 @@ function homeFilter(){try{const x=localStorage.getItem(HOME_FILTER_KEY);return H
 function setHomeFilter(value){if(!HOME_FILTERS.has(value))return;try{localStorage.setItem(HOME_FILTER_KEY,value)}catch{}applyHomeFilter(value)}
 function applyHomeFilter(value=homeFilter()){
  document.querySelectorAll('#homeDynamic .stream-card').forEach(card=>{card.hidden=value!=='all'&&card.dataset.group!==value});
- document.querySelectorAll('#live-channel-list .live-channel-rail-item').forEach(card=>{card.hidden=value!=='all'&&card.dataset.group!==value});
+ document.querySelectorAll('#live-channel-list .live-channel-rail-item').forEach(card=>{card.hidden=(value!=='all'&&card.dataset.group!==value)||(watchMode==='multi'&&viewing.ids.includes(card.dataset.liveVideoId))});
  document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.classList.toggle('active',button.dataset.filter===value));
 }
 function homeSelection(){
@@ -457,7 +457,7 @@ let replacementTarget=0;
 function refreshWatchRail(){
  const ids=new Set(viewing.ids);
  document.querySelectorAll('.live-channel-rail-item[data-live-video-id]').forEach(link=>{
-  link.hidden=watchMode==='multi'&&ids.has(link.dataset.liveVideoId);
+  link.hidden=(homeFilter()!=='all'&&link.dataset.group!==homeFilter())||(watchMode==='multi'&&ids.has(link.dataset.liveVideoId));
  });
 }
 function selectWatchRailVideo(id,title){
