@@ -24,7 +24,31 @@
  <a data-mobile-route="ptt" href="/ptt-today" class="">PTT 今日專串</a></div>
 <div id="connection" hidden>連線確認中</div>
 <main class="client-main">
-<section id="home" class="page active"><div class="page-head"><div><h1>今日直播</h1><p>即時直播、預定與已結束的影片</p></div></div><div id="catalog" class="cards client-grid"></div></section>
+<aside id="live-channel-rail" class="live-channel-rail" aria-label="目前直播頻道" hidden><span class="live-channel-label">直播頻道</span><div id="live-channel-list"></div></aside>
+<section id="home" class="page active">
+ <div id="homeDynamic">
+  <div class="page-head"><div><h1>今日直播</h1></div></div>
+  <div class="stream-filter" role="group" aria-label="直播群組">
+   <button class="stream-filter-button active" type="button" data-filter="hololive">Hololive</button>
+   <button class="stream-filter-button" type="button" data-filter="holostars">HOLOSTARS</button>
+   <button class="stream-filter-button" type="button" data-filter="mekpark">mekPark</button>
+   <button class="stream-filter-button" type="button" data-filter="all">全部</button>
+  </div>
+  <div id="home-announcements"></div>
+  <div id="home-highlights"></div>
+  <section id="home-live-section" class="section" hidden><div class="section-head"><div><h2>現在直播中</h2><p>目前可直接觀看的直播。</p></div></div><div id="home-live" class="client-grid"></div></section>
+  <section id="home-upcoming-section" class="section" hidden><div class="section-head"><div><h2>即將開始</h2><p>已排程、尚未開始的直播。</p></div></div><div id="home-upcoming" class="client-grid"></div></section>
+  <section id="home-unknown-section" class="section" hidden><div class="section-head"><div><h2>狀態待更新</h2><p>已找到直播，但目前沒有足夠新的 lifecycle 證據。</p></div></div><div id="home-unknown" class="client-grid"></div></section>
+  <section class="section"><div class="section-head"><div><h2>觀看方式</h2></div></div><div class="feature-row">
+   <a class="feature-card" href="/watchalong" data-page-link="watchalong"><div><span class="eyebrow">WATCHALONG</span><strong>同時視聽</strong></div><span>Hololive 保持主時間軸，片源跟隨觀看。</span></a>
+   <a class="feature-card" href="/custom-view" data-page-link="single"><div><span class="eyebrow">CUSTOM</span><strong>自訂觀看</strong></div><span>自由加入直播、排列畫面並指定主要聲音。</span></a>
+   <a class="feature-card" href="/ptt-today" data-page-link="ptt"><div><span class="eyebrow">PTT</span><strong>PTT 今日專串</strong></div><span>只留下今天的 PTT 推文時間軸。</span></a>
+  </div></section>
+  <section id="home-ended-section" class="section" hidden><div class="section-head"><div><h2>已結束</h2><p>今天已完成的直播存檔。</p></div></div><div id="home-ended" class="client-grid"></div></section>
+  <p id="home-empty" class="empty-note"></p>
+ </div>
+ <div id="multiSelectBar" class="multi-select-bar" hidden aria-live="polite"><span id="multiSelectCount">已選 0 個直播</span><button type="button" id="multiClear">清除</button><button type="button" id="multiWatch">開始觀看</button></div>
+</section>
  <section id="single" class="page"><div class="page-head"><div><h1>自訂觀看</h1><p>使用 YouTube 影片網址加入觀看</p></div></div><div class="entry"><input id="single-url" aria-label="YouTube 影片網址" placeholder="YouTube 網址或影片 ID"><button id="single-add">播放</button></div><div id="single-player" class="player-area"></div></section>
  <section id="multi" class="page"><div class="page-head"><div><h1>多人連動</h1><p>現階段手動加入；4174 的自動 POV 偵測尚未移植</p></div></div><div class="entry"><input id="multi-url" aria-label="多人觀看影片網址" placeholder="YouTube 網址或影片 ID"><button id="multi-add">加入畫面</button><button id="multi-clear" class="secondary">清空</button></div><div id="multi-players" class="multi-grid"></div></section>
  <section id="history" class="page"><div class="page-head"><div><h1>歷史直播</h1><p>依台灣日期查詢已完成影片</p></div></div><div class="entry"><input type="date" id="history-day" aria-label="History 日期"><button id="history-load">查詢</button></div><p id="history-status" class="sub"></p><div id="history-list" class="cards client-grid"></div><div class="entry"><button id="history-prev" class="secondary">上一頁</button><button id="history-next" class="secondary">下一頁</button></div></section>
