@@ -67,6 +67,7 @@ function route(r){
  updateClientTopbar(r);$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
  history.replaceState(null,'','#'+r);
  const viewerActive=r==='custom-session';
+ if(!viewerActive)window.hvStopFocusCarousel?.();
  $('viewer-4174-css').media=viewerActive?'all':'not all';
  document.body.classList.toggle('custom-session-watching',viewerActive);
  if(!viewerActive&&document.body.classList.contains('custom-immersive')){
@@ -431,7 +432,53 @@ $('videoHeight').oninput=event=>{
  $('videoHeightValue').textContent=px+'px';
 };
 $('audioFollowFocus').onchange=()=>{if($('audioFollowFocus').checked){viewing.audio=viewing.primary;sessionAudio()}};
-function setViewerPrimary(index){
+// The pinned 4174 focus carousel rotates the primary view every 10–60 seconds.
+// Use animation frames rather than background polling; all mounted players persist.
+let focusCarouselFrame=0,focusCarouselDeadline=0;
+let focusCarouselSeconds=10;
+function stopFocusCarousel(){
+ if(focusCarouselFrame)cancelAnimationFrame(focusCarouselFrame);
+ focusCarouselFrame=0;focusCarouselDeadline=0;
+ $('focusCarousel').classList.remove('active');
+ $('focusCarousel').setAttribute('aria-pressed','false');
+ $('focusCarousel').textContent='輪播 '+focusCarouselSeconds+'s';
+}
+window.hvStopFocusCarousel=stopFocusCarousel;
+function focusCarouselTick(now){
+ if(!focusCarouselFrame)return;
+ if(document.hidden||!$('custom-session').classList.contains('active')||viewing.ids.length<2){
+  stopFocusCarousel();return;
+ }
+ if(now>=focusCarouselDeadline){
+  setViewerPrimary((viewing.primary+1)%viewing.ids.length,true);
+  focusCarouselDeadline=now+focusCarouselSeconds*1000;
+ }
+ focusCarouselFrame=requestAnimationFrame(focusCarouselTick);
+}
+function startFocusCarousel(){
+ if(viewing.ids.length<2)return;
+ stopFocusCarousel();
+ $('audioFollowFocus').checked=true;
+ setViewerPrimary(viewing.primary,true);
+ $('focusCarousel').classList.add('active');
+ $('focusCarousel').setAttribute('aria-pressed','true');
+ $('focusCarousel').textContent='停止輪播';
+ focusCarouselDeadline=performance.now()+focusCarouselSeconds*1000;
+ focusCarouselFrame=requestAnimationFrame(focusCarouselTick);
+}
+$('focusCarousel').onclick=()=>{
+ if(focusCarouselFrame)stopFocusCarousel();else startFocusCarousel();
+};
+$('focusCarouselInterval').oninput=()=>{
+ focusCarouselSeconds=Math.max(10,Math.min(60,Number($('focusCarouselInterval').value)||10));
+ $('focusCarouselIntervalOutput').textContent=focusCarouselSeconds+' 秒';
+ if(focusCarouselFrame)focusCarouselDeadline=performance.now()+focusCarouselSeconds*1000;
+ else $('focusCarousel').textContent='輪播 '+focusCarouselSeconds+'s';
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopFocusCarousel()});
+window.addEventListener('pagehide',stopFocusCarousel);
+function setViewerPrimary(index,fromCarousel=false){
+ if(!fromCarousel)stopFocusCarousel();
  if(!Number.isInteger(index)||index<0||index>=viewing.ids.length)return;
  // Original 4174 primary selection is also the target for single-mode rail replacement.
  replacementTarget=index;
@@ -515,6 +562,7 @@ function sessionAudio(){
 window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
+ stopFocusCarousel();
  viewing.ids=clean;viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
  viewing.primary=Math.max(0,Math.min(clean.length-1,Number(opts.primary)||0));
  viewing.audio=Math.max(0,Math.min(clean.length-1,Number(opts.audio)||0));

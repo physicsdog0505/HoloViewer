@@ -251,7 +251,7 @@ class ParityContract(unittest.TestCase):
 
     def test_focus_selects_single_mode_replacement_target(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn('function setViewerPrimary(index)',js)
+        self.assertIn('function setViewerPrimary(index,fromCarousel=false)',js)
         self.assertIn('replacementTarget=index;',js)
         self.assertIn('button.onclick=()=>setViewerPrimary(index)',js)
         self.assertIn('primary.onclick=()=>setViewerPrimary(index)',js)
@@ -308,11 +308,20 @@ class ParityContract(unittest.TestCase):
 
     def test_focus_sets_accepted_primary_layout(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        start=js.index('function setViewerPrimary(index){')
+        start=js.index('function setViewerPrimary(index,fromCarousel=false){')
         end=js.index('function renderFocusChoices()',start)
         focus=js[start:end]
         self.assertIn("viewing.layout='primary';",focus)
         self.assertIn('sessionLayout();',focus)
+
+    def test_focus_carousel_matches_accepted_4174_controls(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        for value in ('id="focusCarousel"', 'id="focusCarouselInterval"', 'id="focusCarouselIntervalOutput"'):
+            self.assertIn(value,html)
+        for value in ('function startFocusCarousel()', 'function stopFocusCarousel()', "setViewerPrimary((viewing.primary+1)%viewing.ids.length,true)", "if(!fromCarousel)stopFocusCarousel();", "if(!viewerActive)window.hvStopFocusCarousel?.();"):
+            self.assertIn(value,js)
+        self.assertIn("document.addEventListener('visibilitychange'",js)
 
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
