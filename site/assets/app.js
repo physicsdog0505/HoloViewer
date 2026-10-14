@@ -3,7 +3,7 @@ const config=window.HOLOVIEWER_CONFIG||{};
 const $=id=>document.getElementById(id);
 const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'歷史直播',ptt:'PTT 今日專串',watchalong:'同時視聽','custom-session':'自訂觀看','ptt-focus':'PTT 今日專串'};
 const stored=(()=>{try{return JSON.parse(sessionStorage.getItem('hvMulti')||'[]')}catch{return []}})();
-const state={multi:Array.isArray(stored)?stored.filter(x=>typeof x==='string'&&/^[\w-]{11}$/.test(x)).slice(0,12):[],offset:0};
+const state={multi:Array.isArray(stored)?stored.filter(x=>typeof x==='string'&&/^[\w-]{11}$/.test(x)):[],offset:0};
 function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el}
 function message(target,text){const box=$(target);box.replaceChildren(node('div',text,'notice'))}
 function videoId(input){let t=input.trim();if(/^[\w-]{11}$/.test(t))return t;try{const u=new URL(t);if(!['youtube.com','www.youtube.com','m.youtube.com','youtu.be','www.youtu.be'].includes(u.hostname))return null;t=u.hostname.includes('youtu.be')?u.pathname.split('/')[1]:u.pathname==='/watch'?u.searchParams.get('v'):['live','embed','shorts'].includes(u.pathname.split('/')[1])?u.pathname.split('/')[2]:null;return /^[\w-]{11}$/.test(t||'')?t:null}catch{return null}}
@@ -31,7 +31,7 @@ function route(r){
  if(r==='multi')loadCollab();
 }
 async function api(path){if(!config.apiBase||!/^https:\/\//.test(config.apiBase))throw Error('尚未設定正式 Worker API');const base=config.apiBase.replace(/\/$/,'');const response=await fetch(base+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}});if(!response.ok)throw Error('API HTTP '+response.status);return response.json()}
-function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>{window.hvOpenCustomSession?.([item.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};card.append(btn);card.append(' ');const multi=node('button','加入多人','secondary');multi.onclick=()=>{if(!state.multi.includes(item.video_id)&&state.multi.length<12)state.multi.push(item.video_id);renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})};card.append(multi);container.append(card)}
+function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>{window.hvOpenCustomSession?.([item.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};card.append(btn);card.append(' ');const multi=node('button','加入多人','secondary');multi.onclick=()=>{if(!state.multi.includes(item.video_id))state.multi.push(item.video_id);renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})};card.append(multi);container.append(card)}
 const HOME_FILTER_KEY='holoviewer-live-filter';
 const HOME_FILTERS=new Set(['hololive','holostars','mekpark','all']);
 const selectedHomeVideos=new Set();
@@ -237,9 +237,9 @@ async function loadPtt(){
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids.slice(0,12);renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
+$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids.slice(0,12);renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
+$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
 $('ptt-refresh').onclick=event=>{event.preventDefault();loadPtt()};
 $('ptt-focus').onclick=event=>{event.preventDefault();route($('ptt').classList.contains('active')&&document.body.classList.contains('ptt-focus-mode')?'ptt':'ptt-focus')};
 document.querySelectorAll('[data-page-link]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.pageLink)}));
