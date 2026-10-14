@@ -274,6 +274,12 @@ class ParityContract(unittest.TestCase):
         self.assertIn("watchMode==='multi'&&ids.has(link.dataset.liveVideoId)",js)
         self.assertIn("watchMode==='multi'&&viewing.ids.includes(card.dataset.liveVideoId)",js)
 
+    def test_live_channel_rail_survives_asynchronous_home_refresh_in_viewer(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("(!$('home').classList.contains('active')&&!$('custom-session').classList.contains('active'))",js)
+        self.assertIn("applyHomeFilter();refreshWatchRail();",js)
+        self.assertIn("selectWatchRailVideo(id,name)",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
