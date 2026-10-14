@@ -6,6 +6,14 @@ on:
         description: "Type DEPLOY to update holoviewer-public production Worker"
         required: true
         type: string
+      release_sha:
+        description: "Full 40-character reviewed main commit SHA (must equal checked-out commit)"
+        required: true
+        type: string
+      baseline_confirmed:
+        description: "Type BASELINE-CHECKED after reviewing current Cloudflare Worker configuration and rollback"
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -13,11 +21,20 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.event.inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main'
+    if: github.event.inputs.confirm == 'DEPLOY' && github.event.inputs.baseline_confirmed == 'BASELINE-CHECKED' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: cloudflare-production
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin exactly reviewed production revision
+        env:
+          REQUESTED_SHA: ${{ inputs.release_sha }}
+        run: |
+          test "${#REQUESTED_SHA}" -eq 40
+          test "$REQUESTED_SHA" = "$(git rev-parse HEAD)"
+          test "${{ github.ref }}" = 'refs/heads/main'
       - name: Verify production asset inputs
         run: |
           test -s site/index.html
@@ -32,6 +49,16 @@ jobs:
           node --check site/assets/config.js
           ! grep -E 'setInterval|setTimeout|location.reload' site/assets/app.js
           python -B -m unittest -v test_public_smoke
+      - name: Validate Wrangler static assets config (no script, D1, KV or routes)
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          cfg=json.loads(Path('cloudflare/wrangler.json').read_text())
+          assert set(cfg)=={'name','compatibility_date','assets'}, cfg.keys()
+          assert cfg['name']=='holoviewer-public'
+          assert cfg['assets']=={'directory':'../site'}
+          PY
       - name: Deploy static assets to existing production Worker
         uses: cloudflare/wrangler-action@v4
         with:
