@@ -129,6 +129,54 @@
    </section>
   </div>
  </section>
- <section id="watchalong" class="page"><div class="page-head"><div><h1>同時視聽</h1><p>影片與推文同步觀看</p></div></div><div class="entry"><input id="watch-url" aria-label="同時視聽影片網址" placeholder="YouTube 影片網址或 ID"><button id="watch-add">開啟影片</button></div><div id="watch-player" class="player-area"></div><div id="watch-status" class="notice">PTT 時間對齊、Playlist、A/B 字幕仍待正式 API 接線，不顯示偽造資料。</div></section>
+ <section id="watchalong" class="page">
+ <div class="page-head"><div><h1>同時視聽</h1></div></div>
+ <section class="section">
+  <div class="tool-card manual-shell" id="manual">
+   <p id="watch-error" class="form-error" hidden></p>
+   <form id="watchalongBuilder" class="manual-grid" method="get" action="/watchalong/session">
+    <div class="manual-copy">
+     <span class="eyebrow">手動建立</span>
+     <h2>找不到想看的同時視聽直播？</h2>
+     <p>貼上 Hololive 主直播，接著在右邊選擇片源。</p>
+     <div class="selection-actions"><a class="selection-link" href="#recent-watchalong" id="watch-recent">回到上方選擇</a></div>
+     <div class="form-grid" style="margin-top:14px"><label>Hololive 主直播
+      <input name="master" autocomplete="off" inputmode="url" required placeholder="YouTube URL 或 Video ID">
+     </label></div>
+    </div>
+    <div>
+     <details class="builder-advanced"><summary>觀看模式（通常不用調整）</summary>
+      <div class="view-mode-choice">
+       <label><input type="radio" name="view_mode" value="auto" checked><span>自動判定</span></label>
+       <label><input type="radio" name="view_mode" value="archive"><span>舊檔 / VOD</span></label>
+       <label><input type="radio" name="view_mode" value="live"><span>即時直播</span></label>
+      </div><div class="helper">如果自動判定失敗，再手動指定舊檔或即時直播。</div>
+     </details>
+     <div style="margin:0 0 8px;font-size:12px;font-weight:800;color:#5e5a54">片源類型</div>
+     <div class="source-choice">
+      <label class="choice-card"><input type="radio" name="source_kind" value="youtube" checked><strong>YouTube</strong><span>可自動控制與同步；支援單支影片或 Playlist。</span></label>
+      <label class="choice-card"><input type="radio" name="source_kind" value="external"><strong>外部平台</strong><span>動畫瘋、Prime Video 或其他網站；會在外部視窗播放並提供手動對齊。</span></label>
+     </div>
+     <div id="youtubePanel" class="source-panel">
+      <div class="mode-tabs"><button type="button" class="mode-tab active" data-youtube-mode="single">單支影片</button><button type="button" class="mode-tab" data-youtube-mode="playlist">Playlist</button></div>
+      <input type="hidden" name="youtube_mode" id="youtubeMode" value="single">
+      <div id="singleFields"><label>YouTube 片源<input name="source" autocomplete="off" inputmode="url" placeholder="YouTube URL 或 Video ID"></label></div>
+      <div id="playlistFields" hidden><label>Playlist URL<input name="playlist" autocomplete="off" inputmode="url" placeholder="https://www.youtube.com/playlist?list=..."></label>
+       <details class="builder-advanced"><summary>Playlist 進階設定</summary>
+        <div class="inline-grid"><label>從第幾集開始<input name="playlist_start" type="number" min="1" value="1"></label><label>匯入幾集（可留空）<input name="playlist_count" type="number" min="1" placeholder="全部"></label></div>
+        <div class="helper">舊檔會依主直播中的開始觀看時間點自動決定需要的集數；即時直播會先載入目前需要的集數，其餘放在等待序列。只有需要覆寫時才需要調整。</div>
+       </details>
+      </div>
+     </div>
+     <div id="externalPanel" class="source-panel" hidden>
+      <label>外部片源網址<input name="external_source" autocomplete="off" inputmode="url" placeholder="動畫瘋 / Prime Video / 其他 http(s) 網址"></label>
+      <div class="helper">外部平台會留在你正常登入的瀏覽器分頁；Viewer 只提供對齊工具，不讀取帳號，也不繞過登入、廣告或播放限制。</div>
+     </div>
+     <div class="actions"><button class="primary-action" type="submit">繼續設定並開始</button></div>
+    </div>
+   </form>
+  </div>
+ </section>
+ </section>
  <footer>非官方粉絲專案 · 與 COVER Corp.、YouTube 無從屬關係</footer></main>
  <script src="assets/config.js"></script><script src="assets/app.js"></script></body></html>
