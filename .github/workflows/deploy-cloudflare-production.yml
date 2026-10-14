@@ -26,6 +26,12 @@ jobs:
           test -s site/assets/config.js
           grep -F 'https://holoviewer-public-api.singlebagel.workers.dev' site/assets/config.js
           ! grep -R -E 'http://(localhost|127\.0\.0\.1)' site || exit 1
+      - name: Validate public client JavaScript and request policy
+        run: |
+          node --check site/assets/app.js
+          node --check site/assets/config.js
+          ! grep -E 'setInterval|setTimeout|location.reload' site/assets/app.js
+          python -B -m unittest -v test_public_smoke
       - name: Deploy static assets to existing production Worker
         uses: cloudflare/wrangler-action@v4
         with:
