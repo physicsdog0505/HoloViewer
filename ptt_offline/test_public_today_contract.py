@@ -134,11 +134,11 @@ class PttOfflineContractTest(unittest.TestCase):
                {"authority": "synthetic-accepted-fixture", "status": "final-complete",
                 "day": "2026-10-15", "aids": []}]
         for m in bad:
-            self.assertEqual(history_completeness(m, True), "partial")
+            self.assertEqual(history_completeness(m, True, expected_day="2026-10-15", expected_aids={"A1", "A2"}), "partial")
         accepted = {"authority": "synthetic-accepted-fixture", "status": "final-complete",
                     "day": "2026-10-15", "aids": ["A1", "A2"]}
-        self.assertEqual(history_completeness(accepted, True), "complete")
-        self.assertEqual(history_completeness(accepted, False), "partial")
+        self.assertEqual(history_completeness(accepted, True, expected_day="2026-10-15", expected_aids={"A1", "A2"}), "complete")
+        self.assertEqual(history_completeness(accepted, False, expected_day="2026-10-15", expected_aids={"A1", "A2"}), "partial")\n        self.assertEqual(history_completeness(accepted, True, expected_day="2026-10-16", expected_aids={"A1", "A2"}), "partial")\n        self.assertEqual(history_completeness(accepted, True, expected_day="2026-10-15", expected_aids={"A1"}), "partial")
 
 
 if __name__ == "__main__":
