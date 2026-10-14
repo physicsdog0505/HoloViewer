@@ -26,6 +26,30 @@ function updateClientTopbar(routeName){
  $('page-title').textContent=label;
 }
 
+
+/* Accepted 4174 immersive state: keep player iframes mounted while changing
+   fullscreen and layout. Original stylesheet is loaded only for viewer routes. */
+function applyViewerImmersive(enabled){
+ document.body.classList.toggle('custom-immersive',enabled);
+ const button=$('customImmerse');button.setAttribute('aria-pressed',String(enabled));
+ button.textContent=enabled?'退出沉浸模式':'沉浸模式';
+}
+document.addEventListener('fullscreenchange',()=>{
+ if(!document.fullscreenElement)applyViewerImmersive(false);
+});
+$('customImmerse').addEventListener('click',async()=>{
+ const next=!document.body.classList.contains('custom-immersive');
+ applyViewerImmersive(next);
+ try{
+  if(next&&!document.fullscreenElement)await document.documentElement.requestFullscreen();
+  else if(!next&&document.fullscreenElement)await document.exitFullscreen();
+ }catch(error){
+  // Leave the accepted CSS-only immersive presentation active if fullscreen
+  // is denied; the same visible button remains available to exit.
+  $('session-status').textContent=next?'無法進入瀏覽器全螢幕，已切換沉浸版面':'';
+ }
+});
+
 function route(r){
  if(!names[r])r='home';
  const pageId=r==='ptt-focus'?'ptt':r;
@@ -35,6 +59,13 @@ function route(r){
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
  updateClientTopbar(r);$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
  history.replaceState(null,'','#'+r);
+ const viewerActive=r==='custom-session';
+ $('viewer-4174-css').media=viewerActive?'all':'not all';
+ document.body.classList.toggle('custom-session-watching',viewerActive);
+ if(!viewerActive&&document.body.classList.contains('custom-immersive')){
+  applyViewerImmersive(false);
+  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+ }
  document.body.classList.toggle('home-wide',r==='home'||r==='history');
  document.body.classList.toggle('ptt-focus-mode',r==='ptt-focus');
  document.body.classList.toggle('watchalong-wide',r==='watchalong');
