@@ -1,7 +1,7 @@
 'use strict';
 const config=window.HOLOVIEWER_CONFIG||{};
 const $=id=>document.getElementById(id);
-const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'History',ptt:'PTT 今日專串',watchalong:'同時視聽'};
+const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'歷史直播',ptt:'PTT 今日專串',watchalong:'同時視聽'};
 const stored=(()=>{try{return JSON.parse(sessionStorage.getItem('hvMulti')||'[]')}catch{return []}})();
 const state={multi:Array.isArray(stored)?stored.filter(x=>typeof x==='string'&&/^[\w-]{11}$/.test(x)).slice(0,12):[],offset:0};
 function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el}
