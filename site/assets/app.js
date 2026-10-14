@@ -41,6 +41,8 @@ function applyViewerImmersive(enabled){
  const button=$('customImmerse');button.setAttribute('aria-pressed',String(enabled));
  button.textContent=enabled?'退出沉浸模式':'沉浸模式';
 }
+$('immersiveExit').onclick=()=>$('customImmerse').click();
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('custom-immersive')&&!document.fullscreenElement)applyViewerImmersive(false)});
 document.addEventListener('fullscreenchange',()=>{
  if(!document.fullscreenElement)applyViewerImmersive(false);
 });
