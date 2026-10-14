@@ -60,7 +60,11 @@ $('customImmerse').addEventListener('click',async()=>{
 function route(r){
  if(!names[r])r='home';
  // A viewing route without mounted players must never display an empty workspace.
- if(r==='custom-session'&&!viewing.ids.length)r='single';
+ if(r==='custom-session'&&!viewing.ids.length){
+  let recoverable=false;
+  try{const saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null');recoverable=Array.isArray(saved?.ids)&&saved.ids.some(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id));}catch{}
+  if(!recoverable)r='single';
+ }
  const pageId=r==='ptt-focus'?'ptt':r;
  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id===pageId));
  const activeNav=r==='custom-session'?'single':pageId;
