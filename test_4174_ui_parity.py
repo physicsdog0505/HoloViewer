@@ -272,6 +272,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn('let verifiedTimelineStarts=new Map();',js)
         self.assertIn('function verifiedTimelineComplete()',js)
         self.assertIn("const timeline=opts.verifiedTimelineStarts;",js)
+        self.assertIn("typeof value==='number'&&Number.isFinite(value)",js)
         self.assertIn('verifiedTimelineStarts.get(viewing.ids[masterIndex])+masterNow-verifiedTimelineStarts.get(viewing.ids[followerIndex])',js)
         self.assertIn("youtubeCommand(iframe,'seekTo',[expected,true])",js)
         self.assertIn('if(expected<0)return false;',js)
