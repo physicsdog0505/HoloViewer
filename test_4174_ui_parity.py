@@ -107,6 +107,15 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('addEventListener', route_body)
         self.assertNotIn("multiWatch').onclick", route_body)
 
+    def test_4174_collab_hub_has_no_invented_manual_editor(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        self.assertIn('id="collab-live"', html)
+        self.assertIn('id="collab-upcoming"', html)
+        self.assertIn('id="collab-ended"', html)
+        self.assertNotIn('id="multi-url"', html)
+        self.assertIn("function loadCollab()", js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
