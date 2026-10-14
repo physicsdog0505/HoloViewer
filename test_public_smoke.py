@@ -10,7 +10,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", ".gitignore"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/config.js", "site/_headers", ".gitignore"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
