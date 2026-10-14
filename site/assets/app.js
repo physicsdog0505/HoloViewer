@@ -13,7 +13,7 @@ function renderMulti(){sessionStorage.setItem('hvMulti',JSON.stringify(state.mul
 
 /* 4174 client_home._english_home_date: %a · %b %d, %Y, uppercase. */
 function clientTopbarDate(day){
- if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(day||''))return '';
+ if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(day||''))return '';
  const date=new Date(day+'T12:00:00Z');
  if(!Number.isFinite(date.getTime()))return '';
  const pieces=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',weekday:'short',month:'short',day:'2-digit',year:'numeric'}).formatToParts(date);
