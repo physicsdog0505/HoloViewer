@@ -232,6 +232,17 @@ class ParityContract(unittest.TestCase):
         self.assertIn("youtubeCommand(iframe,'pauseVideo'",js)
         self.assertNotIn("renderMulti();route('multi')",js)
 
+    def test_4174_live_rail_replaces_only_target_and_appends_in_multi(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('function selectWatchRailVideo(id,title)',js)
+        self.assertIn('function makeWatchCard(id,index)',js)
+        self.assertIn("watchMode==='multi'",js)
+        self.assertIn("viewing.ids.push(id)",js)
+        self.assertIn("box.append(makeWatchCard(id,i))",js)
+        self.assertIn("link.dataset.liveVideoId=id",js)
+        self.assertIn("iframe.src='https://www.youtube-nocookie.com/embed/'",js)
+        self.assertNotIn("route('multi')",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
