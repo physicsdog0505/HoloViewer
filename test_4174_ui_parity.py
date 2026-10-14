@@ -201,6 +201,16 @@ class ParityContract(unittest.TestCase):
         self.assertIn('fullscreenchange',js)
         self.assertIn("viewerActive?'all':'not all'",js)
 
+    def test_4174_viewer_ptt_panel_is_not_a_fake_feed(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('id="customContentGrid"',html)
+        self.assertIn('id="custom-session-ptt-panel"',html)
+        self.assertIn('PTT 尚未對齊',html)
+        self.assertIn('viewerPttPanel.remove()',js)
+        self.assertIn("classList.toggle('video-only',!showPtt)",js)
+        self.assertIn('目前沒有足夠的專串來源與影片時間證據。',js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
