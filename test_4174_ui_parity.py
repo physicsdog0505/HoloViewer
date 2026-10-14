@@ -157,6 +157,16 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("[\\\\w-]", js, "Double escaped regex rejects real YouTube IDs")
         self.assertGreaterEqual(js.count("[A-Za-z0-9_-]{11}"), 3)
 
+    def test_4174_channel_identity_fallback_and_safe_avatars(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('HOME_CHANNEL_ACCENTS',js)
+        self.assertIn('NAKIRI AYAME',js)
+        self.assertIn('TOKOYAMI TOWA',js)
+        self.assertIn('ROBOCO',js)
+        self.assertIn('yt3.ggpht.com',js)
+        self.assertIn('homeAvatarChild(item,name)',js)
+        self.assertIn("style.setProperty('--member-accent',accent)",js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
