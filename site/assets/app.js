@@ -21,6 +21,7 @@ function route(r){
  history.replaceState(null,'','#'+r);
  document.body.classList.toggle('home-wide',r==='home'||r==='history');
  document.body.classList.toggle('ptt-focus-mode',r==='ptt-focus');
+ document.body.classList.toggle('watchalong-wide',r==='watchalong');
  $('ptt-focus').textContent=r==='ptt-focus'?'退出專注':'⛶ 專注模式';
  $('live-channel-rail').hidden=r!=='home'||!$('live-channel-list').childElementCount;
  if(r==='home')loadHome();
@@ -181,7 +182,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('multi-add').onclick=()=>{const id=videoId($('multi-url').value);if(!id)return alert('請輸入有效的 YouTube 網址或 ID');if(!state.multi.includes(id)&&state.multi.length<12)state.multi.push(id);renderMulti()};$('multi-clear').onclick=()=>{state.multi=[];renderMulti()};$('watch-add').onclick=()=>single(videoId($('watch-url').value),'watch-player');$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();route(location.hash.substring(1)||'home');
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('multi-add').onclick=()=>{const id=videoId($('multi-url').value);if(!id)return alert('請輸入有效的 YouTube 網址或 ID');if(!state.multi.includes(id)&&state.multi.length<12)state.multi.push(id);renderMulti()};$('multi-clear').onclick=()=>{state.multi=[];renderMulti()};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();route(location.hash.substring(1)||'home');
 
 /* Accepted 4174 custom-view selection controller with public read-only catalog adapter. */
 (function(){
@@ -292,4 +293,62 @@ window.hvCustomCatalog=function(rows){
 };
 window.hvCustomAdd=addStream;
 
+})();
+
+
+// Accepted 4174 watchalong landing mode/tab interactions.
+(function(){
+
+const recentWatchSearch=document.getElementById('recentWatchSearch');
+let activeWatchGroup='all';
+function filterRecentWatchalong(){
+  const query=recentWatchSearch?.value.trim().toLocaleLowerCase()||'';
+  let visible=0;
+  document.querySelectorAll('#recentWatchGrid .recent-watch-card').forEach(card=>{
+    const groupMatch=activeWatchGroup==='all'||(card.dataset.group||'').split(' ').includes(activeWatchGroup);
+    const textMatch=!query||(card.dataset.search||'').toLocaleLowerCase().includes(query);
+    card.hidden=!(groupMatch&&textMatch);
+    if(!card.hidden)visible++;
+  });
+  const empty=document.getElementById('recentWatchNoMatches');
+  if(empty)empty.hidden=visible!==0;
+}
+recentWatchSearch?.addEventListener('input',filterRecentWatchalong);
+document.querySelectorAll('[data-watch-group]').forEach(button=>button.addEventListener('click',()=>{
+  activeWatchGroup=button.dataset.watchGroup||'all';
+  document.querySelectorAll('[data-watch-group]').forEach(item=>item.classList.toggle('active',item===button));
+  filterRecentWatchalong();
+}));
+const youtubePanel=document.getElementById('youtubePanel');
+const externalPanel=document.getElementById('externalPanel');
+const youtubeMode=document.getElementById('youtubeMode');
+const singleFields=document.getElementById('singleFields');
+const playlistFields=document.getElementById('playlistFields');
+function applySourceKind(){
+  const kind=document.querySelector('input[name="source_kind"]:checked')?.value||'youtube';
+  youtubePanel.hidden=kind!=='youtube';
+  externalPanel.hidden=kind!=='external';
+}
+document.querySelectorAll('input[name="source_kind"]').forEach(input=>input.addEventListener('change',applySourceKind));
+document.querySelectorAll('[data-youtube-mode]').forEach(button=>button.addEventListener('click',()=>{
+  youtubeMode.value=button.dataset.youtubeMode;
+  document.querySelectorAll('[data-youtube-mode]').forEach(item=>item.classList.toggle('active',item===button));
+  singleFields.hidden=youtubeMode.value!=='single';
+  playlistFields.hidden=youtubeMode.value!=='playlist';
+}));
+applySourceKind();
+
+const watchForm=document.getElementById('watchalongBuilder');
+watchForm.addEventListener('submit',event=>{
+ event.preventDefault();
+ const form=new FormData(watchForm);
+ const master=videoId(String(form.get('master')||''));
+ const error=document.getElementById('watch-error');
+ if(!master){error.textContent='Hololive 主影片無法辨識，請確認 YouTube URL 或 Video ID。';error.hidden=false;return}
+ if(form.get('source_kind')==='youtube'&&form.get('youtube_mode')==='single'&&!videoId(String(form.get('source')||''))){error.textContent='請提供有效的 YouTube 片源網址或 Video ID。';error.hidden=false;return}
+ if(form.get('source_kind')==='external'){
+  try{const u=new URL(String(form.get('external_source')||''));if(!['https:','http:'].includes(u.protocol))throw Error('invalid')}catch{error.textContent='外部片源網址無法辨識，請提供 http(s) 網址。';error.hidden=false;return}
+ }
+ error.textContent='4174 同時視聽播放器的同步與對齊引擎尚未移植完成，因此這個版本暫不啟動未驗證的同步播放。';error.hidden=false;
+});
 })();
