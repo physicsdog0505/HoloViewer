@@ -315,7 +315,7 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .manual-shell{padding:20px}.manual-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;align-items:start}
 .selected-master{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;margin-top:12px}.selected-master img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}.selected-master-copy{padding:12px}.selected-master-copy strong{display:block;margin-bottom:5px}.selected-master-copy span{color:var(--muted);font-size:12px}
 .manual-copy h2{margin:7px 0 8px;font-size:22px}.manual-copy p{margin:0;color:var(--muted);line-height:1.65}
-.form-grid{display:grid;gap:12px}label{display:grid;gap:7px;font-size:12px;font-weight:700;color:#5e5a54}
+.form-grid{display:grid;gap:12px}#watchalong label{display:grid;gap:7px;font-size:12px;font-weight:700;color:#5e5a54}
 .actions{display:flex;justify-content:flex-end;margin-top:14px}.boundary{margin:12px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
 @media(max-width:1250px){.watch-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){.watch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
