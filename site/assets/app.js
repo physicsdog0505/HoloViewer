@@ -695,7 +695,16 @@ function render(){
   primary.value=String(Math.max(0,items.indexOf(primaryId)));
   audio.value=String(Math.max(0,items.indexOf(audioId)));
 }
-function addStream(value){const id=videoId(String(value||''));if(!id){const error=document.getElementById('custom-error');error.textContent='請提供有效的 YouTube 直播或影片連結。';error.hidden=false;return}if(items.includes(id))return;document.getElementById('custom-error').hidden=true;items.push(id);render();}
+function addStream(value){
+ const id=videoId(String(value||''));
+ const error=document.getElementById('custom-error');
+ const status=document.getElementById('custom-selection-status');
+ if(!id){error.textContent='請提供有效的 YouTube 直播或影片連結。';error.hidden=false;status.textContent='';return false;}
+ if(items.includes(id)){status.textContent='這支影片已在清單中；按「開始觀看」即可開啟。';return true;}
+ error.hidden=true;items.push(id);render();
+ status.textContent='已加入 '+items.length+' 支影片；按下方「開始觀看」開啟播放器。';
+ return true;
+}
 document.getElementById('custom-live-picker').addEventListener('click',event=>{
  const button=event.target.closest('[data-live-pick]');if(!button)return;
  if(event.target.closest('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open('https://www.youtube.com/watch?v='+button.dataset.livePick,'_blank','noopener,noreferrer');return}
@@ -719,7 +728,7 @@ document.getElementById('displayMode').onclick=()=>{
   gallery.classList.toggle('compact');document.getElementById('displayMode').textContent=gallery.classList.contains('compact')?'詳細卡片':'精簡列表';
 };
 audio.addEventListener('change',()=>{audioId=items[Number(audio.value)]||null;});
-document.getElementById('add').onclick=()=>{const value=input.value.trim();if(!value)return;addStream(value);input.value='';input.focus();};
+document.getElementById('add').onclick=()=>{const value=input.value.trim();if(!value){document.getElementById('custom-error').textContent='請先貼上 YouTube 網址或影片 ID。';document.getElementById('custom-error').hidden=false;return;}if(addStream(value))input.value='';input.focus();};
 input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();document.getElementById('add').click();}});
 document.getElementById('start').onclick=()=>{
   if(!items.length){alert('請先加入至少一個影片。');return;}
@@ -728,7 +737,18 @@ document.getElementById('start').onclick=()=>{
   q.set('ptt',document.getElementById('pttMode').value);
   q.set('primary',String(Math.max(0,items.indexOf(primaryId))));
   q.set('audio',String(Math.max(0,items.indexOf(audioId))));
-  window.hvOpenCustomSession?.(items.slice(),{layout:q.get('layout'),ptt:q.get('ptt'),primary:Number(q.get('primary')),audio:Number(q.get('audio'))});
+  const error=document.getElementById('custom-error');
+  try{
+   if(typeof window.hvOpenCustomSession!=='function')throw Error('播放器初始化尚未完成');
+   window.hvOpenCustomSession(items.slice(),{layout:q.get('layout'),ptt:q.get('ptt'),primary:Number(q.get('primary')),audio:Number(q.get('audio'))});
+   if(!document.getElementById('custom-session').classList.contains('active')||
+      document.querySelectorAll('#stage .player-card iframe').length!==items.length)throw Error('播放器畫面未正確建立');
+   error.hidden=true;
+  }catch(err){
+   error.textContent='開啟觀看失敗：'+(err instanceof Error?err.message:'未知錯誤')+'。請重新整理頁面再試。';
+   error.hidden=false;
+   document.getElementById('custom-selection-status').textContent='觀看尚未開始，已保留所選影片。';
+  }
 };
 render();
 
