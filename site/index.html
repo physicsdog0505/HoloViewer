@@ -91,8 +91,13 @@
     <label>主要聲音 <select id="session-audio" aria-label="主要聲音"></select></label>
     <span id="session-status" class="player-status"></span>
    </div>
-   <div class="custom-content-grid video-only"><div class="custom-player-column"><main id="stage"></main></div></div>
-   <p id="custom-session-ptt-note" class="empty-note" hidden></p>
+   <div class="custom-content-grid video-only" id="customContentGrid">
+    <div class="custom-player-column"><main id="stage"></main></div>
+    <aside class="ptt-live-panel" id="custom-session-ptt-panel" aria-label="PTT 對齊狀態" hidden>
+     <div class="ptt-panel-heading"><span>PTT 尚未對齊</span></div>
+     <div class="ptt-unavailable" id="custom-session-ptt-note"></div>
+    </aside>
+   </div>
   </div>
  </section>
  <section id="multi" class="page"><div class="page-head"><div><h1>多人連動</h1><p>正在進行的連動優先；稍後場次與過去活動依時間排列。</p></div></div><div id="collab-live" class="section collab-hub-section" hidden><div class="section-head"><div><h2>現在直播中</h2></div></div><div class="collab-event-grid"></div></div><div id="collab-upcoming" class="section collab-hub-section" hidden><div class="section-head"><div><h2>稍後</h2></div></div><div class="collab-event-grid"></div></div><div id="collab-ended" class="section collab-hub-section" hidden><div class="section-head"><div><h2>過去連動</h2></div></div><div class="collab-event-grid"></div></div><p id="collab-empty" class="empty-note">目前沒有偵測到可用的多人連動。</p></section>
