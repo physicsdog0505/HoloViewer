@@ -295,6 +295,17 @@ class ParityContract(unittest.TestCase):
         self.assertIn('body.home-wide .page-head h1{font-size:30px;margin-bottom:0}',css)
         self.assertIn('.entry > button,.actions > button{',css)
 
+    def test_home_typography_uses_exact_4174_sizing(self):
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        for rule in (
+            '#home .page-head h1{font-size:30px;',
+            '#home .stream-filter-button{font-size:12px;font-weight:750;padding:8px 14px}',
+            '#home .section-head h2{font-size:22px}',
+            '#home .feature-card strong{font-size:18px}',
+            '#home .eyebrow{font-size:11px}',
+        ):
+            self.assertIn(rule, css)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)

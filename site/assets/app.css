@@ -90,6 +90,14 @@ body.viewer-wide .viewer-frame iframe{height:calc(100vh - 126px);min-height:720p
 @media(max-width:760px){.multi-grid{grid-template-columns:1fr}}
 
 /* Accepted 4174 HOME CSS, exact port from client_home.py at cab0adb51 */
+/* Home typography and controls: accepted 4174 sizing, independent of SPA wrapper
+   or other Public route styling. Do not scale these values for missing data. */
+#home .page-head h1{font-size:30px;line-height:normal;letter-spacing:-.035em;margin:0}
+#home .stream-filter-button{font-size:12px;font-weight:750;padding:8px 14px}
+#home .section-head h2{font-size:22px}
+#home .feature-card strong{font-size:18px}
+#home .eyebrow{font-size:11px}
+
 
 body.home-wide .client-main{max-width:1580px;padding-top:24px}
 /* One FUWAMOCO card receives an ordered dual-color community penlight accent. */
