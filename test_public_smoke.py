@@ -59,7 +59,9 @@ class PublicSmokeTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/deploy-cloudflare-production.yml").read_text()
         for token in ("workflow_dispatch:", "BASELINE-CHECKED", "release_sha", "git rev-parse HEAD", "cloudflare-production", "refs/heads/main", "persist-credentials: false"):
             self.assertIn(token, workflow)
-        self.assertNotIn("  push:", workflow)
+        self.assertIn("  push:", workflow)
+        self.assertIn("      - 'site/**'", workflow)
+        self.assertIn("github.event_name == 'push'", workflow)
         self.assertNotIn("  schedule:", workflow)
 
     def test_absent_snapshot(self):
