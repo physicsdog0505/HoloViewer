@@ -203,3 +203,8 @@ body.home-wide .section-head{margin-bottom:9px}
 .home-announcements{background:#fff9ed!important;border-color:#edd9b4!important;border-left-color:#d7ab64!important;box-shadow:none!important;padding:8px 14px!important;gap:12px!important}
 .announcement-heading{background:#ffe9ba!important;padding:5px 9px!important}
 
+
+/* 4174 history-specific layout from accepted client_home.build_home_html */
+.history-picker,.history-shortcuts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.history-picker input{min-height:40px;padding:6px 10px;border:1px solid var(--line);border-radius:9px}
+.history-shortcuts .subtle-action{min-height:34px;padding:6px 11px}

@@ -69,6 +69,23 @@ class ParityContract(unittest.TestCase):
         self.assertIn('<span class="eyebrow">CUSTOM</span>', html)
         self.assertNotIn("<h1>History</h1>", html)
 
+    def test_history_matches_accepted_4174_date_and_paging_contract(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        for snippet in ('id="history-picker"', 'id="historyDate"', 'id="history-shortcuts"',
+                        'id="history-pagination"', 'id="historyMultiSelectBar"',
+                        '依直播開始日期瀏覽最近 30 天的已結束影片。'):
+            self.assertIn(snippet, html)
+        for snippet in ('shiftDay(today,-30)', 'shiftDay(today,-1)', 'limit=50&offset=',
+                        "['昨天',b.latest]", "['前天',shiftDay(b.latest,-1)]",
+                        "['7 天前',shiftDay(b.latest,-6)]", "['← 前一天',shiftDay(selected,-1)]",
+                        "['後一天 →',shiftDay(selected,1)]"):
+            self.assertIn(snippet, js)
+        self.assertIn('.history-picker,.history-shortcuts', css)
+        self.assertNotIn('id="history-prev"', html)
+        self.assertNotIn('id="history-next"', html)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)

@@ -12,6 +12,8 @@ function single(id,target='single-player'){if(!id){message(target,'請輸入有�
 function renderMulti(){const box=$('multi-players');box.replaceChildren();state.multi.forEach(id=>{const wrap=node('div',undefined,'multi-item');wrap.append(frame(id));const actions=node('div',undefined,'entry');const remove=node('button','移除 '+id,'secondary');remove.onclick=()=>{state.multi=state.multi.filter(x=>x!==id);renderMulti()};actions.append(remove);wrap.append(actions);box.append(wrap)});sessionStorage.setItem('hvMulti',JSON.stringify(state.multi));if(!state.multi.length)message('multi-players','新增影片後可在同一頁觀看。')}
 function route(r){if(!names[r])r='home';document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id===r));document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
+$('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
+$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){single(ids[0]);route('single')}else{state.multi=ids.slice(0,12);renderMulti();route('multi')}};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){single(ids[0]);route('single')}else{state.multi=ids.slice(0,12);renderMulti();route('multi')}};
 document.querySelectorAll('[data-page-link]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.pageLink)}));
@@ -29,10 +31,10 @@ function applyHomeFilter(value=homeFilter()){
  document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.classList.toggle('active',button.dataset.filter===value));
 }
 function homeSelection(){
- document.querySelectorAll('#homeDynamic .stream-card[data-multiview-id]').forEach(card=>{const on=selectedHomeVideos.has(card.dataset.multiviewId);card.classList.toggle('multi-selected',on);card.setAttribute('aria-selected',String(on))});
- $('multiSelectBar').hidden=!selectedHomeVideos.size;
- $('multiSelectCount').textContent='已選 '+selectedHomeVideos.size+' 個影片';
- $('multiWatch').textContent=selectedHomeVideos.size>1?'開始多視角觀看':'觀看選取影片';
+ document.querySelectorAll('#homeDynamic .stream-card[data-multiview-id],#historyDynamic .stream-card[data-multiview-id]').forEach(card=>{const on=selectedHomeVideos.has(card.dataset.multiviewId);card.classList.toggle('multi-selected',on);card.setAttribute('aria-selected',String(on))});
+ const count=selectedHomeVideos.size;for(const [bar,countEl,watch] of [['multiSelectBar','multiSelectCount','multiWatch'],['historyMultiSelectBar','historyMultiSelectCount','historyMultiWatch']]){
+  $(bar).hidden=!count;$(countEl).textContent='已選 '+count+' 個影片';$(watch).textContent=count>1?'開始多視角觀看':'觀看選取影片';
+ }
 }
 function homeCard(item,container){
  if(!item||! /^[\\w-]{11}$/.test(item.video_id||''))return;
@@ -80,6 +82,29 @@ async function loadHome(){
  $('connection').textContent='API 已連線';
  }catch(e){$('home-empty').textContent='無法讀取正式直播資料：'+e.message}
 }
-async function loadHistory(){if(!config.apiBase){message('history-list','History 正式 API 尚未接通。');return}try{const day=$('history-day').value;if(!/^\d{4}-\d{2}-\d{2}$/.test(day))throw Error('日期錯誤');const data=await api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+state.offset);if(!Array.isArray(data.items))throw Error('資料格式錯誤');const box=$('history-list');box.replaceChildren();data.items.forEach(item=>catalogCard(item,box));$('history-status').textContent='總計 '+Number(data.total||0)+' 筆，顯示 '+(state.offset+1)+' 起';if(!data.items.length)message('history-list','本日沒有已驗證的歷史項目。')}catch(e){message('history-list','無法讀取 History：'+e.message)}}
+function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));return o.year+'-'+o.month+'-'+o.day}
+function shiftDay(day,delta){const date=new Date(day+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+delta);return date.toISOString().slice(0,10)}
+function historyBounds(){const today=taipeiDay();return {earliest:shiftDay(today,-30),latest:shiftDay(today,-1)}}
+function historyDateValid(day){const b=historyBounds();return /^\\d{4}-\\d{2}-\\d{2}$/.test(day)&&day>=b.earliest&&day<=b.latest}
+function historyLink(label,day,page=1){const link=node('a',label,'subtle-action');link.href='/history?date='+encodeURIComponent(day)+(page>1?'&page='+page:'');link.onclick=e=>{e.preventDefault();$('historyDate').value=day;state.offset=(page-1)*50;loadHistory()};return link}
+function historyChrome(){const b=historyBounds();const input=$('historyDate');input.min=b.earliest;input.max=b.latest;if(!historyDateValid(input.value)){input.value=b.latest;state.offset=0}
+ const selected=input.value;const shortcuts=$('history-shortcuts');shortcuts.replaceChildren();
+ [['昨天',b.latest],['前天',shiftDay(b.latest,-1)],['7 天前',shiftDay(b.latest,-6)],['← 前一天',shiftDay(selected,-1)],['後一天 →',shiftDay(selected,1)]].forEach(([label,day])=>{if(historyDateValid(day))shortcuts.append(historyLink(label,day))});
+ $('history-heading').textContent=selected.replaceAll('-','/');
+}
+async function loadHistory(){
+ historyChrome();const day=$('historyDate').value;const error=$('history-error');error.hidden=true;error.textContent='';
+ const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;
+ if(!config.apiBase){error.textContent='History 正式 API 尚未接通。';error.hidden=false;return}
+ try{
+  const data=await api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+state.offset);
+  if(!Array.isArray(data.items))throw Error('資料格式錯誤');
+  data.items.forEach(item=>homeCard(item,list));
+  const ids=new Set(data.items.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
+ const total=Number(data.total||0);if(!data.items.length)$('history-empty').hidden=false;
+  const page=Math.floor(state.offset/50)+1;if(page>1)pagination.append(historyLink('上一頁',day,page-1));
+  if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
+ }catch(e){error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false}
+}
 async function loadPtt(){if(!config.apiBase){message('ptt-status','PTT 正式 Worker API 尚未接通。');return}message('ptt-status','PTT 需要經來源驗證的文章識別碼與游標；不會混用不同專串。')}
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('single-add').onclick=()=>single(videoId($('single-url').value));$('multi-add').onclick=()=>{const id=videoId($('multi-url').value);if(!id)return alert('請輸入有效的 YouTube 網址或 ID');if(!state.multi.includes(id)&&state.multi.length<12)state.multi.push(id);renderMulti()};$('multi-clear').onclick=()=>{state.multi=[];renderMulti()};$('watch-add').onclick=()=>single(videoId($('watch-url').value),'watch-player');$('history-load').onclick=()=>{state.offset=0;loadHistory()};$('history-prev').onclick=()=>{state.offset=Math.max(0,state.offset-50);loadHistory()};$('history-next').onclick=()=>{state.offset+=50;loadHistory()};const yesterday=new Date(Date.now()+8*3600000-86400000).toISOString().slice(0,10);$('history-day').value=yesterday;renderMulti();route(location.hash.substring(1)||'home');
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('single-add').onclick=()=>single(videoId($('single-url').value));$('multi-add').onclick=()=>{const id=videoId($('multi-url').value);if(!id)return alert('請輸入有效的 YouTube 網址或 ID');if(!state.multi.includes(id)&&state.multi.length<12)state.multi.push(id);renderMulti()};$('multi-clear').onclick=()=>{state.multi=[];renderMulti()};$('watch-add').onclick=()=>single(videoId($('watch-url').value),'watch-player');$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();route(location.hash.substring(1)||'home');
