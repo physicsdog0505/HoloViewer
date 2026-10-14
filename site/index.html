@@ -49,7 +49,51 @@
  </div>
  <div id="multiSelectBar" class="multi-select-bar" hidden aria-live="polite"><span id="multiSelectCount">已選 0 個直播</span><button type="button" id="multiClear">清除</button><button type="button" id="multiWatch">開始觀看</button></div>
 </section>
- <section id="single" class="page"><div class="page-head"><div><h1>自訂觀看</h1><p>使用 YouTube 影片網址加入觀看</p></div></div><div class="entry"><input id="single-url" aria-label="YouTube 影片網址" placeholder="YouTube 網址或影片 ID"><button id="single-add">播放</button></div><div id="single-player" class="player-area"></div></section>
+ <section id="single" class="page">
+  <div class="page-head"><div><h1>自訂觀看</h1><p>自己挑任意直播組合，再交給系統排版。</p></div></div>
+  <div class="custom-layout">
+   <section class="custom-main">
+    <div class="search-box"><input id="url" aria-label="YouTube URL 或 Video ID" placeholder="貼上 YouTube URL 或 Video ID"><button id="add" class="subtle-action" type="button">加入網址</button></div>
+    <p id="custom-error" class="form-error" hidden></p>
+    <div class="builder-note">可直接點選正在直播的影片，或貼上任意 YouTube 影片網址。跨日期組合不會猜測共用 PTT。</div>
+    <div class="live-picker"><span class="eyebrow">影片庫 · 點選影片加入播放設定</span>
+     <div class="library-tabs" role="tablist" aria-label="影片來源">
+      <button type="button" role="tab" data-library-tab="live" aria-selected="true">直播中</button>
+      <button type="button" role="tab" data-library-tab="history" aria-selected="false">歷史影片</button>
+     </div>
+     <div id="liveLibrary" role="tabpanel"><div class="library-display"><span class="empty-note">選擇想一起觀看的直播</span><button id="displayMode" type="button">精簡列表</button></div><div id="custom-live-picker" class="live-picker-list"></div><p id="custom-live-empty" class="empty-note">目前沒有可用的直播，仍可貼上影片網址。</p></div>
+     <div id="historyLibrary" role="tabpanel" hidden><p class="library-empty">歷史影片搜尋功能準備中。目前可直接貼上 YouTube 影片網址加入觀看清單。</p></div>
+    </div>
+   </section>
+   <aside class="selection-panel">
+    <span class="eyebrow">播放設定 · 拖曳調整順序</span>
+    <h2>已選 <span id="selectedCount">0</span> 個直播</h2>
+    <div id="list" class="selected-list"><div class="empty-selection">還沒有選擇直播。</div></div>
+    <div class="custom-settings"><div class="controls">
+     <label id="layoutControl" hidden>版面<select id="layout"><option value="auto">自動</option><option value="equal">平均排列</option><option value="primary">主視角</option></select></label>
+     <select id="primary" hidden aria-label="主要畫面索引"></select>
+     <label>主要聲音<select id="audio"></select></label>
+     <label>觀看版型<select id="pttMode"><option value="live">影片＋即時 PTT 專串</option><option value="video">純影片</option></select></label>
+     <span class="empty-note">即時專串不顯示搜尋；歷史 VOD 專串需使用對應日期資料，避免誤連今天的推文。</span>
+    </div></div>
+    <div class="start-row"><button id="start" class="primary-action" type="button">開始觀看</button></div>
+   </aside>
+  </div>
+ </section>
+ <section id="custom-session" class="page">
+  <div class="viewer-workspace">
+   <div class="viewer-head"><h1>自訂觀看</h1><a href="/custom-view" class="subtle-action" data-page-link="single">返回自訂觀看</a></div>
+   <div class="player-toolbar" id="custom-player-toolbar">
+    <button type="button" data-session-layout="auto">自動</button>
+    <button type="button" data-session-layout="equal">平均排列</button>
+    <button type="button" data-session-layout="primary">主視角</button>
+    <label>主要聲音 <select id="session-audio" aria-label="主要聲音"></select></label>
+    <span id="session-status" class="player-status"></span>
+   </div>
+   <div class="custom-content-grid video-only"><div class="custom-player-column"><main id="stage"></main></div></div>
+   <p id="custom-session-ptt-note" class="empty-note" hidden></p>
+  </div>
+ </section>
  <section id="multi" class="page"><div class="page-head"><div><h1>多人連動</h1><p>現階段手動加入；4174 的自動 POV 偵測尚未移植</p></div></div><div class="entry"><input id="multi-url" aria-label="多人觀看影片網址" placeholder="YouTube 網址或影片 ID"><button id="multi-add">加入畫面</button><button id="multi-clear" class="secondary">清空</button></div><div id="multi-players" class="multi-grid"></div></section>
  <section id="history" class="page">
   <div id="historyDynamic">
