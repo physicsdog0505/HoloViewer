@@ -52,23 +52,14 @@
  <section id="single" class="page"><div class="page-head"><div><h1>自訂觀看</h1><p>使用 YouTube 影片網址加入觀看</p></div></div><div class="entry"><input id="single-url" aria-label="YouTube 影片網址" placeholder="YouTube 網址或影片 ID"><button id="single-add">播放</button></div><div id="single-player" class="player-area"></div></section>
  <section id="multi" class="page"><div class="page-head"><div><h1>多人連動</h1><p>現階段手動加入；4174 的自動 POV 偵測尚未移植</p></div></div><div class="entry"><input id="multi-url" aria-label="多人觀看影片網址" placeholder="YouTube 網址或影片 ID"><button id="multi-add">加入畫面</button><button id="multi-clear" class="secondary">清空</button></div><div id="multi-players" class="multi-grid"></div></section>
  <section id="history" class="page">
-  <div id="historyDynamic">
-   <div class="page-head"><div><h1>歷史直播</h1><p>依直播開始日期瀏覽最近 30 天的已結束影片。</p></div></div>
-   <form id="history-picker" class="history-picker">
-    <label for="historyDate">選擇日期</label>
-    <input id="historyDate" name="date" type="date" required>
-    <button class="primary-action" type="submit">查看</button>
-   </form>
-   <div class="history-shortcuts" id="history-shortcuts"></div>
-   <p id="history-error" class="form-error" hidden></p>
-   <section class="section"><div class="section-head"><div><h2 id="history-heading"></h2></div></div>
-    <div id="history-list" class="client-grid"></div>
-    <p id="history-empty" class="empty-note" hidden>這一天沒有可顯示的已結束直播，或歷史資料尚未接入。</p>
-   </section>
-   <nav class="history-shortcuts" id="history-pagination" aria-label="歷史直播分頁"></nav>
-  </div>
-  <div class="multi-select-bar" id="historyMultiSelectBar" hidden aria-live="polite"><span id="historyMultiSelectCount">已選 0 個影片</span><button type="button" id="historyMultiClear">清除</button><button type="button" id="historyMultiWatch">開始觀看</button></div>
- </section>
+ <div id="historyDynamic">
+ <div class="page-head"><div><h1>歷史直播</h1><p>依直播開始日期瀏覽最近 30 天的已結束影片。</p></div></div>
+ <form id="history-picker" class="history-picker"><label for="history-day">選擇日期</label><input id="history-day" name="date" type="date" required><button class="primary-action" type="submit">查看</button></form>
+ <div id="history-shortcuts" class="history-shortcuts"></div>
+ <p id="history-error" class="form-error" hidden></p>
+ <section class="section"><div class="section-head"><div><h2 id="history-heading"></h2></div></div><div id="history-list" class="client-grid"></div><p id="history-empty" class="empty-note" hidden>這一天沒有可顯示的已結束直播，或歷史資料尚未接入。</p></section>
+ <nav class="history-shortcuts" aria-label="歷史直播分頁"><a href="#" id="history-prev" class="subtle-action" hidden>上一頁</a><a href="#" id="history-next" class="subtle-action" hidden>下一頁</a></nav>
+ </div></section>
  <section id="ptt" class="page"><div class="page-head"><div><h1>PTT 今日專串</h1><p>即時專串與歷史推文</p></div></div><div id="ptt-status"></div><div id="ptt-list" class="pushes"></div></section>
  <section id="watchalong" class="page"><div class="page-head"><div><h1>同時視聽</h1><p>影片與推文同步觀看</p></div></div><div class="entry"><input id="watch-url" aria-label="同時視聽影片網址" placeholder="YouTube 影片網址或 ID"><button id="watch-add">開啟影片</button></div><div id="watch-player" class="player-area"></div><div id="watch-status" class="notice">PTT 時間對齊、Playlist、A/B 字幕仍待正式 API 接線，不顯示偽造資料。</div></section>
  <footer>非官方粉絲專案 · 與 COVER Corp.、YouTube 無從屬關係</footer></main>
