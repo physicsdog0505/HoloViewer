@@ -1,7 +1,7 @@
 'use strict';
 const config=window.HOLOVIEWER_CONFIG||{};
 const $=id=>document.getElementById(id);
-const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'歷史直播',ptt:'PTT 今日專串',watchalong:'同時視聽','custom-session':'自訂觀看','ptt-focus':'PTT 今日專串'};
+const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'歷史直播',ptt:'PTT 今日專串',watchalong:'同時視聽','custom-session':'自訂觀看','ptt-focus':'PTT 今日專串','multi-session':'多人連動'};
 const stored=(()=>{try{return JSON.parse(sessionStorage.getItem('hvMulti')||'[]')}catch{return []}})();
 const state={multi:Array.isArray(stored)?stored.filter(x=>typeof x==='string'&&/^[\w-]{11}$/.test(x)).slice(0,12):[],offset:0};
 function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el}
@@ -14,7 +14,7 @@ function route(r){
  if(!names[r])r='home';
  const pageId=r==='ptt-focus'?'ptt':r;
  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id===pageId));
- const activeNav=r==='custom-session'?'single':pageId;
+ const activeNav=r==='custom-session'?'single':r==='multi-session'?'multi':pageId;
  document.querySelectorAll('[data-route]').forEach(el=>el.classList.toggle('active',el.dataset.route===activeNav));
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
  $('page-title').textContent=names[r];$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
@@ -28,9 +28,10 @@ function route(r){
  if(r==='history')loadHistory();
  if(r==='ptt'||r==='ptt-focus')loadPtt();
  if(r==='single')loadCustomLibrary();
+ if(r==='multi')loadCollab();
 }
 async function api(path){if(!config.apiBase||!/^https:\/\//.test(config.apiBase))throw Error('尚未設定正式 Worker API');const base=config.apiBase.replace(/\/$/,'');const response=await fetch(base+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}});if(!response.ok)throw Error('API HTTP '+response.status);return response.json()}
-function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>{window.hvOpenCustomSession?.([item.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};card.append(btn);card.append(' ');const multi=node('button','加入多人','secondary');multi.onclick=()=>{if(!state.multi.includes(item.video_id)&&state.multi.length<12)state.multi.push(item.video_id);renderMulti();route('multi')};card.append(multi);container.append(card)}
+function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>{window.hvOpenCustomSession?.([item.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};card.append(btn);card.append(' ');const multi=node('button','加入多人','secondary');multi.onclick=()=>{if(!state.multi.includes(item.video_id)&&state.multi.length<12)state.multi.push(item.video_id);renderMulti();route('multi-session')};card.append(multi);container.append(card)}
 const HOME_FILTER_KEY='holoviewer-live-filter';
 const HOME_FILTERS=new Set(['hololive','holostars','mekpark','all']);
 const selectedHomeVideos=new Set();
@@ -119,6 +120,84 @@ async function loadHistory(){
   if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
  }catch(e){error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false}
 }
+const COLLAB_STOPWORDS=new Set(['hololive','ホロライブ','live','配信','初見','雑談','vtuber','ホロドリ','holodream','コラボ','collab']);
+function collabTime(item){
+ const value=item.start_at||item.actual_start_at||item.scheduled_start_at||'';
+ const stamp=Date.parse(String(value));return Number.isFinite(stamp)?stamp:null;
+}
+function collabState(item){const state=String(item.lifecycle_state||item.state||'unknown').toLowerCase();return state==='waiting'?'upcoming':state}
+function collabTokens(item){
+ const raw=(String(item.title||'')+' '+String(item.source_label||'')).toLowerCase();
+ return new Set((raw.match(/[a-z0-9]{4,}|[ァ-ヶー]{4,}|[一-龠]{3,}/g)||[]).filter(x=>!COLLAB_STOPWORDS.has(x)));
+}
+function collabGroups(rows){
+ const usable=rows.filter(x=>/^[A-Za-z0-9_-]{11}$/.test(String(x.video_id||''))&&['live','upcoming','ended'].includes(collabState(x))&&collabTime(x)!==null);
+ const explicit=new Map(),claimed=new Set(),events=[];
+ for(const item of usable){
+  const title=String(item.title||'')+' '+String(item.source_label||'');
+  if(!(/(?<![a-z])ARK(?![a-z])|ホロARK|ロゼキャンARK|ホロ鯖ARK/i.test(title)&&/#?ホロARK|ホロ鯖ARK|ロゼキャンARK/i.test(title)))continue;
+  const t=collabTime(item)-21600000;
+  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t));
+  if(!explicit.has(day))explicit.set(day,[]);explicit.get(day).push(item);
+ }
+ for(const items of explicit.values()){
+  const distinct=new Map(items.map(x=>[x.channel_id||x.channel_name||x.channel_title||x.video_id,x]));
+  if(distinct.size>1){const group=[...distinct.values()];events.push({label:'ホロARK · 多人連動候選',confidence:'candidate',members:group});group.forEach(x=>claimed.add(x.video_id))}
+ }
+ const rest=usable.filter(x=>!claimed.has(x.video_id)),components=[];
+ for(let i=0;i<rest.length;i++){
+  const left=rest[i],channel=left.channel_id||left.channel_name||left.channel_title;
+  if(!channel)continue;
+  for(let j=i+1;j<rest.length;j++){
+   const right=rest[j],other=right.channel_id||right.channel_name||right.channel_title;
+   if(!other||channel===other||Math.abs(collabTime(left)-collabTime(right))>1200000)continue;
+   const tokens=collabTokens(left),shared=[...collabTokens(right)].some(x=>tokens.has(x));if(!shared)continue;
+   const pair=new Set([left.video_id,right.video_id]);const overlap=components.filter(group=>[...pair].some(id=>group.has(id)));
+   for(const group of overlap){group.forEach(id=>pair.add(id));components.splice(components.indexOf(group),1)}
+   components.push(pair);
+  }
+ }
+ for(const group of components){const members=rest.filter(x=>group.has(x.video_id));if(members.length>1)events.push({label:'多人連動',confidence:'shared-topic',members})}
+ return events.sort((a,b)=>{
+  const weight=e=>e.members.some(x=>collabState(x)==='live')?2:e.members.some(x=>collabState(x)==='upcoming')?1:0;
+  return weight(b)-weight(a)||Math.max(...b.members.map(collabTime))-Math.max(...a.members.map(collabTime));
+ });
+}
+function collabCard(event,container){
+ const members=event.members;const first=members[0];if(!first)return;
+ const states=members.map(collabState);const state=states.includes('live')?'live':states.includes('upcoming')?'upcoming':'ended';
+ const t=Math.max(...members.map(collabTime)),date=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t));
+ const link=node('a',undefined,'collab-event-card '+state);link.href='/collab/session?'+members.map(x=>'stream='+encodeURIComponent(x.video_id)).join('&');link.dataset.eventDate=date;
+ const thumb=node('div',undefined,'collab-event-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+first.video_id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
+ const yt=node('span','YouTube ↗','youtube-source-link');yt.setAttribute('role','link');yt.tabIndex=0;yt.dataset.youtubeHref='https://www.youtube.com/watch?v='+first.video_id;thumb.append(yt);thumb.append(node('span',state==='live'?'LIVE':state==='upcoming'?'稍後':'已結束','status-pill '+state));link.append(thumb);
+ const copy=node('div',undefined,'collab-event-copy');const kicker=node('div',undefined,'collab-event-kicker');kicker.append(node('span',date),node('span',event.confidence));copy.append(kicker);copy.append(node('h3',event.label.replace('候選','').trim()));
+ const avatars=node('div',undefined,'collab-avatars');const seen=new Set();
+ for(const item of members){const channel=item.channel_id||item.channel_name||item.channel_title||item.video_id;if(seen.has(channel))continue;seen.add(channel);
+  const name=String(item.channel_name||item.channel_title||'Hololive'),avatar=node('span',undefined,'collab-avatar');avatar.title=name;
+  const avatarUrl=String(item.avatar_url||'');if(/^https:\/\/(yt3\.ggpht\.com|i\.ytimg\.com)\//.test(avatarUrl)){const image=node('img');image.src=avatarUrl;image.alt=name;image.loading='lazy';avatar.append(image)}else avatar.append(node('span',([...name].find(ch=>/[a-zA-Z0-9]/.test(ch))||'H').toUpperCase()));avatars.append(avatar)}
+ copy.append(avatars);
+ const stats=[['live','直播中'],['upcoming','稍後開始'],['ended','已結束']].map(([key,label])=>[states.filter(x=>x===key).length,label]).filter(([count])=>count).map(([count,label])=>count+' 個'+label);
+ copy.append(node('p',members.length+' 個 POV'+(stats.length?' · '+stats.join(' · '):'')+' · 進入多人連動畫面'));link.append(copy);
+ link.addEventListener('click',e=>{const src=e.target.closest('[data-youtube-href]');e.preventDefault();if(src){e.stopPropagation();window.open(src.dataset.youtubeHref,'_blank','noopener,noreferrer');return}
+  state.multi=members.map(x=>x.video_id);renderMulti();route('multi-session')
+ });
+ container.append(link);
+}
+async function loadCollab(){
+ const box=$('collab-sections');box.replaceChildren();$('collab-empty').hidden=false;
+ try{
+  if(customCatalogCache===null){const data=await api('/v1/catalog/today');if(!Array.isArray(data.streams||data.items))throw Error('資料格式錯誤');customCatalogCache=data.streams||data.items}
+  const groups=collabGroups(customCatalogCache);
+  $('collab-empty').hidden=groups.length>0;
+  if(!groups.length)return;
+  for(const [state,heading] of [['live','現在直播中'],['upcoming','稍後'],['ended','過去連動']]){
+   const matches=groups.filter(e=>e.members.some(x=>collabState(x)==='live')?(state==='live'):e.members.some(x=>collabState(x)==='upcoming')?state==='upcoming':state==='ended');
+   if(!matches.length)continue;
+   const section=node('section',undefined,'section collab-hub-section');const head=node('div',undefined,'section-head');const wrap=node('div');wrap.append(node('h2',heading));head.append(wrap);section.append(head);
+   const grid=node('div',undefined,'collab-event-grid');matches.forEach(item=>collabCard(item,grid));section.append(grid);box.append(section);
+  }
+ }catch(e){$('collab-empty').textContent='無法讀取公開多人連動資料：'+e.message}
+}
 async function loadPtt(){
  const today=taipeiDay();$('ptt-today-meta').textContent=today.replaceAll('-','/')+' · 推文資料尚未接通 · 純 PTT 閱讀';
  $('ptt-list').hidden=true;
@@ -128,7 +207,7 @@ async function loadPtt(){
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids.slice(0,12);renderMulti();route('multi')}};
+$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids.slice(0,12);renderMulti();route('multi-session')}};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids.slice(0,12);renderMulti();route('multi')}};
 $('ptt-refresh').onclick=event=>{event.preventDefault();loadPtt()};
