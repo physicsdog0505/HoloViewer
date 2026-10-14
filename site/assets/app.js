@@ -354,12 +354,66 @@ function sessionMute(iframe,mute){
 }
 const viewing={ids:[],layout:'auto',primary:0,audio:0};
 const viewerPttPanel=$('custom-session-ptt-panel');
+// 4174 watching controls — preserve mounted YouTube iframe instances.
+let watchMode='single';
+function refreshWatchMode(){
+ const single=watchMode==='single';
+ $('watchSingleMode').setAttribute('aria-pressed',String(single));
+ $('watchMultiMode').setAttribute('aria-pressed',String(!single));
+ $('watchModeToggle').setAttribute('aria-checked',String(!single));
+ document.body.classList.toggle('watch-multi',!single);
+}
+function setWatchMode(next){watchMode=next;refreshWatchMode();$('session-status').textContent=next==='single'?'已切換至單人模式：點頭像替換直播':'已切換至多人模式：點頭像新增視角'}
+$('watchSingleMode').onclick=()=>setWatchMode('single');
+$('watchMultiMode').onclick=()=>setWatchMode('multi');
+$('watchModeToggle').onclick=()=>setWatchMode(watchMode==='single'?'multi':'single');
+$('watchSettings').onclick=()=>{
+ const open=document.body.classList.toggle('settings-open');
+ $('watchSettings').setAttribute('aria-expanded',String(open));
+};
+$('watchImmersive').onclick=()=>$('customImmerse').click();
+function syncWatchImmersive(){
+ $('watchImmersive').textContent=document.body.classList.contains('custom-immersive')?'退出沉浸模式':'沉浸模式';
+}
+new MutationObserver(syncWatchImmersive).observe(document.body,{attributes:true,attributeFilter:['class']});
+function youtubeCommand(iframe,command,args=[]){
+ // YouTube documented iframe postMessage player API: no iframe recreation.
+ if(!iframe?.contentWindow)return;
+ iframe.contentWindow.postMessage(JSON.stringify({event:'command',func:command,args}),'https://www.youtube-nocookie.com');
+}
+function globalVolume(value){
+ const volume=Math.max(0,Math.min(100,Number(value)||0));
+ $('globalVolume').value=String(volume);$('immersiveGlobalVolume').value=String(volume);
+ $('globalVolumeValue').textContent=volume+'%';$('immersiveGlobalVolumeValue').textContent=volume+'%';
+ $('stage').querySelectorAll('iframe').forEach(iframe=>youtubeCommand(iframe,'setVolume',[volume]));
+}
+$('globalVolume').oninput=event=>globalVolume(event.target.value);
+$('immersiveGlobalVolume').oninput=event=>globalVolume(event.target.value);
+$('playAll').onclick=()=>$('stage').querySelectorAll('iframe').forEach(iframe=>youtubeCommand(iframe,'playVideo'));
+$('pauseAll').onclick=()=>$('stage').querySelectorAll('iframe').forEach(iframe=>youtubeCommand(iframe,'pauseVideo'));
+$('videoHeight').oninput=event=>{
+ const px=Math.max(360,Math.min(1000,Number(event.target.value)||1000));
+ document.querySelector('.custom-player-column').style.setProperty('--custom-video-height',px+'px');
+ $('videoHeightValue').textContent=px+'px';
+};
+$('audioFollowFocus').onchange=()=>{if($('audioFollowFocus').checked){viewing.audio=viewing.primary;sessionAudio()}};
+function renderFocusChoices(){
+ const box=$('focusChoices');box.replaceChildren();
+ viewing.ids.forEach((id,index)=>{
+  const button=node('button','Focus '+String.fromCharCode(65+index));button.type='button';
+  button.dataset.focusIndex=String(index);button.classList.toggle('active',index===viewing.primary);
+  button.onclick=()=>{viewing.primary=index;if($('audioFollowFocus').checked){viewing.audio=index;sessionAudio()}sessionLayout()};
+  box.append(button);
+ });
+}
+
 function sessionLayout(){
  const stage=$('stage');const n=viewing.ids.length;
  stage.style.setProperty('--columns',String(viewing.layout==='equal'?Math.max(1,Math.ceil(Math.sqrt(n))):viewing.layout==='primary'&&n>1?2:Math.max(1,Math.ceil(Math.sqrt(n)))));
  document.body.classList.toggle('layout-primary',viewing.layout==='primary'&&$('custom-session').classList.contains('active'));
  stage.querySelectorAll('.player-card').forEach((el,i)=>el.classList.toggle('primary',i===viewing.primary));
  document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.classList.toggle('active',btn.dataset.sessionLayout===viewing.layout));
+ $('focusChoices').querySelectorAll('[data-focus-index]').forEach(btn=>btn.classList.toggle('active',Number(btn.dataset.focusIndex)===viewing.primary));
 }
 function sessionAudio(){
  const sel=$('session-audio');sel.value=String(viewing.audio);
@@ -394,7 +448,8 @@ window.hvOpenCustomSession=function(ids,opts={}){
   viewerPttPanel.remove();
  }
  $('session-status').textContent=clean.length+' 個影片';
- route('custom-session');sessionLayout();sessionAudio();
+ watchMode=clean.length>1?'multi':'single';refreshWatchMode();
+ renderFocusChoices();route('custom-session');sessionLayout();sessionAudio();globalVolume($('globalVolume').value);
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
