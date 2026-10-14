@@ -1,0 +1,35 @@
+name: Deploy HoloViewer Cloudflare production
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY to update holoviewer-public production Worker"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: holoviewer-production-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event.inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: cloudflare-production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production asset inputs
+        run: |
+          test -s site/index.html
+          test -s site/assets/app.js
+          test -s site/assets/app.css
+          test -s site/assets/config.js
+          grep -F 'https://holoviewer-public-api.singlebagel.workers.dev' site/assets/config.js
+          ! grep -R -E 'http://(localhost|127\.0\.0\.1)' site || exit 1
+      - name: Deploy static assets to existing production Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare
+          command: deploy
