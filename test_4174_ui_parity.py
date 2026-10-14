@@ -107,6 +107,19 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('addEventListener', route_body)
         self.assertNotIn("multiWatch').onclick", route_body)
 
+    def test_ptt_reader_preserves_4174_shell_without_fake_data(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        for item in ('class="ptt-shell"', 'class="ptt-toolbar"', 'class="ptt-reader"',
+                     'id="ptt-today-meta"', 'id="ptt-refresh"', 'id="ptt-focus"'):
+            self.assertIn(item, html)
+        self.assertIn('.ptt-reader{border:1px solid var(--line)', css)
+        self.assertIn('ptt-focus-mode', css)
+        self.assertIn('document.body.classList.toggle(\'ptt-focus-mode\'', js)
+        self.assertIn('目前尚未接通經過驗證的公開 PTT 專串資料。', js)
+        self.assertNotIn("message('ptt-status'", js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
