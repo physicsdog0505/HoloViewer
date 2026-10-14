@@ -243,6 +243,12 @@ class ParityContract(unittest.TestCase):
         self.assertIn("iframe.src='https://www.youtube-nocookie.com/embed/'",js)
         self.assertNotIn("route('multi')",js)
 
+    def test_no_public_only_multiview_limit(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertNotIn('state.multi.length<12',js)
+        self.assertNotIn('.slice(0,12)',js)
+        self.assertIn('viewing.ids.push(id)',js)
+
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
