@@ -48,12 +48,60 @@ function homeSelection(){
   $(bar).hidden=!count;$(countEl).textContent='已選 '+count+' 個影片';$(watch).textContent=count>1?'開始多視角觀看':'觀看選取影片';
  }
 }
+
+/* Fallback member accents from pinned 4174 client_home._CHANNEL_ACCENT_RULES.
+   Audited member-ID palette should override when the reviewed Public schema exists. */
+const HOME_CHANNEL_ACCENTS=[
+ [["ロボ子", "ROBOCO"], '#d85a8a'],
+ [["ときのそら", "TOKINO SORA"], '#397fc4'],
+ [["AZKI",], '#c94a52'],
+ [["さくらみこ", "SAKURA MIKO"], '#dc6f9f'],
+ [["アキ・ローゼンタール", "AKI ROSENTHAL"], '#69a56f'],
+ [["白上フブキ", "SHIRAKAMI FUBUKI"], '#4b97c8'],
+ [["夏色まつり", "NATSUIRO MATSURI"], '#d87932'],
+ [["百鬼あやめ", "NAKIRI AYAME"], '#c84b55'],
+ [["癒月ちょこ", "YUZUKI CHOCO", "CHOCO CH."], '#d85a8a'],
+ [["大空スバル", "OOZORA SUBARU"], '#a68118'],
+ [["大神ミオ", "OOKAMI MIO"], '#69a56f'],
+ [["兎田ぺこら", "USADA PEKORA"], '#4b97c8'],
+ [["不知火フレア", "SHIRANUI FLARE"], '#d87932'],
+ [["白銀ノエル", "SHIROGANE NOEL"], '#7d7d7d'],
+ [["宝鐘マリン", "HOUSHOU MARINE"], '#c84b55'],
+ [["天音かなた", "AMANE KANATA"], '#4b97c8'],
+ [["常闇トワ", "TOKOYAMI TOWA"], '#7751a8'],
+ [["雪花ラミィ", "YUKIHANA LAMY"], '#4b97c8'],
+ [["獅白ぼたん", "SHISHIRO BOTAN"], '#7d7d7d'],
+ [["尾丸ポルカ", "OMARU POLKA"], '#c84b55']
+];
+function homeChannelAccent(item){
+ const audited=String(item.member_accent||'');
+ if(/^#[0-9a-fA-F]{6}$/.test(audited))return audited;
+ const title=String(item.channel_title||item.channel_name||'').toUpperCase();
+ for(const [needles,accent] of HOME_CHANNEL_ACCENTS)if(needles.some(word=>title.includes(word.toUpperCase())))return accent;
+ return '';
+}
+function homeAvatarUrl(item){
+ const raw=String(item.avatar_url||'');
+ try{
+  const u=new URL(raw);
+  if(u.protocol!=='https:'||u.username||u.password||u.port)return '';
+  return ['yt3.ggpht.com','i.ytimg.com'].includes(u.hostname)?u.href:'';
+ }catch{return ''}
+}
+function homeAvatarChild(item,name){
+ const url=homeAvatarUrl(item);
+ if(url){const img=node('img',undefined,'channel-avatar-img');img.src=url;img.alt='';img.loading='lazy';return img}
+ const first=[...name].find(c=>/[a-zA-Z0-9]/.test(c))||'H';
+ return node('span',first.toUpperCase(),'channel-avatar-fallback');
+}
+
 function homeCard(item,container){
  if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
  const id=item.video_id;const lifecycle=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
  const group=String(item.group||item.channel_group||'other').toLowerCase();
  const href='/custom-view/session?stream='+encodeURIComponent(id)+'&layout=auto&primary=0&audio=0';
  const card=node('a',undefined,'client-card stream-card');card.href=href;card.dataset.group=group;card.id='stream-'+id;
+ const accent=homeChannelAccent(item);if(accent)card.style.setProperty('--member-accent',accent);
  const states={live:['LIVE','live'],waiting:['等待中','upcoming'],upcoming:['即將開始','upcoming'],ended:['已結束','ended'],unknown:['狀態待更新',''],stale:['狀態待更新','']};
  const status=states[lifecycle]||states.unknown;
  if(['live','waiting','upcoming','ended'].includes(lifecycle)){card.dataset.multiviewId=id;card.setAttribute('aria-selected','false')}
@@ -61,8 +109,8 @@ function homeCard(item,container){
  const youTube=node('span','YouTube ↗','youtube-source-link');youTube.role='link';youTube.tabIndex=0;youTube.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;thumb.append(youTube);
  const overlay=node('div',undefined,'thumb-overlay');overlay.append(node('span',status[0],'thumb-badge '+status[1]));
  const time=String(item.start_label||item.start_time_label||'');overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
- const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');const first=[...name].find(c=>/[a-zA-Z0-9]/.test(c))||'H';
- ring.append(node('span',first.toUpperCase(),'channel-avatar-fallback'));meta.append(ring);
+ const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
+ ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
  card.addEventListener('click',event=>{
   const source=event.target.closest('[data-youtube-href]');
@@ -76,7 +124,9 @@ function homeCard(item,container){
 function homeRail(items){const box=$('live-channel-list');box.replaceChildren();const seen=new Set();
  items.forEach(item=>{const id=item.video_id;if(!/^[A-Za-z0-9_-]{11}$/.test(id||''))return;const key=item.channel_id||item.channel_name||item.channel_title||id;if(seen.has(key))return;seen.add(key);
  const link=node('a',undefined,'live-channel-rail-item');link.href='#stream-'+id;link.dataset.group=String(item.group||item.channel_group||'other').toLowerCase();
- const avatar=node('span',undefined,'live-channel-avatar');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');avatar.append(node('span',([...name].find(c=>/[a-zA-Z0-9]/.test(c))||'H').toUpperCase()));avatar.append(node('i'));link.append(avatar);link.append(node('strong',name));
+ const avatar=node('span',undefined,'live-channel-avatar');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
+ const accent=homeChannelAccent(item);if(accent)link.style.setProperty('--member-accent',accent);
+ const avatarNode=homeAvatarChild(item,name);if(!avatarNode.matches('img'))avatarNode.className='';avatar.append(avatarNode);avatar.append(node('i'));link.append(avatar);link.append(node('strong',name));
  link.onclick=event=>{event.preventDefault();const card=$('stream-'+id);card?.scrollIntoView({block:'center',behavior:'smooth'})};box.append(link)});
  $('live-channel-rail').hidden=!box.children.length||!$('home').classList.contains('active');
 }
