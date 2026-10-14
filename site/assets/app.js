@@ -433,8 +433,8 @@ function linkedPlayPause(event){
  if(data?.event==='infoDelivery'&&source&&data.info&&typeof data.info==='object'){
   const previous=viewerTimeline.get(source)||{};
   viewerTimeline.set(source,{
-   currentTime:Number.isFinite(Number(data.info.currentTime))?Number(data.info.currentTime):previous.currentTime,
-   duration:Number.isFinite(Number(data.info.duration))?Number(data.info.duration):previous.duration
+   currentTime:typeof data.info.currentTime==='number'&&Number.isFinite(data.info.currentTime)?data.info.currentTime:previous.currentTime,
+   duration:typeof data.info.duration==='number'&&Number.isFinite(data.info.duration)?data.info.duration:previous.duration
   });
   return;
  }
@@ -573,6 +573,7 @@ function selectWatchRailVideo(id,title){
  const card=$('stage').querySelectorAll('.player-card')[index];if(!card)return;
  const iframe=card.querySelector('iframe');if(!iframe)return;
  // Only the replaced player may navigate. Other iframes stay mounted and playing.
+ viewerTimeline.delete(iframe);
  iframe.src=youtubeEmbedUrl(id);
  card.querySelector('.player-label').textContent=title;
  card.querySelector('.player-youtube-link').href='https://www.youtube.com/watch?v='+id;
@@ -614,7 +615,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
  viewing.ids=clean;viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
  viewing.primary=Math.max(0,Math.min(clean.length-1,Number(opts.primary)||0));
  viewing.audio=Math.max(0,Math.min(clean.length-1,Number(opts.audio)||0));
- const box=$('stage');box.replaceChildren();const audio=$('session-audio');audio.replaceChildren();
+ const box=$('stage');viewerTimeline.clear();box.replaceChildren();const audio=$('session-audio');audio.replaceChildren();
  clean.forEach((id,i)=>{
   box.append(makeWatchCard(id,i));
   const option=node('option',String(i+1)+' · '+id);option.value=String(i);audio.append(option);
