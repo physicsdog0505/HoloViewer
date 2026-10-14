@@ -1560,3 +1560,21 @@ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-
  }
 }
 
+
+/* Immersive overrides must win over later watching-shell !important rules. */
+body.custom-session-watching.custom-immersive .client-rail,
+body.custom-session-watching.custom-immersive .live-channel-rail,
+body.custom-session-watching.custom-immersive .client-topbar,
+body.custom-session-watching.custom-immersive .watch-actions,
+body.custom-session-watching.custom-immersive .player-toolbar{display:none!important}
+body.custom-session-watching.custom-immersive .client-main{
+ box-sizing:border-box!important;margin:0!important;width:100vw!important;
+ max-width:none!important;padding:0!important
+}
+body.custom-session-watching.custom-immersive .viewer-workspace{width:100%!important;min-height:100dvh}
+#immersiveExit{display:none}
+body.custom-session-watching.custom-immersive #immersiveExit{
+ display:block;position:fixed;top:12px;right:12px;z-index:150;
+ padding:8px 12px;border-radius:8px;border:1px solid #555;
+ background:rgba(12,12,12,.8);color:#fff;cursor:pointer
+}

@@ -41,6 +41,8 @@ function applyViewerImmersive(enabled){
  const button=$('customImmerse');button.setAttribute('aria-pressed',String(enabled));
  button.textContent=enabled?'退出沉浸模式':'沉浸模式';
 }
+$('immersiveExit').onclick=()=>$('customImmerse').click();
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('custom-immersive')&&!document.fullscreenElement)applyViewerImmersive(false)});
 document.addEventListener('fullscreenchange',()=>{
  if(!document.fullscreenElement)applyViewerImmersive(false);
 });
@@ -59,6 +61,12 @@ $('customImmerse').addEventListener('click',async()=>{
 
 function route(r){
  if(!names[r])r='home';
+ // A viewing route without mounted players must never display an empty workspace.
+ if(r==='custom-session'&&!viewing.ids.length){
+  let recoverable=false;
+  try{const saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null');recoverable=Array.isArray(saved?.ids)&&saved.ids.some(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id));}catch{}
+  if(!recoverable)r='single';
+ }
  const pageId=r==='ptt-focus'?'ptt':r;
  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id===pageId));
  const activeNav=r==='custom-session'?'single':pageId;
@@ -602,6 +610,7 @@ function sessionAudio(){
 window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
+ try{sessionStorage.setItem('hvCustomViewing',JSON.stringify({ids:clean,layout:opts.layout||'auto',ptt:opts.ptt||'video',primary:opts.primary||0,audio:opts.audio||0}));}catch{}
  stopFocusCarousel();
  verifiedTimelineStarts=new Map();
  const timeline=opts.verifiedTimelineStarts;
@@ -826,4 +835,14 @@ watchForm.addEventListener('submit',event=>{
  }
  error.textContent='4174 同時視聽播放器的同步與對齊引擎尚未移植完成，因此這個版本暫不啟動未驗證的同步播放。';error.hidden=false;
 });
+})();
+
+// Recover the last explicitly opened session after a tab reload/deep link.
+// Without saved valid IDs, route to selection rather than an empty player shell.
+(function restoreCustomSession(){
+ if(location.hash!=='#custom-session')return;
+ let saved=null;try{saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null')}catch{}
+ const ids=Array.isArray(saved?.ids)?saved.ids.filter(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id)):[];
+ if(!ids.length){route('single');return;}
+ window.hvOpenCustomSession(ids,{layout:saved.layout,ptt:saved.ptt,primary:saved.primary,audio:saved.audio});
 })();
