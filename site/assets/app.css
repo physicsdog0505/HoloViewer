@@ -355,3 +355,32 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 @media(max-width:1040px){.collab-event-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.collab-event-card{grid-template-columns:1fr}.collab-event-thumb{min-height:0;aspect-ratio:16/9}}
 
+
+/* Verbatim accepted 4174 LIVE_RAIL_CSS from client_ui_shell.py, pinned cab0adb51. */
+.live-channel-rail{
+  position:fixed;left:2px;top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px);
+  display:flex;flex-direction:column;gap:8px;padding:8px 0;overflow-x:hidden;overflow-y:auto;
+  background:rgba(255,253,250,.98);border-radius:14px;scrollbar-width:none;
+  transition:width .16s ease,box-shadow .16s ease
+}
+.live-channel-rail::-webkit-scrollbar{display:none}
+.live-channel-label{display:none;padding:2px 10px 5px;color:var(--muted);font-size:11px;font-weight:800;white-space:nowrap}
+.live-channel-rail:hover,.live-channel-rail:focus-within{width:222px;box-shadow:8px 8px 24px rgba(52,44,36,.09)}
+.live-channel-rail:hover .live-channel-label,.live-channel-rail:focus-within .live-channel-label{display:block}
+.live-channel-rail-item{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:8px;min-height:56px;padding:2px 4px;border-radius:10px;color:var(--member-accent,var(--text));font-size:12px}
+.live-channel-rail-item:hover,.live-channel-rail-item:focus-visible{background:color-mix(in srgb,var(--member-accent,#7aa8bb) 7%,white);outline:none}
+.live-channel-rail-item[hidden]{display:none!important}
+.live-channel-rail-item strong{opacity:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:color-mix(in srgb,var(--member-accent,var(--text)) 62%,#25232a)}
+.live-channel-rail:hover .live-channel-rail-item strong,.live-channel-rail:focus-within .live-channel-rail-item strong{opacity:1}
+.live-channel-avatar{position:relative;width:52px;height:52px;flex:0 0 52px;border-radius:50%;display:grid;place-items:center;background:white;border:2px solid var(--member-accent,#9ab8c4);color:var(--member-accent,#4f7f93);font-size:9px;font-weight:800}
+.live-channel-avatar img,.live-channel-avatar>span{width:100%;height:100%;border-radius:50%;object-fit:cover;display:grid;place-items:center;overflow:hidden}
+.live-channel-avatar i{position:absolute;right:-2px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:#e6213c;border:2px solid white}
+@media(min-width:761px){
+  body:has(.client-rail:hover) .live-channel-rail,body:has(.client-rail:focus-within) .live-channel-rail{width:222px}
+  body:has(.client-rail:hover) .live-channel-rail-item strong,body:has(.client-rail:focus-within) .live-channel-rail-item strong{opacity:1}
+  body:has(.client-rail:hover) .live-channel-label,body:has(.client-rail:focus-within) .live-channel-label{display:block}
+}
+@media(max-width:760px){.live-channel-rail{display:none}}
+[data-support-mode="dual_color"] .live-channel-avatar{background:var(--member-accent-dual)!important;border-color:transparent!important;padding:3px}
+
+.live-channel-rail[hidden]{display:none!important}
