@@ -82,12 +82,13 @@ test('remote failure after mutation attempt forces STOP without retry',()=>{
 test('existing PTT migration aborts before any write',()=>{
  const plan=planMigration();
  const existing=['public_catalog','public_history','public_today_schema_migrations',
-   'd1_migrations','ptt_threads','ptt_pushes','ptt_source_evidence',
+   'd1_migrations','public_ptt_migration_receipts','ptt_threads','ptt_pushes','ptt_source_evidence',
    'ptt_provider_state','ptt_gap_repairs','public_ptt_schema_migrations'];
  let writes=0;
  const exec=(args)=>{
   if(args[0]==='whoami')return ACCOUNT;
   if(args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply'){writes++;throw Error('must not happen')}
+  if(String(args.at(-1)).includes('FROM public_ptt_migration_receipts'))return JSON.stringify([{success:true,results:[{version:1,source_sha256:plan.sha256}]}]);
   if(String(args.at(-1)).includes('FROM d1_migrations'))return JSON.stringify([{success:true,results:[{name:'0001_today_canonical.sql'},{name:'0002_canonical_ptt.sql'}]}]);
   if(String(args.at(-1)).includes('SELECT version,description'))
     return JSON.stringify([{success:true,results:[{version:1,description:'ptt'}]}]);
@@ -105,5 +106,5 @@ test('checksum receipt belongs to same migration and rejects mismatches',()=>{
  assert.match(sql,/public_ptt_migration_receipts/);
  assert.match(sql,new RegExp(expected));
  assert.equal(verifyReceipt([{version:1,source_sha256:expected}],expected),true);
- assert.throws(()=>verifyReceipt([{version:1,source_sha256:'0'.repeat(64)}],expected),/checksum receipt mismatch/);
+ assert.throws(()=>verifyReceipt([{version:1,source_sha256:'0'.repeat(64)}],expected),/migration receipt mismatch/);
 });
