@@ -2,6 +2,7 @@
  * Inject fetchFeed and durable D1 queue. Does not touch YouTube search.list.
  */
 import {persistEvent} from './websub-store.mjs';
+import {nextReconcileWindow,commitReconcileWindow} from './websub-hardening.mjs';
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/,VIDEO=/^[A-Za-z0-9_-]{11}$/;
 function entries(xml){
  if(typeof xml!=='string'||xml.length>262144||/<!DOCTYPE|<!ENTITY/i.test(xml))throw Error('invalid feed');
@@ -17,7 +18,8 @@ function entries(xml){
 export async function reconcileAtomFeeds({db,roster,fetchFeed,now=new Date(),maxChannels=3}={}){
  if(!db?.prepare||typeof fetchFeed!=='function'||!roster?.version||!Array.isArray(roster.channels)
    ||!Number.isInteger(maxChannels)||maxChannels<1||maxChannels>10)throw Error('invalid feed reconciliation');
- const channels=roster.channels.slice(0,maxChannels),ids=new Set(),record={channels:0,discovered:0,failed:0,more_channels:roster.channels.length>maxChannels};
+ const window=await nextReconcileWindow(db,roster,{now,limit:maxChannels});
+ const channels=window.selected,ids=new Set(),record={channels:0,discovered:0,failed:0,more_channels:roster.channels.length>maxChannels};
  for(const channel of channels){
   if(!CHANNEL.test(channel.id)||ids.has(channel.id))throw Error('bad approved channel');
   ids.add(channel.id);
@@ -35,5 +37,6 @@ export async function reconcileAtomFeeds({db,roster,fetchFeed,now=new Date(),max
    record.channels++;
   }catch(error){record.failed++;break;}
  }
+ if(!record.failed)await commitReconcileWindow(db,window);
  return {...record,status:record.failed?'STOP_REVIEW':'PARTIAL_DISCOVERY',gap:true};
 }
