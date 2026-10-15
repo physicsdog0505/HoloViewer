@@ -1,9 +1,23 @@
 import unittest
 from unittest.mock import patch
 from contextlib import nullcontext
-from ptt_offline.recurring_publisher import run_snapshot
+from ptt_offline.recurring_publisher import run_snapshot,snapshot_interval,seconds_until_next_snapshot
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 class RecurringPublisherTests(unittest.TestCase):
+    def test_taipei_overnight_snapshot_boundaries(self):
+        tpe=ZoneInfo("Asia/Taipei")
+        for hour,minute,seconds,expected in [
+            (1,59,0,60),(2,0,0,600),(2,1,0,600),
+            (6,59,0,600),(7,0,0,60),(23,59,0,60)]:
+            with self.subTest(hour=hour,minute=minute):
+                at=datetime(2026,10,16,hour,minute,seconds,tzinfo=tpe)
+                self.assertEqual(snapshot_interval(at),expected)
+        self.assertEqual(seconds_until_next_snapshot(datetime(2026,10,16,1,59,30,tzinfo=tpe)),30)
+        self.assertEqual(seconds_until_next_snapshot(datetime(2026,10,16,2,1,0,tzinfo=tpe)),540)
+        self.assertEqual(seconds_until_next_snapshot(datetime(2026,10,16,6,59,0,tzinfo=tpe)),60)
+        self.assertEqual(seconds_until_next_snapshot(datetime(2026,10,16,7,0,30,tzinfo=tpe)),30)
     def test_empty_collector_never_posts(self):
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
              patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"NO_REAL_COLLECTOR_ROWS","candidate_rows":[]}), \
