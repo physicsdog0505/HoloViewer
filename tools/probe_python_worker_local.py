@@ -195,6 +195,33 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
                 print("=== END PYODIDE ERROR LOG ===", flush=True)
                 raise RuntimeError("Local Python Worker HTTP proof failed")
             if fixture_mode:
+                import hashlib
+                asset_names = (
+                    "public/ptt_timeline.js",
+                    "public/ptt_player_adapter.js",
+                    "public/ptt_worker_adapter.js",
+                    "hololive_channels.prototype.json",
+                )
+                with urllib.request.urlopen(
+                    base + "/__local_proof_assets", timeout=15
+                ) as response:
+                    if response.status != 200:
+                        raise RuntimeError("Worker static asset proof endpoint failed")
+                    worker_hashes = json.loads(response.read(8192))
+                root = Path(__file__).resolve().parents[1]
+                for name in asset_names:
+                    local_hash = hashlib.sha256(
+                        (root / "vendor" / "4174-a144bb3" / name).read_bytes()
+                    ).hexdigest()
+                    passed = worker_hashes.get(name) == local_hash
+                    results.append({
+                        "path": name, "proof": "accepted-static-sha256",
+                        "pass": passed, "sha256": worker_hashes.get(name),
+                    })
+                    print(("PASS" if passed else "FAIL") +
+                          ": Pyodide packaged original asset " + name, flush=True)
+                if not all(x["pass"] for x in results):
+                    raise RuntimeError("Worker static assets differ from accepted SHA")
                 parity = compare_accepted_fixture(base)
         finally:
             process.terminate()
