@@ -62,8 +62,21 @@ class PttProviderBindingTest(unittest.TestCase):
             "2026-10-15", fetch, checkpoint="opaque:/+?=token", limit=200,
         ))
         self.assertEqual(data["page"]["next_checkpoint"], "opaque-next")
-        self.assertIn("checkpoint=opaque%3A%2F%2B%3F%3Dtoken", calls[0])
+        self.assertIn("after=opaque%3A%2F%2B%3F%3Dtoken", calls[0])
+        self.assertNotIn("checkpoint=", calls[0])
         self.assertIn("limit=200", calls[0])
+
+    def test_history_first_page_has_no_continuation_query(self):
+        calls = []
+        async def fetch(url):
+            calls.append(url)
+            return envelope()
+        asyncio.run(PttPublicReader(enabled=True).read_history(
+            "2026-10-15", fetch, limit=50
+        ))
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("after=", calls[0])
+        self.assertNotIn("checkpoint=", calls[0])
 
     def test_invalid_envelopes_and_private_fields_fail_closed(self):
         invalid = [
