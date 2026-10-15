@@ -786,5 +786,10 @@ function mountWatchPlayer(index){
   players[index]=mounted;
 }
 window.onYouTubeIframeAPIReady=function(){streams.forEach((stream,index)=>mountWatchPlayer(index));};
-const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);
+if(window.YT?.Player){
+ streams.forEach((stream,index)=>mountWatchPlayer(index));
+}else{
+ const existingApi=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+ if(!existingApi){const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);}
+}
 };
