@@ -30,7 +30,7 @@ import platform_adapter.cloudflare_entry as worker
 from platform_adapter.public_api import DEFAULT_API, PublicAPIUnavailable
 
 
-async def fixture_public_json(url):
+async def fixture_public_json(url, *, api_service=None):
     if url == DEFAULT_API + "/v1/catalog/today":
         return {"freshness": {"status": "unknown"}, "streams": []}
     if url.startswith(DEFAULT_API + "/v1/history?"):
