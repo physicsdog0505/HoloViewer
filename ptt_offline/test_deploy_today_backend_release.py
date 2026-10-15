@@ -40,6 +40,13 @@ class TodayBackendReleaseTests(unittest.TestCase):
         self.assertEqual(ptt_operational_day(datetime(2026,10,16,5,59,tzinfo=tz)),"2026-10-15")
         self.assertEqual(ptt_operational_day(datetime(2026,10,16,6,0,tzinfo=tz)),"2026-10-16")
 
+    def test_release_gate_day_must_not_be_clock_only(self):
+        # Regression marker: production gate resolves latest successful provider
+        # day from D1 instead of trusting a wall-clock rollover boundary.
+        source=Path(__file__).with_name("deploy_today_backend_release.py").read_text(encoding="utf-8")
+        self.assertIn("PTT_LAST_DAY=",source)
+        self.assertIn("ORDER BY last_success_at DESC LIMIT 1",source)
+
     def test_wrong_worker_fails_closed(self):
         cfg=self.config(); cfg["name"]="wrong-worker"
         with tempfile.TemporaryDirectory() as td:

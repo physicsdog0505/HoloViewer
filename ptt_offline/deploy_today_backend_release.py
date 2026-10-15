@@ -48,7 +48,7 @@ def ptt_operational_day(now=None):
     day=local.date()-timedelta(days=1) if local.hour<6 else local.date()
     return day.isoformat()
 
-def verify_ptt_rollout(state_root):
+def verify_ptt_rollout(state_root, config):
     metrics=Path(state_root)/"minute-metrics.jsonl"
     if not metrics.is_file():
         raise SystemExit("PTT metrics missing; refusing Today release")
@@ -60,7 +60,19 @@ def verify_ptt_rollout(state_root):
             ack=row
     if ack is None:
         raise SystemExit("no post-restart PTT ACK receipt yet; refusing Today release")
-    day=ptt_operational_day()
+
+    # Do not infer the validation day from wall clock near the 06:00 Taipei
+    # operational rollover. Read the most recent successfully published day
+    # from canonical production provider state instead.
+    sql=("SELECT 'PTT_LAST_DAY=' || day AS marker FROM ptt_provider_state "
+         "WHERE last_success_at IS NOT NULL ORDER BY last_success_at DESC LIMIT 1;")
+    out=run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,"--command",sql],
+            capture=True).stdout
+    match=__import__("re").search(r"PTT_LAST_DAY=(\d{4}-\d{2}-\d{2})",out)
+    if not match:
+        raise SystemExit("could not resolve latest successful PTT provider day")
+    day=match.group(1)
+
     req=Request(API+"/v1/ptt/today?day="+day+"&limit=10",
                 headers={"Accept":"application/json","User-Agent":"Mozilla/5.0"})
     with urlopen(req,timeout=30) as response:
@@ -100,7 +112,7 @@ def main():
     config=str(Path(args.config).resolve())
     load_config(config)
     secrets=secret_names(config)
-    ptt=verify_ptt_rollout(args.ptt_state_root)
+    ptt=verify_ptt_rollout(args.ptt_state_root, config)
 
     # 1) Activate verified legacy profiles on D1 + existing read path.
     run([__import__("sys").executable,"-B","-m","ptt_offline.activate_today_profiles",
