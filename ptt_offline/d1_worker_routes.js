@@ -40,12 +40,12 @@ export async function handlePttD1Read(request, db) {
       sql += ' AND (occurred_at,aid,source_line,push_id)>(?,?,?,?)';
       binds.push(anchor.occurred_at,anchor.aid,anchor.source_line,anchor.push_id);
     }
-    sql += ` ORDER BY occurred_at,aid,source_line,push_id LIMIT ?`;
+    sql += ` ORDER BY occurred_at ${history ? 'ASC' : 'DESC'},aid ${history ? 'ASC' : 'DESC'},source_line ${history ? 'ASC' : 'DESC'},push_id ${history ? 'ASC' : 'DESC'} LIMIT ?`;
     binds.push(limit + 1);
     const got = await db.prepare(sql).bind(...binds).all();
     const raw = got.results || [];
     // History uses forward paging. Today serves newest N in consumer order.
-    const visible = history ? raw.slice(0,limit) : raw.slice(-limit);
+    const visible = history ? raw.slice(0,limit) : raw.slice(0,limit).reverse();
     const hasMore = raw.length > limit;
     const newestCheck = (scope.results || []).map(x=>x.last_success_at).filter(Boolean);
     const lastSuccess = newestCheck.length ? newestCheck.sort()[0] : null;
