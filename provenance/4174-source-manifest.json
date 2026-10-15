@@ -1,505 +1,755 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
   "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
-  "files": [
+  "generated_from_branch": "dev/8788-full-4174",
+  "product_files": [
     {
       "path": "archive_translation_service.py",
-      "blob_sha": "f3a642cf175486d28b906bf2286181e57283ffdd",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "f3a642cf175486d28b906bf2286181e57283ffdd",
       "mode": "100644",
-      "size": 4028
+      "size": 4028,
+      "role": "python_module"
     },
     {
       "path": "channel_push_discovery.py",
-      "blob_sha": "f867657c727c7908a39f918c80646fbe91072bf8",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "f867657c727c7908a39f918c80646fbe91072bf8",
       "mode": "100644",
-      "size": 12850
+      "size": 12850,
+      "role": "python_module"
     },
     {
       "path": "client_app.py",
-      "blob_sha": "b774a83464e0d63bd3390d341b65b42e87e257a0",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "b774a83464e0d63bd3390d341b65b42e87e257a0",
       "mode": "100644",
-      "size": 36702
+      "size": 36702,
+      "role": "python_module"
     },
     {
       "path": "client_collab_candidates.py",
-      "blob_sha": "60f68c9a0c7d528896adbadde9b361b8427e5130",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "60f68c9a0c7d528896adbadde9b361b8427e5130",
       "mode": "100644",
-      "size": 8144
+      "size": 8144,
+      "role": "python_module"
     },
     {
       "path": "client_custom_view.py",
-      "blob_sha": "ce399492785d4e386ecdf68d6e6e56e3cd6bfb35",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "ce399492785d4e386ecdf68d6e6e56e3cd6bfb35",
       "mode": "100644",
-      "size": 18214
+      "size": 18214,
+      "role": "python_module"
     },
     {
       "path": "client_history.py",
-      "blob_sha": "5b8bf704b497054bc12521025c7306b71dff8edf",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "5b8bf704b497054bc12521025c7306b71dff8edf",
       "mode": "100644",
-      "size": 10733
+      "size": 10733,
+      "role": "python_module"
     },
     {
       "path": "client_home.py",
-      "blob_sha": "481ad8c4a925892e242b076512ffbb99167d6a68",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "481ad8c4a925892e242b076512ffbb99167d6a68",
       "mode": "100644",
-      "size": 67732
+      "size": 67732,
+      "role": "python_module"
     },
     {
       "path": "client_ptt_today.py",
-      "blob_sha": "11b529310341820afe5561d8fa5d9927e08d2591",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "11b529310341820afe5561d8fa5d9927e08d2591",
       "mode": "100644",
-      "size": 13842
+      "size": 13842,
+      "role": "python_module"
     },
     {
       "path": "client_runtime.py",
-      "blob_sha": "beed18eba5ad51031c98c7abd90092a8b12349ff",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "beed18eba5ad51031c98c7abd90092a8b12349ff",
       "mode": "100644",
-      "size": 839
+      "size": 839,
+      "role": "python_module"
     },
     {
       "path": "client_stream_catalog.py",
-      "blob_sha": "50a90fbba40467a2875ac1c1fed8a930e471da78",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "50a90fbba40467a2875ac1c1fed8a930e471da78",
       "mode": "100644",
-      "size": 9411
+      "size": 9411,
+      "role": "python_module"
     },
     {
       "path": "client_support_colors.py",
-      "blob_sha": "942b9e5f995b769187f0db6f873aeb88b219abc1",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "942b9e5f995b769187f0db6f873aeb88b219abc1",
       "mode": "100644",
-      "size": 3017
+      "size": 3017,
+      "role": "python_module"
     },
     {
       "path": "client_ui_shell.py",
-      "blob_sha": "20204b9dc23f22cac03e7952fea2cb2834e7ef1c",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "20204b9dc23f22cac03e7952fea2cb2834e7ef1c",
       "mode": "100644",
-      "size": 17469
+      "size": 17469,
+      "role": "python_module"
     },
     {
       "path": "client_watchalong.py",
-      "blob_sha": "37ba908c88ee23b9c397766de5c4ff654d6c7e4e",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "37ba908c88ee23b9c397766de5c4ff654d6c7e4e",
       "mode": "100644",
-      "size": 65429
+      "size": 65429,
+      "role": "python_module"
     },
     {
       "path": "collab_live_feed.py",
-      "blob_sha": "a3399cb370ae2720d277a6e04fe1b03b95e3f369",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "a3399cb370ae2720d277a6e04fe1b03b95e3f369",
       "mode": "100644",
-      "size": 5152
+      "size": 5152,
+      "role": "python_module"
     },
     {
       "path": "collector_settings.py",
-      "blob_sha": "4bd4afac5fbb252e64a6233e3c447fe1d7843f46",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "4bd4afac5fbb252e64a6233e3c447fe1d7843f46",
       "mode": "100644",
-      "size": 1721
+      "size": 1721,
+      "role": "python_module"
     },
     {
       "path": "corpus_translation.py",
-      "blob_sha": "15ef6ef5676475f0b39dc6aed109239f7d12f2aa",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "15ef6ef5676475f0b39dc6aed109239f7d12f2aa",
       "mode": "100644",
-      "size": 5203
+      "size": 5203,
+      "role": "python_module"
     },
     {
       "path": "direct_youtube_caption_provider.py",
-      "blob_sha": "b708742e78237e3cbf4f365736bd144ba42a0955",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "b708742e78237e3cbf4f365736bd144ba42a0955",
       "mode": "100644",
-      "size": 7958
+      "size": 7958,
+      "role": "python_module"
     },
     {
       "path": "discovery_evidence.py",
-      "blob_sha": "a36bce2bb4ae187deba7d52202d82a0949696192",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "a36bce2bb4ae187deba7d52202d82a0949696192",
       "mode": "100644",
-      "size": 27966
+      "size": 27966,
+      "role": "python_module"
     },
     {
       "path": "discovery_evidence_runtime.py",
-      "blob_sha": "5040d8a6593adae6cb514083613f67876e361518",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "5040d8a6593adae6cb514083613f67876e361518",
       "mode": "100644",
-      "size": 11103
+      "size": 11103,
+      "role": "python_module"
     },
     {
       "path": "frontend_chat.py",
-      "blob_sha": "130abaf1c4ac934eace2357c30d54913d91d86fa",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "130abaf1c4ac934eace2357c30d54913d91d86fa",
       "mode": "100644",
-      "size": 9337
+      "size": 9337,
+      "role": "python_module"
     },
     {
       "path": "frontend_config.py",
-      "blob_sha": "19425da88e0161f6c11ec1cc695f5651219a0eaa",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "19425da88e0161f6c11ec1cc695f5651219a0eaa",
       "mode": "100644",
-      "size": 1252
+      "size": 1252,
+      "role": "python_module"
     },
     {
       "path": "frontend_db.py",
-      "blob_sha": "13ba17e2f4fcfa799662e15efd1bc0a737fc4b42",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "13ba17e2f4fcfa799662e15efd1bc0a737fc4b42",
       "mode": "100644",
-      "size": 8107
+      "size": 8107,
+      "role": "python_module"
     },
     {
       "path": "frontend_feed_polling.py",
-      "blob_sha": "916b27d9317897aed1814d154b22d301cb6b31a6",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "916b27d9317897aed1814d154b22d301cb6b31a6",
       "mode": "100644",
-      "size": 1436
+      "size": 1436,
+      "role": "python_module"
     },
     {
       "path": "frontend_multistream.py",
-      "blob_sha": "63dfe072720a5c971d31796f95a660c0d533cca0",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "63dfe072720a5c971d31796f95a660c0d533cca0",
       "mode": "100644",
-      "size": 6573
+      "size": 6573,
+      "role": "python_module"
     },
     {
       "path": "frontend_multistream_sync.py",
-      "blob_sha": "7b7afa2fcf77814f53db5c8d3e26bb605e2920c1",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "7b7afa2fcf77814f53db5c8d3e26bb605e2920c1",
       "mode": "100644",
-      "size": 25469
+      "size": 25469,
+      "role": "python_module"
     },
     {
       "path": "frontend_stream_discovery.py",
-      "blob_sha": "f18856be7e2ccf5de6f866dc53ef8fcbfccbe51f",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "f18856be7e2ccf5de6f866dc53ef8fcbfccbe51f",
       "mode": "100644",
-      "size": 6874
+      "size": 6874,
+      "role": "python_module"
     },
     {
       "path": "frontend_sync_query.py",
-      "blob_sha": "c3363fbd20636e68c0588a034dea30df8071011c",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "c3363fbd20636e68c0588a034dea30df8071011c",
       "mode": "100644",
-      "size": 7403
+      "size": 7403,
+      "role": "python_module"
     },
     {
       "path": "frontend_time.py",
-      "blob_sha": "bea086e36cf5b2406b6ba5f071a17af9feaff300",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "bea086e36cf5b2406b6ba5f071a17af9feaff300",
       "mode": "100644",
-      "size": 4537
+      "size": 4537,
+      "role": "python_module"
     },
     {
       "path": "frontend_watchalong.py",
-      "blob_sha": "d0fbc52120727fa2d7e2a80ad71892234bc740be",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "d0fbc52120727fa2d7e2a80ad71892234bc740be",
       "mode": "100644",
-      "size": 22787
+      "size": 22787,
+      "role": "python_module"
     },
     {
       "path": "frontend_watchalong_companion.py",
-      "blob_sha": "9c78c581393bd0d8dbccaf3e6e14712529f7e650",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "9c78c581393bd0d8dbccaf3e6e14712529f7e650",
       "mode": "100644",
-      "size": 6953
+      "size": 6953,
+      "role": "python_module"
     },
     {
       "path": "frontend_watchalong_extras.py",
-      "blob_sha": "1c032af32cf1ae01e235d19825973fee649513cc",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "1c032af32cf1ae01e235d19825973fee649513cc",
       "mode": "100644",
-      "size": 29150
+      "size": 29150,
+      "role": "python_module"
     },
     {
       "path": "gemini_translation_provider.py",
-      "blob_sha": "527b559bd61b869b85596a18d6828f8053b49d1d",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "527b559bd61b869b85596a18d6828f8053b49d1d",
       "mode": "100644",
-      "size": 8209
+      "size": 8209,
+      "role": "python_module"
     },
     {
       "path": "gemini_translation_quality.py",
-      "blob_sha": "0cb1ffd7a311cccedf3bae74ab0f7b738ab08777",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "0cb1ffd7a311cccedf3bae74ab0f7b738ab08777",
       "mode": "100644",
-      "size": 26249
+      "size": 26249,
+      "role": "python_module"
     },
     {
       "path": "hololive_channels.prototype.json",
-      "blob_sha": "90b6648ca025c66eb30daa3e14afecf04a216a4f",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "90b6648ca025c66eb30daa3e14afecf04a216a4f",
       "mode": "100644",
-      "size": 2933
+      "size": 2933,
+      "role": "json_asset"
     },
     {
       "path": "innertube_youtube_caption_provider.py",
-      "blob_sha": "3f3646aa393f05bab39d80ae5ca4fffe4a629adf",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "3f3646aa393f05bab39d80ae5ca4fffe4a629adf",
       "mode": "100644",
-      "size": 9340
+      "size": 9340,
+      "role": "python_module"
     },
     {
       "path": "live_stream_discovery.py",
-      "blob_sha": "94f83cfbc5236d49f8cb4e8d369444e9f7012e55",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "94f83cfbc5236d49f8cb4e8d369444e9f7012e55",
       "mode": "100644",
-      "size": 9755
+      "size": 9755,
+      "role": "python_module"
     },
     {
       "path": "ptt_reader_components.py",
-      "blob_sha": "aa1fe19819d6b347df4018126c3aad0ebc15e038",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "aa1fe19819d6b347df4018126c3aad0ebc15e038",
       "mode": "100644",
-      "size": 5995
+      "size": 5995,
+      "role": "python_module"
     },
     {
       "path": "ptt_stream_discovery.py",
-      "blob_sha": "06dec536a16fa49414b33f4b073c85e51ab286fe",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "06dec536a16fa49414b33f4b073c85e51ab286fe",
       "mode": "100644",
-      "size": 3610
+      "size": 3610,
+      "role": "python_module"
     },
     {
       "path": "public/ptt_player_adapter.js",
-      "blob_sha": "814b40ae35075686513e833a61b1c7fabb418364",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "814b40ae35075686513e833a61b1c7fabb418364",
       "mode": "100644",
-      "size": 2574
+      "size": 2574,
+      "role": "js_asset"
     },
     {
       "path": "public/ptt_timeline.js",
-      "blob_sha": "46c2bfde372824711aec418e5c740a57a5665e6d",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "46c2bfde372824711aec418e5c740a57a5665e6d",
       "mode": "100644",
-      "size": 4194
+      "size": 4194,
+      "role": "js_asset"
     },
     {
       "path": "public/ptt_worker_adapter.js",
-      "blob_sha": "e3de0e0ebdacab74929b615b37240d6014f98e69",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "e3de0e0ebdacab74929b615b37240d6014f98e69",
       "mode": "100644",
-      "size": 5468
+      "size": 5468,
+      "role": "js_asset"
     },
     {
       "path": "quality_v2_translation_service.py",
-      "blob_sha": "ec4ef732826ee3db4ae7074e2f376ab325e6ac82",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "ec4ef732826ee3db4ae7074e2f376ab325e6ac82",
       "mode": "100644",
-      "size": 8720
+      "size": 8720,
+      "role": "python_module"
     },
     {
       "path": "requirements-frontend.txt",
-      "blob_sha": "617daf37df6eb2f3b7606a0dee8d8f5c5938d74e",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "617daf37df6eb2f3b7606a0dee8d8f5c5938d74e",
       "mode": "100644",
-      "size": 55
+      "size": 55,
+      "role": "runtime_requirement_manifest"
     },
     {
       "path": "requirements-transcript.txt",
-      "blob_sha": "06414123a6c9bee2cb2d5496f8ad5e6e6329519a",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "06414123a6c9bee2cb2d5496f8ad5e6e6329519a",
       "mode": "100644",
-      "size": 355
+      "size": 355,
+      "role": "runtime_requirement_manifest"
     },
     {
       "path": "requirements-web.txt",
-      "blob_sha": "95c08784a97511b5a77cacb0ea26901538c4f181",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "95c08784a97511b5a77cacb0ea26901538c4f181",
       "mode": "100644",
-      "size": 20
+      "size": 20,
+      "role": "runtime_requirement_manifest"
     },
     {
       "path": "requirements.txt",
-      "blob_sha": "f075f1afcec5cbe3e76ad9a8156d7b9f84b458cd",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "f075f1afcec5cbe3e76ad9a8156d7b9f84b458cd",
       "mode": "100644",
-      "size": 47
+      "size": 47,
+      "role": "runtime_requirement_manifest"
     },
     {
       "path": "resilient_translation.py",
-      "blob_sha": "460486a7ff6b72d42282d1027d4589ab156486fc",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "460486a7ff6b72d42282d1027d4589ab156486fc",
       "mode": "100644",
-      "size": 10158
+      "size": 10158,
+      "role": "python_module"
     },
     {
       "path": "shared_viewing_core.py",
-      "blob_sha": "6c3aaaba7793bc01d65d5096f0308e9c8b12491f",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "6c3aaaba7793bc01d65d5096f0308e9c8b12491f",
       "mode": "100644",
-      "size": 179050
+      "size": 179050,
+      "role": "python_module"
     },
     {
       "path": "start_client.sh",
-      "blob_sha": "ff12856738d8282424f1e1f56e4fd3879ad897e2",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "ff12856738d8282424f1e1f56e4fd3879ad897e2",
       "mode": "100644",
-      "size": 434
+      "size": 434,
+      "role": "launcher_support"
     },
     {
       "path": "stream_catalog.py",
-      "blob_sha": "b3907bb744bf264e69d135a9803fd7fbd63976a9",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "b3907bb744bf264e69d135a9803fd7fbd63976a9",
       "mode": "100644",
-      "size": 25573
+      "size": 25573,
+      "role": "python_module"
     },
     {
       "path": "stream_catalog_runtime.py",
-      "blob_sha": "6c2dc46606ceb018a9d7b3ccca0e079cbd2a88e7",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "6c2dc46606ceb018a9d7b3ccca0e079cbd2a88e7",
       "mode": "100644",
-      "size": 9329
+      "size": 9329,
+      "role": "python_module"
     },
     {
       "path": "subtitle_translation_component.py",
-      "blob_sha": "cf017f6643c3dad6fc5b9b589d342cd97aeb9e67",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "cf017f6643c3dad6fc5b9b589d342cd97aeb9e67",
       "mode": "100644",
-      "size": 5837
+      "size": 5837,
+      "role": "python_module"
     },
     {
       "path": "thread_discovery.py",
-      "blob_sha": "2a90409df0da248be3605a9899ec0152c3668200",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "2a90409df0da248be3605a9899ec0152c3668200",
       "mode": "100644",
-      "size": 6895
+      "size": 6895,
+      "role": "python_module"
     },
     {
       "path": "today_stream_refresh.py",
-      "blob_sha": "1b4791aeefde3aa371009a9cf4a5c8a0573bd254",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "1b4791aeefde3aa371009a9cf4a5c8a0573bd254",
       "mode": "100644",
-      "size": 11776
+      "size": 11776,
+      "role": "python_module"
     },
     {
       "path": "today_stream_status.py",
-      "blob_sha": "5d8b2cf488120faeea3e31a929a9570f8e123e09",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "5d8b2cf488120faeea3e31a929a9570f8e123e09",
       "mode": "100644",
-      "size": 9770
+      "size": 9770,
+      "role": "python_module"
     },
     {
       "path": "transcript_corpus.py",
-      "blob_sha": "88214ad17b11ee7ff3a12f79ced773f2e671ac92",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "88214ad17b11ee7ff3a12f79ced773f2e671ac92",
       "mode": "100644",
-      "size": 15462
+      "size": 15462,
+      "role": "python_module"
     },
     {
       "path": "transcript_ingest.py",
-      "blob_sha": "a3e374d6d73bcbc2bb74da1d8669ce61c9105abe",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "a3e374d6d73bcbc2bb74da1d8669ce61c9105abe",
       "mode": "100644",
-      "size": 8111
+      "size": 8111,
+      "role": "python_module"
     },
     {
       "path": "transcript_pipeline.py",
-      "blob_sha": "00f1231d8ac964eb90c4f5159793678c7d24e553",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "00f1231d8ac964eb90c4f5159793678c7d24e553",
       "mode": "100644",
-      "size": 7821
+      "size": 7821,
+      "role": "python_module"
     },
     {
       "path": "translation_benchmark.py",
-      "blob_sha": "fbf05fd509df8ea3ae7b2f20eaa886229aaab159",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "fbf05fd509df8ea3ae7b2f20eaa886229aaab159",
       "mode": "100644",
-      "size": 10206
+      "size": 10206,
+      "role": "python_module"
     },
     {
       "path": "translation_chinese_retiming.py",
-      "blob_sha": "5665b97f08b69a569d5cdd7264d689687006d95c",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "5665b97f08b69a569d5cdd7264d689687006d95c",
       "mode": "100644",
-      "size": 2966
+      "size": 2966,
+      "role": "python_module"
     },
     {
       "path": "translation_fansub_capture.py",
-      "blob_sha": "0c2f9bec2300020ef565c34e03ac722126813f66",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "0c2f9bec2300020ef565c34e03ac722126813f66",
       "mode": "100644",
-      "size": 3496
+      "size": 3496,
+      "role": "python_module"
     },
     {
       "path": "translation_pipeline.py",
-      "blob_sha": "c6c25eda109f1876a7aca21f874b981d313a6bbd",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "c6c25eda109f1876a7aca21f874b981d313a6bbd",
       "mode": "100644",
-      "size": 5043
+      "size": 5043,
+      "role": "python_module"
     },
     {
       "path": "translation_quality_b_events.py",
-      "blob_sha": "3adae0e8324897b84589542c58223de10b8e390f",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "3adae0e8324897b84589542c58223de10b8e390f",
       "mode": "100644",
-      "size": 7753
+      "size": 7753,
+      "role": "python_module"
     },
     {
       "path": "translation_quality_b_long_job.py",
-      "blob_sha": "c595583db227da8fc2bf405f27b05705c6f34ca5",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "c595583db227da8fc2bf405f27b05705c6f34ca5",
       "mode": "100644",
-      "size": 13718
+      "size": 13718,
+      "role": "python_module"
     },
     {
       "path": "translation_quality_b_pipeline.py",
-      "blob_sha": "79fde4c022c54aaa1bc565e4f7c8dbf5d8b527c9",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "79fde4c022c54aaa1bc565e4f7c8dbf5d8b527c9",
       "mode": "100644",
-      "size": 2583
+      "size": 2583,
+      "role": "python_module"
     },
     {
       "path": "translation_quality_b_semantic_audit.py",
-      "blob_sha": "8e71183565a9acdd7c77d454740da6c8cb883455",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "8e71183565a9acdd7c77d454740da6c8cb883455",
       "mode": "100644",
-      "size": 3006
+      "size": 3006,
+      "role": "python_module"
     },
     {
       "path": "translation_quality_benchmark.py",
-      "blob_sha": "7afa6cf02e513bd45cd2c4d3ebadeece7542b79b",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "7afa6cf02e513bd45cd2c4d3ebadeece7542b79b",
       "mode": "100644",
-      "size": 7636
+      "size": 7636,
+      "role": "python_module"
     },
     {
       "path": "translation_quality_existing_adapter.py",
-      "blob_sha": "fef18f07aed17d0debb7246d4a641240ab13752d",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "fef18f07aed17d0debb7246d4a641240ab13752d",
       "mode": "100644",
-      "size": 2520
+      "size": 2520,
+      "role": "python_module"
     },
     {
       "path": "translation_quality_pipeline.py",
-      "blob_sha": "f31f556278fe03552e6bbe7c899563ab74ee886b",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "f31f556278fe03552e6bbe7c899563ab74ee886b",
       "mode": "100644",
-      "size": 6514
+      "size": 6514,
+      "role": "python_module"
     },
     {
       "path": "translation_quality_workspace.py",
-      "blob_sha": "4b6de6200538aee4be48e2b2cc5a692c0967fd58",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "4b6de6200538aee4be48e2b2cc5a692c0967fd58",
       "mode": "100644",
-      "size": 7969
+      "size": 7969,
+      "role": "python_module"
     },
     {
       "path": "translation_sentence_reconstruction.py",
-      "blob_sha": "386bb6bf3fd81999b85cd29281878379e5513c67",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "386bb6bf3fd81999b85cd29281878379e5513c67",
       "mode": "100644",
-      "size": 2481
+      "size": 2481,
+      "role": "python_module"
     },
     {
       "path": "watchalong_archive_store.py",
-      "blob_sha": "ce905d6403f61e350a6a35a21caa56b1a299bed5",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "ce905d6403f61e350a6a35a21caa56b1a299bed5",
       "mode": "100644",
-      "size": 12117
+      "size": 12117,
+      "role": "python_module"
     },
     {
       "path": "watchalong_playback_telemetry.py",
-      "blob_sha": "46128023b8955ad660481ebde5d7209816430155",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "46128023b8955ad660481ebde5d7209816430155",
       "mode": "100644",
-      "size": 11362
+      "size": 11362,
+      "role": "python_module"
     },
     {
       "path": "watchalong_playlist.py",
-      "blob_sha": "748d0bb5e4a156a790b695fc6745766f3e676081",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "748d0bb5e4a156a790b695fc6745766f3e676081",
       "mode": "100644",
-      "size": 5027
+      "size": 5027,
+      "role": "python_module"
     },
     {
       "path": "watchalong_provider.py",
-      "blob_sha": "acf0858310307b3ede6506bf485d4879a08ad9ae",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "acf0858310307b3ede6506bf485d4879a08ad9ae",
       "mode": "100644",
-      "size": 1959
+      "size": 1959,
+      "role": "python_module"
     },
     {
       "path": "watchalong_ptt_catalog.py",
-      "blob_sha": "a359a97604daaff8a474401f369aad8a0b27514f",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "a359a97604daaff8a474401f369aad8a0b27514f",
       "mode": "100644",
-      "size": 11919
+      "size": 11919,
+      "role": "python_module"
     },
     {
       "path": "watchalong_transcript.py",
-      "blob_sha": "4115a05742422a946270c20c080bae161172dfa8",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "4115a05742422a946270c20c080bae161172dfa8",
       "mode": "100644",
-      "size": 13986
+      "size": 13986,
+      "role": "python_module"
     },
     {
       "path": "watchalong_transcript_integration.py",
-      "blob_sha": "98652c5e3c9fdbfd8b540a4e28ace5ba493ecd8d",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "98652c5e3c9fdbfd8b540a4e28ace5ba493ecd8d",
       "mode": "100644",
-      "size": 5902
+      "size": 5902,
+      "role": "python_module"
     },
     {
       "path": "watchalong_translation_integration.py",
-      "blob_sha": "cbaa98becbe09149a530fde9021c3a496afc839d",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "cbaa98becbe09149a530fde9021c3a496afc839d",
       "mode": "100644",
-      "size": 3036
+      "size": 3036,
+      "role": "python_module"
     },
     {
       "path": "web_backfill.py",
-      "blob_sha": "713bd436107b571cdfee41b2b3ed67e9a6a00bd1",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "713bd436107b571cdfee41b2b3ed67e9a6a00bd1",
       "mode": "100644",
-      "size": 20582
+      "size": 20582,
+      "role": "python_module"
     },
     {
       "path": "youtube_history_event_source.py",
-      "blob_sha": "a436f6ace53b0e43ca23eccde7c712588ec98355",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "a436f6ace53b0e43ca23eccde7c712588ec98355",
       "mode": "100644",
-      "size": 8897
+      "size": 8897,
+      "role": "python_module"
     },
     {
       "path": "youtube_metadata.py",
-      "blob_sha": "34905919a07567a33bef7f5b32def82c2ddcb938",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "34905919a07567a33bef7f5b32def82c2ddcb938",
       "mode": "100644",
-      "size": 7419
+      "size": 7419,
+      "role": "python_module"
     },
     {
       "path": "youtube_transcript_provider.py",
-      "blob_sha": "b7e64e1dbfbadce833bd74af26470343f718b05a",
+      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+      "source_blob_sha": "b7e64e1dbfbadce833bd74af26470343f718b05a",
       "mode": "100644",
-      "size": 7741
+      "size": 7741,
+      "role": "python_module"
     }
   ]
 }
