@@ -1,0 +1,69 @@
+"""Offline D1-compatible schema and replay regression tests for Issue #48."""
+import sqlite3
+import unittest
+from pathlib import Path
+
+from ptt_offline.d1_publisher import publish_batch, read_day
+from ptt_offline.public_today_contract import ContractError, canonical_id
+
+
+def record(i, **changes):
+    r = dict(aid="A1", source_line=i, kind="推", author="tester",
+             content=f"hello-{i}", occurred_at="2026-10-15T03:00:00+08:00",
+             floor=None, origin="web",
+             source_record_key=f"raw:{i}")
+    r.update(changes)
+    return r
+
+
+class D1PublisherTests(unittest.TestCase):
+    def setUp(self):
+        self.db = sqlite3.connect(":memory:")
+        path = Path(__file__).with_name("d1_migrations") / "0001_canonical_ptt.sql"
+        schema = path.read_text(encoding="utf-8")
+        self.db.executescript(schema)
+        self.db.executescript(schema)
+
+    def tearDown(self):
+        self.db.close()
+
+    def test_replay_and_collector_precedence(self):
+        initial = record(1)
+        self.assertEqual(publish_batch(self.db, "2026-10-15", {"A1"}, [initial]), 1)
+        publish_batch(self.db, "2026-10-15", {"A1"}, [initial])
+        enriched = record(1, origin="collector", floor=45)
+        publish_batch(self.db, "2026-10-15", {"A1"}, [enriched])
+        publish_batch(self.db, "2026-10-15", {"A1"}, [initial])
+        aids, rows = read_day(self.db, "2026-10-15")
+        self.assertEqual(aids, {"A1"})
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["push_id"], canonical_id(initial))
+        self.assertEqual(rows[0]["floor"], 45)
+
+    def test_day_aid_source_order_and_forward_repair(self):
+        publish_batch(self.db, "2026-10-15", {"A1", "A2"},
+                      [record(2, aid="A2"), record(1, aid="A1")])
+        aids, rows = read_day(self.db, "2026-10-15")
+        self.assertEqual(aids, {"A1", "A2"})
+        self.assertEqual([(r["aid"], r["source_line"]) for r in rows],
+                         [("A1", 1), ("A2", 2)])
+        self.assertEqual(self.db.execute(
+            "SELECT count(*) FROM schema_migrations").fetchone()[0], 1)
+        self.assertEqual(self.db.execute(
+            "SELECT count(*) FROM ptt_source_evidence").fetchone()[0], 2)
+
+    def test_failed_batch_no_partial_write(self):
+        with self.assertRaises(ContractError):
+            publish_batch(self.db, "2026-10-15", {"A1"},
+                          [record(1), record(2, aid="A2")])
+        self.assertEqual(read_day(self.db, "2026-10-15"), (set(), []))
+
+    def test_nullable_floor_and_replay_survive(self):
+        publish_batch(self.db, "2026-10-15", {"A1"}, [record(1)])
+        self.assertIsNone(read_day(self.db, "2026-10-15")[1][0]["floor"])
+        publish_batch(self.db, "2026-10-15", {"A1"}, [record(1, floor=7)])
+        self.assertEqual(read_day(self.db, "2026-10-15")[1][0]["floor"], 7)
+
+
+if __name__ == "__main__":
+    unittest.main()
