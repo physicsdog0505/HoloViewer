@@ -18,7 +18,7 @@ class Response:
 class OwnerHttpTransportTests(unittest.TestCase):
     def test_no_write_without_explicit_owner_opt_in(self):
         with self.assertRaises(ContractError):
-            owner_signed_http_executor(endpoint="https://api.example/private/ptt/publish",
+            owner_signed_http_executor(endpoint="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish",
                 secret="s"*40)
     def test_one_signed_request_and_exact_response(self):
         calls=[]
@@ -33,13 +33,18 @@ class OwnerHttpTransportTests(unittest.TestCase):
             calls.append(raw)
             self.assertEqual(timeout,10)
             return Response(receipt)
-        fn=owner_signed_http_executor(endpoint="https://api.example/private/ptt/publish",
+        fn=owner_signed_http_executor(endpoint="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish",
             secret="s"*40,allow_write=True,opener=opener,clock_ms=lambda:1792069200000)
         self.assertEqual(fn(batch),receipt)
         self.assertEqual(len(calls),1)
+    def test_wrong_hostname_never_sends(self):
+        with self.assertRaises(ContractError):
+            owner_signed_http_executor(endpoint="https://wrong.example/private/ptt/publish",
+                secret="s"*40,allow_write=True)
+
     def test_wrong_path_never_sends(self):
         with self.assertRaises(ContractError):
-            owner_signed_http_executor(endpoint="https://api.example/ptt/publish",
+            owner_signed_http_executor(endpoint="https://holoviewer-public-api.singlebagel.workers.dev/ptt/publish",
                 secret="s"*40,allow_write=True)
 if __name__=="__main__":
     unittest.main()
