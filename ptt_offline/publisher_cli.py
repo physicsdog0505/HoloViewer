@@ -20,6 +20,7 @@ from .public_today_contract import ContractError
 MAX_BATCH = 5
 SCREEN_COLUMNS = {"article_id","source_page","total_pages",
                   "start_line","end_line","captured_at"}
+ARTICLE_COVERAGE_COLUMNS = {"last_page","total_pages","last_source_line"}
 
 @contextmanager
 def exclusive_lock(path: Path):
@@ -35,26 +36,80 @@ def exclusive_lock(path: Path):
             fcntl.flock(handle.fileno(),fcntl.LOCK_UN)
 
 def coverage_receipt(db, aid: str):
-    columns={r[1] for r in db.execute("PRAGMA table_info(article_screens)")}
-    if not SCREEN_COLUMNS <= columns:
+    """Return canonical Collector line-coverage evidence for exactly one AID.
+
+    Completeness is positive only when article_screens continuously covers
+    source lines 1..articles.last_source_line. Push readability is irrelevant.
+    """
+    screen_columns={r[1] for r in db.execute("PRAGMA table_info(article_screens)")}
+    if not SCREEN_COLUMNS <= screen_columns:
         raise ContractError("source coverage schema missing")
+    article_columns={r[1] for r in db.execute("PRAGMA table_info(articles)")}
+    if not ARTICLE_COVERAGE_COLUMNS <= article_columns:
+        raise ContractError("article coverage watermark schema missing")
     article=db.execute(
-        "SELECT id FROM articles WHERE board='C_Chat' AND aid=?",(aid,)
+        """SELECT id,last_page,total_pages,last_source_line
+           FROM articles WHERE board='C_Chat' AND aid=?""",(aid,)
     ).fetchone()
     if not article:
         raise ContractError("unverified article/AID")
-    article_id=article[0]
+    article_id,last_page,total_pages,last_source_line=article
+    if (last_source_line is None or type(last_source_line) is not int or
+            last_source_line < 1):
+        return {"article_verified":True,"screen_rows":0,"covered_start":None,
+                "covered_end":None,"last_source_line":last_source_line,
+                "gaps":[],"malformed_screen_evidence":False,
+                "complete":False,"has_gap":"UNKNOWN",
+                "reason":"article last_source_line watermark unavailable"}
     rows=db.execute("""
-        SELECT source_page,total_pages,start_line,end_line FROM article_screens
-        WHERE article_id=? ORDER BY start_line,end_line LIMIT 10
+        SELECT source_page,total_pages,start_line,end_line
+        FROM article_screens WHERE article_id=?
+        ORDER BY start_line,end_line,source_page
     """,(article_id,)).fetchall()
-    # A screen set isn't necessarily proof of complete history.
-    malformed=any(p<1 or total<p or start<1 or end<start
-                  for p,total,start,end in rows)
-    return {"article_verified":True,"screen_samples":len(rows),
-            "malformed_screen_evidence":malformed,
-            "complete":False,"has_gap":"UNKNOWN",
-            "reason":"screens alone do not certify continuous 1..last-source-line coverage"}
+    malformed=False
+    intervals=[]
+    for page,row_total,start,end in rows:
+        if (type(page) is not int or type(row_total) is not int or
+            type(start) is not int or type(end) is not int or
+            page < 1 or row_total < page or start < 1 or end < start):
+            malformed=True
+            continue
+        intervals.append((start,end))
+    if malformed:
+        return {"article_verified":True,"screen_rows":len(rows),
+                "covered_start":None,"covered_end":None,
+                "last_source_line":last_source_line,"gaps":[],
+                "malformed_screen_evidence":True,"complete":False,
+                "has_gap":True,"reason":"malformed article_screens evidence"}
+    if not intervals:
+        return {"article_verified":True,"screen_rows":0,"covered_start":None,
+                "covered_end":None,"last_source_line":last_source_line,
+                "gaps":[[1,last_source_line]],"malformed_screen_evidence":False,
+                "complete":False,"has_gap":True,
+                "reason":"no article_screens coverage evidence"}
+
+    covered_start=intervals[0][0]
+    merged_end=intervals[0][1]
+    gaps=[]
+    if covered_start > 1:
+        gaps.append([1,min(last_source_line,covered_start-1)])
+    for start,end in intervals[1:]:
+        if start > merged_end + 1 and merged_end < last_source_line:
+            gaps.append([merged_end+1,min(last_source_line,start-1)])
+        merged_end=max(merged_end,end)
+    if merged_end < last_source_line:
+        gaps.append([merged_end+1,last_source_line])
+    gaps=[g for g in gaps if g[0] <= g[1]]
+    complete=(covered_start == 1 and merged_end >= last_source_line and not gaps)
+    return {"article_verified":True,"screen_rows":len(rows),
+            "covered_start":covered_start,"covered_end":merged_end,
+            "last_source_line":last_source_line,"last_page":last_page,
+            "article_total_pages":total_pages,"gaps":gaps,
+            "malformed_screen_evidence":False,"complete":complete,
+            "has_gap":not complete,
+            "reason":("continuous article_screens coverage through canonical "
+                      "last_source_line" if complete else
+                      "article_screens does not continuously cover 1..last_source_line")}
 
 def atomic_receipt(destination: Path, body: dict):
     destination.parent.mkdir(parents=True,exist_ok=True)
