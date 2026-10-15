@@ -83,7 +83,7 @@ def live_provider_sample(roster_document, api_key, *, request_json=None, observe
                 extra=[item.get('id',{}).get('videoId') for item in query['items']]
                 if any(not isinstance(v,str) or not VIDEO.fullmatch(v) for v in extra):
                     raise ValueError('bad search video identity')
-                selected.append(extra)
+                selected[-1].extend(extra)
         pages[ident]=selected
     # Explicit fixed candidates; do not let ingest_batches call more than one metadata batch.
     flat=list(dict.fromkeys(v for channel_pages in pages.values() for page in channel_pages for v in page))
