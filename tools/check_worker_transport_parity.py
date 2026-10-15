@@ -17,7 +17,8 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "vendor" / "4174-a144bb3"
-sys.path.insert(0, str(ROOT))\nsys.path.insert(0, str(VENDOR))
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(VENDOR))
 
 from client_app import ClientRequestHandler  # noqa: E402
 from platform_adapter.worker_transport import dispatch_accepted_get  # noqa: E402
