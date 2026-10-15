@@ -634,11 +634,11 @@ window.hvOpenCustomSession=function(ids,opts={}){
 
  const section=$('custom-session');
  if(typeof window.render4174SharedViewerDOM!=='function'||typeof window.mount4174SharedViewer!=='function'){
-  section.innerHTML='<p class="form-error">4174 viewer transplant assets failed to load.</p>';
+  section.replaceChildren(Object.assign(document.createElement('p'),{className:'form-error',textContent:'4174 viewer transplant assets failed to load.'}));
   route('custom-session');
   return;
  }
- section.innerHTML=window.render4174SharedViewerDOM(viewing.ptt==='live');
+ section.replaceChildren(window.render4174SharedViewerDOM(viewing.ptt==='live'));
  route('custom-session');
 
  const streamMetadata=new Map([...document.querySelectorAll('.live-channel-rail-item[data-live-video-id]')].map(item=>[
