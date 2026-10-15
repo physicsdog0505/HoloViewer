@@ -120,6 +120,11 @@ def consumer_receipt(origin: str, *, ptt_day: str | None = None) -> dict:
         # Explicit LOCAL proof only: the normal product's PTT reader remains
         # disabled until reviewed production mount and cutover authority.
         reader = PttPublicReader(enabled=True)
+        via_reader_today = asyncio.run(reader.read_today(
+            ptt_day, checked_owner_get,
+        ))
+        if len(via_reader_today["pushes"]) != len(body["pushes"]):
+            raise PublicAPIUnavailable("PTT Today reader does not match reviewed router")
         first = asyncio.run(reader.read_history(
             ptt_day, checked_owner_get, limit=1,
         ))
@@ -143,6 +148,7 @@ def consumer_receipt(origin: str, *, ptt_day: str | None = None) -> dict:
             "push_count": len(body["pushes"]),
             "freshness": body["freshness"]["status"],
             "gap": body["completeness"]["gap"],
+            "today_enabled_reader_checked": True,
             "history_first_count": len(first["pushes"]),
             "history_second_count": len(second["pushes"]) if second else 0,
             "history_continuation_checked": second is not None,
