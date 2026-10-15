@@ -10,6 +10,7 @@ from .collector_day_stage import stage_verified_day
 from .publisher_session import load_checkpoint, run_synthetic_one
 from .public_today_contract import ContractError, normalize_public_aid
 from .publisher_cli import exclusive_lock
+from .d1_publisher import canonical_record
 
 
 def prepare_verified_batch(db, *, day, aid, checkpoint_path, time_verifier):
@@ -35,7 +36,14 @@ def prepare_verified_batch(db, *, day, aid, checkpoint_path, time_verifier):
             pending.append({"source_line":row["source_line"],
                             "reason":"timestamp-authority-not-verified"})
         elif not pending:
-            verified.append(dict(row))
+            record=canonical_record({**row,
+                'floor':row.get('floor'),
+                'source_record_key':row['source_record_key']})
+            # D1 sender receives only the contract fields; raw PTT time text
+            # remains audit evidence, never a guessed canonical field.
+            accepted=('push_id','aid','day','source_line','kind','author',
+                      'content','occurred_at','floor','source_url','source_record_key')
+            verified.append({field:record.get(field) for field in accepted})
         else:
             pending.append({"source_line":row["source_line"],
                             "reason":"blocked-behind-pending-source-line"})
