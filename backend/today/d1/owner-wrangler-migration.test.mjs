@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {buildPlan,executionArgs} from './owner-wrangler-migration.mjs';
+import {buildPlan,executionArgs,validateAccountReceipt} from './owner-wrangler-migration.mjs';
 test('wrangler migration package preserves exact reviewed SQL and inserts ledger atomically',()=>{
  const p=buildPlan(),source=readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8');
  assert.ok(p.sql.startsWith(source));
@@ -16,4 +16,9 @@ test('wrangler migration package preserves exact reviewed SQL and inserts ledger
 test('wrangler package rejects tampered immutable migration bytes',()=>{
  const raw=readFileSync(new URL('./0002_today_canonical.sql',import.meta.url));
  assert.throws(()=>buildPlan(Buffer.concat([raw,Buffer.from('-- drift')])),/immutable Git blob drift/);
+});
+
+test('owner CLI rejects a Cloudflare account not matching production identity',()=>{
+ assert.equal(validateAccountReceipt('Account ID: f5999f88acc7aa8855f0896eef5d9942'),true);
+ assert.throws(()=>validateAccountReceipt('Account ID: different-account'),/account mismatch/);
 });
