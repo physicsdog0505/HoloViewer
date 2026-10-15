@@ -104,6 +104,30 @@ export async function setCoverage(db, c) {
     typeof c.checkpoint==='string'&&ckPattern.test(c.checkpoint)?c.checkpoint:null));
   await db.batch(statements);
 }
+/** 4174 Home adapter-safe optional fields: never let one malformed optional cell kill the catalog. */
+function consumerText(value){return typeof value==='string'?value:'';}
+function consumerTime(value){return validTime(value)?value:null;}
+function consumerLifecycle(value){return lifecycles.has(value)?value:'unknown';}
+function consumerRow(row,nowStamp,supportColors){
+ const video_id=idPattern.test(row?.video_id??'')?row.video_id:null;
+ const channel_id=channelPattern.test(row?.publisher_channel_id??'')?row.publisher_channel_id:null;
+ // Broken primary identity is a corrupt candidate, not a fabricated Home card.
+ if(!video_id||!channel_id)return null;
+ const color=supportColorFor(channel_id,supportColors);
+ const observed=consumerTime(row.lifecycle_observed_at);
+ const age=observed?Date.parse(nowStamp)-Date.parse(observed):NaN;
+ const fresh=Number.isFinite(age)&&age>=0&&age<=1200000;
+ const state=consumerLifecycle(row.lifecycle_state);
+ const lifecycle_state=state==='ended'&&consumerTime(row.actual_end)?'ended':!fresh?'stale':
+  state==='upcoming'&&consumerTime(row.scheduled_start)&&row.scheduled_start<=nowStamp?'waiting':state;
+ return {video_id,title:consumerText(row.title),channel_id,channel_name:consumerText(row.channel_name),
+  group:groups.has(row.channel_group)?row.channel_group:'other',lifecycle_state,observed_at:observed,
+  start_at:consumerTime(row.actual_start)??consumerTime(row.scheduled_start),
+  avatar_url:verifiedChannelAvatar(row.trusted_channel_avatar),
+  member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,
+  support_mode:color.support_mode,support_color_source:color.support_color_source,
+  source_label:consumerText(row.source_label),stale:lifecycle_state==='stale'};
+}
 export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false,supportColors=null}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
     throw Error('invalid canonical Today day');
@@ -144,14 +168,5 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
     completeness:{status:coverage?(coverage.gap||coverage.scanned_channels>0?'partial':'unverified'):'unverified',
                   gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated,has_more:truncated,offset,overnight},
     checkpoint:coverage?.checkpoint??null,
-    streams:(rows.results??[]).slice(0,limit).map(r=>{
-      const evidenceAge=Date.parse(nowStamp)-Date.parse(r.lifecycle_observed_at),valid=evidenceAge>=0&&evidenceAge<=1200000;
-      const state=r.lifecycle_state==='ended'&&r.actual_end?'ended':!valid?'stale':
-        r.lifecycle_state==='upcoming'&&r.scheduled_start&&r.scheduled_start<=nowStamp?'waiting':r.lifecycle_state;
-      const color=supportColorFor(r.publisher_channel_id,supportColors);
-      return {video_id:r.video_id,title:r.title,channel_id:r.publisher_channel_id,channel_name:r.channel_name,
-        group:r.channel_group,lifecycle_state:state,observed_at:r.lifecycle_observed_at,
-        start_at:r.actual_start??r.scheduled_start,avatar_url:verifiedChannelAvatar(r.trusted_channel_avatar),member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,support_mode:color.support_mode,support_color_source:color.support_color_source,
-        source_label:r.source_label,stale:state==='stale'};
-    })};
+    streams:(rows.results??[]).slice(0,limit).map(r=>consumerRow(r,nowStamp,supportColors)).filter(Boolean)};
 }
