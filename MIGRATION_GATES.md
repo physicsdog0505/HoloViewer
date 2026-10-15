@@ -44,11 +44,14 @@ The launcher/runtime runner must:
 
 1. run `tools/verify_4174_snapshot.py` first;
 2. clear `PYTHONPATH` and disable user-site imports;
-3. use `vendor/4174-a144bb3/` as both code root and deterministic runtime root;
-4. resolve local 4174 imports only under the vendored snapshot;
-5. verify loaded product modules are manifest-listed;
-6. verify required PTT/static assets resolve under the snapshot;
-7. print startup provenance including:
+3. use `vendor/4174-a144bb3/` as immutable code/static root only;
+4. use a distinct external runtime-data root (disposable by default, or explicitly supplied), never nested under `vendor/**`;
+5. keep runtime-data root out of `sys.path`;
+6. disable Today refresh in Checkpoint 2 isolation mode;
+7. resolve local 4174 imports only under the vendored snapshot;
+8. verify loaded product modules are manifest-listed;
+9. verify required PTT/static assets resolve under the snapshot;
+10. print startup provenance including:
    - exact migration HEAD;
    - pinned 4174 source SHA;
    - cwd;
@@ -56,7 +59,8 @@ The launcher/runtime runner must:
    - `sys.path`;
    - resolved `module.__file__` for loaded product modules;
    - resolved path + SHA-256 for required static assets;
-8. fail closed on any path escape or unmanifested product dependency.
+11. verify the vendored snapshot is unchanged after runtime exits;
+12. fail closed on any path escape, vendor write, or unmanifested product dependency.
 
 Checkpoint 2 is not PASS until an owner-local launch proves the runtime report and an independent review accepts it.
 
