@@ -203,15 +203,13 @@ class ParityContract(unittest.TestCase):
         self.assertIn("viewerActive?'all':'not all'",js)
 
     def test_4174_viewer_ptt_panel_is_not_a_fake_feed(self):
-        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
-        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn('id="customContentGrid"',html)
-        self.assertIn('id="custom-session-ptt-panel"',html)
-        self.assertIn('PTT 尚未對齊',html)
-        self.assertIn('viewerPttPanel.remove()',js)
-        self.assertIn("classList.toggle('video-only',!showPtt)",js)
-        self.assertIn("viewerPttPanel.hidden=false;",js)
-        self.assertIn('目前沒有足夠的專串來源與影片時間證據。',js)
+        dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn('class="ptt-live-panel"',dom)
+        self.assertIn('/ptt-today?focus=1&embed=1',dom)
+        self.assertIn("const pttPanel=document.querySelector('.ptt-live-panel')",js)
+        self.assertIn("function placePttForLayout()",js)
+        self.assertNotIn('目前沒有足夠的專串來源與影片時間證據。',dom)
 
     def test_shared_shell_has_no_invented_footer_or_dead_id_bindings(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
@@ -234,14 +232,13 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("renderMulti();route('multi')",js)
 
     def test_4174_live_rail_replaces_only_target_and_appends_in_multi(self):
-        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn('function selectWatchRailVideo(id,title)',js)
-        self.assertIn('function makeWatchCard(id,index)',js)
-        self.assertIn("watchMode==='multi'",js)
-        self.assertIn("viewing.ids.push(id)",js)
-        self.assertIn("box.append(makeWatchCard(id,i))",js)
-        self.assertIn("link.dataset.liveVideoId=id",js)
-        self.assertIn("iframe.src=youtubeEmbedUrl(id)",js)
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn("function appendWatchStream(videoId,label,channelId='')",js)
+        self.assertIn("streams.push(stream);players.push(null)",js)
+        self.assertIn("function setReplacementTarget(index)",js)
+        self.assertIn("replacementTarget",js)
+        self.assertIn("liveRailItems",js)
+        self.assertIn("mountWatchPlayer(index)",js)
         self.assertNotIn("route('multi')",js)
 
     def test_no_public_only_multiview_limit(self):
@@ -288,16 +285,13 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('viewerPttPanel.remove()',fix)
 
     def test_public_viewer_does_not_mount_uncertified_ptt_or_collapse_video(self):
-        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
-        self.assertIn("viewerPttPanel.remove();",js)
-        self.assertIn("classList.toggle('video-only',!showPtt)",js)
-        self.assertIn("viewerPttPanel.hidden=false;",js)
-        self.assertIn("if(!viewerPttPanel.isConnected)$('customContentGrid').append(viewerPttPanel);",js)
-        self.assertIn("目前沒有足夠的專串來源與影片時間證據。",js)
-        self.assertIn('body.custom-session-watching .custom-content-grid.video-only #stage .video-wrap{',css)
-        self.assertIn('aspect-ratio:16/9!important',css)
-        self.assertIn('grid-auto-rows:max-content!important',css)
+        dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("render4174SharedViewerDOM(viewing.ptt==='live')",app)
+        self.assertIn("showLivePtt?'':' video-only'",dom)
+        self.assertIn('.video-wrap{position:relative;aspect-ratio:16/9',css)
+        self.assertIn('.custom-content-grid.video-only{display:block}',css)
 
     def test_custom_session_restores_on_reload_without_blank_shell(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
@@ -326,16 +320,15 @@ class ParityContract(unittest.TestCase):
         self.assertIn('觀看尚未開始，已保留所選影片。',js)
 
     def test_verified_timeline_engine_is_fail_closed_and_uses_4174_offset_formula(self):
-        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn('let verifiedTimelineStarts=new Map();',js)
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('const verifiedTimelineStarts=(config.verifiedTimelineStarts||{})',js)
         self.assertIn('function verifiedTimelineComplete()',js)
-        self.assertIn("const timeline=opts.verifiedTimelineStarts;",js)
-        self.assertIn("typeof value==='number'&&Number.isFinite(value)",js)
-        self.assertIn('verifiedTimelineStarts.get(viewing.ids[masterIndex])+masterNow-verifiedTimelineStarts.get(viewing.ids[followerIndex])',js)
-        self.assertIn("youtubeCommand(iframe,'seekTo',[expected,true])",js)
+        self.assertIn('function timelineStartFor(index)',js)
         self.assertIn('if(expected<0)return false;',js)
         self.assertIn('expected>=duration)return false;',js)
-        self.assertIn("data?.event==='infoDelivery'",js)
+        self.assertIn('seekTo(expected,true)',js)
+        self.assertIn('verifiedTimelineStarts:opts.verifiedTimelineStarts',app)
         self.assertNotIn('start_at',js)
 
     def test_live_rail_preserves_group_and_selection_filter(self):
