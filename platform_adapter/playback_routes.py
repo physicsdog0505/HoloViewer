@@ -8,18 +8,16 @@ from __future__ import annotations
 from http import HTTPStatus
 from urllib.parse import parse_qs, urlsplit
 
-from client_custom_view import (
-    build_custom_view_html,
-    build_custom_view_session_html,
-    custom_view_session_from_query,
-)
-
-
 def playback_handler(accepted_handler):
     """Subclass original handler; only intercept two custom-view GET pages."""
 
     class PlaybackOnlyHandler(accepted_handler):
         def do_GET(self):
+            from client_custom_view import (
+                build_custom_view_html,
+                build_custom_view_session_html,
+                custom_view_session_from_query,
+            )
             parsed = urlsplit(self.path)
             if parsed.path == "/custom-view":
                 from client_home import load_home_streams
