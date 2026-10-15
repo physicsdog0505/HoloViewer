@@ -18,6 +18,20 @@ from platform_adapter.support_style_binding import (
 from platform_adapter.worker_transport import TransportResponse
 
 
+def build_request_live_rail() -> str:
+    """Render the accepted live rail from the request-local preloaded Today payload."""
+    import client_home
+
+    install_support_style_adapter(client_home)
+    payload = PublicAPI(DEFAULT_API).read_today()
+    live, _upcoming, _ended, _unknown = home_groups_from_payload(
+        payload, client_home.HomeStream
+    )
+    styles = extract_support_styles(payload)
+    with using_support_styles(styles):
+        return client_home._live_channel_rail(live)
+
+
 def dispatch_lightweight_home(target: str) -> TransportResponse:
     parsed = urlsplit(target)
     if parsed.path not in {"/", "/api/home"}:
