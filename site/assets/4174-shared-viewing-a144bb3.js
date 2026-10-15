@@ -304,22 +304,35 @@ immerse?.addEventListener('click',async()=>{
   statusBox.textContent=next?'已進入沉浸介面（瀏覽器未提供全螢幕）':'已退出沉浸介面';
  }
 });
+function restoreImmersiveSnapshots(){
+ document.querySelectorAll('[data-immersive-style]').forEach(node=>{
+  const saved=node.dataset.immersiveStyle;
+  if(saved!==undefined){node.setAttribute('style',saved);delete node.dataset.immersiveStyle;}
+ });
+ document.querySelectorAll('[data-multi-immersive-style]').forEach(node=>{
+  const saved=node.dataset.multiImmersiveStyle;
+  if(saved!==undefined){node.setAttribute('style',saved);delete node.dataset.multiImmersiveStyle;}
+ });
+}
+function finishImmersiveExit(){
+ if(immersiveEnabled||document.body.classList.contains('custom-immersive'))applyImmersiveState(false);
+ restoreImmersiveSnapshots();
+ document.body.classList.remove('custom-immersive');
+}
 window.hvExit4174Immersive=async function hvExit4174Immersive(){
- if(immersiveEnabled)applyImmersiveState(false);
+ finishImmersiveExit();
  if(document.fullscreenElement){
   try{await document.exitFullscreen();}catch(_e){}
  }
 };
 document.addEventListener('keydown',event=>{
  if(event.key!=='Escape'||!immersiveEnabled)return;
- setTimeout(()=>{if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);},0);
+ [0,50,150,350].forEach(delay=>setTimeout(()=>{if(!document.fullscreenElement)finishImmersiveExit();},delay));
 });
 document.addEventListener('fullscreenchange',()=>{
- // Escape exits immersive if fullscreen was actually active. CSS-only immersive
- // remains valid when the browser refuses requestFullscreen().
- if(!document.fullscreenElement&&immersiveEnabled){
-  applyImmersiveState(false);
- }else if(document.fullscreenElement){
+ if(!document.fullscreenElement){
+  finishImmersiveExit();
+ }else{
   applyImmersiveState(true);
  }
 });
