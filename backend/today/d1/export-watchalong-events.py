@@ -16,7 +16,7 @@ def q(value):
 
 def main():
     ap=argparse.ArgumentParser()
-    ap.add_argument("--database",required=True,type=Path)
+    ap.add_argument("--database",type=Path)
     ap.add_argument("--output",required=True,type=Path)
     ap.add_argument("--json-output",type=Path)
     ap.add_argument("--days",type=int,default=90)
@@ -24,9 +24,20 @@ def main():
     args=ap.parse_args()
     if not 1<=args.days<=3660:
         raise SystemExit("days outside safe range")
-    sys.path.insert(0,str(args.source_root.expanduser().resolve()))
+    source_root=args.source_root.expanduser().resolve()
+    sys.path.insert(0,str(source_root))
     from watchalong_ptt_catalog import load_recent_events
-    events=load_recent_events(args.database.expanduser().resolve(),days=args.days)
+    if args.database is not None:
+        database=args.database.expanduser().resolve()
+    else:
+        # Reuse the accepted 4174 runtime DB resolver; do not invent another path.
+        from client_runtime import client_runtime_root
+        from frontend_config import database_paths
+        _collector, web_database=database_paths(root=client_runtime_root())
+        database=Path(web_database).expanduser().resolve()
+    if not database.is_file():
+        raise SystemExit(f"PTT Web history DB not found: {database}")
+    events=load_recent_events(database,days=args.days)
     imported=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     out=[]
     for event in events:
