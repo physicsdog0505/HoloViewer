@@ -156,11 +156,40 @@ class Default(WorkerEntrypoint):
                          "Cache-Control": "no-store",
                          "X-HoloViewer-Recovered-Stage": stage},
             )
-        # Header names/values come from the accepted handler. Do not return
-        # hop-by-hop server transport headers to the Worker network stack.
-        headers = {
-            key: value
-            for key, value in result.headers
-            if key.lower() not in {"connection", "transfer-encoding", "server", "date", "content-length"}
-        }
-        return Response(result.body, status=result.status, headers=headers)
+        # Header/body conversion crosses the Python -> Workers JS bridge and
+        # can itself raise after rendering has already succeeded. Keep this
+        # boundary inside the same fail-soft policy so a malformed/unsupported
+        # transport value never escapes as Cloudflare 1101.
+        stage = "response-build"
+        try:
+            headers = {
+                key: value
+                for key, value in result.headers
+                if key.lower() not in {"connection", "transfer-encoding", "server", "date", "content-length"}
+            }
+            return Response(result.body, status=result.status, headers=headers)
+        except Exception as exc:
+            print("PYTHON_WORKER_PAGE_EXCEPTION:",
+                  stage, type(exc).__module__, type(exc).__name__)
+            if parsed.path in PAGE_ROUTES:
+                try:
+                    fallback = render_page_fallback(target)
+                except Exception as fallback_exc:
+                    print("PYTHON_WORKER_FALLBACK_EXCEPTION:",
+                          type(fallback_exc).__module__, type(fallback_exc).__name__)
+                    fallback = None
+                if fallback is not None:
+                    status, html = fallback
+                    return Response(
+                        html, status=status,
+                        headers={"Content-Type": "text/html; charset=utf-8",
+                                 "Cache-Control": "no-store",
+                                 "X-HoloViewer-Recovered-Stage": stage},
+                    )
+            return Response(
+                "Public page temporarily unavailable",
+                status=503,
+                headers={"Content-Type": "text/plain; charset=utf-8",
+                         "Cache-Control": "no-store",
+                         "X-HoloViewer-Recovered-Stage": stage},
+            )
