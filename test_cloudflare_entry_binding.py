@@ -184,6 +184,32 @@ class EntryPointBindingTest(unittest.TestCase):
         self.assertEqual(response.headers["X-HoloViewer-Recovered-Stage"], "home-render")
         fallback.assert_called_once_with("/")
 
+    def test_response_build_exception_falls_back_instead_of_1101(self):
+        class HomeRequest:
+            url = "https://public.example.test/"
+            method = "GET"
+
+        original_response = self.entry.Response
+        calls = {"n": 0}
+
+        def flaky_response(body, *, status=200, headers=None):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise TypeError("bridge failure")
+            return original_response(body, status=status, headers=headers)
+
+        with (patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}),
+              patch.object(self.entry, "dispatch_lightweight_home", return_value=TransportResponse(
+                  200, (("Content-Type", "text/html"),), b"<html>home</html>"
+              )),
+              patch.object(self.entry, "render_page_fallback", return_value=(200, "<html>safe-home</html>")),
+              patch.object(self.entry, "Response", side_effect=flaky_response)):
+            response = asyncio.run(self.entry.Default().fetch(HomeRequest()))
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.body, "<html>safe-home</html>")
+        self.assertEqual(response.headers["X-HoloViewer-Recovered-Stage"], "response-build")
+
     def test_page_and_fallback_exception_returns_owned_503_not_raise(self):
         class HomeRequest:
             url = "https://public.example.test/"
