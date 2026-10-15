@@ -2,7 +2,7 @@
 
 **Owner:** #68 Public host / accepted 4174 Consumer. **Backend API shell owner:** #47. **PTT mount owner:** #48. Canonical coordination: #45 comment 6190442416; #68 comment 6190448478.
 
-This is a **review-only proposed host diff** derived from the *executed*, same-Worker local Pyodide configuration. It is not a new backend, a second API Worker, a second frontend or an authorized Cloudflare deployment. The existing production host Worker identity and account identifiers must be confirmed by #45 before producing an applied Wrangler configuration.
+This is a **review-only proposed host diff** derived from the *executed*, same-Worker local Pyodide configuration. It is not a new backend, a second API Worker, a second frontend or an authorized Cloudflare deployment. The repository-configured Public Worker identity is confirmed as `holoviewer-public`; the currently deployed Cloudflare revision, account/zone route state and runtime bindings/headers still require owner-controlled read-only preflight before any applied Wrangler change.
 
 ## Known verified local configuration
 
@@ -40,7 +40,7 @@ The actual local workerd/Playwright evidence is Actions `38722971689`: four asse
 
 ## Pre-deploy owner validation required
 
-1. Existing Public host Worker **exact name**, routes/domains, Wrangler configuration and deployment revision (not guessed).
+1. Existing Public host Worker repository identity **`holoviewer-public`** is known; owner must still capture live routes/domains, deployed revision, account/zone and runtime configuration read-only before mutation.
 2. Correct existing public API Worker `holoviewer-public-api`, exact existing `DB` binding target `holoviewer-public-v1`, access/CORS and request budgets (review authority #45/#47).
 3. Reviewed combined #47 Today + #48 PTT router source with local/mock D1-compatible integration receipt. #68 must consume, not edit, that router.
 4. Owner-confirmed asset URL map, CSP/security headers, production timezone/package compatibility, and actual retained 4174 product routes.
@@ -76,14 +76,14 @@ Source HEADs pinned in the executed offline workflow:
 
 The test imports the **actual #47 + #48 owner-authored modules** (no copied API/router) and runs the single combined shell via local Node HTTP with deterministic, read-only D1-compatible `prepare/bind/all/first` fixtures. #68's actual Python consumer mapping then calls the loopback API to consume canonical Today and PTT Today, reads PTT History page one with `limit=1`, carries its opaque `next_checkpoint` through `PttPublicReader.read_history`, maps the query to `after`, and verifies the second distinct push appears. Actual `history_continuation_checked=true`, `history_second_count=1`, `db_reads=7` in the successful combined receipt. A separate unmounted Today-only router check has `db_reads=2`.
 
-The **same CI run** also records 42/42 offline tests, local Pyodide Python Worker startup, four exact original asset bytes and six Playwright Home/History geometry comparisons. The combined API/router runs through the accepted **Python consumer contract**; the local Pyodide rendering fixture is a separate CI step. This is *not yet* a single HTTP trace from Pyodide `fetch()` through the combined router. Do not claim production deployed D1, live PTT publication, or PTT UI cutover.
+The **same CI run** also records 42/42 offline tests, local Pyodide Python Worker startup, four exact original asset bytes and six Playwright Home/History geometry comparisons. The older combined API/router receipt ran through the accepted **Python consumer contract** and kept Pyodide rendering separate. That historical limitation is superseded by the later single Pyodide `fetch()` trace documented below. It still does not prove production deployed D1, live PTT publication, or PTT UI cutover.
 
-**Source-only/mocked milestone:** the 4174 Consumer can consume the actual combined owner-authored Router using a D1-compatible mock. Remaining production gates: independent acceptance of the #48 mount against the precise #47 base, real existing Worker account/binding identity, end-to-end Pyodide fetch against owner Router where required, D1 read-only canary, and owner-authorized deployment/merge. PTT product routes remain explicit 503 until those gates are cleared.
+**Historical source-only/mocked milestone:** the 4174 Consumer could consume the actual combined owner-authored Router using a D1-compatible mock. The later exact-head receipt below closes the single-Pyodide-fetch gap. Remaining gates are live deployed Worker/account/route/binding identity, real D1 read-only canary, #48 production readiness, and owner-authorized deployment/merge. PTT product routes remain explicit 503 until those gates are cleared.
 
 
 ## 8788 production host wiring — offline configuration validation
 
-A non-Wrangler, inert machine-readable proposal now lives at `platform_adapter/production_host_wiring_spec.json`. It deliberately leaves the Public host Worker name as `null` with `owner_confirmation_required=true`; it cannot be mistaken for an applied Cloudflare configuration. Offline regression `test_production_host_wiring.py` enforces all of the following:
+A non-Wrangler, inert machine-readable proposal now lives at `platform_adapter/production_host_wiring_spec.json`. It records the repository-confirmed Public host name `holoviewer-public` while separately marking the live deployed revision/runtime identity as unverified; it cannot be mistaken for an applied Cloudflare configuration. Offline regression `test_production_host_wiring.py` enforces all of the following:
 
 - the Public/UI Python Worker has **no D1 binding**;
 - the existing API Worker remains `holoviewer-public-api`, canonical origin `https://holoviewer-public-api.singlebagel.workers.dev`;
@@ -94,7 +94,7 @@ A non-Wrangler, inert machine-readable proposal now lives at `platform_adapter/p
 - normal product PTT remains `enabled=false` and fail-closed;
 - deploy, route/domain mutation, D1 migration/write, Publisher/Cron, secrets and merge/cutover remain explicit owner gates.
 
-This validates the **shape and ownership boundary** of production wiring without inventing the unknown production host Worker identity, account route, domain or existing deployment revision.
+This validates the **shape and ownership boundary** of production wiring without inventing the still-unknown live account/zone route, custom domain state, runtime headers/bindings or deployed revision.
 
 ## Single Pyodide fetch -> combined Router -> mock D1 proof
 
@@ -119,7 +119,7 @@ The exact-head workflow now executes this proof in addition to the existing comb
 ## Remaining production gates after offline host validation
 
 1. **#48 independent acceptance:** required before normal product PTT can be enabled. Local canaries may use `PttPublicReader(enabled=True)` only as test evidence.
-2. **Existing Public host identity/config:** exact Worker name, account/zone, routes/custom domain, deployed revision, CSP/security headers and owner-managed configuration are still UNKNOWN and must be confirmed by #45/Owner.
+2. **Existing Public host live identity/config:** repository Worker name is `holoviewer-public`; account/zone, routes/custom domain, deployed revision, CSP/security headers and owner-managed runtime configuration remain UNKNOWN until owner read-only preflight.
 3. **Real D1 read canary:** current proof is D1-compatible mock only. Real `holoviewer-public-v1` access is a production/staging mutation boundary and is not attempted here.
 4. **Cloudflare API Worker production wiring:** exact combined #47+#48 production source, API Worker deployment/config and D1 binding must be reviewed independently; #68 only consumes it.
 5. **Mutation authorization:** no deployment, D1 migration/write, Publisher/Cron activation, secret change, merge or cutover without explicit Owner authorization.
@@ -131,7 +131,7 @@ The inert wiring spec now records the actual ownership boundary rather than leav
 
 | Hop | Runtime owner | Required binding / variable | Offline disposition |
 |---|---|---|---|
-| Browser -> accepted product/static | Public Python Worker | `ASSETS`, `run_worker_first=false` | verified local shape; production Worker name/route still owner-confirmed |
+| Browser -> accepted product/static | Public Python Worker | `ASSETS`, `run_worker_first=false` | repo Worker name `holoviewer-public` known; live route/revision still owner-confirmed |
 | Accepted Python Worker -> canonical data API | Public Python Worker | hard-pinned `platform_adapter.public_api.DEFAULT_API`; no runtime API-base override | prevents deployment-time origin drift |
 | Canonical API -> data store | `holoviewer-public-api` | D1 binding `DB -> holoviewer-public-v1` | belongs only to API Worker; UI Worker has zero D1 bindings |
 | Browser-origin CORS at canonical API | `holoviewer-public-api` | `ALLOWED_ORIGIN` | exact production value remains owner-confirmed; do not guess it |
@@ -158,7 +158,7 @@ The exact-head offline workflow now also checks out current `main` read-only and
 
 ## Exact-head offline acceptance receipt
 
-Workflow `38740976552` at source HEAD `6a65a5fd9ffd63f21b3a88d97384df473bbeb12a`: **SUCCESS**.
+Final exact-head workflow `38741312102` at HEAD `c1b12c398e9237f16b4848cadf98837f99a61b92`: **SUCCESS**. The immediately preceding source HEAD `6a65a5fd9ffd63f21b3a88d97384df473bbeb12a` / workflow `38740976552` is also green and contains the teardown fix.
 
 - current-`main` repository host baseline comparison: PASS (`holoviewer-public`, static-only baseline, canonical API origin unchanged, no Public-host D1 binding);
 - #47 + #48 combined owner Router / Python consumer proof: PASS;
