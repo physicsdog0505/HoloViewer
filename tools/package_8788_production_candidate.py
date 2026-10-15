@@ -40,6 +40,11 @@ AUTHORIZED_UI_OVERRIDES = {
         "old": 'selectable_states = {"live", "waiting", "upcoming", "ended"}',
         "new": 'selectable_states = {"live", "waiting", "upcoming", "ended", "unknown", "stale"}',
     },
+    "home_collab_detection_is_nonfatal": {
+        "path": "client_home.py",
+        "old": "    collab_candidates = detect_collab_candidates([*live, *upcoming, *ended])\n",
+        "new": "    try:\n        collab_candidates = detect_collab_candidates([*live, *upcoming, *ended])\n    except (ValueError, TypeError, OverflowError):\n        collab_candidates = ()\n",
+    },
 }
 
 def apply_authorized_ui_overrides(output: Path) -> dict[str, str]:
