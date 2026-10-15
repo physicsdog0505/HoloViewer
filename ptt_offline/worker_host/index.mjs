@@ -5,9 +5,10 @@ import {createExistingApiRouter} from './today/api-shell.mjs';
 import {composeFullPttOnExistingApi} from '../full_ptt_api_composition.mjs';
 import {verifyPublisherTimeProof} from './time_authority.mjs';
 import {mountTodayPublisherOnCombinedApi} from './today/today-private-post.mjs';
+import {mountTodayCadence} from './today/cadence-refresh.mjs';
 
 const combined = composeFullPttOnExistingApi(createExistingApiRouter,{
   verifyAuthority: async (row,env) => verifyPublisherTimeProof(row,env)
 });
 
-export default mountTodayPublisherOnCombinedApi(combined);
+export default mountTodayCadence(mountTodayPublisherOnCombinedApi(combined));
