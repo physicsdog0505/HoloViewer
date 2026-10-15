@@ -58,6 +58,25 @@ class D1PublisherTests(unittest.TestCase):
                           [record(1), record(2, aid="A2")])
         self.assertEqual(read_day(self.db, "2026-10-15"), (set(), []))
 
+    def test_identity_correction_with_stable_source_key_fails_closed(self):
+        original = record(1)
+        publish_batch(self.db, "2026-10-15", {"A1"}, [original])
+        with self.assertRaisesRegex(ContractError, "identity conflict"):
+            publish_batch(self.db, "2026-10-15", {"A1"},
+                          [record(1, content="corrected identity")])
+        self.assertEqual(len(read_day(self.db, "2026-10-15")[1]), 1)
+        self.assertEqual(read_day(self.db, "2026-10-15")[1][0]["push_id"], canonical_id(original))
+
+    def test_equal_priority_null_floor_never_regresses(self):
+        for priority in ("web", "collector"):
+            with self.subTest(priority=priority):
+                item = record(10 if priority == "web" else 11, origin=priority, floor=45)
+                publish_batch(self.db, "2026-10-15", {"A1"}, [item])
+                publish_batch(self.db, "2026-10-15", {"A1"},
+                              [record(item["source_line"], origin=priority, floor=None)])
+                rows = read_day(self.db, "2026-10-15")[1]
+                self.assertEqual(next(r["floor"] for r in rows if r["source_line"] == item["source_line"]), 45)
+
     def test_nullable_floor_and_replay_survive(self):
         publish_batch(self.db, "2026-10-15", {"A1"}, [record(1)])
         self.assertIsNone(read_day(self.db, "2026-10-15")[1][0]["floor"])
