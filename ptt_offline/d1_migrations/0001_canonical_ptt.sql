@@ -1,6 +1,6 @@
 -- Issue #48, durable production-compatible Cloudflare D1 schema v1.
 -- Forward-only and idempotent; never drop canonical identity or replay evidence.
-CREATE TABLE IF NOT EXISTS schema_migrations (
+CREATE TABLE IF NOT EXISTS public_ptt_schema_migrations (
     version INTEGER PRIMARY KEY,
     description TEXT NOT NULL,
     applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -48,5 +48,5 @@ CREATE TABLE IF NOT EXISTS ptt_source_evidence (
     source_line INTEGER NOT NULL,
     PRIMARY KEY(day, aid, source_record_key)
 );
-INSERT OR IGNORE INTO schema_migrations(version,description)
+INSERT OR IGNORE INTO public_ptt_schema_migrations(version,description)
 VALUES(1,'canonical push, thread scope, replay and forward repair state');
