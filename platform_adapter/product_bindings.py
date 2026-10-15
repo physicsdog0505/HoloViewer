@@ -26,7 +26,7 @@ def _timestamp(value):
     return instant.astimezone(timezone.utc) if instant.tzinfo else None
 
 
-def _home_row(row: dict, home_stream_cls: Callable):
+def _home_row(row: dict, home_stream_cls: Callable, *, feed_freshness: str = "unknown"):
     if not isinstance(row, dict):
         return None
     video_id = row.get("video_id")
@@ -39,6 +39,10 @@ def _home_row(row: dict, home_stream_cls: Callable):
     if lifecycle not in ALLOWED_STATES:
         lifecycle = "unknown"
     state = "upcoming" if lifecycle == "waiting" else lifecycle
+    # A positive LIVE assertion requires fresh feed evidence, not simply
+    # an old persisted lifecycle label from the canonical store.
+    if state == "live" and feed_freshness != "fresh":
+        state = "unknown"
     if state == "stale":
         state = "unknown"
     group = str(row.get("group") or "").lower()
@@ -70,8 +74,10 @@ def bind_home_reader(api: PublicAPI, home_stream_cls: Callable):
         if not isinstance(rows, list):
             raise PublicAPIUnavailable("Today rows missing")
         groups = {"live": [], "upcoming": [], "ended": [], "unknown": []}
+        freshness = payload.get("freshness")
+        freshness = freshness if isinstance(freshness, str) else "unknown"
         for raw in rows:
-            item = _home_row(raw, home_stream_cls)
+            item = _home_row(raw, home_stream_cls, feed_freshness=freshness)
             if item is None:
                 continue
             bucket = item.state if item.state in groups else "unknown"
