@@ -25,6 +25,16 @@ ROUTES = [
     ("/collab", "page"),
     ("/api/home", "api"),
     ("/api/ptt/today", "api"),
+    ("/api/ptt/video?video_id=invalid", "api"),
+    ("/api/collab/live?collab=unsupported", "api"),
+    ("/api/translation/preflight", "api"),
+    ("/api/translation/prepare", "api"),
+    ("/api/watchalong/progressive", "api"),
+    ("/api/watchalong/reanalyze", "api"),
+    ("/collab/session?collab=unsupported", "page"),
+    ("/watchalong/session", "page"),
+    ("/history?date=invalid", "page"),
+    ("/history?page=0", "page"),
 ]
 
 
