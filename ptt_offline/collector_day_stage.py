@@ -58,7 +58,11 @@ def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
     selected=[{**r,"source_url":url,"origin":"collector"}
               for r in chronological if r["day"] == day
               and r["source_line"] > after_source_line]
-    source_identity=sha256(json.dumps([board,canonical,url,article_id],
+    # Bind replay to the exact audited immutable source snapshot, not just URL.
+    # Collector may rewrite an existing source_line after a later screen capture.
+    # A changed content/time/source ordering must never reuse an ACK checkpoint.
+    source_identity=sha256(json.dumps(
+        [board,canonical,url,article_id,raw],
         separators=(",",":"),ensure_ascii=False).encode("utf-8")).hexdigest()
     return {
         "day":day,"aid":canonical,"source_identity":source_identity,
