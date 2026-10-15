@@ -18,6 +18,31 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(seconds_until_next_snapshot(datetime(2026,10,16,2,1,0,tzinfo=tpe)),540)
         self.assertEqual(seconds_until_next_snapshot(datetime(2026,10,16,6,59,0,tzinfo=tpe)),60)
         self.assertEqual(seconds_until_next_snapshot(datetime(2026,10,16,7,0,30,tzinfo=tpe)),30)
+    def test_one_hundred_pushes_drain_four_ack_batches(self):
+        source="b"*64
+        responses=[{"status":"ACK","sent":25} for _ in range(4)]+[{"status":"NO_NEW_ROWS","sent":0}]
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",side_effect=responses) as publisher:
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,executor=lambda x:x,batch_cap=25,max_batches=8)
+        self.assertEqual(result["sent"],100)
+        self.assertEqual(result["http_posts"],4)
+        self.assertEqual(publisher.call_count,5)
+        self.assertFalse(result["backlog_may_remain"])
+
+    def test_bounded_drain_marks_possible_backlog(self):
+        source="c"*64
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",return_value={"status":"ACK","sent":25}) as publisher:
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=25,max_batches=8)
+        self.assertEqual(result["sent"],200)
+        self.assertEqual(result["http_posts"],8)
+        self.assertEqual(publisher.call_count,8)
+        self.assertTrue(result["backlog_may_remain"])
+
     def test_empty_collector_never_posts(self):
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
              patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"NO_REAL_COLLECTOR_ROWS","candidate_rows":[]}), \
