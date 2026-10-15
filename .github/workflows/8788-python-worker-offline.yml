@@ -38,6 +38,14 @@ jobs:
           ref: 149a80361654b06377dbae580e1d8da2e5010cf0
           path: .owner-issue47
           persist-credentials: false
+      - name: Checkout exact #48-owned PTT extension for combined read-only proof
+        uses: actions/checkout@v4
+        with:
+          ref: b96d0902a504bc26019efd693a1b3586cfb3d3d2
+          path: .owner-issue48
+          persist-credentials: false
+      - name: Exercise exact #47 + #48 combined router into accepted consumer
+        run: node tools/check_8788_owner_api_e2e.mjs .owner-issue47 .owner-issue48
       - name: Exercise exact #47 router via local mock D1 into accepted 4174 consumer
         run: node tools/check_8788_owner_api_e2e.mjs .owner-issue47
       - name: Verify immutable accepted 4174 snapshot
