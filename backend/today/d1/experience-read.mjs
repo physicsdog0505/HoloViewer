@@ -151,12 +151,26 @@ export function detectCollabCandidates(input){
  }
  return out.map(c=>eventPayload(c,rows));
 }
+function nextDay(day){
+ const d=new Date(day+'T00:00:00Z');
+ d.setUTCDate(d.getUTCDate()+1);
+ return d.toISOString().slice(0,10);
+}
 async function historyRows(db,day){
+ // Accepted 4174 Collab event-day rolls over at 06:00 Taipei. Read the selected
+ // calendar day plus the following early-morning calendar day, then filter by
+ // canonical event-day so one overnight event is never split in two.
  const rows=await db.prepare(`SELECT video_id,title,channel_id,channel_name,avatar_url,actual_start,actual_end,scheduled_start
- FROM public_history WHERE taipei_day=?
- ORDER BY COALESCE(actual_start,scheduled_start) ASC,video_id ASC LIMIT ?`).bind(day,MAX_HISTORY_ROWS+1).all();
+ FROM public_history WHERE taipei_day IN (?,?)
+ ORDER BY COALESCE(actual_start,scheduled_start) ASC,video_id ASC LIMIT ?`)
+  .bind(day,nextDay(day),MAX_HISTORY_ROWS*2+1).all();
  const raw=rows.results??[];
- return {limited:raw.length>MAX_HISTORY_ROWS,streams:raw.slice(0,MAX_HISTORY_ROWS).map(x=>normalizeStream(x,{state:'ended'})).filter(Boolean)};
+ const normalized=raw.map(x=>normalizeStream(x,{state:'ended'})).filter(Boolean)
+  .filter(x=>x.start_at&&taipeiDayWithSixHourRollover(x.start_at)===day);
+ return {
+  limited:raw.length>MAX_HISTORY_ROWS*2||normalized.length>MAX_HISTORY_ROWS,
+  streams:normalized.slice(0,MAX_HISTORY_ROWS)
+ };
 }
 async function collabLive(db,{now=new Date(),profileTableEnabled=false}={}){
  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
