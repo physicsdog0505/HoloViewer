@@ -1,4 +1,5 @@
 import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
 import {validateSupportColorExport} from './support-colors.mjs';
 
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
@@ -43,7 +44,7 @@ export function verifyLegacy66Handoff(rosterPayload,colorPayload){
   };
 }
 
-if(import.meta.url===new URL(process.argv[1], 'file://').href){
+if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href){
   const [rosterPath,colorPath]=process.argv.slice(2);
   if(!rosterPath||!colorPath){
     console.error('usage: node verify-support-color-handoff.mjs <legacy66.json> <holoviewer-channel-support-colors.json>');
