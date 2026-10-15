@@ -353,7 +353,7 @@ window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHo
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
+$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;const query=new URLSearchParams();ids.forEach(id=>query.append('stream',id));query.set('layout','auto');query.set('primary','0');query.set('audio','0');location.assign('/custom-view/session?'+query.toString())};
 $('ptt-refresh').onclick=event=>{event.preventDefault();loadPtt()};
 $('ptt-focus').onclick=event=>{event.preventDefault();route($('ptt').classList.contains('active')&&document.body.classList.contains('ptt-focus-mode')?'ptt':'ptt-focus')};
 document.querySelectorAll('[data-page-link]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.pageLink)}));
