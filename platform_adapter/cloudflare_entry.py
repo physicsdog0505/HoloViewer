@@ -38,6 +38,11 @@ class Default(WorkerEntrypoint):
         if parsed.query:
             target += "?" + parsed.query
 
+        # Reject non-GET requests before any upstream API fetch or product dispatch.
+        if str(request.method) != "GET":
+            return Response("Method Not Allowed", status=405,
+                            headers={"Allow": "GET", "Cache-Control": "no-store"})
+
         # Phase-E first proof slice only. Unbound routes must never fall back
         # to the immutable product's local SQLite/file loaders in a Worker.
         # This is a data-readiness gate, NOT another product route dispatcher.
