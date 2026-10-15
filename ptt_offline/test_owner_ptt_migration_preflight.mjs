@@ -21,7 +21,7 @@ test('read-only only, pinned account and no write command',()=>{
   if(args[0]==='whoami') return ACCOUNT;
   return JSON.stringify([{success:true,results:inventory.map(name=>({name,type:'table'}))}]);
  };
- assert.throws(()=>run(['--apply'],invoke,()=>{}),/write\/apply not implemented/);
+ assert.throws(()=>run(['--apply'],invoke,()=>{}),/exact owner checksum approval required/);
  const result=run(['--inspect'],invoke,()=>{});
  assert.equal(result.mode,'READ_ONLY_ACCOUNT_PREFLIGHT');
  assert.equal(calls.length,2);
@@ -37,4 +37,26 @@ test('existing PTT objects are not treated as applied without version ledger',()
  assert.throws(()=>verifyAppliedPttLedger([],inventory),/ledger missing/);
  assert.deepEqual(verifyAppliedPttLedger([{version:1,description:'ptt'}],inventory),
    {applied:true,verified:true,version:1});
+});
+
+test('owner pinned apply invokes exactly one existing-D1 file mutation and verifies',()=>{
+ const plan=planMigration();
+ const existing=['public_catalog','public_history','public_today_schema_migrations','d1_migrations'];
+ const after=[...existing,'ptt_threads','ptt_pushes','ptt_source_evidence',
+   'ptt_provider_state','ptt_gap_repairs','public_ptt_schema_migrations'];
+ const commands=[];let wrote=false;
+ const execute=(args)=>{
+  commands.push(args);
+  if(args[0]==='whoami')return ACCOUNT;
+  if(args.includes('--file')){wrote=true;return 'ok';}
+  const sql=args[args.length-1];
+  const rows=sql.includes('SELECT version,description')?
+    [{version:1,description:'canonical push, thread scope, replay and forward repair state'}]:
+    (wrote?after:existing).map(name=>({name,type:'table'}));
+  return JSON.stringify([{success:true,results:rows}]);
+ };
+ const result=run(['--apply','--approve='+plan.sha256],execute,()=>{});
+ assert.equal(result.mode,'OWNER_APPLIED_VERIFIED');
+ assert.equal(commands.filter(c=>c.includes('--file')).length,1);
+ assert.equal(commands.find(c=>c.includes('--file'))[2],UUID);
 });
