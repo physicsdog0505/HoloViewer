@@ -10,11 +10,20 @@ def url_at(utc):
 
 
 class UrlEpochAuthorityTests(unittest.TestCase):
+    verifier=staticmethod(lambda board,aid,url: board == "C_Chat" and aid == "A1")
+    def test_missing_or_rejected_identity_fails_closed(self):
+        url=url_at("2025-12-31T15:00:00Z")
+        with self.assertRaises(ContractError):
+            article_epoch(board="C_Chat",aid="A1",url=url)
+        with self.assertRaises(ContractError):
+            article_epoch(board="C_Chat",aid="A1",url=url,
+                          identity_verifier=lambda *args: False)
+
     def test_december_to_january_rollover_and_selected_day(self):
         url=url_at("2025-12-31T15:00:00Z")  # 23:00 Taipei
         rows=[{"source_line":5,"ptt_date":"12/31","ptt_time":"23:01"},
               {"source_line":6,"ptt_date":"01/01","ptt_time":"00:01"}]
-        got=reconstruct_events(board="C_Chat",aid="#A1",url=url,pushes=rows)
+        got=reconstruct_events(board="C_Chat",aid="#A1",url=url,pushes=rows,identity_verifier=self.verifier)
         self.assertEqual([r["day"] for r in got],["2025-12-31","2026-01-01"])
         self.assertEqual(got[0]["occurred_at"],"2025-12-31T15:01:00Z")
         self.assertEqual(got[1]["source_record_key"],"A1:6")
@@ -22,7 +31,7 @@ class UrlEpochAuthorityTests(unittest.TestCase):
     def test_january_first_push_after_december_article(self):
         url=url_at("2025-12-31T15:59:00Z")
         rows=[{"source_line":1,"ptt_date":"01/01","ptt_time":"00:01"}]
-        self.assertEqual(reconstruct_events(board="C_Chat",aid="A1",url=url,pushes=rows)[0]["day"],"2026-01-01")
+        self.assertEqual(reconstruct_events(board="C_Chat",aid="A1",url=url,pushes=rows,identity_verifier=self.verifier)[0]["day"],"2026-01-01")
 
     def test_reject_malformed_url_or_board(self):
         for board,url in [
@@ -30,7 +39,7 @@ class UrlEpochAuthorityTests(unittest.TestCase):
             ("Other",url_at("2025-12-31T15:00:00Z")),
         ]:
             with self.subTest(board=board,url=url),self.assertRaises(ContractError):
-                article_epoch(board=board,aid="A1",url=url)
+                article_epoch(board=board,aid="A1",url=url,identity_verifier=self.verifier)
 
     def test_reject_unobserved_year_and_regressive_sequence(self):
         url=url_at("2025-01-01T00:00:00Z")
@@ -43,7 +52,7 @@ class UrlEpochAuthorityTests(unittest.TestCase):
         ]
         for rows in cases:
             with self.subTest(rows=rows),self.assertRaises(ContractError):
-                reconstruct_events(board="C_Chat",aid="A1",url=url,pushes=rows)
+                reconstruct_events(board="C_Chat",aid="A1",url=url,pushes=rows,identity_verifier=self.verifier)
 
 
 if __name__=="__main__":
