@@ -78,6 +78,12 @@ class ProviderIngestionTests(unittest.TestCase):
         result=self.ingest({C:[[V]]},lambda _:{V:{"id":"wrong"}})
         self.assertTrue(result.gap)
         self.assertFalse(result.records)
+    def test_roster_group_propagates(self):
+        self.roster=ApprovedRoster("fixture-v1",frozenset({C}),{C:"holostars"})
+        result=self.ingest({C:[[V]]},lambda ids:{V:video()})
+        self.assertEqual(result.records[0]["group"],"holostars")
+    def test_bad_group_rejected(self):
+        with self.assertRaises(ValueError):ApprovedRoster("fixture-v1",frozenset({C}),{C:"invalid"})
     def test_truncated_pages(self):
         self.assertTrue(self.ingest({C:[[V],[V],[V]]},lambda _:{V:video()}).gap)
 

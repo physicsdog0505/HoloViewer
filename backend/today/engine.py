@@ -98,14 +98,16 @@ def project(rows, *, now, last_success_at=None, expected_channels=66, scanned_ch
         item_fresh = 0 <= (current-observed).total_seconds() <= ttl_seconds
         item = {k:row.get(k) for k in ("video_id","title","channel_id","channel_name","group",
             "observed_at","source_label","avatar_url","member_accent")}
-        if not item_fresh:
+        if row["lifecycle_state"] == "ended" and row.get("actual_end"):
+            item["lifecycle_state"] = "ended"
+        elif not item_fresh:
             item["lifecycle_state"] = "stale"
         elif row["lifecycle_state"] == "upcoming" and row.get("scheduled_start") and utc(row["scheduled_start"]) <= current:
             item["lifecycle_state"] = "waiting"
         else:
             item["lifecycle_state"] = row["lifecycle_state"]
         item["start_at"] = row.get("actual_start") or row.get("scheduled_start")
-        item["stale"] = not item_fresh
+        item["stale"] = not item_fresh and item["lifecycle_state"] != "ended"
         items.append(item)
     return {"schema_version":"public-consumer-v1","as_of":stamp(current),
         "freshness":{"status":fresh_status,

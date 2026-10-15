@@ -1,5 +1,5 @@
 """Bounded offline ingestion orchestration: never performs provider I/O itself."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from .engine import normalize_video, VIDEO_ID, CHANNEL_ID
 from .schedule import Budget
 
@@ -7,11 +7,14 @@ from .schedule import Budget
 class ApprovedRoster:
     version: str
     channels: frozenset[str]
+    groups: dict = field(default_factory=dict)
     def __post_init__(self):
         if not self.version.strip() or not self.channels:
             raise ValueError("roster requires version and channels")
         if any(not CHANNEL_ID.fullmatch(channel) for channel in self.channels):
             raise ValueError("invalid roster channel ID")
+        if any(ch not in self.channels or group not in {"hololive","holostars","mekpark","other"} for ch,group in self.groups.items()):
+            raise ValueError("unapproved roster group")
 
 @dataclass(frozen=True)
 class IngestionResult:
@@ -82,7 +85,7 @@ def ingest_batches(*, roster, pages, metadata, observed_at, budget=None,
             try:
                 normalized = normalize_video(raw, observed_at=observed_at,
                     approved_channels=roster.channels, reference_now=reference_now,
-                    roster_version=roster.version)
+                    roster_version=roster.version, approved_groups=roster.groups)
             except (ValueError, TypeError):
                 gap = True
                 errors.append((ident, "bad_metadata"))

@@ -99,6 +99,11 @@ class TodayVectors(unittest.TestCase):
         self.assertEqual(readers([norm(payload("upcoming"))])["streams"][0]["lifecycle_state"],"upcoming")
     def test_group_not_fabricated(self):
         self.assertEqual(norm(payload("upcoming"))["group"],"other")
+    def test_durable_ended_after_ttl(self):
+        e=norm(payload("none",ended="2026-10-15T10:00:00Z"),NOW-timedelta(hours=2))
+        x=readers([e],last=NOW-timedelta(hours=2))
+        self.assertEqual(x["streams"][0]["lifecycle_state"],"ended")
+        self.assertFalse(x["streams"][0]["stale"])
     def test_non_divisor_ceiling(self):
         self.assertEqual(Budget(scan_minutes=31).requests_per_day_estimate(channel_count=1,video_batches=0),47)
 if __name__=="__main__":
