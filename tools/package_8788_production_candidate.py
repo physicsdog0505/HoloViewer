@@ -125,7 +125,70 @@ from frontend_time import TAIPEI
     tail = tail.replace(loader_anchor, loader_imports, 1)
     text = text[:start] + tail
     target.write_text(text, encoding="utf-8")
-    return {"client_home_lazy_runtime_imports": "applied"}
+
+    watchalong = output / "client_watchalong.py"
+    watch_text = watchalong.read_text(encoding="utf-8")
+    heavy = """from client_home import _channel_accent
+from client_runtime import client_runtime_root
+from frontend_config import database_paths
+from client_ui_shell import client_document
+from client_home import _stream_group
+from client_ui_shell import client_viewer_document
+from frontend_time import TAIPEI
+from frontend_watchalong_companion import build_companion_watchalong_html
+from frontend_watchalong_extras import (
+    WatchalongPttPayload,
+    enhance_watchalong_html,
+    load_watchalong_ptt_messages,
+    subtitle_payload,
+)
+from shared_viewing_core import (
+    parse_youtube_video_id,
+    render_watchalong_session,
+    watchalong_session_from_inputs,
+)
+from transcript_corpus import TranscriptCorpus
+from transcript_ingest import TranscriptIngestService
+from transcript_pipeline import TranscriptSegment
+from live_stream_discovery import LiveDiscoveryCache
+from watchalong_archive_store import (
+    SavedWatchalongSourceMapping,
+    load_latest_watchalong_source_mapping,
+    load_watchalong_source_mapping,
+    save_watchalong_source_mapping,
+)
+from watchalong_provider import detect_provider, is_http_source
+from watchalong_ptt_catalog import load_recent_events, parse_watchalong_events
+from watchalong_transcript import (
+    confirmed_episode_start_cues,
+    format_timestamp_ms,
+    infer_watchalong_cues,
+    parse_manual_transcript,
+)
+from watchalong_transcript_integration import load_watchalong_transcript
+from watchalong_translation_integration import (
+    inspect_watchalong_translation,
+    watchalong_translation_view,
+)
+from watchalong_playback_telemetry import (
+    PlaybackTelemetryReceiver,
+    start_playback_telemetry_receiver,
+)
+from youtube_metadata import fetch_video, load_api_key
+"""
+    light = """from client_home import _channel_accent, _stream_group
+from client_ui_shell import client_document, client_viewer_document
+from frontend_time import TAIPEI
+"""
+    if watch_text.count(heavy) != 1:
+        raise RuntimeError("client_watchalong eager-import anchor mismatch")
+    watch_text = watch_text.replace(heavy, light)
+    watchalong.write_text(watch_text, encoding="utf-8")
+
+    return {
+        "client_home_lazy_runtime_imports": "applied",
+        "client_watchalong_landing_lightweight_imports": "applied",
+    }
 
 
 def package(output: Path) -> dict:
