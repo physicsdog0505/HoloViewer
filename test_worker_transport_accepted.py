@@ -52,7 +52,7 @@ class AcceptedDispatcherProof(unittest.TestCase):
         self.assertIn("無效的歷史日期".encode(), response.body)
 
     def test_full_product_dispatcher_not_copied(self):
-        self.assertIs(
+        self.assertEqual(
             client_app.ClientRequestHandler.do_GET.__module__,
             client_app.ClientRequestHandler.__module__,
         )
