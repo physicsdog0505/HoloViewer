@@ -15,6 +15,8 @@ from urllib.parse import urlencode, urlsplit
 
 DEFAULT_API = "https://holoviewer-public-api.singlebagel.workers.dev"
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+EXPERIENCE_EVENT_ID = re.compile(r"^[A-Za-z0-9:_-]{1,160}$")
+WATCHALONG_EVENT_ID = re.compile(r"^watch:[0-9a-f]{20}$")
 
 _PRELOADED = ContextVar("holoviewer_canonical_api_preload", default=None)
 
@@ -110,6 +112,62 @@ class PublicAPI:
         if not VIDEO_ID.fullmatch(video_id):
             raise ValueError("Invalid YouTube video id")
         return self._read("/v1/catalog/videos/" + video_id)
+
+
+
+    def read_collab_live(self) -> dict:
+        """Canonical Collab candidates; candidate grouping remains non-authoritative."""
+        result = self._read("/v1/collab/live")
+        if not isinstance(result.get("events"), list):
+            raise PublicAPIUnavailable("Collab event list missing")
+        return result
+
+    def read_collab_history(self, day: date, *, limit: int = 50, offset: int = 0) -> dict:
+        if not isinstance(day, date) or not 1 <= limit <= 100 or not 0 <= offset <= 1000:
+            raise ValueError("Invalid collab history page")
+        result = self._read("/v1/collab/history", query={
+            "day": day.isoformat(), "limit": str(limit), "offset": str(offset)
+        })
+        if not isinstance(result.get("events"), list):
+            raise PublicAPIUnavailable("Collab history list missing")
+        return result
+
+    def read_collab_event(self, event_id: str, *, day: date | None = None) -> dict:
+        if not isinstance(event_id, str) or not EXPERIENCE_EVENT_ID.fullmatch(event_id):
+            raise ValueError("Invalid collab event id")
+        query = {"day": day.isoformat()} if isinstance(day, date) else None
+        result = self._read("/v1/collab/events/" + event_id, query=query)
+        if not isinstance(result.get("event"), dict):
+            raise PublicAPIUnavailable("Collab event missing")
+        return result
+
+    def read_watchalong_recent(self, *, days: int = 30, limit: int = 60) -> dict:
+        if not 1 <= days <= 90 or not 1 <= limit <= 100:
+            raise ValueError("Invalid Watchalong recent bounds")
+        result = self._read("/v1/watchalong/recent", query={
+            "days": str(days), "limit": str(limit)
+        })
+        if not isinstance(result.get("events"), list):
+            raise PublicAPIUnavailable("Watchalong event list missing")
+        return result
+
+    def read_watchalong_history(self, day: date, *, limit: int = 60, offset: int = 0) -> dict:
+        if not isinstance(day, date) or not 1 <= limit <= 100 or not 0 <= offset <= 1000:
+            raise ValueError("Invalid Watchalong history page")
+        result = self._read("/v1/watchalong/history", query={
+            "day": day.isoformat(), "limit": str(limit), "offset": str(offset)
+        })
+        if not isinstance(result.get("events"), list):
+            raise PublicAPIUnavailable("Watchalong history list missing")
+        return result
+
+    def read_watchalong_event(self, event_id: str) -> dict:
+        if not isinstance(event_id, str) or not WATCHALONG_EVENT_ID.fullmatch(event_id):
+            raise ValueError("Invalid Watchalong event id")
+        result = self._read("/v1/watchalong/events/" + event_id)
+        if not isinstance(result.get("event"), dict):
+            raise PublicAPIUnavailable("Watchalong event missing")
+        return result
 
     def read_day(self, day: date, *, limit: int = 50, offset: int = 0) -> dict:
         """Legacy-compatible History consumption; not a #47/#48 canonical projection."""
