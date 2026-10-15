@@ -26,7 +26,7 @@ export async function handleTodayRead(request,env,now=new Date()) {
   const rawOffset=url.searchParams.get('offset')??'0';
   if (!/^(0|[1-9][0-9]{0,4})$/.test(rawOffset) || Number(rawOffset)>10000) return json({error:'bad_offset'},400);
   try {
-    const result=await readToday(env.DB,{day,limit:Number(rawLimit),offset:Number(rawOffset),now});
+    const result=await readToday(env.DB,{day,limit:Number(rawLimit),offset:Number(rawOffset),now,profileTableEnabled:env.TODAY_PROFILES_ENABLED==='true'});
     const serialized=JSON.stringify(result);
     if (new TextEncoder().encode(serialized).length>MAX_BODY) return json({error:'response_limit'},503);
     return new Response(serialized,{status:200,headers:{
