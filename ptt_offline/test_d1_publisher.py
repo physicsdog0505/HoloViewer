@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from pathlib import Path
 
-from ptt_offline.d1_publisher import publish_batch, publish_provider_state, read_day
+from ptt_offline.d1_publisher import publish_batch, publish_provider_state, close_verified_gap, read_day
 from ptt_offline.public_today_contract import ContractError, canonical_id
 
 
@@ -91,6 +91,26 @@ class D1PublisherTests(unittest.TestCase):
             last_success_at="2026-10-15T00:00:30Z")
         self.assertEqual(self.db.execute(
             "SELECT count(*) FROM ptt_provider_state").fetchone()[0], 1)
+
+    def test_verified_gap_closure_blocks_old_replay_and_allows_new_gap(self):
+        publish_provider_state(self.db, day="2026-10-15", aid="A1",
+            last_success_at="2026-10-15T00:00:20Z", has_gap=True,
+            purged_through_cursor=5)
+        evidence = dict(day="2026-10-15", aid="A1",
+            verified_at="2026-10-15T00:00:30Z",
+            covered_through_cursor=5, repair_id="repair-1",
+            evidence_digest="0123456789abcdef")
+        with self.assertRaises(ContractError):
+            close_verified_gap(self.db, evidence, verify_coverage=lambda _: False)
+        close_verified_gap(self.db, evidence, verify_coverage=lambda _: True)
+        publish_provider_state(self.db, day="2026-10-15", aid="A1",
+            last_success_at="2026-10-15T00:00:20Z", has_gap=True)
+        self.assertEqual(self.db.execute(
+            "SELECT has_gap FROM ptt_provider_state WHERE aid='A1'").fetchone()[0],0)
+        publish_provider_state(self.db, day="2026-10-15", aid="A1",
+            last_success_at="2026-10-15T00:00:40Z", has_gap=True)
+        self.assertEqual(self.db.execute(
+            "SELECT has_gap FROM ptt_provider_state WHERE aid='A1'").fetchone()[0],1)
 
     def test_nullable_floor_and_replay_survive(self):
         publish_batch(self.db, "2026-10-15", {"A1"}, [record(1)])
