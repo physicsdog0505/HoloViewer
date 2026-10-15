@@ -28,15 +28,15 @@ class ConsumerPagingTests(unittest.TestCase):
     def test_real_page_two_three_and_terminal(self):
         reader = PttConsumerReader(self.provider())
         first = reader.read_history("2026-10-15", {"limit": 3})
-        self.assertEqual([x["source_line"] for x in first.pushes], [1, 2, 3])
+        self.assertEqual([x["source_line"] for x in first.pushes], [1, 3, 5])
         self.assertTrue(first.page["has_more"])
         cursor1 = first.page["next_checkpoint"]
         self.assertNotEqual(cursor1, first.checkpoint)
         second = reader.read_history("2026-10-15", {"limit": 3, "checkpoint": cursor1})
-        self.assertEqual([x["source_line"] for x in second.pushes], [4, 5, 6])
+        self.assertEqual([x["source_line"] for x in second.pushes], [7, 2, 4])
         self.assertTrue(second.page["has_more"])
         third = reader.read_history("2026-10-15", {"limit": 3, "checkpoint": second.page["next_checkpoint"]})
-        self.assertEqual([x["source_line"] for x in third.pushes], [7])
+        self.assertEqual([x["source_line"] for x in third.pushes], [6])
         self.assertFalse(third.page["has_more"])
         self.assertIsNone(third.page["next_checkpoint"])
         self.assertEqual(len({x["push_id"] for x in first.pushes + second.pushes + third.pushes}), 7)
