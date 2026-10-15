@@ -97,8 +97,8 @@ class EntryPointBindingTest(unittest.TestCase):
         preload.assert_not_called()
         dispatch.assert_not_called()
 
-    def test_custom_view_routes_use_canonical_preload_and_accepted_dispatch(self):
-        for route in ("/custom-view", "/custom-view/session?stream=dQw4w9WgXcQ&ptt=live"):
+    def test_custom_view_landing_uses_canonical_preload_and_accepted_dispatch(self):
+        for route in ("/custom-view",):
             with self.subTest(route=route):
                 class CustomRequest:
                     url = "https://public.example.test" + route
@@ -114,10 +114,9 @@ class EntryPointBindingTest(unittest.TestCase):
                 self.assertEqual(preload.await_args.args[0], route)
                 self.assertEqual(dispatch.call_args.kwargs["target"], route)
 
-    def test_collab_routes_use_canonical_preload_and_accepted_dispatch(self):
+    def test_collab_data_routes_use_canonical_preload_and_accepted_dispatch(self):
         routes = (
             "/collab",
-            "/collab/session?collab=ark&stream=dQw4w9WgXcQ",
             "/api/collab/live?collab=ark&stream=dQw4w9WgXcQ",
         )
         fake_handler = type("AcceptedHandler", (), {})
@@ -138,7 +137,13 @@ class EntryPointBindingTest(unittest.TestCase):
                 self.assertEqual(dispatch.call_args.kwargs["target"], route)
 
     def test_page_only_routes_render_fallback_without_provider(self):
-        for route in ("/ptt-today", "/watchalong", "/watchalong/session"):
+        for route in (
+            "/ptt-today",
+            "/watchalong",
+            "/watchalong/session",
+            "/custom-view/session?stream=dQw4w9WgXcQ&stream=abcdefghijk",
+            "/collab/session?collab=shared-topic&stream=dQw4w9WgXcQ&stream=abcdefghijk",
+        ):
             with self.subTest(route=route):
                 class PageRequest:
                     url = "https://public.example.test" + route
