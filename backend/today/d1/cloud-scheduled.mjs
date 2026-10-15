@@ -1,4 +1,5 @@
 import {refreshPendingVideos} from './websub-status.mjs';
+import {reconcileAtomFeeds} from './feed-reconcile.mjs';
 // Cloudflare scheduled-handler building block, disabled unless Owner explicitly enables.
 // Inject D1 DB with approved additive event queue schema, verified roster and API key.
 const ID=/^[A-Za-z0-9_-]{11}$/;
@@ -19,5 +20,18 @@ export async function runTodayScheduled(env,{fetchImpl=fetch,now=new Date()}={})
   if(!Array.isArray(json.items))throw Error('malformed videos.list');
   return json.items;
  };
- return refreshPendingVideos({db:env.DB,roster,fetchVideos,now,maxEvents:25});
+ let reconciliation=null;
+ if(env.TODAY_RECONCILE_ENABLED==='true'){
+  reconciliation=await reconcileAtomFeeds({db:env.DB,roster,now,maxChannels:3,
+   fetchFeed:async url=>{
+    const response=await fetchImpl(url,{headers:{accept:'application/atom+xml'},signal:AbortSignal.timeout(12000)});
+    if(!response.ok)throw Error('Atom feed unavailable '+response.status);
+    const size=Number(response.headers?.get?.('content-length')??0);
+    if(size>262144)throw Error('Atom feed too large');
+    return response.text();
+   }});
+  if(reconciliation.failed)throw Error('feed reconciliation interrupted; manual review');
+ }
+ const status=await refreshPendingVideos({db:env.DB,roster,fetchVideos,now,maxEvents:25});
+ return {...status,reconciliation};
 }
