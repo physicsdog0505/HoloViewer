@@ -38,11 +38,15 @@ export function createExistingApiRouter({legacyHistory=defaultLegacyHistory,lega
   },env?.DB?200:503),origin,origins);
   if(!env?.DB)return wrap(json({error:'database_not_bound'},503),origin,origins);
   let response;
+  try {
   if(u.pathname==='/v1/catalog/today')response=await handleTodayRead(request,env);
   else if((u.pathname==='/v1/ptt/today'||u.pathname==='/v1/ptt/history')&&pttHandler)response=await pttHandler(request,env);
   else if(u.pathname==='/v1/history'&&legacyHistory)response=await legacyHistory(request,env);
   else if(/^\/v1\/catalog\/videos\/[A-Za-z0-9_-]{11}$/.test(u.pathname)&&legacyVideo)response=await legacyVideo(request,env);
   else response=json({error:'not_found'},404);
+  } catch (error) {
+   response=json({error:'read_projection_unavailable'},503);
+  }
   return wrap(response,origin,origins);
  }};
 }
