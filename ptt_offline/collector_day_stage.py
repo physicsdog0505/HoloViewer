@@ -58,14 +58,19 @@ def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
     selected=[{**r,"source_url":url,"origin":"collector"}
               for r in chronological if r["day"] == day
               and r["source_line"] > after_source_line]
-    # Bind replay to the exact audited immutable source snapshot, not just URL.
-    # Collector may rewrite an existing source_line after a later screen capture.
-    # A changed content/time/source ordering must never reuse an ACK checkpoint.
-    source_identity=sha256(json.dumps(
-        [board,canonical,url,article_id,raw],
+    source_identity=sha256(json.dumps([board,canonical,url,article_id],
         separators=(",",":"),ensure_ascii=False).encode("utf-8")).hexdigest()
+    # Source-prefix digest only through ACKed line; later appends do not change it.
+    # Existing-row edits/reparses do, and must fail before advancing checkpoint.
+    def prefix_digest(through):
+        return sha256(json.dumps(
+            [r for r in raw if r[0] <= through],
+            separators=(",",":"),ensure_ascii=False).encode("utf-8")).hexdigest()
     return {
         "day":day,"aid":canonical,"source_identity":source_identity,
+        "acked_prefix_digest":prefix_digest(after_source_line),
+        "next_prefix_digest":prefix_digest(
+            selected[min(len(selected),limit)-1]["source_line"] if selected else after_source_line),
         "source_rows_examined":len(raw),
         "selected_rows_total":len(selected),
         "rows":selected[:limit],
