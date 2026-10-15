@@ -49,6 +49,7 @@ jobs:
             ptt_offline.test_source_time_partition \
             ptt_offline.test_verified_publisher_flow \
             ptt_offline.test_source_audit_stage \
-            ptt_offline.test_owner_http_transport
+            ptt_offline.test_owner_http_transport \
+            ptt_offline.test_capacity_probe
       - name: Cloudflare Worker pure offline regressions
         run: node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshness.mjs ptt_offline/test_api_shell_ptt_extension.mjs ptt_offline/test_d1_owner_writer.mjs ptt_offline/test_d1_owner_dispatch.mjs ptt_offline/test_ptt_owner_hmac.mjs ptt_offline/test_api_owner_shell_extension.mjs ptt_offline/test_owner_ptt_migration_preflight.mjs
