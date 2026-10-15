@@ -6,6 +6,8 @@ snapshot. In particular this is NOT a second Today/PTT writer or D1 client.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import date
 import json
 import re
@@ -15,6 +17,19 @@ import urllib.request
 
 DEFAULT_API = "https://holoviewer-public-api.singlebagel.workers.dev"
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
+_PRELOADED = ContextVar("holoviewer_canonical_api_preload", default=None)
+
+
+@contextmanager
+def preloaded_public_reads(mapping: dict):
+    """A Worker request consumes only the canonical async-prefetched reads."""
+    token = _PRELOADED.set(dict(mapping))
+    try:
+        yield
+    finally:
+        _PRELOADED.reset(token)
+
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -47,6 +62,16 @@ class PublicAPI:
     def _read(self, path: str, *, query: dict[str, str] | None = None) -> dict:
         if not path.startswith("/v1/") or "//" in path:
             raise ValueError("unsupported Public API route")
+        preload = _PRELOADED.get()
+        if preload is not None:
+            key = (path, tuple(sorted((query or {}).items())))
+            if key not in preload:
+                raise PublicAPIUnavailable("Canonical provider read not preloaded")
+            value = preload[key]
+            if not isinstance(value, dict):
+                raise PublicAPIUnavailable("Invalid preloaded Public API envelope")
+            return value
+
         url = self.origin.rstrip("/") + path
         if query:
             url += "?" + urllib.parse.urlencode(query)
