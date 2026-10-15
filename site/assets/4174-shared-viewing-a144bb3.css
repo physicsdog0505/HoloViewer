@@ -1559,3 +1559,15 @@ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-
   flex-shrink:0!important
  }
 }
+
+
+/* 8788 parity: a narrow PTT tile must wrap controls, not squeeze the heading
+   into one-character columns. The reader remains the same transplanted DOM. */
+.ptt-panel-heading{flex-wrap:wrap;column-gap:10px;row-gap:6px}
+.ptt-panel-heading>span:first-child{flex:1 1 120px;min-width:120px}
+.ptt-panel-heading>span:first-child small{display:block;white-space:normal}
+.ptt-panel-heading .ptt-embed-controls{display:flex;align-items:center;gap:8px;min-width:0}
+@media(max-width:1100px){
+ .ptt-panel-heading .ptt-embed-controls{flex:1 1 100%;justify-content:flex-start}
+ .ptt-panel-heading>a{margin-left:auto;white-space:nowrap}
+}
