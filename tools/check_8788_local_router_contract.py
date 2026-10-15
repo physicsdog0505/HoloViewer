@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 from platform_adapter.public_api import PublicAPI, PublicAPIUnavailable, preloaded_public_reads
 from platform_adapter.product_bindings import bind_home_reader
@@ -29,10 +29,18 @@ def checked_local_origin(value: str) -> str:
     return value.rstrip("/")
 
 
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_LOCAL_OPENER = build_opener(NoRedirect)
+
+
 def read_json(base: str, path: str) -> tuple[int, dict]:
     req = Request(base + path, method="GET", headers={"Accept": "application/json"})
     try:
-        with urlopen(req, timeout=5) as response:
+        with _LOCAL_OPENER.open(req, timeout=5) as response:
             status = response.status
             payload = response.read(512_001)
             content_type = response.headers.get_content_type()
@@ -40,6 +48,8 @@ def read_json(base: str, path: str) -> tuple[int, dict]:
         status = exc.code
         payload = exc.read(512_001)
         content_type = exc.headers.get_content_type()
+    if status in (301, 302, 303, 307, 308):
+        raise PublicAPIUnavailable("Local router redirected: refusing external origin")
     if len(payload) > 512_000 or content_type != "application/json":
         raise PublicAPIUnavailable("Local router returned oversized/non-JSON response")
     try:
