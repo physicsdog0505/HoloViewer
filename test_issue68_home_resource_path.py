@@ -26,6 +26,28 @@ class SupportStyleBindingTests(unittest.TestCase):
         )
 
 
+class SupportStyleRuntimeIsolationTests(unittest.TestCase):
+    def test_api_context_never_calls_runtime_fallback(self):
+        from platform_adapter.support_style_binding import install_support_style_adapter, using_support_styles
+
+        class Item:
+            channel_id = "UCmissing"
+
+        class FakeHome:
+            _holoviewer_api_style_installed = False
+            fallback_calls = 0
+
+            @staticmethod
+            def _channel_style(item):
+                FakeHome.fallback_calls += 1
+                return "runtime-fallback"
+
+        install_support_style_adapter(FakeHome)
+        with using_support_styles({}):
+            self.assertEqual(FakeHome._channel_style(Item()), "")
+        self.assertEqual(FakeHome.fallback_calls, 0)
+
+
 class LightweightHomeImportTests(unittest.TestCase):
     def test_home_lightweight_module_does_not_import_client_app(self):
         sys.modules.pop("client_app", None)
