@@ -7,13 +7,33 @@ a signed private POST. Writes append-only local operational metrics.
 import argparse
 import json
 import time
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from .collector_source_preview import open_source
 from .live_capture_publisher import inspect_latest_article,run_live_once,state_for_source
 from .owner_http_transport import owner_signed_http_executor
 from .publisher_cli import exclusive_lock
 from .public_today_contract import ContractError
+
+TAIPEI=ZoneInfo('Asia/Taipei')
+
+def snapshot_interval(now=None):
+    """02:00 through 06:59 Taipei: 10 min; otherwise: 1 min."""
+    local=(now or datetime.now(timezone.utc)).astimezone(TAIPEI)
+    return 600 if 2<=local.hour<7 else 60
+
+def seconds_until_next_snapshot(now=None):
+    """Wall-clock aligned, including 02:00 and 07:00 boundaries."""
+    local=(now or datetime.now(timezone.utc)).astimezone(TAIPEI)
+    cadence=snapshot_interval(local)
+    minute_of_day=local.hour*60+local.minute
+    next_minute=((minute_of_day//(cadence//60))+1)*(cadence//60)
+    if next_minute>=1440:
+        target=(local+timedelta(days=1)).replace(hour=0,minute=0,second=0,microsecond=0)
+    else:
+        target=local.replace(hour=next_minute//60,minute=next_minute%60,second=0,microsecond=0)
+    return max(0,(target-local).total_seconds())
 
 def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5):
     started=clock()
@@ -34,15 +54,16 @@ def main(argv=None):
     p.add_argument("--source",required=True)
     p.add_argument("--state-dir",required=True)
     p.add_argument("--metrics",required=True)
-    p.add_argument("--interval-seconds",type=int,default=60)
+    p.add_argument("--interval-seconds",type=int,choices=(60,120),default=None,
+                   help="optional fixed interval override; default 1min daytime / 10min 02-07 Asia/Taipei")
     p.add_argument("--iterations",type=int,default=1)
     p.add_argument("--send",action="store_true")
     p.add_argument("--batch-cap",type=int,default=5)
     p.add_argument("--approve-live-capture-policy",action="store_true")
     p.add_argument("--endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish")
     args=p.parse_args(argv)
-    if args.interval_seconds not in (60,120) or not 1<=args.iterations<=1440:
-        p.error("only 60 or 120 second cadence and <=1440 bounded iterations allowed")
+    if not 1<=args.iterations<=1440:
+        p.error("maximum 1440 bounded iterations allowed")
     if not 1<=args.batch_cap<=25:
         p.error('batch cap must be 1-25 and match approved Worker configuration')
     import os
@@ -77,5 +98,6 @@ def main(argv=None):
                 os.fsync(handle.fileno())
             print(json.dumps(result,ensure_ascii=False,sort_keys=True),flush=True)
             if iteration+1<args.iterations:
-                time.sleep(max(0,args.interval_seconds-(time.monotonic()-started)))
+                time.sleep(max(0,args.interval_seconds-(time.monotonic()-started))
+                           if args.interval_seconds else seconds_until_next_snapshot())
 if __name__=="__main__":main()
