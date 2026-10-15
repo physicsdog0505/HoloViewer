@@ -2,7 +2,9 @@
 // #48 existing D1 identity + immutable migration preparation.
 // Offline default; --inspect only issues read-only Wrangler commands.
 // Never modifies existing Today objects, migrations or production D1.
-import {readFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -61,9 +63,13 @@ function invoke(args) {
  return result.stdout;
 }
 export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
- if(argv.some(a=>a!=='--inspect'))throw Error('write/apply not implemented; no live mutation approved');
+ const apply=argv.includes('--apply');
+ const approve=argv.find(a=>a.startsWith('--approve='))?.slice(10);
+ if(argv.some(a=>a!=='--inspect'&&a!=='--apply'&&!a.startsWith('--approve=')) ||
+    (apply&&argv.includes('--inspect')))throw Error('invalid migration arguments');
  const plan=planMigration();
- if(!argv.includes('--inspect')){print(JSON.stringify(plan,null,2));return plan;}
+ if(!apply&&!argv.includes('--inspect')){print(JSON.stringify(plan,null,2));return plan;}
+ if(apply&&approve!==plan.sha256)throw Error('exact owner checksum approval required');
  const whoami=exec(['whoami']);
  if(!whoami.includes(ACCOUNT))throw Error('Cloudflare account mismatch');
  const objects=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
@@ -76,7 +82,31 @@ export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
    applied=verifyAppliedPttLedger(ledger,inspection);
  }
  const receipt={...plan,mode:'READ_ONLY_ACCOUNT_PREFLIGHT',...inspection,...applied};
- print(JSON.stringify(receipt,null,2));return receipt;
+ if(!apply){print(JSON.stringify(receipt,null,2));return receipt;}
+ if(inspection.pttSchemaPresent)throw Error('PTT migration already applied; do not rerun');
+ // Explicitly use the existing D1 by UUID, without touching Wrangler's
+ // already-populated Today migration directory/ledger.
+ // Temporary file contains byte-verified immutable SQL only.
+ const dir=mkdtempSync(join(tmpdir(),'ptt48-d1-'));
+ const file=join(dir,'0001_canonical_ptt.sql');
+ let mutationAttempted=false;
+ try{
+   writeFileSync(file,readFileSync(FILE),{mode:0o600});
+   mutationAttempted=true;
+   exec(['d1','execute',UUID,'--remote','--file',file]);
+   const after=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
+     '--command',"SELECT name,type FROM sqlite_master WHERE type IN ('table','index') ORDER BY name;"]));
+   const state=assertInventory(after);
+   const ledger=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
+     '--command','SELECT version,description FROM public_ptt_schema_migrations ORDER BY version;']));
+   const verified=verifyAppliedPttLedger(ledger,state);
+   if(!verified.verified)throw Error('postflight PTT ledger not verified');
+   const result={...receipt,...verified,mode:'OWNER_APPLIED_VERIFIED'};
+   print(JSON.stringify(result,null,2));return result;
+ }catch(error){
+   if(mutationAttempted)throw Error('REMOTE MUTATION MAY HAVE OCCURRED; STOP, INSPECT, DO NOT RETRY: '+error.message);
+   throw error;
+ }finally{rmSync(dir,{force:true,recursive:true});}
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
  try{run()}catch(error){console.error(error.message);process.exitCode=1}
