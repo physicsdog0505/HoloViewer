@@ -2,10 +2,11 @@
  * Run only from a separately approved scheduled handler.
  */
 import {planSubscriptions} from './websub-renewal.mjs';
-export async function renewSubscriptions({roster,leases,callback,secret,enabled=false,post,now=new Date(),limit=25}={}){
+import {recordSubscriptionRequest} from './websub-leases.mjs';
+export async function renewSubscriptions({roster,leases,callback,secret,db,enabled=false,post,now=new Date(),limit=25}={}){
  const plan=planSubscriptions(roster,leases,{now,limit});
  if(!enabled)return {...plan,status:'DISABLED',sent:0};
- if(typeof post!=='function'||typeof callback!=='string'||!callback.startsWith('https://')||
+ if(!db?.prepare||typeof post!=='function'||typeof callback!=='string'||!callback.startsWith('https://')||
    typeof secret!=='string'||secret.length<32)throw Error('renewal credentials/transport missing');
  let sent=0;
  const responses=[];
@@ -13,6 +14,7 @@ export async function renewSubscriptions({roster,leases,callback,secret,enabled=
   const body=new URLSearchParams({'hub.callback':callback,'hub.mode':'subscribe','hub.topic':entry.topic,
    'hub.verify':'async','hub.secret':secret,'hub.lease_seconds':'432000'});
   try {
+   await recordSubscriptionRequest(db,{channelId:entry.channel_id,rosterVersion:entry.roster_version,now});
    const response=await post(entry.hub,body);
    if(![202,204].includes(response.status))throw Error('hub nonaccepted status '+response.status);
    sent++;responses.push({channel_id:entry.channel_id,accepted:true});
