@@ -13,14 +13,19 @@ from .public_today_contract import (
 
 
 class D1PttProvider(PttProvider):
-    def __init__(self, db: Any, *, checked_at: str = "2026-10-15T00:00:00Z"):
+    def __init__(self, db: Any, *, day: str, checked_at: str = "2026-10-15T00:00:00Z"):
         self.db = db
+        self.day = day
         self.checked_at = checked_at
 
     def aids_for_day(self, day: str) -> set[str]:
+        if day != self.day:
+            raise ContractError("provider day binding mismatch")
         return read_day(self.db, day)[0]
 
     def snapshot_for_day(self, day: str) -> list[dict[str, Any]]:
+        if day != self.day:
+            raise ContractError("provider day binding mismatch")
         return read_day(self.db, day)[1]
 
     def initial_window(self, aid: str, *, limit: int) -> InitialWindow:
@@ -34,9 +39,9 @@ class D1PttProvider(PttProvider):
         rows = self.db.execute(
             """SELECT p.push_id,p.aid,p.source_line,p.kind,p.author,p.content,
                       p.occurred_at,p.floor,p.source_url
-               FROM ptt_pushes p WHERE p.aid=?
+               FROM ptt_pushes p WHERE p.day=? AND p.aid=?
                ORDER BY p.occurred_at,p.source_line,p.push_id DESC LIMIT ?""",
-            (aid, limit),
+            (self.day, aid, limit),
         ).fetchall()
         names = ("push_id", "aid", "source_line", "kind", "author",
                  "content", "occurred_at", "floor", "source_url")
