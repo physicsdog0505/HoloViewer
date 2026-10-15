@@ -125,3 +125,74 @@ def bind_history_reader(api: PublicAPI, home_stream_cls: Callable):
                 cards.append(item)
         return cards, result.get("has_more") is True
     return read_history_day
+
+
+def bind_collab_reader(api: PublicAPI, home_stream_cls: Callable):
+    """Adapt canonical Collab event streams into accepted 4174 three-list input."""
+    def read_collab_event_streams(*args, **kwargs):
+        payload = api.read_collab_live()
+        events = payload.get("events")
+        if not isinstance(events, list):
+            raise PublicAPIUnavailable("Collab events missing")
+        deduped = {}
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            for raw in event.get("streams") or ():
+                item = _home_row(raw, home_stream_cls)
+                if item is not None:
+                    deduped.setdefault(item.video_id, item)
+        groups = {"live": [], "upcoming": [], "ended": []}
+        for item in deduped.values():
+            bucket = "upcoming" if item.state == "waiting" else item.state
+            if bucket in groups:
+                groups[bucket].append(item)
+        far_future = datetime.max.replace(tzinfo=timezone.utc)
+        far_past = datetime.min.replace(tzinfo=timezone.utc)
+        groups["upcoming"].sort(
+            key=lambda item: (item.start_at is None, item.start_at or far_future, item.video_id)
+        )
+        groups["ended"].sort(
+            key=lambda item: (item.start_at or far_past, item.video_id), reverse=True
+        )
+        return groups["live"], groups["upcoming"], groups["ended"]
+    return read_collab_event_streams
+
+
+def bind_watchalong_reader(api: PublicAPI, recent_card_cls: Callable, recent_host_cls: Callable):
+    """Adapt minimal canonical Watchalong events into accepted landing cards."""
+    def read_recent_watchalong_cards(*, database_path=None, days=30, limit=60, now=None):
+        if database_path is not None:
+            raise ValueError("Public Watchalong reader does not accept local DB overrides")
+        payload = api.read_watchalong_recent(days=days, limit=limit)
+        events = payload.get("events")
+        if not isinstance(events, list):
+            raise PublicAPIUnavailable("Watchalong events missing")
+        cards = []
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            hosts = []
+            for raw in event.get("hosts") or ():
+                if not isinstance(raw, dict):
+                    continue
+                video_id = str(raw.get("video_id") or "")
+                if len(video_id) != VIDEO_ID_LEN:
+                    continue
+                hosts.append(recent_host_cls(
+                    label=str(raw.get("label") or ""),
+                    video_id=video_id,
+                    channel_name=str(raw.get("channel_name") or ""),
+                    avatar_url=str(raw.get("avatar_url") or ""),
+                ))
+            if not hosts:
+                continue
+            cards.append(recent_card_cls(
+                title=str(event.get("title") or ""),
+                day=str(event.get("day") or ""),
+                scheduled_time=str(event.get("scheduled_time") or ""),
+                member_only=bool(event.get("member_only")),
+                hosts=tuple(hosts),
+            ))
+        return tuple(cards)
+    return read_recent_watchalong_cards
