@@ -32,3 +32,9 @@ Issue #68 comments `6189311810` and `6189323248` authorize a **transport shim** 
 **Unproven concrete compatibility points**: direct Python Worker import of the vendored `client_app` dependency closure (including `sqlite3`, `threading`, filesystem and other modules), non-blocking Worker fetch compatibility with synchronous `urllib` in `PublicAPI`, and packaging static PTT assets without local writable storage. The accepted HTTP dispatcher still handles route semantics; no Worker-local DB or thread may be started. The source adapter should not be represented as production-runnable until tested inside the Python Workers runtime and reconciled with the existing `holoviewer-public-api` service.
 
 No Cloudflare account operation, D1 migration, new runtime backend, Wrangler deploy, or product rewrite has been performed.
+
+### Proof-slice route fail-closed rule
+
+The experimental Python Worker entry currently permits only `/`, `/api/home`, and `/history` to reach the accepted handler. All other paths return 503 before product dispatch because their canonical Worker data providers have **not** been bound; this avoids rendering misleading local-SQLite emptiness. The restriction is a temporary data-readiness gate, not a copy of accepted route/navigation logic. Expand it only after the corresponding canonical provider route exists and has accepted behavior parity.
+
+`test_cloudflare_entry_binding.py` checks that the original handler is called only after `bind_public_today(client_app, api_base=DEFAULT_API)`, exactly once, and that unbound PTT returns 503 without local data dispatch. **Tests are committed, not yet executed.**
