@@ -149,9 +149,14 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
       const state=r.lifecycle_state==='ended'&&r.actual_end?'ended':!valid?'stale':
         r.lifecycle_state==='upcoming'&&r.scheduled_start&&r.scheduled_start<=nowStamp?'waiting':r.lifecycle_state;
       const color=supportColorFor(r.publisher_channel_id,supportColors);
-      return {video_id:r.video_id,title:r.title,channel_id:r.publisher_channel_id,channel_name:r.channel_name,
-        group:r.channel_group,lifecycle_state:state,observed_at:r.lifecycle_observed_at,
-        start_at:r.actual_start??r.scheduled_start,avatar_url:verifiedChannelAvatar(r.trusted_channel_avatar),member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,support_mode:color.support_mode,support_color_source:color.support_color_source,
-        source_label:r.source_label,stale:state==='stale'};
+      const group=groups.has(r.channel_group)?r.channel_group:'other';
+      const title=typeof r.title==='string'&&r.title.trim()?r.title:r.video_id;
+      const channelName=typeof r.channel_name==='string'?r.channel_name:'';
+      const sourceLabel=typeof r.source_label==='string'?r.source_label:'';
+      const startAt=validTime(r.actual_start)?r.actual_start:validTime(r.scheduled_start)?r.scheduled_start:null;
+      return {video_id:r.video_id,title,channel_id:r.publisher_channel_id,channel_name:channelName,
+        group,lifecycle_state:state,observed_at:validTime(r.lifecycle_observed_at)?r.lifecycle_observed_at:null,
+        start_at:startAt,avatar_url:verifiedChannelAvatar(r.trusted_channel_avatar),member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,support_mode:color.support_mode,support_color_source:color.support_color_source,
+        source_label:sourceLabel,stale:state==='stale'};
     })};
 }
