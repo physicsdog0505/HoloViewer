@@ -275,3 +275,27 @@ owner data, start a real Publisher, or represent a production-ready
 checkpoint/replay writer. Positive complete-source coverage and trustworthy
 event time still require independent acceptance. Test module:
 `ptt_offline.test_publisher_cli`.
+
+## #47 exact shared API seam now available — #48 handler injection
+
+Owner review #48 6192092942 points to #47 exact HEAD
+`149a80361654b06377dbae580e1d8da2e5010cf0`.
+Directly verified `backend/today/d1/api-shell.mjs` at that HEAD exports
+`createExistingApiRouter({legacyHistory,legacyVideo,pttHandler})`, whose
+routing already preserves CORS, GET/OPTIONS, /health, missing DB, canonical
+#47 Today and legacy history/video paths. The PTT seam passes the same
+`env.DB` to the injected handler.
+
+#48 now exports `createPttMountedApiRouter(createExistingApiRouter,options)`
+from `ptt_offline/api_shell_ptt_extension.mjs`, wiring only the already
+reviewed `handlePttPublicRead(request,env)`. It neither reconstructs a
+second shell nor introduces another service. The adjacent
+`test_api_shell_ptt_extension.mjs` uses a deterministic signature-matched
+fixture to verify the two PTT routes, read-only GET behavior and preservation
+of the host guards. **This fixture is not a byte-for-byte execution of #47's
+actual shell**: final combined-router testing requires the exact #47 source
+in the same checked-out integration branch and remains outstanding.
+
+After the #47 base is integrated into the exact combined tree, the intended
+call is `createPttMountedApiRouter(createExistingApiRouter)` using its
+real factory, with no duplicate worker entrypoint.
