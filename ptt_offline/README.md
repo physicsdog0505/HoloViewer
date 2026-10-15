@@ -198,3 +198,29 @@ The existing `holoviewer-public-api` router source/route table has not
 been verified in this branch and MUST be reviewed at integration; the
 bridge is therefore an export contract, NOT proof of a connected route.
 Production D1 migration, Publisher activation and deploy remain owner-gated.
+
+## Review 6188824728 — multi-AID and verified gap-close hardening
+
+- Worker day freshness now evaluates **every** verified `ptt_threads` AID
+  against `ptt_provider_state`, not just nonnull timestamp rows.
+  Missing/invalid any required AID => `unknown`; all known with one
+  outdated => `stale`; all current => `fresh`.
+  Dedicated Node tests cover the A1-only/A1+A2 partial state regression.
+- Ordinary `publish_provider_state` writes still latch gaps. Separately
+  `close_verified_gap` requires an injected authoritative positive
+  coverage verifier, a stable repair ID/digest, verified timestamp and
+  a covered-through watermark at least as high as the known purge cursor.
+  A repair record is preserved in `ptt_gap_repairs` and a closure marker
+  `gap_closed_at` fences old replay. Only newer explicit gap evidence
+  can reopen the gap. Offline SQLite regressions cover reject-without-proof,
+  successful closure, old replay and newer re-gap.
+
+Migration note: all of these changes belong to the **proposed** v1 SQL for
+the EXISTING `holoviewer-public-v1`. It has not been applied to any real DB.
+If an earlier schema version has already been applied elsewhere, use a
+forward `0002` migration rather than mutating that applied database's
+history. Actual runtime migration is explicitly owner-gated.
+
+Tests remain the six-module Python suite plus
+`node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshness.mjs`.
+Neither source commits nor missing Actions may be described as test PASS.
