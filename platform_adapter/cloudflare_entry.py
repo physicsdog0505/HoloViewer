@@ -57,7 +57,7 @@ class Default(WorkerEntrypoint):
             # remain synchronous but consume request-local preloaded values.
             # Cloudflare same-account workers.dev subrequests require a service binding.
             # Keep the old injectable transport for disposable offline fixture tests.
-            api_service = getattr(self.env, "PUBLIC_API", None)
+            api_service = getattr(getattr(self, "env", None), "PUBLIC_API", None)
             getter = partial(fetch_canonical_json, api_service=api_service)
             preload = await preload_for_accepted_request(target, getter)
             with preloaded_public_reads(preload):
