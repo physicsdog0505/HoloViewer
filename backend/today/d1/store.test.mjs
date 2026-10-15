@@ -21,7 +21,7 @@ function db() {
     return {first:async()=>stmt.get(...params)??null,
       all:async()=>({results:stmt.all(...params)}),
       run:async()=>stmt.run(...params)};
-  },first:async()=>sqlite.prepare(sql).get()??null}};
+  },first:async()=>sqlite.prepare(sql).get()??null};
   },async batch(statements){
     sqlite.exec('BEGIN IMMEDIATE');
     try {const result=[];for(const s of statements)result.push(await s.run());sqlite.exec('COMMIT');return result;}
