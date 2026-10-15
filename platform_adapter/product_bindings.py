@@ -38,12 +38,10 @@ def _home_row(row: dict, home_stream_cls: Callable, *, feed_freshness: str = "un
     lifecycle = str(row.get("lifecycle_state") or row.get("state") or "unknown").lower()
     if lifecycle not in ALLOWED_STATES:
         lifecycle = "unknown"
-    state = "upcoming" if lifecycle == "waiting" else lifecycle
+    state = lifecycle
     # A positive LIVE assertion requires fresh feed evidence, not simply
     # an old persisted lifecycle label from the canonical store.
     if state == "live" and feed_freshness != "fresh":
-        state = "unknown"
-    if state == "stale":
         state = "unknown"
     group = str(row.get("group") or "").lower()
     if group not in VISIBLE_GROUPS:
@@ -81,7 +79,9 @@ def bind_home_reader(api: PublicAPI, home_stream_cls: Callable):
             item = _home_row(raw, home_stream_cls, feed_freshness=freshness)
             if item is None:
                 continue
-            bucket = item.state if item.state in groups else "unknown"
+            bucket = ("upcoming" if item.state == "waiting" else
+                      "unknown" if item.state == "stale" else
+                      item.state if item.state in groups else "unknown")
             groups[bucket].append(item)
         return tuple(groups[key] for key in ("live", "upcoming", "ended", "unknown"))
     return read_home
