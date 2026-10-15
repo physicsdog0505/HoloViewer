@@ -43,16 +43,26 @@ def recent_observed_utc(row):
         return None
     return None
 
-def inspect_latest_article(db,*,max_rows=50000):
+def active_article_ids(db,limit=4):
+    """Recent independent AIDs; bounded fair sweep rather than latest only."""
+    if type(limit) is not int or not 1<=limit<=8:
+        raise ContractError('invalid bounded article window')
+    return [r[0] for r in db.execute('''
+        SELECT a.id FROM articles a JOIN pushes p ON p.article_id=a.id
+        WHERE a.board='C_Chat'
+        GROUP BY a.id ORDER BY MAX(p.collected_at) DESC,a.id DESC LIMIT ?
+    ''',(limit,)).fetchall()]
+
+def inspect_latest_article(db,*,max_rows=50000,article_id=None):
     verify_schema(db)
     if type(max_rows) is not int or not 1<=max_rows<=50000:
         raise ContractError("bounded live source scan required")
-    article=db.execute("""
-        SELECT a.id,a.board,a.aid,a.url,MAX(p.collected_at) AS latest
-        FROM articles a JOIN pushes p ON p.article_id=a.id
-        WHERE a.board='C_Chat'
-        GROUP BY a.id ORDER BY latest DESC LIMIT 1
-    """).fetchone()
+    if article_id is None:
+        ids=active_article_ids(db,limit=1)
+        article_id=ids[0] if ids else None
+    article=(db.execute('''SELECT id,board,aid,url,last_seen_at FROM articles
+        WHERE id=? AND board='C_Chat' ''',(article_id,)).fetchone()
+        if article_id is not None else None)
     if article is None:return {"status":"NO_REAL_COLLECTOR_ROWS","candidate_rows":[]}
     article_id,board,raw_aid,url,_=article
     receipt=identity_receipt(board,raw_aid,url)
@@ -90,12 +100,12 @@ def content_digest(row):
     return sha256(json.dumps([row.get(k) for k in OUTPUT_KEYS if k!="time_proof"],
           ensure_ascii=False,separators=(",",":")).encode("utf-8")).hexdigest()
 
-def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap=5):
+def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap=5,article_id=None):
     if type(batch_cap) is not int or not 1<=batch_cap<=25:
         raise ContractError('invalid bounded live batch cap')
     path=Path(state_path)
     with exclusive_lock(path.with_suffix(path.suffix+".lock")):
-        plan=inspect_latest_article(db)
+        plan=inspect_latest_article(db,article_id=article_id)
         if plan["status"]!="READY":
             return {"status":plan["status"],"sent":0}
         current={}
