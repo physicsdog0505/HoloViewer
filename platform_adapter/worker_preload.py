@@ -22,7 +22,7 @@ async def preload_for_accepted_request(target: str, get_json):
         if not isinstance(value, dict):
             raise PublicAPIUnavailable("Invalid Today envelope")
         return {("/v1/catalog/today", ()): value}
-    if parsed.path != "/history":
+    # /v1/history remains a legacy compatibility API read per #45.\n    if parsed.path != "/history":
         return {}
 
     # Use accepted date and bounds rules, never duplicate date semantics.
