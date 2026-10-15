@@ -48,6 +48,13 @@ export function verifyAppliedPttLedger(rows,inventory) {
    throw Error('PTT applied schema ledger missing or unexpected');
  return {applied:true,verified:true,version:1};
 }
+export function assertWranglerLedger(rows,{pttApplied=false}={}) {
+ if(!Array.isArray(rows)||!rows.some(row=>row.name==='0001_today_canonical.sql'))
+   throw Error('expected applied Today Wrangler migration identity missing');
+ const hasPtt=rows.some(row=>row.name==='0002_canonical_ptt.sql');
+ if(hasPtt!==pttApplied)throw Error('PTT Wrangler migration ledger out of sync');
+ return true;
+}
 export function decodeD1(value) {
  const items=JSON.parse(value);
  const groups=Array.isArray(items)?items:[items];
@@ -75,6 +82,10 @@ export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
  const objects=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
    '--command',"SELECT name,type FROM sqlite_master WHERE type IN ('table','index') ORDER BY name;"]));
  const inspection=assertInventory(objects);
+ if(!inspection.wranglerLedgerPresent)throw Error('existing Wrangler migration ledger missing');
+ const oldLedger=decodeD1(exec(['d1','execute',UUID,'--remote','--json','--command',
+   'SELECT name FROM d1_migrations ORDER BY id;']));
+ assertWranglerLedger(oldLedger,{pttApplied:inspection.pttSchemaPresent});
  let applied={applied:false,verified:false};
  if(inspection.pttSchemaPresent) {
    const ledger=decodeD1(exec(['d1','execute',UUID,'--remote','--json','--command',
@@ -105,6 +116,9 @@ export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
    const state=assertInventory(after);
    const ledger=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
      '--command','SELECT version,description FROM public_ptt_schema_migrations ORDER BY version;']));
+   const newLedger=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
+     '--command','SELECT name FROM d1_migrations ORDER BY id;']));
+   assertWranglerLedger(newLedger,{pttApplied:true});
    const verified=verifyAppliedPttLedger(ledger,state);
    if(!verified.verified)throw Error('postflight PTT ledger not verified');
    const result={...receipt,...verified,mode:'OWNER_APPLIED_VERIFIED'};
