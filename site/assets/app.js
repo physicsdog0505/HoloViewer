@@ -281,8 +281,11 @@ function renderHomeHighlights(rows){
  section.append(carousel);highlights.append(section);
 }
 
+let homeLoadInFlight=false;
 async function loadHome(){
+ if(homeLoadInFlight)return;
  if(!config.apiBase){$('home-empty').textContent='正式直播資料 API 尚未接通。';return}
+ homeLoadInFlight=true;
  try{
  const data=await api('/v1/catalog/today');const rows=data.streams||data.items;
  if(!Array.isArray(rows))throw Error('資料格式錯誤');
@@ -296,6 +299,7 @@ async function loadHome(){
  $('home-empty').textContent=rows.length?'':'目前沒有今天的直播資料。';
  $('connection').textContent='API 已連線';
  }catch(e){$('home-empty').textContent='無法讀取正式直播資料：'+e.message}
+ finally{homeLoadInFlight=false}
 }
 function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));return o.year+'-'+o.month+'-'+o.day}
 function shiftDay(day,delta){const date=new Date(day+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+delta);return date.toISOString().slice(0,10)}
@@ -330,10 +334,14 @@ async function loadCollab(){
  }
  $('collab-empty').textContent='目前沒有偵測到可用的多人連動。';
 }
-let pttLastGoodCount=0;
+let pttLastGoodCount=0,pttLastGoodDay='',pttLoadInFlight=false;
 async function loadPtt(){
+ if(pttLoadInFlight)return;
  const today=taipeiDay();
  const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty');
+ if(pttLastGoodDay&&pttLastGoodDay!==today){
+  pttLastGoodCount=0;pttLastGoodDay='';list.replaceChildren();list.hidden=true;
+ }
  if(!pttLastGoodCount){
   meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
   empty.hidden=false;empty.textContent='讀取今日 PTT 推文中…';
@@ -343,6 +351,7 @@ async function loadPtt(){
   if(!pttLastGoodCount){empty.hidden=false;empty.textContent='PTT 正式 API 尚未接通。'}
   return;
  }
+ pttLoadInFlight=true;
  try{
   const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
@@ -363,7 +372,7 @@ async function loadPtt(){
    push.append(head,node('div',row.content,'ptt-push-content'));
    next.append(push);count++;
   }
-  list.replaceChildren(next);pttLastGoodCount=count;
+  list.replaceChildren(next);pttLastGoodCount=count;pttLastGoodDay=today;
   const freshness=String(data.freshness?.status||'unknown');
   const freshnessLabel=freshness==='fresh'?'即時':freshness==='stale'?'資料稍舊':'狀態未知';
   meta.textContent=today.replaceAll('-','/')+' · '+freshnessLabel+' · '+count+' 則 · 純 PTT 閱讀';
@@ -375,7 +384,7 @@ async function loadPtt(){
    list.hidden=true;empty.hidden=false;
    empty.textContent='今日 PTT 後端資料暫未就緒；頁面會每 10 秒自動重試。';
   }
- }
+ } finally{pttLoadInFlight=false}
 }
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
