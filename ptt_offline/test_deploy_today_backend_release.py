@@ -1,0 +1,43 @@
+import json, tempfile, unittest
+from pathlib import Path
+from ptt_offline.deploy_today_backend_release import load_config, safe_deploy_config
+
+class TodayBackendReleaseTests(unittest.TestCase):
+    def config(self):
+        return {
+          "name":"holoviewer-public-api",
+          "vars":{
+            "PTT_PUBLISH_ENABLED":"false",
+            "PTT_PUBLISH_MAX_ROWS":"5",
+            "TODAY_CADENCE_ENABLED":"false",
+            "ALLOWED_ORIGIN":"https://example.test"
+          },
+          "d1_databases":[{
+            "binding":"DB",
+            "database_name":"holoviewer-public-v1",
+            "database_id":"64e1a0ee-1455-4377-9640-3922e8f4d061"
+          }]
+        }
+
+    def test_safe_config_never_reintroduces_plaintext_ptt_gate(self):
+        with tempfile.TemporaryDirectory() as td:
+            src=Path(td)/"wrangler.json"
+            src.write_text(json.dumps(self.config()),encoding="utf-8")
+            holder,out=safe_deploy_config(str(src))
+            try:
+                cfg=json.loads(out.read_text())
+                self.assertNotIn("PTT_PUBLISH_ENABLED",cfg["vars"])
+                self.assertNotIn("PTT_PUBLISH_MAX_ROWS",cfg["vars"])
+                self.assertEqual(cfg["vars"]["TODAY_CADENCE_ENABLED"],"true")
+                self.assertEqual(cfg["vars"]["ALLOWED_ORIGIN"],"https://example.test")
+            finally:
+                holder.cleanup()
+
+    def test_wrong_worker_fails_closed(self):
+        cfg=self.config(); cfg["name"]="wrong-worker"
+        with tempfile.TemporaryDirectory() as td:
+            src=Path(td)/"wrangler.json"; src.write_text(json.dumps(cfg),encoding="utf-8")
+            with self.assertRaises(SystemExit): load_config(str(src))
+
+if __name__=="__main__":
+    unittest.main()
