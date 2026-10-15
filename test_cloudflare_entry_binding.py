@@ -132,6 +132,35 @@ class EntryPointBindingTest(unittest.TestCase):
                 self.assertEqual(preload.await_args.args[0], route)
                 self.assertEqual(dispatch.call_args.kwargs["target"], route)
 
+    def test_page_only_routes_render_fallback_without_provider(self):
+        for route in ("/ptt-today", "/watchalong", "/watchalong/session"):
+            with self.subTest(route=route):
+                class PageRequest:
+                    url = "https://public.example.test" + route
+                    method = "GET"
+                with (patch.object(self.entry, "render_page_fallback", return_value=(200, "<html>fallback</html>")) as fallback,
+                      patch.object(self.entry, "preload_for_accepted_request") as preload,
+                      patch.object(self.entry, "dispatch_accepted_get") as dispatch):
+                    response = asyncio.run(self.entry.Default().fetch(PageRequest()))
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.body, "<html>fallback</html>")
+                fallback.assert_called_once_with(route)
+                preload.assert_not_called()
+                dispatch.assert_not_called()
+
+    def test_connected_page_falls_back_to_4174_shell_when_provider_is_down(self):
+        class HistoryRequest:
+            url = "https://public.example.test/history?date=2026-10-15"
+            method = "GET"
+        with (patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, side_effect=self.entry.PublicAPIUnavailable("down")),
+              patch.object(self.entry, "render_page_fallback", return_value=(200, "<html>history-shell</html>")) as fallback,
+              patch.object(self.entry, "dispatch_accepted_get") as dispatch):
+            response = asyncio.run(self.entry.Default().fetch(HistoryRequest()))
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.body, "<html>history-shell</html>")
+        fallback.assert_called_once()
+        dispatch.assert_not_called()
+
     def test_handler_binding_never_selects_custom_provider(self):
         with patch.object(self.entry, "bind_public_today") as bind:
             self.entry._accepted_handler()
