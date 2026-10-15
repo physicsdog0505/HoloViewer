@@ -2,7 +2,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from ptt_offline.live_capture_publisher import inspect_latest_article,run_live_once,state_for_source
+from ptt_offline.live_capture_publisher import active_article_ids,inspect_latest_article,run_live_once,state_for_source
 from ptt_offline.ptt_aid_identity import aid_from_article_url
 from ptt_offline.public_today_contract import ContractError
 
@@ -24,6 +24,17 @@ class LiveCapturePublisherTests(unittest.TestCase):
           (1,1,1,1,'推','a','old historical','10/14','09:00','2026-10-15T10:00:00Z'),
           (2,1,2,1,'推','b','new one','10/15','18:00','2026-10-15T10:01:05Z'),
           (3,1,3,1,'→','c','new two','10/15','18:01','2026-10-15T10:02:07Z')])
+    def test_recent_articles_select_separate_active_aids(self):
+        url="https://www.ptt.cc/bbs/C_Chat/M.1789081300.A.5FC.html"
+        aid=aid_from_article_url(url)[1]
+        self.db.execute("INSERT INTO articles VALUES(2,'C_Chat',?,?,'night','now','now')",(aid,url))
+        self.db.execute("INSERT INTO pushes VALUES(4,2,1,1,'推','new','night line','10/15','18:03','2026-10-15T10:04:00Z')")
+        self.assertEqual(active_article_ids(self.db,limit=2),[2,1])
+        first=inspect_latest_article(self.db,article_id=1)
+        second=inspect_latest_article(self.db,article_id=2)
+        self.assertNotEqual(first["source_identity"],second["source_identity"])
+        self.assertEqual(first["aid"],self.aid)
+        self.assertEqual(second["aid"],aid)
     def test_per_thread_state_separates_day_night_receipts(self):
         directory=Path(self.tmp.name)
         self.assertNotEqual(state_for_source(directory,"a"*64),
