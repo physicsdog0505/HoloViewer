@@ -17,6 +17,7 @@ class MigrationPreflightTests(unittest.TestCase):
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual(receipt["sha256"], manifest["immutable_migrations"][0]["sha256"])
         self.assertEqual(receipt["git_blob_sha"], manifest["immutable_migrations"][0]["git_blob_sha"])
+        self.assertEqual(receipt["git_blob_sha"], "7466163e331b05c2b12ca559affbf2386f49460c")
         self.assertEqual(set(receipt["required_tables"]), set(TABLES))
 
     def test_reviewed_blob_pin_mismatch_rejected_even_if_sha256_is_updated(self):
