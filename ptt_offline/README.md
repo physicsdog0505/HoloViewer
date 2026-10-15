@@ -164,3 +164,20 @@ node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshn
 No CI or exact-head local execution is implied by committed test source;
 report these as NOT RUN until genuinely executed. No production DB
 mutation, SQLite owner-data read, Publisher activation or deploy authorized.
+
+## Follow-up: shared-D1 three-gate review 6188494686
+
+- `publicPttFreshness()` now distinguishes known old success (`stale`)
+  from malformed/missing/future timestamps (`unknown`); only [0,30s]
+  finite elapsed time is `fresh`.
+- `publish_provider_state()` writes real per-day/AID last-success,
+  gap latch and observed cursor/purge watermarks. Replays use monotonic
+  updates; absent watermark inputs do not invent resume cursor evidence.
+  This is a separate explicit write path; production caller still must
+  invoke it with Collector/Publisher-verified evidence.
+- Migration ledger is `public_ptt_schema_migrations`, preventing a
+  generic ledger collision with other subsystems of shared
+  `holoviewer-public-v1`; tests verify re-application and version row.
+
+Testing continues with the six-module Python command and Node freshness
+command above. Committed tests alone do not establish executed PASS.
