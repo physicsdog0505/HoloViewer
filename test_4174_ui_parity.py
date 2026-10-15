@@ -166,6 +166,18 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("[\\\\w-]", js, "Double escaped regex rejects real YouTube IDs")
         self.assertGreaterEqual(js.count("[A-Za-z0-9_-]{11}"), 3)
 
+    def test_public_support_color_and_time_projection(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        self.assertIn('function applyHomeSupportStyle(el,item)',js)
+        self.assertIn("item?.member_accent_dual",js)
+        self.assertIn("el.dataset.supportMode='dual_color'",js)
+        self.assertIn("function homeStartLabel(item)",js)
+        self.assertIn("item?.start_at",js)
+        self.assertIn("timeZone:'Asia/Taipei'",js)
+        self.assertIn("background:color-mix(in srgb,var(--member-accent,#7aa8bb) 8%,white)",css)
+        self.assertIn('[data-support-mode="dual_color"].stream-card:hover',css)
+
     def test_4174_channel_identity_fallback_and_safe_avatars(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn('HOME_CHANNEL_ACCENTS',js)
@@ -180,7 +192,7 @@ class ParityContract(unittest.TestCase):
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         self.assertIn("Verbatim accepted 4174 LIVE_RAIL_CSS", css)
-        self.assertIn("position:fixed;left:2px;top:270px;z-index:65;width:64px", css)
+        self.assertIn("position:fixed;left:2px;top:378px;z-index:65;width:64px", css)
         self.assertIn(".live-channel-rail:hover,.live-channel-rail:focus-within{width:222px", css)
         self.assertIn("body:has(.client-rail:hover) .live-channel-rail", css)
         self.assertIn("@media(max-width:760px){.live-channel-rail{display:none}}", css)
