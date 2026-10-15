@@ -14,7 +14,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .collector_source_preview import open_source,verify_schema
-from .ptt_aid_identity import identity_receipt
+from .ptt_aid_identity import identity_receipt, verify_aid_url
+from .url_epoch_authority import reconstruct_events
 from .d1_publisher import canonical_record
 from .owner_publisher_once import sign_time_proof
 from .owner_http_transport import owner_signed_http_executor
@@ -24,6 +25,7 @@ from .d1_transport_contract import execute_once
 from .public_today_contract import ContractError
 
 TPE=ZoneInfo("Asia/Taipei")
+RECOVERY_MAX_DELAY_SECONDS=2*60*60
 OUTPUT_KEYS=("push_id","aid","day","source_line","kind","author","content",
              "occurred_at","floor","source_url","source_record_key","time_proof")
 
@@ -73,10 +75,30 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
         FROM pushes WHERE article_id=? ORDER BY source_line DESC LIMIT ?
     """,(article_id,max_rows+1)).fetchall()
     truncated=len(raw)>max_rows
+    chronological_raw=[dict(zip(keys,record)) for record in reversed(raw[:max_rows])]
+    recovered_by_line={}
+    if not truncated and chronological_raw:
+        try:
+            rebuilt=reconstruct_events(
+                board=board,aid=receipt["aid"],url=url,
+                identity_verifier=verify_aid_url,pushes=chronological_raw,
+            )
+            recovered_by_line={row["source_line"]:row["occurred_at"] for row in rebuilt}
+        except ContractError:
+            recovered_by_line={}
     ready=[];pending=[]
-    for record in reversed(raw[:max_rows]):
-        row=dict(zip(keys,record))
+    for row in chronological_raw:
         observed=recent_observed_utc(row)
+        if observed is None:
+            recovered=recovered_by_line.get(row["source_line"])
+            try:
+                collected=datetime.fromisoformat(row["collected_at"].replace("Z","+00:00")).astimezone(timezone.utc)
+                canonical=(datetime.fromisoformat(recovered.replace("Z","+00:00")).astimezone(timezone.utc)
+                           if recovered else None)
+                delay=(collected-canonical).total_seconds() if canonical else None
+            except (TypeError,ValueError,AttributeError):
+                delay=None
+            observed=recovered if delay is not None and 0<=delay<=RECOVERY_MAX_DELAY_SECONDS else None
         if observed is None:
             pending.append(row["source_line"])
             continue
