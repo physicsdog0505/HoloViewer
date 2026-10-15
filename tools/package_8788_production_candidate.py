@@ -25,6 +25,16 @@ AUTHORIZED_UI_OVERRIDES = {
         "old": "position:fixed;left:2px;top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px);",
         "new": "position:fixed;left:2px;top:466px;z-index:65;width:64px;max-height:calc(100vh - 478px);",
     },
+    "default_hololive_keeps_unclassified_cards_visible": {
+        "path": "client_home.py",
+        "old": "item.hidden=activeStreamFilter!=='all'&&group!==activeStreamFilter;",
+        "new": "item.hidden=activeStreamFilter!=='all'&&group!==activeStreamFilter&&!(activeStreamFilter==='hololive'&&(group==='unknown'||group==='other'));",
+    },
+    "default_hololive_keeps_unclassified_live_rail_visible": {
+        "path": "client_ui_shell.py",
+        "old": "item.hidden=filter!=='all'&&item.dataset.group!==filter;",
+        "new": "item.hidden=filter!=='all'&&item.dataset.group!==filter&&!(filter==='hololive'&&(item.dataset.group==='unknown'||item.dataset.group==='other'));",
+    },
 }
 
 def apply_authorized_ui_overrides(output: Path) -> dict[str, str]:
