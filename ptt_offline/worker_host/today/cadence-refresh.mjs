@@ -1,3 +1,4 @@
+import {refreshTodayDiscovery} from './discovery-refresh.mjs';
 import {writeEvidence} from './store.mjs';
 
 const ID=/^[A-Za-z0-9_-]{11}$/;
@@ -69,7 +70,9 @@ export function mountTodayCadence(base,{fetchImpl=fetch}={}){
     async scheduled(event,env,ctx){
       if(typeof base.scheduled==='function')await base.scheduled(event,env,ctx);
       const now=Number.isFinite(event?.scheduledTime)?new Date(event.scheduledTime):new Date();
-      return refreshKnownTodayLifecycle(env,{fetchImpl,now});
+      const lifecycle=await refreshKnownTodayLifecycle(env,{fetchImpl,now});
+      const discovery=await refreshTodayDiscovery(env,{fetchImpl,now});
+      return {lifecycle,discovery};
     }
   };
 }
