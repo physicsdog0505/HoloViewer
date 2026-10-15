@@ -138,3 +138,16 @@ The inert wiring spec now records the actual ownership boundary rather than leav
 | Accepted product PTT | Public Python Worker | none yet | disabled/fail-closed until #48 independent acceptance + owner cutover |
 
 No secret is required by the accepted Python Worker for read-only canonical API access. Any future credential/service-binding proposal is a new review item, not implied by this host diff.
+
+
+## Repository-confirmed current Public host baseline
+
+Read-only inspection of current `main` resolves the repository-configured host identity that was previously marked unknown:
+
+- `cloudflare/wrangler.json`: Worker name **`holoviewer-public`**, compatibility date `2026-10-14`, static assets only from `../site`; no Worker script, D1, KV or routes in that repo config.
+- `.github/workflows/deploy-cloudflare-production.yml`: manual `workflow_dispatch` only; exact reviewed main SHA + `BASELINE-CHECKED` are required before Wrangler deploy; existing deployment uses owner-managed Cloudflare token/account secrets.
+- `site/assets/config.js`: existing public client points at the same canonical API origin `https://holoviewer-public-api.singlebagel.workers.dev`.
+
+Therefore the proposed 8788 host diff is now concrete at repository level: retain the existing **`holoviewer-public`** identity, replace the static-only host configuration with the reviewed Python Worker `entry.py` + `python_workers`, keep same-Worker static assets through `ASSETS`, and add **no D1/KV binding** to the Public host. The canonical API remains separate.
+
+This does **not** prove the currently deployed Cloudflare revision, account/zone route state, custom-domain mapping, or runtime headers. Those remain read-only production preflight evidence required by #45 immediately before any owner-authorized config/deploy mutation.
