@@ -60,24 +60,34 @@ class PublisherOfflineE2ETests(unittest.TestCase):
             raise ContractError("synthetic lost ACK")
         with self.assertRaises(ContractError):
             run_synthetic_one(checkpoint_path=self.receipt,source_identity=ident,
-                day="2026-01-01",aids=["A1"],rows=first["rows"],executor=failed)
+                day="2026-01-01",aids=["A1"],rows=first["rows"],executor=failed,
+                source_prefix_digest=first["acked_prefix_digest"],
+                next_prefix_digest=first["next_prefix_digest"])
         self.assertFalse(Path(self.receipt).exists())
         one=run_synthetic_one(checkpoint_path=self.receipt,source_identity=ident,
-            day="2026-01-01",aids=["A1"],rows=first["rows"],executor=self.ack)
+            day="2026-01-01",aids=["A1"],rows=first["rows"],executor=self.ack,
+            source_prefix_digest=first["acked_prefix_digest"],
+            next_prefix_digest=first["next_prefix_digest"])
         self.assertEqual(one["checkpoint"]["aids"]["A1"],6)
         second=self.stage(after=6)
         two=run_synthetic_one(checkpoint_path=self.receipt,source_identity=ident,
-            day="2026-01-01",aids=["A1"],rows=second["rows"],executor=self.ack)
+            day="2026-01-01",aids=["A1"],rows=second["rows"],executor=self.ack,
+            source_prefix_digest=second["acked_prefix_digest"],
+            next_prefix_digest=second["next_prefix_digest"])
         self.assertEqual(two["checkpoint"]["aids"]["A1"],8)
         self.assertEqual(self.stage(after=8)["rows"],[])
-        # A rescan that edits an existing source_line is also a new source identity.
+        # A rescan changes the ACKed source prefix, but not stable article identity.
         self.db.execute("UPDATE pushes SET content=? WHERE source_line=3",("reparsed",))
         changed_content=self.stage(after=8)
-        self.assertNotEqual(changed_content["source_identity"],ident)
+        self.assertEqual(changed_content["source_identity"],ident)
+        self.assertNotEqual(changed_content["acked_prefix_digest"],
+                            two["checkpoint"]["acked_prefix_digest"])
         with self.assertRaises(ContractError):
             run_synthetic_one(checkpoint_path=self.receipt,
                 source_identity=changed_content["source_identity"],day="2026-01-01",
-                aids=["A1"],rows=changed_content["rows"],executor=self.ack)
+                aids=["A1"],rows=changed_content["rows"],executor=self.ack,
+                source_prefix_digest=changed_content["acked_prefix_digest"],
+                next_prefix_digest=changed_content["next_prefix_digest"])
         # A URL change is a source identity change; an old checkpoint
         # cannot follow it even when the synthetic verifier permits it.
         self.db.execute("UPDATE articles SET url=REPLACE(url,'.ABC.html','.DEF.html')")
