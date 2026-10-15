@@ -10,6 +10,7 @@ class SQLiteD1 {
  constructor(){
   this.sqlite=new DatabaseSync(':memory:');
   this.sqlite.exec(readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8'));
+  this.sqlite.exec('CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)');
  }
  prepare(sql){
   const stmt=this.sqlite.prepare(sql);
