@@ -6,6 +6,7 @@ routing here selects which approved external data entry must be read in advance.
 from __future__ import annotations
 
 from datetime import datetime
+import json
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from platform_adapter.public_api import DEFAULT_API, PublicAPIUnavailable
@@ -50,14 +51,19 @@ async def fetch_canonical_json(url: str, *, api_service=None) -> dict:
     if not url.startswith(DEFAULT_API + "/"):
         raise PublicAPIUnavailable("Non-canonical Public API URL rejected")
     try:
-        from pyodide.http import pyfetch
         if api_service is not None:
+            # ServiceBinding.fetch returns a JS Response proxy; JSON text parsing
+            # avoids passing JS object proxies into Python consumer contracts.
             response = await api_service.fetch(url, {"method": "GET", "headers": {"Accept": "application/json"}})
+            if response.status != 200:
+                raise PublicAPIUnavailable("Canonical Public API HTTP error")
+            data = json.loads(str(await response.text()))
         else:
+            from pyodide.http import pyfetch
             response = await pyfetch(url, method="GET", headers={"Accept": "application/json"})
-        if response.status != 200:
-            raise PublicAPIUnavailable("Canonical Public API HTTP error")
-        data = await response.json()
+            if response.status != 200:
+                raise PublicAPIUnavailable("Canonical Public API HTTP error")
+            data = await response.json()
     except PublicAPIUnavailable:
         raise
     except Exception as exc:
