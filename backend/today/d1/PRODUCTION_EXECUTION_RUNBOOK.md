@@ -1,7 +1,7 @@
 # Issue #47 — production-bound execution preparation (NO OPERATIONS AUTHORIZED)
 
 ## Locked identities
-- Reviewed PR #53 code HEAD before this document: `5d03c34b43992fb33681b25c679c472106cf369a`
+- Independent #45 reviewed source base: `149a80361654b06377dbae580e1d8da2e5010cf0`. Latest #47 offline PASS HEAD before this documentation update: `fdd6c885ea146dd47de8157b278f869d3d3d35b4` (workflow `38738844538`, Node 29/29 and Python 49/49). Any subsequent documentation commit needs its own exact-head confirmation; this is not permission to deploy.
 - Migration source: `backend/today/d1/0002_today_canonical.sql`
 - Pinned migration Git blob SHA-1: `943e3d49f665060a2f0b71c7ffef44185d754244`
 - Migration ID: `0002_today_canonical`
@@ -37,18 +37,45 @@ Do not run until authorized, authenticated and exact worker binding is independe
 - Re-run identical migration through the runner, expect `applied:false`; never re-apply changed migration bytes under same ID. Drift or schema mismatch = ABORT, no cleanup via drop/reseed.
 
 ## D. Existing Worker API source mount
-No existing `holoviewer-public-api` source/router is present in this repository's documented `cloudflare/` static site deployment surface. The actual API entrypoint must be located and owner-verified before making a target-file diff. **Do not substitute** `cloudflare/wrangler.json` or create another Worker.
+The reviewed #47 `api-shell.mjs` reconstructs the owner-supplied legacy API shell and has a #48 PTT injection seam; #68 confirmed combined local router behavior. This is **not evidence of byte identity with the currently deployed Worker**. The actual deployed API entrypoint/revision must still be owner-verified before the production-target diff. **Do not substitute** `cloudflare/wrangler.json` or create another Worker.
 - Minimal mount in the **existing** API Worker router:
   `import { handleTodayRead } from '<reviewed #47 module location>';`
   `if (new URL(request.url).pathname === '/v1/catalog/today') return handleTodayRead(request,env);`
 - Preserve other routes, existing `DB` binding, rate limits, authentication boundaries, telemetry, and CORS policy. Unauthenticated Today API must be GET-only.
 - Version and route diff must receive separate review and Owner runtime authorization before deploy.
 
-## E. Hosted canary proposal (owner/runtime authorized only)
-- First verify Worker health and DB binding **read-only**; never enable ingestion just to test the route.
-- Max **3** GET requests total to `/v1/catalog/today?day=<Taipei canonical day>&limit=1`, no automatic retries, no concurrent loops. Inspect `schema_version`, `freshness`, `completeness.gap`, and array form of `streams`; empty but gap=true is acceptable before source ingestion.
-- Expected D1 queries per GET: up to 2 reads (catalog_meta + bounded canonical join query); expected rows returned from canonical <= 1 plus <= 1 catalog_meta. Verify actual Cloudflare Rows Read metrics separately because query scans and returned rows are not the same.
-- Abort on 5xx, wrong DB binding, contract mismatch, non-GET writes, missing rate-limit controls, unexpected D1 usage, any evidence of wrong account/database, or unexpected exposure of internal cursor/run IDs.
+## E. Unified hosted read-only canary — #45 authority, NOT authorized
+
+**#45 canonical freeze supersedes the older #47 Today-only three-GET proposal.**
+Do not run this in production without explicit owner authorization, confirmed real Worker source/version,
+correct `DB -> holoviewer-public-v1` identity and reviewed #47 + #48 artifacts.
+Use exactly one quiet observation window, baseline Cloudflare metrics before/after, **no retries**.
+
+1. `GET /health` (0 data queries expected).
+2. `GET /v1/catalog/today?day=<Taipei-day>&limit=1` (2 D1 queries expected).
+3. `GET /v1/ptt/today?day=<same>&limit=1` (3 D1 queries expected).
+4. `GET /v1/ptt/history?day=<same>&limit=1` (3 D1 queries expected).
+5. **Only if** step 4 has `has_more=true`, one continuation using exactly the returned opaque token:
+   `GET /v1/ptt/history?day=<same>&limit=1&after=<returned-push-id>` (4 D1 queries expected).
+
+**Hard caps (entire unified window, not per path):** HTTP requests <= 5; automatic retries 0;
+D1 queries <= 12; attributable Rows Read delta <= 1,000; Rows Written exactly 0;
+unexpected route or write SQL 0. A missing migration/schema before approved application is
+a *pre-canary blocker*, not permission to write or synthesize rows. Queries/Rows Read must
+be measured, not inferred from response size.
+
+Capture exact deployed Worker revision and #47/#48 source SHAs, binding/database identity,
+request status/content-type/cache/CORS, public schema/day/freshness/completeness, continuation
+equality and advancement, request/query/read/write/retry metric deltas and timestamps.
+
+**Abort:** wrong Worker/D1 identity, unreviewed route, unintended SQL write, nonexpected 5xx,
+contract/CORS/OPTIONS/health divergence, duplicated or reordered continuation, >5 requests,
+>12 queries, >1,000 Rows Read, any Rows Written, or any retry. Leave both ingestion/Cron and
+Publisher disabled; roll back Worker revision before any producer activation. Preserve additive
+D1 migrations and evidence; do not DROP/reseed.
+
+The #47 Today reader should still consume no more than the reviewed two queries per
+bounded request. This paragraph is offline deployment preparation, **not** a hosted receipt.
 
 ## F. Later ingestion activation (NOT authorized)
 1. Approve and version authoritative publisher roster manifest, including explicit group and valid channels.
@@ -68,9 +95,9 @@ Existing route/entrypoint:
 Migration ledger before/after:
 Schema objects before/after:
 Exact-head Node test / Python test:
-Canary requests (max 3):
+Unified canary requests (max 5, conditional fifth):
 HTTP statuses / sanitized response:
-D1 queries / Rows Read / Rows Written:
+D1 queries (max 12) / Rows Read (max 1000) / Rows Written (=0) / retries (=0):
 Source manifest version and approval:
 Decision: PASS | FAIL | ABORT
 Owner approval reference:
