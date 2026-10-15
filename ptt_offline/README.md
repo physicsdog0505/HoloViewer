@@ -299,3 +299,32 @@ in the same checked-out integration branch and remains outstanding.
 After the #47 base is integrated into the exact combined tree, the intended
 call is `createPttMountedApiRouter(createExistingApiRouter)` using its
 real factory, with no duplicate worker entrypoint.
+
+
+## #48 Publisher authority follow-up — timestamp, coverage, resumability
+
+Canonical Collector source inspection establishes a strict split between event
+and observation time. `pushes.ptt_date` + `pushes.ptt_time` contain only
+`MM/DD HH:MM`; `collected_at` and `article_screens.captured_at` are
+Collector observation timestamps and are **not** event-time substitutes.
+
+`timestamp_authority.py` therefore has no current-year/collection-time
+fallback. A publishable event timestamp requires explicit positive evidence
+for year, `Asia/Taipei`, authority type and a stable source reference.
+Synthetic rollover tests prove that identical `01/01 00:01` text resolves to
+different years only when different verified evidence is supplied.
+
+Coverage is now positive only when canonical `article_screens` intervals
+continuously cover source lines `1..articles.last_source_line`. Readable
+pushes, first-N samples, page count alone, or partial screens cannot produce
+`complete=true`; internal/tail gaps are reported explicitly.
+
+`resumable_publisher.py` is a pure offline transport-neutral state machine:
+explicit source identity + selected Taipei day + verified AID vector, at most
+5 rows per batch, one request cap, zero automatic retries, deterministic batch
+digest, replay skip by per-AID source-line checkpoint, and **checkpoint advance
+only after an exact all-row ACK**. It has no network/D1 implementation.
+
+This closes the source/offline contract shape but does not fabricate missing
+production evidence. Real source timestamp evidence, D1 transport mutation,
+Publisher activation/Cron, secrets, deploy and merge remain owner-gated.
