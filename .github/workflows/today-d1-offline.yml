@@ -1,0 +1,27 @@
+name: Today D1 and API shell offline tests
+on:
+  push:
+    branches: [issue47-public-today-offline-ingestion]
+    paths: ['backend/today/**', '.github/workflows/today-d1-offline.yml']
+  pull_request:
+    paths: ['backend/today/**', '.github/workflows/today-d1-offline.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exact HEAD
+        run: git rev-parse HEAD
+      - name: D1 and API shell offline tests
+        run: node --test backend/today/d1/migrate.test.mjs backend/today/d1/store.test.mjs backend/today/d1/worker-read.test.mjs backend/today/d1/api-shell.test.mjs backend/today/d1/legacy-compat.test.mjs
+      - name: Python provider and contract tests
+        run: python -B -m unittest -v backend.today.test_today_offline backend.today.test_provider_ingest backend.today.test_today_contract
