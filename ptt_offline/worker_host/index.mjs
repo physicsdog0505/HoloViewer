@@ -4,7 +4,10 @@
 import {createExistingApiRouter} from './today/api-shell.mjs';
 import {composeFullPttOnExistingApi} from '../full_ptt_api_composition.mjs';
 import {verifyPublisherTimeProof} from './time_authority.mjs';
+import {mountTodayPublisherOnCombinedApi} from './today/today-private-post.mjs';
 
-export default composeFullPttOnExistingApi(createExistingApiRouter,{
+const combined = composeFullPttOnExistingApi(createExistingApiRouter,{
   verifyAuthority: async (row,env) => verifyPublisherTimeProof(row,env)
 });
+
+export default mountTodayPublisherOnCombinedApi(combined);
