@@ -42,22 +42,20 @@ def load_config(path):
     return cfg
 
 def parse_table_names_output(stdout):
-    marker="PTT_TABLES="
-    for line in stdout.splitlines():
-        if marker not in line:
-            continue
-        value=line.split(marker,1)[1].strip()
-        # Wrangler human table output may append a column border.
-        value=value.split("│",1)[0].strip()
-        if not value:
-            return set()
-        return {part.strip() for part in value.split(",") if part.strip()}
+    # Wrangler may wrap long cells across multiple terminal lines. Parse only
+    # the exact known schema identifiers from the complete captured output.
+    found={name for name in REQUIRED_TABLES if name in stdout}
+    if found:
+        return found
+    # Empty schema is a valid pre-migration state; distinguish it from a
+    # Wrangler/query failure by requiring the column header to be present.
+    if "name" in stdout and "sqlite_master" not in stdout:
+        return set()
     raise SystemExit("could not parse D1 schema preflight")
 
 def d1_table_names(config):
-    sql=("SELECT 'PTT_TABLES=' || COALESCE(GROUP_CONCAT(name, ','),'') AS marker "
-         "FROM sqlite_master WHERE type='table' AND "
-         "(name LIKE 'ptt_%' OR name='public_ptt_schema_migrations');")
+    sql=("SELECT name FROM sqlite_master WHERE type='table' AND "
+         "(name LIKE 'ptt_%' OR name='public_ptt_schema_migrations') ORDER BY name;")
     r=run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,"--command",sql],capture=True)
     return parse_table_names_output(r.stdout)
 
