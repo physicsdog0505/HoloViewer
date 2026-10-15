@@ -42,6 +42,18 @@ class ProductionPackageTests(unittest.TestCase):
                 "position:fixed;left:2px;top:466px;z-index:65;width:64px;max-height:calc(100vh - 478px);",
             )
             self.assertEqual(
+                receipt["authorized_ui_overrides"]["default_hololive_keeps_unclassified_cards_visible"],
+                "item.hidden=activeStreamFilter!=='all'&&group!==activeStreamFilter&&!(activeStreamFilter==='hololive'&&(group==='unknown'||group==='other'));",
+            )
+            self.assertEqual(
+                receipt["authorized_ui_overrides"]["default_hololive_keeps_unclassified_live_rail_visible"],
+                "item.hidden=filter!=='all'&&item.dataset.group!==filter&&!(filter==='hololive'&&(item.dataset.group==='unknown'||item.dataset.group==='other'));",
+            )
+            packaged_home = (dest / "client_home.py").read_text()
+            packaged_shell = (dest / "client_ui_shell.py").read_text()
+            self.assertIn("group==='unknown'||group==='other'", packaged_home)
+            self.assertIn("item.dataset.group==='unknown'||item.dataset.group==='other'", packaged_shell)
+            self.assertEqual(
                 receipt["runtime_optimizations"]["client_home_lazy_runtime_imports"],
                 "applied",
             )
