@@ -82,7 +82,7 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
   // A bounded write acknowledges observation, never full historical coverage.
   // Until a separately verified gap repair, Public completeness stays partial.
   for(const aid of aids)statements.push(DB.prepare(SQL_STATE).bind(batch.day,aid));
-  const queries=statements.length+batch.rows.length;
+  const queries=statements.length+3*batch.rows.length;
   // Conservative pre-dispatch upper bound for this single-writer transaction:
   // at most one thread insert per AID plus one push and evidence mutation per
   // logical row. Must not rely only on post-commit meta.changes.
@@ -91,6 +91,20 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
   requireTrue(queries<=30,'query budget exceeded');
   const results=await DB.batch(statements);
   requireTrue(Array.isArray(results) && results.length===statements.length,'D1 transaction failure');
+  // A successful transaction response is not sufficient proof of canonical
+  // visibility. Perform two exact readbacks per pushed source before ACK.
+  for(const row of batch.rows){
+    const push=await DB.prepare('SELECT aid,day,source_line,author,content,occurred_at,source_url FROM ptt_pushes WHERE push_id=?')
+      .bind(row.push_id).first();
+    const evidence=await DB.prepare('SELECT push_id,source_line FROM ptt_source_evidence WHERE day=? AND aid=? AND source_record_key=?')
+      .bind(row.day,row.aid,row.source_record_key).first();
+    requireTrue(push && evidence && push.aid===row.aid && push.day===row.day &&
+      push.source_line===row.source_line && push.author===row.author &&
+      push.content===row.content && push.occurred_at===row.occurred_at &&
+      push.source_url===row.source_url && evidence.push_id===row.push_id &&
+      evidence.source_line===row.source_line,
+      'D1 canonical readback mismatch; remote state uncertain, do not retry');
+  }
   const affected=results.reduce((sum,result)=>sum+(result?.meta?.changes??0),0);
   requireTrue(Number.isInteger(affected) && affected>=0 && affected<=20,'affected-row budget exceeded');
   // meta.changes is not an authoritative account-level D1 Rows Written receipt.
