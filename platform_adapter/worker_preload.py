@@ -37,7 +37,7 @@ async def preload_for_accepted_request(target: str, get_json):
         page = int(query.get("page", ["1"])[0])
     except (ValueError, OverflowError):
         return {}  # accepted handler itself produces its 400 error
-    if page < 1 or page > 20:
+    if page < 1 or page > 10000:
         return {}
     params = {"day": selected.isoformat(), "limit": "50", "offset": str((page - 1) * 50)}
     value = await get_json(DEFAULT_API + "/v1/history?" + urlencode(params))
