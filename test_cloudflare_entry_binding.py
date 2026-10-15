@@ -38,22 +38,19 @@ class EntryPointBindingTest(unittest.TestCase):
         sys.modules.pop("platform_adapter.cloudflare_entry", None)
         self.workers.stop()
 
-    def test_binds_canonical_provider_once_before_original_dispatch(self):
-        order = []
-        def bind(app, *, api_base):
-            self.assertEqual(api_base, DEFAULT_API)
-            order.append("provider")
-        def dispatch(handler, *, target, method):
-            order.append("dispatch")
-            self.assertEqual((target,method),("/api/home","GET"))
-            return TransportResponse(200,(("Content-Type","application/json"),),b"{}")
-        with (patch.object(self.entry, "bind_public_today", side_effect=bind),
+    def test_home_uses_lightweight_dispatch_without_binding_full_client_app(self):
+        with (patch.object(self.entry, "bind_public_today") as bind,
               patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}),
-              patch.object(self.entry, "dispatch_accepted_get", side_effect=dispatch)):
+              patch.object(self.entry, "dispatch_lightweight_home", return_value=TransportResponse(
+                  200, (("Content-Type", "application/json"),), b"{}"
+              )) as dispatch,
+              patch.object(self.entry, "dispatch_accepted_get") as accepted):
             response = asyncio.run(self.entry.Default().fetch(FakeRequest()))
-            self.assertEqual(response.status,200)
+            self.assertEqual(response.status, 200)
             asyncio.run(self.entry.Default().fetch(FakeRequest()))
-        self.assertEqual(order,["provider","dispatch","dispatch"])
+        bind.assert_not_called()
+        accepted.assert_not_called()
+        self.assertEqual(dispatch.call_count, 2)
 
     def test_binding_failure_keeps_runtime_unbound(self):
         with patch.object(self.entry, "bind_public_today", side_effect=ValueError("unavailable")):
