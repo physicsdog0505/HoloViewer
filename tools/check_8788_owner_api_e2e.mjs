@@ -61,7 +61,10 @@ try {
   const python = spawn('python3', [
     '-B', 'tools/check_8788_local_router_contract.py',
     '--api-base', localOrigin,
-  ], {stdio: ['ignore', 'pipe', 'pipe']});
+  ], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {...process.env, PYTHONPATH: process.cwd()},
+  });
   const chunks = [], errors = [];
   python.stdout.on('data', x => chunks.push(x));
   python.stderr.on('data', x => errors.push(x));
