@@ -83,6 +83,33 @@ class EntryPointBindingTest(unittest.TestCase):
         preload.assert_not_called()
         dispatch.assert_not_called()
 
+    def test_embedded_ptt_only_returns_blank_without_backend_fetch(self):
+        class Embedded:
+            url = "https://public.example.test/ptt-today?focus=1&embed=1"
+            method = "GET"
+        with (patch.object(self.entry, "preload_for_accepted_request") as preload,
+              patch.object(self.entry, "dispatch_accepted_get") as dispatch):
+            response = asyncio.run(self.entry.Default().fetch(Embedded()))
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.body, "")
+        preload.assert_not_called()
+        dispatch.assert_not_called()
+
+    def test_custom_view_routes_use_canonical_preload_and_accepted_dispatch(self):
+        for route in ("/custom-view", "/custom-view/session?stream=dQw4w9WgXcQ&ptt=live"):
+            with self.subTest(route=route):
+                class CustomRequest:
+                    url = "https://public.example.test" + route
+                    method = "GET"
+                with (patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}) as preload,
+                      patch.object(self.entry, "dispatch_accepted_get", return_value=TransportResponse(
+                          200, (("Content-Type", "text/html"),), b"<html></html>"
+                      )) as dispatch):
+                    response = asyncio.run(self.entry.Default().fetch(CustomRequest()))
+                self.assertEqual(response.status, 200)
+                self.assertEqual(preload.await_args.args[0], route)
+                self.assertEqual(dispatch.call_args.kwargs["target"], route)
+
     def test_handler_binding_never_selects_custom_provider(self):
         with patch.object(self.entry, "bind_public_today") as bind:
             self.entry._accepted_handler()
