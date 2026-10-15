@@ -23,5 +23,7 @@ jobs:
         run: git rev-parse HEAD
       - name: D1 and API shell offline tests
         run: node --test backend/today/d1/owner-migration.test.mjs backend/today/d1/check-release-preflight.test.mjs backend/today/d1/migrate.test.mjs backend/today/d1/store.test.mjs backend/today/d1/worker-read.test.mjs backend/today/d1/api-shell.test.mjs backend/today/d1/legacy-compat.test.mjs
+      - name: Pin migration SHA-256 receipt (offline only)
+        run: node backend/today/d1/check-release-preflight.mjs
       - name: Python provider and contract tests
         run: python -B -m unittest -v backend.today.test_today_offline backend.today.test_provider_ingest backend.today.test_today_contract
