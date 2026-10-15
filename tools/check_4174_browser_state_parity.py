@@ -66,6 +66,48 @@ def scenario(browser, root, width):
     finally:
         context.close()
 
+def general_page(browser, root, width, path):
+    """Measure existing accepted page geometry without relying on live providers."""
+    context = browser.new_context(viewport={"width": width, "height": 900}, reduced_motion="reduce")
+    allowed_origin = urlsplit(root).netloc
+    def isolated_request(route):
+        target = urlsplit(route.request.url)
+        if target.hostname in {"127.0.0.1", "localhost"} and target.netloc == allowed_origin:
+            route.continue_()
+        else:
+            route.abort()
+    context.route("**/*", isolated_request)
+    page = context.new_page()
+    try:
+        response = page.goto(root.rstrip("/") + path, wait_until="domcontentloaded")
+        evidence = page.evaluate("""() => {
+          const selected=['.client-rail','.client-topbar','.client-main','.page-head',
+             '.client-grid','.viewer-workspace','.viewer-frame','.custom-layout',
+             '.selection-panel','.ptt-panel','.live-channel-rail'];
+          const geometry={};
+          for(const selector of selected) {
+            const e=document.querySelector(selector);
+            if(!e){geometry[selector]=null;continue;}
+            const r=e.getBoundingClientRect(),s=getComputedStyle(e);
+            geometry[selector]={
+              width:Math.round(r.width),height:Math.round(r.height),
+              display:s.display,grid:s.gridTemplateColumns,
+              padding:s.padding,fontSize:s.fontSize,lineHeight:s.lineHeight,
+              overflow:s.overflow,zIndex:s.zIndex,visibility:s.visibility};
+          }
+          return {
+            title:document.title,
+            navLinks:[...document.querySelectorAll('.rail-nav a')].map(e=>e.getAttribute('href')),
+            documentWidth:document.documentElement.scrollWidth,
+            viewportWidth:document.documentElement.clientWidth,
+            iframeCount:document.querySelectorAll('iframe').length,
+            geometry
+          };
+        }""")
+        return {"status": response.status if response else None, "evidence": evidence}
+    finally:
+        context.close()
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--baseline", required=True)
@@ -91,6 +133,19 @@ def main():
                 except Exception as exc:
                     rows.append({"width": width, "pass": False, "error": str(exc)})
                     print(f"FAIL: custom-view browser-state {width}px: {exc}")
+            for width in (1440, 760, 390):
+                for path in ("/", "/history", "/ptt-today", "/ptt-today?focus=1",
+                             "/custom-view", "/watchalong", "/collab"):
+                    try:
+                        baseline = general_page(browser, args.baseline, width, path)
+                        candidate = general_page(browser, args.candidate, width, path)
+                        passed = baseline == candidate
+                        rows.append({"width": width, "path": path, "pass": passed,
+                                     "baseline": baseline, "candidate": candidate})
+                        print(f"{'PASS' if passed else 'FAIL'}: browser DOM {width}px {path}")
+                    except Exception as exc:
+                        rows.append({"width":width,"path":path,"pass":False,"error":str(exc)})
+                        print(f"FAIL: browser DOM {width}px {path}: {exc}")
         finally:
             browser.close()
     output = Path(args.output)
