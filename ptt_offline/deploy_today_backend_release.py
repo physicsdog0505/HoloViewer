@@ -93,6 +93,7 @@ def safe_deploy_config(config_path):
     for name in PTT_SECRET_NAMES:
         vars.pop(name,None)
     vars["TODAY_CADENCE_ENABLED"]="true"
+    vars["TODAY_DISCOVERY_ENABLED"]="true"
     cfg["vars"]=vars
     td=tempfile.TemporaryDirectory(prefix="holoviewer-today-release-")
     path=Path(td.name)/"wrangler.json"
@@ -118,7 +119,12 @@ def main():
     run([__import__("sys").executable,"-B","-m","ptt_offline.activate_today_profiles",
          "--apply","--config",config,"--profiles-json",args.profiles_json])
 
-    # 2) Deploy only the SAME existing API Worker with backend cadence source.
+    # 2) Apply only the isolated additive discovery queue/cursor schema.
+    discovery_schema=repo_root/"ptt_offline"/"worker_host"/"today"/"discovery-only.sql"
+    run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,
+         "--file",str(discovery_schema)])
+
+    # 3) Deploy only the SAME existing API Worker with backend cadence/discovery source.
     td,deploy_cfg=safe_deploy_config(config)
     try:
         run(["npx","wrangler","deploy",str(repo_root/"ptt_offline"/"worker_host"/"index.mjs"),
@@ -134,6 +140,7 @@ def main():
       "api_contract_changed":False,
       "profile_rows_expected":66,
       "today_cadence_enabled":True,
+      "today_discovery_enabled":True,
       "preserved_secret_bindings":secrets,
       "ptt_preflight":ptt
     },ensure_ascii=False,indent=2))
