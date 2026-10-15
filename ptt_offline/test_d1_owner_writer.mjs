@@ -70,3 +70,11 @@ test('tampered batch digest fails before D1 access',async()=>{
  }),/batch checksum mismatch/);
  assert.equal(calls.length,0);
 });
+
+test('publisher terminal 2-of-5 rows preserves Python canonical digest',async()=>{
+ const {DB,calls}=mock();
+ const terminal=await signed({...batch,write_cap:5});
+ const ack=await applyAuthorizedPttBatch({DB,batch:terminal,verifyAuthority:async()=>true});
+ assert.equal(ack.logical_rows_acked,1);
+ assert.equal(calls.some(c=>c[0]==='batch'),true);
+});
