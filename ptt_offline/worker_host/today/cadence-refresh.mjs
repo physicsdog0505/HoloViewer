@@ -12,7 +12,12 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
   if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('invalid lifecycle refresh limit');
 
   const got=await env.DB.prepare(`
-    SELECT video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_observed_at
+    SELECT video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_observed_at,
+      scheduled_start,actual_start,actual_end,
+      EXISTS(
+        SELECT 1 FROM public_today_websub_events e
+        WHERE e.video_id=public_today_canonical.video_id AND e.status='processed'
+      ) AS from_discovery
     FROM public_today_canonical
     WHERE lifecycle_state!='ended'
     ORDER BY lifecycle_observed_at ASC,video_id ASC
@@ -35,15 +40,24 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
   const byId=new Map(payload.items.map(item=>[item.id,item]));
   const expected=new Map(rows.map(r=>[r.video_id,r]));
   const observed_at=now.toISOString().replace(/\.\d{3}Z$/,'Z');
-  let updated=0,missing=0;
+  let updated=0,missing=0,removed_non_live=0;
 
   for(const id of ids){
     const base=expected.get(id),v=byId.get(id),s=v?.snippet,d=v?.liveStreamingDetails??{};
     if(!base||!v||!s){missing++;continue;}
     if(!CHANNEL.test(base.publisher_channel_id??'')||s.channelId!==base.publisher_channel_id)throw Error('publisher mismatch');
     const actualEnd=iso(d.actualEndTime),actualStart=iso(d.actualStartTime),scheduled=iso(d.scheduledStartTime);
+    const hasLivestreamEvidence=Boolean(
+      actualEnd || actualStart || scheduled ||
+      s.liveBroadcastContent==='live' || s.liveBroadcastContent==='upcoming'
+    );
+    if(!hasLivestreamEvidence && Boolean(base.from_discovery)){
+      await env.DB.prepare('DELETE FROM public_today_canonical WHERE video_id=?').bind(id).run();
+      removed_non_live++;
+      continue;
+    }
     const lifecycle=actualEnd?'ended':s.liveBroadcastContent==='live'?'live':
-      s.liveBroadcastContent==='upcoming'?'upcoming':'unknown';
+      s.liveBroadcastContent==='upcoming'?'upcoming':actualStart?'live':'unknown';
     await writeEvidence(env.DB,{
       video_id:id,
       channel_id:base.publisher_channel_id,
@@ -60,7 +74,7 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
     });
     updated++;
   }
-  return {status:'refreshed',requests:1,selected:ids.length,updated,missing};
+  return {status:'refreshed',requests:1,selected:ids.length,updated,missing,removed_non_live};
 }
 
 export function mountTodayCadence(base,{fetchImpl=fetch}={}){
