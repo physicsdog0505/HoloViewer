@@ -366,7 +366,7 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 
 /* Verbatim accepted 4174 LIVE_RAIL_CSS from client_ui_shell.py, pinned cab0adb51. */
 .live-channel-rail{
-  position:fixed;left:2px;top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px);
+  position:fixed;left:2px;top:426px;z-index:65;width:64px;max-height:calc(100vh - 438px);
   display:flex;flex-direction:column;gap:8px;padding:8px 0;overflow-x:hidden;overflow-y:auto;
   background:rgba(255,253,250,.98);border-radius:14px;scrollbar-width:none;
   transition:width .16s ease,box-shadow .16s ease
