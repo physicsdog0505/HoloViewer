@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "checkpoint": "4174-product-runtime-parity",
+  "accepted_source": {
+    "repository": "physicsdog0505/Hololive-PTT-Viewer",
+    "commit": "a144bb378a8bdd772faa867d608c1e7491253883"
+  },
+  "candidate_branch": "dev/8788-full-4174",
+  "platform_adapter_blocked": true,
+  "routes": [
+    {
+      "id": "home",
+      "path": "/",
+      "kind": "page",
+      "data": "empty-or-synthetic",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "history",
+      "path": "/history",
+      "kind": "page",
+      "data": "empty-or-synthetic",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "ptt",
+      "path": "/ptt-today",
+      "kind": "page",
+      "data": "empty-or-synthetic",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "ptt-focus",
+      "path": "/ptt-today?focus=1",
+      "kind": "page",
+      "data": "empty-or-synthetic",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "custom",
+      "path": "/custom-view",
+      "kind": "page",
+      "data": "none",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "custom-session-single",
+      "path": "/custom-view/session?stream=dQw4w9WgXcQ&layout=auto&primary=0&audio=0",
+      "kind": "page",
+      "data": "synthetic-video-id",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "custom-session-multi",
+      "path": "/custom-view/session?stream=dQw4w9WgXcQ&stream=9bZkp7q19f0&layout=auto&primary=0&audio=0",
+      "kind": "page",
+      "data": "synthetic-video-ids",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "watchalong",
+      "path": "/watchalong",
+      "kind": "page",
+      "data": "empty-or-synthetic",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "collab",
+      "path": "/collab",
+      "kind": "page",
+      "data": "empty-or-synthetic",
+      "evidence": [
+        "http",
+        "dom-source",
+        "browser"
+      ]
+    },
+    {
+      "id": "api-home",
+      "path": "/api/home",
+      "kind": "api",
+      "data": "empty-or-synthetic",
+      "evidence": [
+        "http-json"
+      ]
+    },
+    {
+      "id": "api-ptt-today",
+      "path": "/api/ptt/today",
+      "kind": "api",
+      "data": "empty-or-synthetic",
+      "evidence": [
+        "http-json"
+      ]
+    }
+  ],
+  "browser_states": [
+    {
+      "id": "navigation-desktop",
+      "area": "navigation",
+      "viewport": "desktop",
+      "status": "pending"
+    },
+    {
+      "id": "navigation-mobile",
+      "area": "navigation",
+      "viewport": "mobile",
+      "status": "pending"
+    },
+    {
+      "id": "custom-single",
+      "area": "custom-view",
+      "viewport": "desktop",
+      "status": "pending"
+    },
+    {
+      "id": "custom-multi",
+      "area": "multiview",
+      "viewport": "desktop",
+      "status": "pending"
+    },
+    {
+      "id": "audio-master",
+      "area": "audio/player",
+      "viewport": "desktop",
+      "status": "pending"
+    },
+    {
+      "id": "immersive-enter",
+      "area": "fullscreen",
+      "viewport": "desktop",
+      "status": "pending"
+    },
+    {
+      "id": "immersive-esc",
+      "area": "fullscreen/ESC",
+      "viewport": "desktop",
+      "status": "pending"
+    },
+    {
+      "id": "ptt-focus",
+      "area": "PTT",
+      "viewport": "desktop",
+      "status": "pending"
+    },
+    {
+      "id": "responsive-760",
+      "area": "responsive",
+      "viewport": "760px",
+      "status": "pending"
+    },
+    {
+      "id": "responsive-620",
+      "area": "responsive",
+      "viewport": "620px",
+      "status": "pending"
+    }
+  ],
+  "rules": [
+    "Accepted 4174 behavior is product truth.",
+    "Missing backend data is recorded separately from product/UI parity.",
+    "No product HTML/CSS/JS/Python rewrite is permitted in Phase D.",
+    "Cloudflare/platform work remains blocked until Checkpoint 3 PASS."
+  ]
+}
