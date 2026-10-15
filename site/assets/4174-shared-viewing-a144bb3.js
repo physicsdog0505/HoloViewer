@@ -1,10 +1,10 @@
 /* Direct browser transplant from Hololive-PTT-Viewer shared_viewing_core.py
  * source: a144bb378a8bdd772faa867d608c1e7491253883
- * Only Python f-string payload injection is adapted to the config argument below.
+ * Only Python server-side value injection is adapted to the config argument.
  */
 window.mount4174SharedViewer = function mount4174SharedViewer(config){
 const streams=config.streams;
-const singlePttKind={json.dumps("vod" if show_live_ptt and ptt_worker_config and ptt_worker_config.get("mode") == "archive" else ("live" if show_live_ptt else ""))};
+const singlePttKind=(config.singlePttKind||"");
 function syncSessionCardinalityClasses(){
  const single=streams.length===1;
  document.body.classList.toggle('single-ptt',single&&Boolean(singlePttKind));
@@ -316,7 +316,7 @@ document.addEventListener('fullscreenchange',()=>{
 
 function refreshMultiControls(){const active=streams.length>1;document.querySelectorAll('[data-layout]').forEach(button=>button.hidden=!active);for(const id of ['playerSyncLabel','focusChoices','focusCarousel','focusCarouselIntervalLabel','audioFollowLabel','playAll','pauseAll']){const el=document.getElementById(id);if(el)el.hidden=!active;}}
 refreshMultiControls();
-let layout={json.dumps(layout)}==='auto'&&streams.length===2?'equal':{json.dumps(layout)}, primaryIndex={session.primary_index}, audioMaster={session.audio_master_index};
+let layout=(config.layout||"auto")==='auto'&&streams.length===2?'equal':(config.layout||"auto"), primaryIndex=Number(config.primaryIndex||0), audioMaster=Number(config.audioMasterIndex||0);
 const videoHeight=document.getElementById('videoHeight');
 const videoHeightValue=document.getElementById('videoHeightValue');
 videoHeight?.addEventListener('input',()=>{
