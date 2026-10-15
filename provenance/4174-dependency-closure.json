@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
+  "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
+  "accepted_roots": [
+    "client_app.py",
+    "client_custom_view.py",
+    "client_history.py",
+    "client_home.py",
+    "client_ptt_today.py",
+    "client_ui_shell.py",
+    "client_watchalong.py",
+    "shared_viewing_core.py"
+  ],
+  "python_dependency_closure": [
+    "archive_translation_service.py",
+    "channel_push_discovery.py",
+    "client_app.py",
+    "client_collab_candidates.py",
+    "client_custom_view.py",
+    "client_history.py",
+    "client_home.py",
+    "client_ptt_today.py",
+    "client_runtime.py",
+    "client_stream_catalog.py",
+    "client_support_colors.py",
+    "client_ui_shell.py",
+    "client_watchalong.py",
+    "collab_live_feed.py",
+    "collector_settings.py",
+    "corpus_translation.py",
+    "direct_youtube_caption_provider.py",
+    "discovery_evidence.py",
+    "discovery_evidence_runtime.py",
+    "frontend_chat.py",
+    "frontend_config.py",
+    "frontend_db.py",
+    "frontend_feed_polling.py",
+    "frontend_multistream.py",
+    "frontend_multistream_sync.py",
+    "frontend_stream_discovery.py",
+    "frontend_sync_query.py",
+    "frontend_time.py",
+    "frontend_watchalong.py",
+    "frontend_watchalong_companion.py",
+    "frontend_watchalong_extras.py",
+    "gemini_translation_provider.py",
+    "gemini_translation_quality.py",
+    "innertube_youtube_caption_provider.py",
+    "live_stream_discovery.py",
+    "ptt_reader_components.py",
+    "ptt_stream_discovery.py",
+    "quality_v2_translation_service.py",
+    "resilient_translation.py",
+    "shared_viewing_core.py",
+    "stream_catalog.py",
+    "stream_catalog_runtime.py",
+    "subtitle_translation_component.py",
+    "thread_discovery.py",
+    "today_stream_refresh.py",
+    "today_stream_status.py",
+    "transcript_corpus.py",
+    "transcript_ingest.py",
+    "transcript_pipeline.py",
+    "translation_benchmark.py",
+    "translation_chinese_retiming.py",
+    "translation_fansub_capture.py",
+    "translation_pipeline.py",
+    "translation_quality_b_events.py",
+    "translation_quality_b_long_job.py",
+    "translation_quality_b_pipeline.py",
+    "translation_quality_b_semantic_audit.py",
+    "translation_quality_benchmark.py",
+    "translation_quality_existing_adapter.py",
+    "translation_quality_pipeline.py",
+    "translation_quality_workspace.py",
+    "translation_sentence_reconstruction.py",
+    "watchalong_archive_store.py",
+    "watchalong_playback_telemetry.py",
+    "watchalong_playlist.py",
+    "watchalong_provider.py",
+    "watchalong_ptt_catalog.py",
+    "watchalong_transcript.py",
+    "watchalong_transcript_integration.py",
+    "watchalong_translation_integration.py",
+    "web_backfill.py",
+    "youtube_history_event_source.py",
+    "youtube_metadata.py",
+    "youtube_transcript_provider.py"
+  ],
+  "required_static_assets": [
+    "public/ptt_timeline.js",
+    "public/ptt_player_adapter.js",
+    "public/ptt_worker_adapter.js",
+    "hololive_channels.prototype.json"
+  ],
+  "runtime_requirement_manifests": [
+    "requirements-frontend.txt",
+    "requirements-transcript.txt",
+    "requirements-web.txt",
+    "requirements.txt"
+  ],
+  "intentionally_excluded_runtime_generated": [
+    {
+      "path": ".ptt_stream_discovery_cache.json",
+      "reason": "runtime cache"
+    },
+    {
+      "path": ".channel_push_discovery.json",
+      "reason": "runtime discovery state"
+    },
+    {
+      "path": ".channel_feed_reconcile.json",
+      "reason": "runtime reconciliation state"
+    },
+    {
+      "path": ".today_stream_status.json",
+      "reason": "runtime status state"
+    },
+    {
+      "path": "holoviewer-channel-support-colors.json",
+      "reason": "runtime-generated 8501 export consumed read-only"
+    },
+    {
+      "path": "collector_runtime_settings.json",
+      "reason": "runtime settings state"
+    },
+    {
+      "path": "collector_events.jsonl",
+      "reason": "runtime event log"
+    },
+    {
+      "path": "metadata.json/raw.txt/segments.json/selection.json and artifact JSONs",
+      "reason": "runtime transcript/corpus artifacts"
+    }
+  ],
+  "policy": {
+    "old_public_product_files_allowed": false,
+    "failed_branch_sources": [
+      "dev/8788-parity",
+      "dev/8788-clean-transplant"
+    ],
+    "phase_c_launcher_allowed": false,
+    "phase_e_cloudflare_allowed": false
+  }
+}
