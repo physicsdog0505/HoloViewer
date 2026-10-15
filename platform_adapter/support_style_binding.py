@@ -39,8 +39,10 @@ def install_support_style_adapter(client_home) -> None:
 
     def channel_style(item):
         styles = _CURRENT.get()
-        if styles is not None and item.channel_id in styles:
-            entry = styles[item.channel_id]
+        if styles is not None:
+            entry = styles.get(item.channel_id)
+            if not entry:
+                return ""
             if entry["mode"] == "dual_color":
                 left, right = entry["hexes"]
                 return (
