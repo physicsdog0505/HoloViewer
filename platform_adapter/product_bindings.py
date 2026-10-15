@@ -96,7 +96,7 @@ def bind_history_reader(api: PublicAPI, home_stream_cls: Callable):
         # Explicit fixture/source overrides stay outside the production adapter.
         if source is not None:
             raise ValueError("Cannot combine local source override with Public API")
-        if not 1 <= page <= 20:
+        if not 1 <= page <= 10000:
             raise ValueError("history page outside accepted bounded range")
         result = api.read_day(selected, limit=50, offset=(page - 1) * 50)
         items = result.get("items")
