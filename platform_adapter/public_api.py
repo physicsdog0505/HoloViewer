@@ -11,9 +11,7 @@ from contextvars import ContextVar
 from datetime import date
 import json
 import re
-import urllib.error
-import urllib.parse
-import urllib.request
+from urllib.parse import urlencode, urlsplit
 
 DEFAULT_API = "https://holoviewer-public-api.singlebagel.workers.dev"
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -31,15 +29,6 @@ def preloaded_public_reads(mapping: dict):
         _PRELOADED.reset(token)
 
 
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, request, fp, code, msg, headers, newurl):
-        return None
-
-
-_READ_OPENER = urllib.request.build_opener(_NoRedirect)
-
-
 class PublicAPIUnavailable(RuntimeError):
     """The canonical API could not provide a valid consumer read."""
 
@@ -53,7 +42,7 @@ class PublicAPI:
     def __post_init__(self) -> None:
         if self.origin != DEFAULT_API and not self._test_only_allow_alternate_origin:
             raise ValueError("Only the canonical holoviewer-public-api is authorized")
-        parsed = urllib.parse.urlsplit(self.origin)
+        parsed = urlsplit(self.origin)
         if (parsed.scheme != "https" or not parsed.hostname or parsed.username
                 or parsed.password or parsed.query or parsed.fragment
                 or parsed.path not in ("", "/")):
@@ -74,12 +63,22 @@ class PublicAPI:
 
         url = self.origin.rstrip("/") + path
         if query:
-            url += "?" + urllib.parse.urlencode(query)
+            url += "?" + urlencode(query)
+        # Cloudflare Worker requests always consume async-prefetched values above.
+        # Import the synchronous urllib stack only for local/offline compatibility.
+        import urllib.error
+        import urllib.request
+
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, request, fp, code, msg, headers, newurl):
+                return None
+
         request = urllib.request.Request(
             url, method="GET", headers={"Accept": "application/json"}
         )
+        opener = urllib.request.build_opener(_NoRedirect)
         try:
-            with _READ_OPENER.open(request, timeout=self.timeout_seconds) as response:
+            with opener.open(request, timeout=self.timeout_seconds) as response:
                 if response.status != 200:
                     raise PublicAPIUnavailable(f"Public API HTTP {response.status}")
                 content_type = response.headers.get_content_type()
