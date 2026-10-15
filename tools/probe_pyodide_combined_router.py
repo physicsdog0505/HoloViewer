@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import time
@@ -52,6 +53,24 @@ def _wait_json(url: str, process: subprocess.Popen, timeout: float = 60) -> dict
         except (OSError, RuntimeError):
             time.sleep(0.5)
     raise TimeoutError("local proof process did not become ready")
+
+
+def _terminate_group(process: subprocess.Popen, timeout: float = 15) -> None:
+    """Terminate pywrangler/workerd as one local proof process group."""
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=5)
 
 
 def _head(path: Path) -> str:
@@ -127,14 +146,15 @@ def run(bundle: Path, owner47: Path, owner48: Path, *, api_port: int, worker_por
     env = {**os.environ, "CI": "1", "NO_COLOR": "1"}
 
     with router_log.open("w", encoding="utf-8") as rlog:
-        router = subprocess.Popen(router_cmd, cwd=root, stdout=rlog, stderr=subprocess.STDOUT, env=env)
+        router = subprocess.Popen(router_cmd, cwd=root, stdout=rlog, stderr=subprocess.STDOUT, env=env, start_new_session=True)
         try:
             router_ready = _wait_json(
                 f"http://127.0.0.1:{api_port}/__proof", router, timeout=30
             )
             with worker_log.open("w", encoding="utf-8") as wlog:
                 worker = subprocess.Popen(
-                    worker_cmd, cwd=bundle, stdout=wlog, stderr=subprocess.STDOUT, env=env
+                    worker_cmd, cwd=bundle, stdout=wlog, stderr=subprocess.STDOUT,
+                    env=env, start_new_session=True
                 )
                 try:
                     deadline = time.monotonic() + 120
@@ -187,19 +207,9 @@ def run(bundle: Path, owner47: Path, owner48: Path, *, api_port: int, worker_por
                     }
                     return result
                 finally:
-                    worker.terminate()
-                    try:
-                        worker.wait(timeout=15)
-                    except subprocess.TimeoutExpired:
-                        worker.kill()
-                        worker.wait(timeout=5)
+                    _terminate_group(worker)
         finally:
-            router.terminate()
-            try:
-                router.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                router.kill()
-                router.wait(timeout=5)
+            _terminate_group(router, timeout=10)
 
 
 def main() -> int:
