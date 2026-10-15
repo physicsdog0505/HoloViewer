@@ -253,3 +253,25 @@ Before a live Publisher can exist, separately review:
 - bounded transaction, one-process exclusivity and resumable checkpoint;
 - actual D1 transport/binding and hard first-window budget.
 No owner SQLite has been opened.
+
+## #48 Publisher CLI bounded preparation
+
+`publisher_cli.py` now supplies an executable **offline-only dry-run
+skeleton** with explicit `--source`, `--day`, `--aid`, `--receipt`,
+`--batch` and required `--dry-run`. It opens only the caller-supplied
+source SQLite in read-only mode; takes a nonblocking exclusive file lock;
+checks `articles/pushes/article_screens` schemas and selected AID; samples
+screen coverage without declaring completeness; and atomically replaces a
+redacted local checkpoint receipt. The upper batch bound is 5.
+
+```sh
+python3 -B -m ptt_offline.publisher_cli --source /explicit/approved/synthetic.sqlite3 --day 2026-10-15 --aid A1 --receipt /tmp/ptt48-offline-receipt.json --batch 5 --dry-run
+```
+
+By design the result is `BLOCKED_UNVERIFIED_TIMESTAMP` with zero
+publishable rows, zero D1 requests and no automatic retries. This CLI
+does **not** upload, resolve source timestamps, read arbitrary private
+owner data, start a real Publisher, or represent a production-ready
+checkpoint/replay writer. Positive complete-source coverage and trustworthy
+event time still require independent acceptance. Test module:
+`ptt_offline.test_publisher_cli`.
