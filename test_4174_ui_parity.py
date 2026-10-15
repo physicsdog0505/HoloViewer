@@ -303,7 +303,7 @@ class ParityContract(unittest.TestCase):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn('body.custom-session-watching.custom-immersive .client-main',css)
-        self.assertIn('body.custom-session-watching.custom-immersive .client-rail',css)
+        self.assertIn('body.custom-immersive .client-rail',css)
         self.assertIn("if(!document.fullscreenElement&&immersiveEnabled)",js)
         self.assertIn("if(event.key!=='Escape'||!immersiveEnabled)return",js)
         self.assertIn('window.hvExit4174Immersive?.()',app)
