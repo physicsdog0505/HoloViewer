@@ -145,6 +145,18 @@ function homeAvatarChild(item,name){
  return node('span',first.toUpperCase(),'channel-avatar-fallback');
 }
 
+function homeTimeLabel(item){
+ const raw=item.actual_start||item.scheduled_start||item.start_at;
+ if(raw){
+  const d=new Date(raw);
+  if(Number.isFinite(d.getTime())){
+   const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);
+   const p=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+   return p.month+'/'+p.day+' '+p.hour+':'+p.minute;
+  }
+ }
+ return String(item.start_label||item.start_time_label||'');
+}
 function homeCard(item,container){
  if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
  const id=item.video_id;const lifecycle=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
@@ -158,7 +170,7 @@ function homeCard(item,container){
  const thumb=node('div',undefined,'card-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
  const youTube=node('span','YouTube ↗','youtube-source-link');youTube.role='link';youTube.tabIndex=0;youTube.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;thumb.append(youTube);
  const overlay=node('div',undefined,'thumb-overlay');overlay.append(node('span',status[0],'thumb-badge '+status[1]));
- const time=String(item.start_label||item.start_time_label||'');overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
+ const time=homeTimeLabel(item);overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
@@ -260,7 +272,7 @@ function renderHomeHighlights(rows){
   badges.append(node('span',pick.label,'highlight-type'));
   badges.append(node('span',state==='live'?'LIVE':state==='ended'?'已結束':'即將開始','highlight-state'+(state==='live'?' is-live':'')));
   copy.append(badges);copy.append(node('h3',String(row.title||id)));
-  copy.append(node('p',String(row.channel_title||row.channel_name||'頻道資訊待補')+' · '+String(row.start_label||''),'highlight-channel'));
+  copy.append(node('p',String(row.channel_title||row.channel_name||'頻道資訊待補')+' · '+homeTimeLabel(row),'highlight-channel'));
   copy.append(node('span','前往觀看 →','highlight-cta'));card.append(copy);slide.append(card);carousel.append(slide);
  });
  if(picks.length>1){
