@@ -9,6 +9,8 @@ on:
       - 'tools/build_python_worker_bundle.py'
       - 'tools/probe_python_worker_local.py'
       - 'tools/prepare_worker_fixture_bundle.py'
+      - 'tools/probe_pyodide_combined_router.py'
+      - 'tools/serve_8788_owner_api_mock.mjs'
       - 'test_*worker*.py'
       - 'test_public_api_binding.py'
       - 'test_canonical_consumer_integration.py'
@@ -26,7 +28,7 @@ permissions:
 jobs:
   worker-source-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -78,6 +80,14 @@ jobs:
           python3 tools/probe_python_worker_local.py \
             --bundle "$RUNNER_TEMP/hv-8788-worker-bundle" \
             --output "$RUNNER_TEMP/python-worker-runtime-receipt.json"
+      - name: Exercise single Pyodide fetch through exact #47+#48 Router into mock D1
+        run: |
+          python3 tools/build_python_worker_bundle.py --output "$RUNNER_TEMP/hv-8788-worker-router-e2e"
+          python3 tools/probe_pyodide_combined_router.py \
+            --bundle "$RUNNER_TEMP/hv-8788-worker-router-e2e" \
+            --owner47 .owner-issue47 \
+            --owner48 .owner-issue48 \
+            --output "$RUNNER_TEMP/pyodide-combined-router-e2e.json"
       - name: Install Playwright Chromium for accepted geometry proof
         run: |
           python3 -m pip install playwright
@@ -99,4 +109,7 @@ jobs:
           path: |
             ${{ runner.temp }}/python-worker-runtime-receipt.json
             ${{ runner.temp }}/python-worker-fixture-receipt.json
+            ${{ runner.temp }}/pyodide-combined-router-e2e.json
+            ${{ runner.temp }}/combined-router-e2e.log
+            ${{ runner.temp }}/pyodide-combined-router-e2e.log
             ${{ runner.temp }}/worker-local-proof.log
