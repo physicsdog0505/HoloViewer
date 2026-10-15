@@ -79,8 +79,22 @@ export async function setCoverage(db, c) {
     VALUES (1,?,?,?,?,?,?)
     ON CONFLICT(singleton) DO UPDATE SET roster_version=excluded.roster_version,last_success_at=excluded.last_success_at,
       expected_channels=excluded.expected_channels,scanned_channels=excluded.scanned_channels,gap=excluded.gap,checkpoint=excluded.checkpoint`;
-  await db.prepare(sql).bind(c.roster_version,c.last_success_at??null,c.expected_channels,c.scanned_channels,c.gap?1:0,
-    typeof c.checkpoint==='string'&&ckPattern.test(c.checkpoint)?c.checkpoint:null).run();
+  // A roster activation requires explicit approved publisher membership.
+  // Atomic replacement also revokes removed channels; no implicit inference from old evidence.
+  if (!Array.isArray(c.approved_channels) || c.approved_channels.length!==c.expected_channels)
+    throw Error('approved channel manifest required');
+  const unique=new Set();
+  const statements=[db.prepare('DELETE FROM public_today_approved_channels')];
+  for (const channel of c.approved_channels) {
+    if (!channelPattern.test(channel.id) || !groups.has(channel.group) || unique.has(channel.id))
+      throw Error('invalid approved channel manifest');
+    unique.add(channel.id);
+    statements.push(db.prepare('INSERT INTO public_today_approved_channels(channel_id,roster_version,activated_at,channel_group) VALUES (?,?,?,?)')
+      .bind(channel.id,c.roster_version,c.last_success_at??'1970-01-01T00:00:00Z',channel.group));
+  }
+  statements.push(db.prepare(sql).bind(c.roster_version,c.last_success_at??null,c.expected_channels,c.scanned_channels,c.gap?1:0,
+    typeof c.checkpoint==='string'&&ckPattern.test(c.checkpoint)?c.checkpoint:null));
+  await db.batch(statements);
 }
 export async function readToday(db,{day,limit=200,now=new Date()}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
@@ -91,9 +105,10 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
   // actively LIVE streams crossing midnight, but not unrelated historical rows.
   const start=new Date(day+'T00:00:00+08:00').toISOString().replace(/\.\d{3}Z$/,'Z');
   const end=new Date(new Date(day+'T00:00:00+08:00').getTime()+86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
-  const rows=await db.prepare(`SELECT * FROM public_today_canonical
-    WHERE roster_version=?
-      AND ((lifecycle_observed_at>=? AND lifecycle_observed_at<?)
+  const rows=await db.prepare(`SELECT public_today_canonical.* FROM public_today_canonical
+    JOIN public_today_approved_channels ac
+      ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
+    WHERE ((lifecycle_observed_at>=? AND lifecycle_observed_at<?)
         OR (scheduled_start>=? AND scheduled_start<?)
         OR (actual_start>=? AND actual_start<?)
         OR (actual_end>=? AND actual_end<?)

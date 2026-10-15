@@ -50,3 +50,12 @@ CREATE TABLE IF NOT EXISTS public_today_catalog_meta (
   gap INTEGER NOT NULL DEFAULT 1 CHECK(gap IN (0,1)),
   checkpoint TEXT
 );
+
+-- Current-authority channel allowlist; membership is separate from video observation roster_version.
+CREATE TABLE IF NOT EXISTS public_today_approved_channels (
+  channel_id TEXT PRIMARY KEY NOT NULL,
+  roster_version TEXT NOT NULL,
+  activated_at TEXT NOT NULL,
+  channel_group TEXT NOT NULL CHECK(channel_group IN ('hololive','holostars','mekpark','other'))
+);
+CREATE INDEX IF NOT EXISTS public_today_approved_version ON public_today_approved_channels(roster_version);

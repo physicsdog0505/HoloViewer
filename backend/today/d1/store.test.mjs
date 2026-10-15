@@ -38,7 +38,7 @@ test('create/replay/update/read and durable END',async()=>{
   assert.equal((await writeEvidence(d,ended)).changed,true);
   const old=fixture({observed:'2026-10-15T12:04:00Z'});
   assert.equal((await writeEvidence(d,old)).changed,false);
-  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:04:00Z',expected_channels:1,scanned_channels:1,gap:false,checkpoint:'cp_abcdefgh'});
+  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:04:00Z',expected_channels:1,scanned_channels:1,gap:false,approved_channels:[{id:C,group:'hololive'}],checkpoint:'cp_abcdefgh'});
   const result=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T16:00:00Z')});
   assert.equal(result.streams.length,1);
   assert.equal(result.streams[0].lifecycle_state,'ended');
@@ -59,7 +59,7 @@ test('new approved roster updates same publisher and preserves both evidence ver
   assert.equal((await writeEvidence(d,next)).changed,false);
   assert.equal(d.raw.prepare('SELECT roster_version FROM public_today_canonical WHERE video_id=?').get(V).roster_version,'fixture-v2');
   assert.equal(d.raw.prepare('SELECT COUNT(DISTINCT roster_version) n FROM public_today_evidence WHERE video_id=?').get(V).n,2);
-  await setCoverage(d,{roster_version:'fixture-v2',last_success_at:'2026-10-15T12:05:00Z',expected_channels:1,scanned_channels:1,gap:false});
+  await setCoverage(d,{roster_version:'fixture-v2',last_success_at:'2026-10-15T12:05:00Z',expected_channels:1,scanned_channels:1,gap:false,approved_channels:[{id:C,group:'hololive'}]});
   assert.equal((await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:06:00Z')})).streams.length,1);
   d.close();
 });
@@ -70,7 +70,7 @@ test('changed publisher still rejects',async()=>{
 });
 test('coverage cannot leak integer checkpoint; empty result stays partial/unverified',async()=>{
   const d=db();
-  await setCoverage(d,{roster_version:'fixture-v1',expected_channels:1,scanned_channels:0,gap:true,checkpoint:7});
+  await setCoverage(d,{roster_version:'fixture-v1',expected_channels:1,scanned_channels:0,gap:true,approved_channels:[{id:C,group:'hololive'}],checkpoint:7});
   const x=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z')});
   assert.equal(x.streams.length,0);
   assert.equal(x.completeness.gap,true);
@@ -95,7 +95,7 @@ test('Taipei requested day excludes unrelated prior-day entries',async()=>{
   const d=db();
   await writeEvidence(d,{...fixture({id:'oldvideo001',state:'unknown',observed:'2026-10-13T08:00:00Z'}),actual_start:null,scheduled_start:'2026-10-13T09:00:00Z'});
   await writeEvidence(d,{...fixture({id:'newvideo001',state:'upcoming',observed:'2026-10-15T02:00:00Z'}),actual_start:null,scheduled_start:'2026-10-15T03:00:00Z'});
-  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T02:00:00Z',expected_channels:1,scanned_channels:1,gap:false});
+  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T02:00:00Z',expected_channels:1,scanned_channels:1,gap:false,approved_channels:[{id:C,group:'hololive'}]});
   const result=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T02:01:00Z')});
   assert.deepEqual(result.streams.map(x=>x.video_id),['newvideo001']);
   d.close();
@@ -104,8 +104,28 @@ test('bounded cross-midnight LIVE survives and unrelated ancient LIVE is exclude
   const d=db();
   await writeEvidence(d,{...fixture({id:'carrylive01',observed:'2026-10-14T14:00:00Z'}),actual_start:'2026-10-14T13:00:00Z',scheduled_start:'2026-10-14T13:00:00Z'});
   await writeEvidence(d,{...fixture({id:'distantlive',observed:'2026-10-12T02:00:00Z'}),actual_start:'2026-10-12T01:00:00Z',scheduled_start:'2026-10-12T01:00:00Z'});
-  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T02:00:00Z',expected_channels:1,scanned_channels:1,gap:true});
+  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T02:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
   const result=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T02:00:00Z')});
   assert.deepEqual(result.streams.map(x=>x.video_id),['carrylive01']);
+  d.close();
+});
+
+test('roster v2 activates approved publisher without freezing v1 canonical row',async()=>{
+  const d=db();await writeEvidence(d,fixture());
+  await setCoverage(d,{roster_version:'fixture-v2',last_success_at:'2026-10-15T12:00:00Z',
+    expected_channels:1,scanned_channels:1,gap:false,approved_channels:[{id:C,group:'hololive'}]});
+  const rows=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:01:00Z')});
+  assert.equal(rows.streams.length,1);
+  assert.equal(rows.streams[0].video_id,V);
+  assert.equal(d.raw.prepare('SELECT roster_version FROM public_today_canonical WHERE video_id=?').get(V).roster_version,'fixture-v1');
+  d.close();
+});
+test('removed publisher excluded immediately at approved roster rollover',async()=>{
+  const d=db();await writeEvidence(d,fixture());
+  const removed='UC'+'B'.repeat(22);
+  await setCoverage(d,{roster_version:'fixture-v2',last_success_at:'2026-10-15T12:00:00Z',
+    expected_channels:1,scanned_channels:1,gap:false,approved_channels:[{id:removed,group:'other'}]});
+  const rows=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:01:00Z')});
+  assert.equal(rows.streams.length,0);
   d.close();
 });
