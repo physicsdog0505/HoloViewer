@@ -195,9 +195,34 @@ from frontend_time import TAIPEI
     watch_text = watch_text.replace(heavy, light)
     watchalong.write_text(watch_text, encoding="utf-8")
 
+    shell = output / "client_ui_shell.py"
+    shell_text = shell.read_text(encoding="utf-8")
+    shell_old = """    # Resolve once per page request from the same persisted live catalog as Today.
+    # Lazy import keeps client_home -> client_ui_shell dependencies acyclic.
+    from client_home import _live_channel_rail, load_home_streams
+    if live_rail_html is None:
+        live, _, _, _ = load_home_streams()
+        live_rail = _live_channel_rail(live)
+    else:
+        live_rail = live_rail_html
+"""
+    shell_new = """    # Public Worker never falls back to local runtime/DB loaders.
+    # The platform adapter supplies request-local Today rail HTML when available.
+    from platform_adapter.live_rail_binding import current_live_rail_html
+    if live_rail_html is None:
+        live_rail = current_live_rail_html() or ""
+    else:
+        live_rail = live_rail_html
+"""
+    if shell_text.count(shell_old) != 1:
+        raise RuntimeError("client_ui_shell live-rail provider anchor mismatch")
+    shell_text = shell_text.replace(shell_old, shell_new)
+    shell.write_text(shell_text, encoding="utf-8")
+
     return {
         "client_home_lazy_runtime_imports": "applied",
         "client_watchalong_landing_lightweight_imports": "applied",
+        "client_shell_request_local_live_rail": "applied",
     }
 
 
