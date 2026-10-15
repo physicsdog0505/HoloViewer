@@ -328,3 +328,53 @@ only after an exact all-row ACK**. It has no network/D1 implementation.
 This closes the source/offline contract shape but does not fabricate missing
 production evidence. Real source timestamp evidence, D1 transport mutation,
 Publisher activation/Cron, secrets, deploy and merge remain owner-gated.
+
+
+## Review 6192891842 — identity/chronology/continuation corrections
+
+The URL-epoch time adapter is still a **candidate, not production timestamp
+authority**. The article URL epoch can anchor the article posting year, but
+does not by itself prove all later push years or the AID ↔ URL identity.
+`article_epoch` now **requires an independently supplied positive
+`identity_verifier(board, normalized_aid, url)`**. A missing, negative or
+malformed identity proof aborts before timestamp reconstruction. Synthetic
+tests inject an explicit fixture verifier. No trusted production verifier has
+been approved or wired.
+
+The source-line monotonic chronology reconstruction rejects invalid date
+text, backward chronology except observed Dec→Jan, duplicate/regressive line
+order and unobserved gaps exceeding 45 days. This limit is a **conservative
+fail-closed policy**, not a claim that a PTT article cannot remain idle longer.
+A thread with ambiguous multi-year calendar evidence must remain blocked until
+external positive evidence exists. Never infer it from `collected_at`,
+`captured_at` or system year.
+
+`collector_day_stage.stage_selected_day()` requires exact calendar
+`YYYY-MM-DD`, one verified article identity, source-only line-order read,
+a 50,000-row maximum audit scan, selected-day filtering, a five-row return cap,
+and a stable `next_after_source_line` for continuation. The
+`after_source_line` argument filters already ACKed source lines; the opaque
+Public History cursor is a distinct consumer contract and is not reused as
+the Publisher source checkpoint.
+
+`coverage_receipt()` now keeps **observed** line gaps distinct from
+**unverified** terminal/completeness evidence. `has_gap=true` represents
+actual source-line holes; continuous screens with no verified terminal page
+return `has_gap="UNKNOWN"`, `complete=false`, avoiding an unjustified sticky
+provider purge-gap latch. Even structurally contiguous current coverage is
+not automatically accepted historical final-complete evidence.
+
+The first-window D1 cap of 20 Rows Written is a conservative **abort ceiling**,
+not logical push count or SQL statement count. Five pushes can attempt one
+thread insert, five push upserts, five evidence upserts and one separately
+ordered provider-state update (up to 12 possible row mutations before
+accounting for actual affected-row behavior). `logical_rows_acked` must
+equal the batch's five-or-fewer pushes independently of Cloudflare
+`d1_rows_written`; real rows-written/query counters remain an owner-gated
+runtime measurement.
+
+`publisher_session.py` proves an **offline injected synthetic**
+ACK→atomic checkpoint order and fail/restart/replay contract. It neither
+certifies a real remote ACK nor authorizes D1 transport, live execution or
+source-data access. Only approved independent identity and chronology evidence
+can lift the positive transformation gate.
