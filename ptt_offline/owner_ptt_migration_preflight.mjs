@@ -55,6 +55,17 @@ export function assertWranglerLedger(rows,{pttApplied=false}={}) {
  if(hasPtt!==pttApplied)throw Error('PTT Wrangler migration ledger out of sync');
  return true;
 }
+export function migrationSqlWithReceipt(sql,sha256) {
+ if(!/^[a-f0-9]{64}$/.test(sha256))throw Error('bad migration SHA256');
+ return sql+"\nCREATE TABLE IF NOT EXISTS public_ptt_migration_receipts (version INTEGER PRIMARY KEY, source_sha256 TEXT NOT NULL);\n"+
+   "INSERT INTO public_ptt_migration_receipts(version,source_sha256) VALUES (1,'"+sha256+"');\n";
+}
+export function verifyReceipt(rows,sha256) {
+ if(!Array.isArray(rows)||rows.length!==1||rows[0]?.version!==1||
+    rows[0]?.source_sha256!==sha256)
+   throw Error('PTT exact migration receipt mismatch');
+ return true;
+}
 export function decodeD1(value) {
  const items=JSON.parse(value);
  const groups=Array.isArray(items)?items:[items];
@@ -93,6 +104,11 @@ export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
    const ledger=decodeD1(exec(['d1','execute',UUID,'--remote','--json','--command',
      'SELECT version,description FROM public_ptt_schema_migrations ORDER BY version;']));
    applied=verifyAppliedPttLedger(ledger,inspection);
+   if(!objects.some(x=>x.name==='public_ptt_migration_receipts'))
+     throw Error('PTT source checksum receipt missing');
+   const attest=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
+     '--command','SELECT version,source_sha256 FROM public_ptt_migration_receipts ORDER BY version;']));
+   verifyReceipt(attest,plan.sha256);
  }
  const receipt={...plan,mode:'READ_ONLY_ACCOUNT_PREFLIGHT',...inspection,...applied};
  if(apply&&!inspection.wranglerLedgerPresent)throw Error('existing Wrangler ledger required for controlled migration');
@@ -108,7 +124,7 @@ export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
  try{
    mkdirSync(migrations);
    writeFileSync(join(migrations,'0001_today_canonical.sql'),'-- previously applied Today migration; must never execute again\n',{mode:0o600});
-   writeFileSync(file,readFileSync(FILE),{mode:0o600});
+   writeFileSync(file,migrationSqlWithReceipt(readFileSync(FILE).toString('utf8'),plan.sha256),{mode:0o600});
    const config=join(dir,'wrangler.json');
    writeFileSync(config,JSON.stringify({name:'holoviewer-public-api',compatibility_date:'2026-10-14',d1_databases:[{binding:'DB',database_name:DB,database_id:UUID,migrations_dir:'migrations',migrations_table:'d1_migrations'}]}),{mode:0o600});
    mutationAttempted=true;
@@ -121,6 +137,9 @@ export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
    const newLedger=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
      '--command','SELECT name FROM d1_migrations ORDER BY id;']));
    assertWranglerLedger(newLedger,{pttApplied:true});
+   const receiptRows=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
+     '--command','SELECT version,source_sha256 FROM public_ptt_migration_receipts ORDER BY version;']));
+   verifyReceipt(receiptRows,plan.sha256);
    const verified=verifyAppliedPttLedger(ledger,state);
    if(!verified.verified)throw Error('postflight PTT ledger not verified');
    const result={...receipt,...verified,mode:'OWNER_APPLIED_VERIFIED'};
