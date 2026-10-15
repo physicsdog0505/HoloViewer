@@ -1,4 +1,9 @@
-# #48 One-minute PTT ingestion: source and rollout contract
+# #48 PTT snapshot cadence and rollout contract
+
+## Operator-editable schedule contract (Asia/Taipei)
+
+**Current owner-requested rule, 2026-10-16**: regular period **07:00–01:59** every **60 seconds**; overnight period **02:00–06:59** every **600 seconds**. At 02:00 switch to aligned 02:00/02:10/…/06:50 slots; at 07:00 return to every minute. Times follow `Asia/Taipei` (not container/system UTC). This is the **snapshot/publish inspection interval**, not a limit of 25 messages per minute or a request to stop the upstream Collector. Empty snapshots send zero HTTP POST. Subsequent changes must update this document, #48 issue and boundary tests together. The local CLI accepts an explicit `--interval-seconds 60|120` override for temporary controlled trials; omitting the flag uses this daypart policy. It does not authorize production changes, secret toggling or new D1 writes.
+
 
 Status: IMPLEMENTED OFFLINE, **NOT ACTIVATED**, 24-hour cloud cost/latency ACCEPTANCE PENDING.
 
@@ -15,7 +20,7 @@ python3 -B -m ptt_offline.recurring_publisher \
   --source /path/to/hololive_ptt.sqlite3 \
   --state-dir /persistent/ptt-publisher-state \
   --metrics /persistent/ptt-publisher-state/minute-metrics.jsonl \
-  --interval-seconds 60 --iterations 1
+  --iterations 1
 ```
 
 A 24-hour local dry-run can specify `--iterations 1440`; this is NOT a
@@ -33,7 +38,7 @@ Worker and local CLI and undergo reviewed staging/load verification:
 - `PTT_PUBLISH_MAX_ROWS=25` (previous default 5)
 - `PTT_PUBLISH_MAX_BYTES=131072` (128 KiB)
 - `PTT_PUBLISH_MAX_QUERIES=150`, `PTT_PUBLISH_MAX_WRITES=80`
-- 60-second local snapshot cadence, max one active Publisher process
+- Wall-clock Taipei daypart cadence: 60s except 02:00–06:59 every 600s; max one active Publisher process
 - **zero automatic retries** on unknown remote commit, durable STOP latch
 - normal day/night AID separation, source-year ambiguous rows remain pending
 
@@ -43,7 +48,7 @@ python3 -B -m ptt_offline.recurring_publisher \
   --source /path/to/hololive_ptt.sqlite3 \
   --state-dir /persistent/ptt-publisher-state \
   --metrics /persistent/ptt-publisher-state/minute-metrics.jsonl \
-  --interval-seconds 60 --iterations 1440 --batch-cap 25 \
+  --iterations 1440 --batch-cap 25 \
   --send --approve-live-capture-policy
 ```
 
