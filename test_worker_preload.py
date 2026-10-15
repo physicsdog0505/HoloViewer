@@ -14,7 +14,7 @@ class RequestLocalProviderTest(unittest.TestCase):
         class Response:
             status = 200
             async def text(self):
-                return \'{"streams":[],"source":"d1_public_projection"}\'
+                return \'{"streams":[],"source":"d1_public_projection"}'
         class Binding:
             def __init__(self): self.calls = []
             async def fetch(self, url):
