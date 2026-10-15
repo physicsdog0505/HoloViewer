@@ -6,7 +6,7 @@ from unittest.mock import patch
 from io import StringIO
 from ptt_offline.owner_publisher_once import main
 from pathlib import Path
-from ptt_offline.owner_publisher_once import load_manual_evidence,row_fingerprint
+from ptt_offline.owner_publisher_once import load_manual_evidence,row_fingerprint,sign_time_proof
 from ptt_offline.public_today_contract import ContractError
 
 class OwnerPublisherOnceTests(unittest.TestCase):
@@ -29,6 +29,7 @@ class OwnerPublisherOnceTests(unittest.TestCase):
             signed=load_manual_evidence(path,source_identity="source-sha",day="2026-10-15",
                 aid="1gepPtNy",proof_secret="x"*40)(row)
             self.assertEqual(len(signed),64)
+            self.assertEqual(signed,sign_time_proof(row,"x"*40))
             self.assertFalse(check({**row,"content":"changed"}))
             self.assertFalse(check({**row,"source_line":2}))
     def test_readonly_inspect_never_stages_send_or_requires_year(self):
