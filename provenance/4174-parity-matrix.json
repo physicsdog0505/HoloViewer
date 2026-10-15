@@ -124,6 +124,96 @@
       "evidence": [
         "http-json"
       ]
+    },
+    {
+      "id": "api-ptt-video-invalid",
+      "path": "/api/ptt/video?video_id=invalid",
+      "kind": "api",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "api-collab-live-unsupported",
+      "path": "/api/collab/live?collab=unsupported",
+      "kind": "api",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "api-translation-preflight",
+      "path": "/api/translation/preflight",
+      "kind": "api",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "api-translation-prepare",
+      "path": "/api/translation/prepare",
+      "kind": "api",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "api-watchalong-progressive",
+      "path": "/api/watchalong/progressive",
+      "kind": "api",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "api-watchalong-reanalyze",
+      "path": "/api/watchalong/reanalyze",
+      "kind": "api",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "collab-session-unsupported",
+      "path": "/collab/session?collab=unsupported",
+      "kind": "page",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "watchalong-session-empty",
+      "path": "/watchalong/session",
+      "kind": "page",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "history-invalid-date",
+      "path": "/history?date=invalid",
+      "kind": "page",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
+    },
+    {
+      "id": "history-invalid-page",
+      "path": "/history?page=0",
+      "kind": "page",
+      "data": "negative/empty",
+      "evidence": [
+        "http"
+      ]
     }
   ],
   "browser_states": [
