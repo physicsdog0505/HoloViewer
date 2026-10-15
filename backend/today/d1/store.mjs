@@ -97,9 +97,9 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
         OR (scheduled_start>=? AND scheduled_start<?)
         OR (actual_start>=? AND actual_start<?)
         OR (actual_end>=? AND actual_end<?)
-        OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL))
+        OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL AND lifecycle_observed_at>=?))
     ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ?`)
-    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,limit).all();
+    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\\.\\d{3}Z$/,'Z'),limit).all();
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
   const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
