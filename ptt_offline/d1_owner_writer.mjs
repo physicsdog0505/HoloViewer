@@ -78,6 +78,11 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
     statements.push(DB.prepare(SQL_EVIDENCE).bind(row.day,row.aid,row.source_record_key,row.push_id,row.source_line));
   }
   const queries=statements.length+batch.rows.length;
+  // Conservative pre-dispatch upper bound for this single-writer transaction:
+  // at most one thread insert per AID plus one push and evidence mutation per
+  // logical row. Must not rely only on post-commit meta.changes.
+  const possibleWrites=aids.length+2*batch.rows.length;
+  requireTrue(possibleWrites<=20,'potential D1 write budget exceeded before dispatch');
   requireTrue(queries<=30,'query budget exceeded');
   const results=await DB.batch(statements);
   requireTrue(Array.isArray(results) && results.length===statements.length,'D1 transaction failure');
