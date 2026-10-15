@@ -37,3 +37,21 @@ It requires an HTTPS origin, rejects unsupported routes, bounds input, uses GET 
 - API availability, Cloudflare bindings, D1 migrations and publish authorization.
 
 No production services, credentials, local 4174 checkout, database or Cloudflare resources have been touched.
+
+## Implementation progress (isolated, unpromoted)
+
+- `catalog_projection.mjs`: conservative Today/History state grouping; missing lifecycle remains unknown, missing completeness is never promoted.
+- `custom_view_state.mjs`: accepted selection, order, primary/audio identities, five viewing layouts and session query generation.
+- `persistent_player_host.mjs`: mounts YouTube iframe nodes once under the long-lived application shell, pauses when navigation hides the viewing route, and reuses retained nodes on return. Browser/YouTube integration still needs review; background playback is not asserted.
+- `viewing_route_controller.mjs`: strict accepted session URL rehydration and route visibility transition.
+- `extract_accepted_assets.py`: extracts exact accepted literal CSS and JS without importing the product Python server. Output is a **build input**, not a finished Cloudflare website.
+
+### UI build seam
+
+Do not deploy the extracted custom-view JS in isolation: it expects the accepted DOM anchors, element IDs and event context. The Cloudflare shell must reproduce these anchors and preserve the source interaction behavior before Phase E promotion. Styling alone is not parity. An empty-data HTTP comparison cannot prove populated-data parity.
+
+The small `.test.mjs` modules can be run offline using the built-in Node test runner if necessary; no Playwright, CI workflow or external service is required for this development slice.
+
+### Major independent review threshold
+
+Request architecture review **before** replacing the Phase C production entrypoint or changing root `site/**`, API contracts, Cloudflare bindings, Workers or D1. Review must sign off on faithful accepted 4174 DOM/JS conversion and who owns the #45/#47/#48 integration contracts. Until then, continue isolated development and do not weaken the Phase C guard.
