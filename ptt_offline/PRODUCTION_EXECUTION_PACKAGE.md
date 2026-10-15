@@ -31,6 +31,23 @@ new exact-HEAD review and production authorization. The existing D1
 the immutable receipt+manifest is therefore required provenance, not
 a claim of in-DB checksum verification.
 
+### Latest owner-supplied API shell decision
+
+The existing `holoviewer-public-api` router source was supplied to #45 in
+https://github.com/physicsdog0505/HoloViewer/issues/45#issuecomment-6190031268.
+Its identity, `env.DB`, CORS origin policy, GET/OPTIONS guards,
+`/health`, response security headers and existing compatibility routes
+must be preserved. The legacy `/v1/catalog/today` SQL query is **not**
+accepted as canonical: replace that specific branch with #47
+`handleTodayRead(request, env)`. Add two #48 branches for
+`/v1/ptt/today` and `/v1/ptt/history`, invoking
+`handlePttPublicRead(request, env)`.
+
+The current repo does not contain a verified byte-for-byte copy of the
+owner-supplied Worker. Do not fabricate its CORS/header/legacy route code.
+The final integration diff is owned by the shared existing API shell and
+must be based on the supplied exact Worker source, not this runbook.
+
 ## A. Freeze migration artifact and prove compatibility (offline only)
 
 From an exact PR #55 checkout:
