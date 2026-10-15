@@ -181,3 +181,20 @@ mutation, SQLite owner-data read, Publisher activation or deploy authorized.
 
 Testing continues with the six-module Python command and Node freshness
 command above. Committed tests alone do not establish executed PASS.
+
+## Existing Public Worker route integration seam (after review 6188659557)
+
+The neighboring #47 branch's accepted `backend/today/d1/worker-read.mjs`
+exports `handleTodayRead(request, env)` for the existing
+`holoviewer-public-api` router. #48 now likewise exports
+`handlePttPublicRead(request,env)` in `d1_worker_routes.js`.
+The owner of the existing Worker route table can dispatch only
+`/v1/ptt/today` and `/v1/ptt/history` to it, passing the existing
+`env.DB` bound to `holoviewer-public-v1`. The adapter rejects missing
+bindings and non-GET methods. There is **no automatic deployment, Worker
+entrypoint replacement, or binding mutation**.
+
+The existing `holoviewer-public-api` router source/route table has not
+been verified in this branch and MUST be reviewed at integration; the
+bridge is therefore an export contract, NOT proof of a connected route.
+Production D1 migration, Publisher activation and deploy remain owner-gated.
