@@ -2,8 +2,6 @@
 // No network, Cloudflare auth, D1, or production mutation.
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
-const root=new URL('../../../',import.meta.url);
 const pins={
  'backend/today/d1/0002_today_canonical.sql':'943e3d49f665060a2f0b71c7ffef44185d754244',
  'backend/today/d1/api-shell.mjs':'55d17e204f94b61fa53b7ce59cbbba907a59ee38',
@@ -22,8 +20,10 @@ export function inspectRelease(rootPath=new URL('../../../',import.meta.url)){
  const sql=readFileSync(new URL('backend/today/d1/0002_today_canonical.sql',rootPath));
  const sha256=createHash('sha256').update(sql).digest('hex');
  const runbook=readFileSync(new URL('backend/today/d1/PRODUCTION_EXECUTION_RUNBOOK.md',rootPath),'utf8');
+ const canary=runbook.split('## E. Unified hosted read-only canary')[1]?.split('## F. Later ingestion activation')[0];
+ if(!canary)throw Error('runbook unified canary section missing');
  for(const needle of ['HTTP requests <= 5','D1 queries <= 12','Rows Read delta <= 1,000','Rows Written exactly 0','automatic retries 0','/v1/ptt/history?day=<same>&limit=1&after=']){
-  if(!runbook.includes(needle))throw Error(`runbook canary constraint missing: ${needle}`);
+  if(!canary.includes(needle))throw Error(`runbook canary constraint missing: ${needle}`);
  }
  return {result:'OFFLINE_PREFLIGHT_PASS',source_blobs:actual,migration_sha256:sha256,first_window:firstWindow,production_mutation:false};
 }
