@@ -132,6 +132,24 @@ def main():
     finally:
         td.cleanup()
 
+    # 4) After the fixed Worker is live, remove only #96 non-livestream
+    # canonical pollution. Idempotent and scoped to processed discovery events.
+    cleanup=repo_root/"ptt_offline"/"worker_host"/"today"/"cleanup-discovery-nonlive.sql"
+    run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,
+         "--file",str(cleanup)])
+    verify_sql=("SELECT 'NONLIVE_DISCOVERY_ROWS=' || COUNT(*) AS marker "
+                "FROM public_today_canonical c "
+                "WHERE c.video_id IN (SELECT e.video_id FROM public_today_websub_events e "
+                "WHERE e.status='processed' AND e.video_id IS NOT NULL) "
+                "AND c.lifecycle_state='unknown' "
+                "AND c.scheduled_start IS NULL AND c.actual_start IS NULL AND c.actual_end IS NULL "
+                "AND c.lifecycle_observed_at>='2026-10-15T22:22:00Z';")
+    verify_out=run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,
+                    "--command",verify_sql],capture=True).stdout
+    marker=__import__("re").search(r"NONLIVE_DISCOVERY_ROWS=(\\d+)",verify_out)
+    if not marker or int(marker.group(1))!=0:
+        raise SystemExit("non-live discovery cleanup did not converge to zero")
+
     print(json.dumps({
       "status":"TODAY_BACKEND_RELEASE_DEPLOYED",
       "worker":WORKER,
@@ -141,6 +159,7 @@ def main():
       "profile_rows_expected":66,
       "today_cadence_enabled":True,
       "today_discovery_enabled":True,
+      "nonlive_discovery_rows_after_cleanup":0,
       "preserved_secret_bindings":secrets,
       "ptt_preflight":ptt
     },ensure_ascii=False,indent=2))
