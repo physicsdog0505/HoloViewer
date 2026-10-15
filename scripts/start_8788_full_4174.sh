@@ -8,6 +8,7 @@ RUNTIME_DATA_ROOT="${PTT_4174_RUNTIME_DATA_ROOT:-}"
 cd "$ROOT"
 
 python3 tools/verify_4174_snapshot.py
+python3 -m unittest -v test_runtime_isolation
 
 export PYTHONNOUSERSITE=1
 export PYTHONDONTWRITEBYTECODE=1
