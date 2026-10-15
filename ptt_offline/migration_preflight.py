@@ -11,6 +11,7 @@ import sqlite3
 from pathlib import Path
 
 SCHEMA = Path(__file__).with_name("d1_migrations") / "0001_canonical_ptt.sql"
+MANIFEST = SCHEMA.with_name("manifest.json")
 TABLES = (
     "ptt_threads", "ptt_pushes", "ptt_source_evidence",
     "ptt_provider_state", "ptt_gap_repairs", "public_ptt_schema_migrations",
@@ -24,9 +25,22 @@ COLS = {
 
 
 def schema_receipt():
+    """Fail closed on immutable, reviewed migration-byte drift."""
     payload = SCHEMA.read_bytes()
-    return {"migration": SCHEMA.as_posix(), "sha256": hashlib.sha256(payload).hexdigest(),
-            "bytes": len(payload), "required_tables": list(TABLES)}
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    entries = manifest.get("immutable_migrations")
+    if not isinstance(entries, list) or len(entries) != 1:
+        raise RuntimeError("migration manifest missing or unexpected version set")
+    entry = entries[0]
+    digest = hashlib.sha256(payload).hexdigest()
+    if (entry.get("version") != 1
+        or entry.get("path") != "ptt_offline/d1_migrations/0001_canonical_ptt.sql"
+        or entry.get("sha256") != digest
+        or entry.get("bytes") != len(payload)):
+        raise RuntimeError("immutable migration v1 checksum/length mismatch; create v2 instead")
+    return {"migration": SCHEMA.as_posix(), "sha256": digest,
+            "bytes": len(payload), "manifest_verified": True,
+            "required_tables": list(TABLES)}
 
 
 def inspect_fixture(path):
