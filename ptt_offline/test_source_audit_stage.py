@@ -44,7 +44,7 @@ class SourceAuditStageTests(unittest.TestCase):
         self.assertEqual(redacted["pending_count"],3)
         self.assertEqual(redacted["publishable_count"],0)
         self.assertNotIn("content",str(redacted))
-        self.assertNotIn("author",str(redacted))
+        self.assertNotIn("author",redacted)
 
 if __name__=="__main__":
     unittest.main()
