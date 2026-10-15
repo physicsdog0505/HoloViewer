@@ -1578,3 +1578,32 @@ body.custom-session-watching.custom-immersive #immersiveExit{
  padding:8px 12px;border-radius:8px;border:1px solid #555;
  background:rgba(12,12,12,.8);color:#fff;cursor:pointer
 }
+
+/* Public single-video baseline: avoid the zero-height flex/grid chain.
+   With no certified PTT source, the movie uses its native 16:9 canvas. */
+body.custom-session-watching .custom-content-grid.video-only{
+ display:block!important;flex:1 1 auto!important;height:auto!important;
+ min-height:0!important;overflow:auto!important
+}
+body.custom-session-watching .custom-content-grid.video-only .custom-player-column{
+ display:block!important;height:auto!important;min-height:0!important;
+ max-height:none!important;overflow:visible!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage{
+ display:grid!important;grid-template-columns:repeat(var(--columns),minmax(0,1fr))!important;
+ grid-auto-rows:max-content!important;height:auto!important;min-height:0!important;
+ max-height:none!important;overflow:visible!important;align-content:start!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage .player-card{
+ height:auto!important;min-height:0!important;max-height:none!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage .video-wrap{
+ flex:none!important;width:100%!important;height:auto!important;min-height:0!important;
+ aspect-ratio:16/9!important;max-height:none!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage .video-wrap iframe{
+ position:absolute!important;inset:0!important;width:100%!important;height:100%!important
+}
+body.custom-session-watching.custom-immersive .custom-content-grid.video-only{
+ overflow:auto!important;min-height:0!important
+}
