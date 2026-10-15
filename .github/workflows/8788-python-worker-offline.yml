@@ -52,6 +52,10 @@ jobs:
           python3 tools/probe_python_worker_local.py \
             --bundle "$RUNNER_TEMP/hv-8788-worker-bundle" \
             --output "$RUNNER_TEMP/python-worker-runtime-receipt.json"
+      - name: Install Playwright Chromium for accepted geometry proof
+        run: |
+          python3 -m pip install playwright
+          python3 -m playwright install chromium
       - name: Build disposable fixture-only accepted route proof
         run: |
           python3 tools/build_python_worker_bundle.py --output "$RUNNER_TEMP/hv-8788-worker-fixture"
