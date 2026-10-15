@@ -7,6 +7,7 @@ publish it. Only accepts loopback URLs; no production calls, writes or D1.
 from __future__ import annotations
 
 import argparse
+import asyncio
 from datetime import date
 import hashlib
 import json
@@ -18,6 +19,8 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 from platform_adapter.public_api import PublicAPI, PublicAPIUnavailable, preloaded_public_reads
 from platform_adapter.product_bindings import bind_home_reader
 from platform_adapter.ptt_consumer_contract import validate_ptt_consumer_envelope
+from platform_adapter.ptt_provider import PttPublicReader
+from platform_adapter.public_api import DEFAULT_API
 
 
 def checked_local_origin(value: str) -> str:
@@ -104,6 +107,35 @@ def consumer_receipt(origin: str, *, ptt_day: str | None = None) -> dict:
         if status != 200:
             raise PublicAPIUnavailable("Owner #48 PTT route not mounted")
         validate_ptt_consumer_envelope(body, day=ptt_day)
+        async def checked_owner_get(url: str) -> dict:
+            if not url.startswith(DEFAULT_API + "/v1/ptt/"):
+                raise PublicAPIUnavailable("PTT canary attempted noncanonical API path")
+            parsed = urlsplit(url)
+            local_route = parsed.path + ("?" + parsed.query if parsed.query else "")
+            remote_status, document = read_json(base, local_route)
+            if remote_status != 200:
+                raise PublicAPIUnavailable("Owner #48 PTT History unavailable")
+            return document
+
+        # Explicit LOCAL proof only: the normal product's PTT reader remains
+        # disabled until reviewed production mount and cutover authority.
+        reader = PttPublicReader(enabled=True)
+        first = asyncio.run(reader.read_history(
+            ptt_day, checked_owner_get, limit=1,
+        ))
+        first_checkpoint = first["page"]["next_checkpoint"]
+        if first["page"]["has_more"]:
+            if not isinstance(first_checkpoint, str) or not first_checkpoint:
+                raise PublicAPIUnavailable("PTT History missing continuation")
+            second = asyncio.run(reader.read_history(
+                ptt_day, checked_owner_get, limit=1,
+                checkpoint=first_checkpoint,
+            ))
+            if (not second["pushes"] or
+                    second["pushes"][0]["push_id"] == first["pushes"][0]["push_id"]):
+                raise PublicAPIUnavailable("PTT History did not advance")
+        else:
+            second = None
         result["canonical_ptt"] = {
             "status": status,
             "schema_version": body["schema_version"],
@@ -111,6 +143,9 @@ def consumer_receipt(origin: str, *, ptt_day: str | None = None) -> dict:
             "push_count": len(body["pushes"]),
             "freshness": body["freshness"]["status"],
             "gap": body["completeness"]["gap"],
+            "history_first_count": len(first["pushes"]),
+            "history_second_count": len(second["pushes"]) if second else 0,
+            "history_continuation_checked": second is not None,
         }
     return result
 
