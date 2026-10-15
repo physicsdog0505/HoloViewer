@@ -6,13 +6,16 @@
  * node tools/check_8788_owner_api_e2e.mjs /path/to/issue47/checkout
  */
 import assert from 'node:assert/strict';
-import {spawn} from 'node:child_process';
+import {spawn, execFileSync} from 'node:child_process';
 import {createServer} from 'node:http';
 import {resolve, join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 const ownerRoot = process.argv[2];
 if (!ownerRoot) throw new Error('Pass a local #47 owner-source checkout path');
+const expectedOwnerHead = '149a80361654b06377dbae580e1d8da2e5010cf0';
+const actualOwnerHead = execFileSync('git', ['-C', ownerRoot, 'rev-parse', 'HEAD'], {encoding:'utf8'}).trim();
+assert.equal(actualOwnerHead, expectedOwnerHead, 'Wrong #47 shell version; do not claim exact-head parity');
 const shellUrl = pathToFileURL(resolve(ownerRoot, 'backend/today/d1/api-shell.mjs')).href;
 const {createExistingApiRouter} = await import(shellUrl);
 
@@ -52,6 +55,21 @@ try {
   const health = await fetch(localOrigin + '/health');
   assert.equal(health.status, 200);
   assert.equal((await health.json()).status, 'database_bound');
+  const preflight = await fetch(localOrigin + '/v1/catalog/today', {
+    method: 'OPTIONS',
+    headers: {'Origin': 'https://example.invalid', 'Access-Control-Request-Method': 'GET'},
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-max-age'), '600');
+  assert.equal(preflight.headers.get('access-control-allow-headers'), 'Accept');
+  const missingOriginPreflight = await fetch(localOrigin + '/v1/catalog/today', {method:'OPTIONS'});
+  assert.equal(missingOriginPreflight.status, 400);
+  assert.equal((await missingOriginPreflight.json()).error, 'origin_required');
+  const nonGet = await fetch(localOrigin + '/v1/catalog/today', {method:'POST'});
+  assert.equal(nonGet.status, 405);
+  const badOrigin = await fetch(localOrigin + '/v1/catalog/today', {headers:{Origin:'https://denied.invalid'}});
+  assert.equal(badOrigin.status, 403);
+  assert.equal((await badOrigin.json()).error, 'origin_not_allowed');
   const today = await fetch(localOrigin + '/v1/catalog/today?day=2026-10-15');
   assert.equal(today.status, 200);
   const model = await today.json();
@@ -79,7 +97,8 @@ try {
   assert.equal(receipt.ptt_mount_checked, false);
   assert.ok(selects >= 2, 'Actual #47 DB query path must execute');
   console.log(JSON.stringify({
-    status: 'PASS', api_source: shellUrl,
+    status: 'PASS', api_source: shellUrl, api_source_sha: actualOwnerHead,
+    guards: {preflight:true, preflight_no_origin:true, method:true, denied_origin:true},
     shell: 'owner-owned #47 existing-API reconstruction',
     db: 'mock D1-compatible read-only prepare/bind/all',
     db_reads: selects,
