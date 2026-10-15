@@ -50,7 +50,7 @@ test('release preflight rejects changed API shell and does not touch cloud',()=>
 test('release preflight refuses runbook with loosened read-only canary ceiling',()=>{
  isolatedFixture(({path,root})=>{
    const file=join(path,files[4]);
-   writeFileSync(file,readFileSync(file,'utf8').replace('D1 queries <= 12','D1 queries <= 120'));
+   writeFileSync(file,readFileSync(file,'utf8').replaceAll('D1 queries <= 12','D1 queries <= 120'));
    assert.throws(()=>inspectRelease(root),/runbook canary constraint missing: D1 queries <= 12/);
  });
 });
