@@ -64,11 +64,11 @@ Record actual SHA256, byte length, exact git HEAD and test receipt. A checksum
 computed at checkout is NOT an immutable freeze until compared against the
 reviewed owner-approved value. No previous-HEAD test claim is transferable.
 
-The schema is a **proposed** migration, not proof of coexistence with current
+Current runner uses Wrangler transactional migrations with the existing Today migration name pinned and an additive PTT migration as the next numbered file. Before any owner execution, independently confirm the existing `d1_migrations` ledger names and inspect exact reviewed source. The runner must never reset or reseed an existing ledger.\n\nThe schema is a **proposed** migration, not proof of coexistence with current
 live D1. A preflight must verify names and columns, existing ledger/version,
 indexes and D1 schema before attempting application.
 
-Read-only remote inspection examples (DO NOT EXECUTE before owner runtime gate):
+Read-only remote inspection examples (only against the already verified owner D1):
 ```sh
 npx wrangler d1 execute holoviewer-public-v1 --remote --command "SELECT name,sql FROM sqlite_master WHERE type='table' ORDER BY name;"
 npx wrangler d1 execute holoviewer-public-v1 --remote --command "SELECT name,sql FROM sqlite_master WHERE type='index' ORDER BY name;"
@@ -76,9 +76,9 @@ npx wrangler d1 execute holoviewer-public-v1 --remote --command "SELECT version,
 ```
 The final ledger SELECT is valid only after table existence has been confirmed.
 
-Owner-only migration command template (NOT EXECUTED):
+Owner-only migration command (NOT EXECUTED; only after exact separate owner approval and independent #45 review):
 ```sh
-npx wrangler d1 execute holoviewer-public-v1 --remote --file ptt_offline/d1_migrations/0001_canonical_ptt.sql
+node ptt_offline/owner_ptt_migration_preflight.mjs --apply --approve=70f4a2da051b107421c443fb3bf26dda55d3c46bf4b3a66823bb84d3f19ac14f
 ```
 
 After authorization and execution, assert the six tables:
