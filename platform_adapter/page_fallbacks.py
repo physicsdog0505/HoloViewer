@@ -96,25 +96,39 @@ def render_page_fallback(target: str) -> tuple[int, str] | None:
         return 200, build_ptt_today_page_html([], today)
 
     if parsed.path == "/watchalong":
+        import client_home
         from client_watchalong import build_watchalong_landing_html
-        return 200, build_watchalong_landing_html(
-            recent_pool=(),
-            error="同時視聽資料暫未接通；頁面功能會在資料服務接上後恢復。",
-            master_value=query.get("master", [""])[0],
-        )
+        original_home_loader = client_home.load_home_streams
+        client_home.load_home_streams = lambda *args, **kwargs: ([], [], [], [])
+        try:
+            html = build_watchalong_landing_html(
+                recent_pool=(),
+                error="同時視聽資料暫未接通；頁面功能會在資料服務接上後恢復。",
+                master_value=query.get("master", [""])[0],
+            )
+        finally:
+            client_home.load_home_streams = original_home_loader
+        return 200, html
 
     if parsed.path == "/watchalong/session":
         # Page-first: until Watchalong providers are connected, never import or
         # execute the heavyweight session/translation/runtime path. Preserve
         # the user's inputs and return the accepted 4174 builder page instead.
+        import client_home
         from client_watchalong import build_watchalong_landing_html
         master = query.get("master", [""])[0]
         source = query.get("source", [""])[0]
-        return 200, build_watchalong_landing_html(
-            recent_pool=(),
-            error="同時視聽資料暫未接通；設定已保留，可返回修改。",
-            master_value=master,
-            source_value=source,
-        )
+        original_home_loader = client_home.load_home_streams
+        client_home.load_home_streams = lambda *args, **kwargs: ([], [], [], [])
+        try:
+            html = build_watchalong_landing_html(
+                recent_pool=(),
+                error="同時視聽資料暫未接通；設定已保留，可返回修改。",
+                master_value=master,
+                source_value=source,
+            )
+        finally:
+            client_home.load_home_streams = original_home_loader
+        return 200, html
 
     return None
