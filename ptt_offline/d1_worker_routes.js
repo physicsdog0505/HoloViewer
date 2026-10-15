@@ -71,3 +71,20 @@ export async function handlePttD1Read(request, db) {
     return json({error:'PTT source unavailable'},503);
   }
 }
+
+// Integration contract for the existing holoviewer-public-api router:
+// add a dispatch to this handler only for PTT routes, passing the EXISTING
+// env.DB binding to holoviewer-public-v1. No second Worker or DB is created.
+export async function handlePttPublicRead(request, env) {
+  if (!request || request.method !== 'GET') {
+    return new Response(JSON.stringify({error:'method_not_allowed'}), {
+      status:405,headers:{'allow':'GET','content-type':'application/json'}
+    });
+  }
+  if (!env?.DB || typeof env.DB.prepare !== 'function') {
+    return new Response(JSON.stringify({error:'PTT source unavailable'}), {
+      status:503,headers:{'content-type':'application/json'}
+    });
+  }
+  return handlePttD1Read(request, env.DB);
+}
