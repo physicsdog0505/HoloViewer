@@ -40,7 +40,7 @@ export async function writeEvidence(db, evidence) {
   }
   const current=await db.prepare('SELECT lifecycle_state,lifecycle_observed_at,publisher_channel_id,roster_version,source_checksum FROM public_today_canonical WHERE video_id=?')
     .bind(r.video_id).first();
-  if (current && (current.publisher_channel_id!==r.channel_id || current.roster_version!==r.roster_version))
+  if (current && (current.publisher_channel_id!==r.channel_id))
     throw Error('canonical publisher/roster mismatch');
   const newer=(!current || r.observed_at>current.lifecycle_observed_at);
   const canSelect=newer && !(current?.lifecycle_state==='ended' && r.lifecycle_state!=='ended');
@@ -56,13 +56,12 @@ export async function writeEvidence(db, evidence) {
        lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(video_id) DO UPDATE SET
-      channel_group=excluded.channel_group,title=excluded.title,channel_name=excluded.channel_name,
+      roster_version=excluded.roster_version,channel_group=excluded.channel_group,title=excluded.title,channel_name=excluded.channel_name,
       lifecycle_state=excluded.lifecycle_state,lifecycle_observed_at=excluded.lifecycle_observed_at,
       checked_at=excluded.checked_at,scheduled_start=excluded.scheduled_start,actual_start=excluded.actual_start,
       actual_end=excluded.actual_end,source_label=excluded.source_label,source_checksum=excluded.source_checksum
       WHERE excluded.lifecycle_observed_at>public_today_canonical.lifecycle_observed_at
         AND (public_today_canonical.lifecycle_state!='ended' OR excluded.lifecycle_state='ended')
-        AND public_today_canonical.roster_version=excluded.roster_version
         AND public_today_canonical.publisher_channel_id=excluded.publisher_channel_id`;
     mutations.push(db.prepare(sql).bind(r.video_id,r.channel_id,r.roster_version,r.group,r.title,r.channel_name??'',
       r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.source_label,hash));
@@ -88,8 +87,19 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
     throw Error('invalid canonical Today day');
   if (!Number.isInteger(limit)||limit<1||limit>200) throw Error('invalid limit');
   const coverage=await db.prepare('SELECT * FROM public_today_catalog_meta WHERE singleton=1').first();
-  const rows=await db.prepare('SELECT * FROM public_today_canonical WHERE roster_version=? ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ?')
-    .bind(coverage?.roster_version??'',limit).all();
+  // Taipei day boundaries are UTC+08:00. Scope includes this day's activity and
+  // actively LIVE streams crossing midnight, but not unrelated historical rows.
+  const start=new Date(day+'T00:00:00+08:00').toISOString().replace(/\\.\\d{3}Z$/,'Z');
+  const end=new Date(new Date(day+'T00:00:00+08:00').getTime()+86400000).toISOString().replace(/\\.\\d{3}Z$/,'Z');
+  const rows=await db.prepare(`SELECT * FROM public_today_canonical
+    WHERE roster_version=?
+      AND ((lifecycle_observed_at>=? AND lifecycle_observed_at<?)
+        OR (scheduled_start>=? AND scheduled_start<?)
+        OR (actual_start>=? AND actual_start<?)
+        OR (actual_end>=? AND actual_end<?)
+        OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL))
+    ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ?`)
+    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,limit).all();
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
   const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
