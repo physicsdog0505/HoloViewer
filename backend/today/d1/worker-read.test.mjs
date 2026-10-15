@@ -5,7 +5,7 @@ function mockDb() {
   return {prepare(sql){
     if (sql.includes('catalog_meta')) return {first:async()=>null};
     if (sql.includes('public_today_canonical')) return {bind(...params){
-      assert.equal(params.at(-1),200);
+      assert.equal(params.at(-1),201); // fetch one extra row to detect truncation
       return {all:async()=>({results:[]})};
     }};
     throw Error('unexpected D1 SQL');
