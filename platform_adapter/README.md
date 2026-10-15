@@ -38,3 +38,29 @@ No Cloudflare account operation, D1 migration, new runtime backend, Wrangler dep
 The experimental Python Worker entry currently permits only `/`, `/api/home`, and `/history` to reach the accepted handler. All other paths return 503 before product dispatch because their canonical Worker data providers have **not** been bound; this avoids rendering misleading local-SQLite emptiness. The restriction is a temporary data-readiness gate, not a copy of accepted route/navigation logic. Expand it only after the corresponding canonical provider route exists and has accepted behavior parity.
 
 `test_cloudflare_entry_binding.py` checks that the original handler is called only after `bind_public_today(client_app, api_base=DEFAULT_API)`, exactly once, and that unbound PTT returns 503 without local data dispatch. **Tests are committed, not yet executed.**
+
+## Async provider transport and disposable Worker bundle
+
+Cloudflare Python Workers execute in Pyodide. The official Python Worker handler is async, and its supported outbound HTTP primitive is asynchronous. The approved 4174 product loaders remain synchronous; production Worker requests now `await` the canonical API read **before** entering the original handler. `preloaded_public_reads()` stores the result in a request-local ContextVar; any unprefetched read fails closed instead of calling blocking `urllib` inside the Worker.
+
+- `platform_adapter/worker_preload.py`: prefetches canonical Today and History using `pyodide.http.pyfetch` and accepted 4174 History date parsing/bounds.
+- `test_worker_preload.py`: validates request scoping, nested cleanup, history day/key matching and no synchronous fallback.
+- `tools/build_python_worker_bundle.py`: copies only manifest-listed, Git-blob-verified pinned 4174 files into a **new disposable build folder**, includes the platform adapter and local Python Worker `entry.py`/configuration. This does not deploy a Worker or create a new backend/D1.
+- `test_python_worker_bundle.py`: verifies manifest packaging and fail-on-overwrite.
+
+Offline source regression commands (run from the HoloViewer checkout):
+
+```sh
+python3 -B -m unittest -v \
+  test_public_api_binding \
+  test_worker_preload \
+  test_worker_transport \
+  test_worker_transport_accepted \
+  test_cloudflare_entry_binding \
+  test_python_worker_bundle
+python3 tools/build_python_worker_bundle.py --output /tmp/hv-worker-feasibility-NEW
+```
+
+For real Python Worker runtime compatibility, start the resulting folder with the Cloudflare Python Workers toolchain in **local dev mode only** (not deploy). Verify `WorkerEntrypoint.fetch` import, async canonical API transport and immutable vendored asset reads; preserve actual error evidence in the Issue. The build presence and CPython tests do **not** claim Pyodide/Worker or browser/DOM PASS.
+
+Only `/`, `/api/home`, and `/history` are in the first proof scope. The canonical backend remains the **existing** `holoviewer-public-api -> DB -> holoviewer-public-v1`. Other accepted product features and PTT routes are not fabricated in the Worker shell.
