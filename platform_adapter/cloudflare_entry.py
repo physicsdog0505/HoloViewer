@@ -144,13 +144,15 @@ class Default(WorkerEntrypoint):
                     return Response(
                         html, status=status,
                         headers={"Content-Type": "text/html; charset=utf-8",
-                                 "Cache-Control": "no-store"},
+                                 "Cache-Control": "no-store",
+                                 "X-HoloViewer-Recovered-Stage": stage},
                     )
             return Response(
                 "Public page temporarily unavailable",
                 status=503,
                 headers={"Content-Type": "text/plain; charset=utf-8",
-                         "Cache-Control": "no-store"},
+                         "Cache-Control": "no-store",
+                         "X-HoloViewer-Recovered-Stage": stage},
             )
         # Header names/values come from the accepted handler. Do not return
         # hop-by-hop server transport headers to the Worker network stack.
