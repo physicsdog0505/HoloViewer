@@ -30,6 +30,7 @@ class OwnerHttpTransportTests(unittest.TestCase):
             expected=hmac.new(("s"*40).encode(),timestamp.encode()+b"\n"+raw,
                               hashlib.sha256).hexdigest()
             self.assertEqual(request.get_header("X-ptt-signature"),expected)
+            self.assertEqual(request.get_header("User-agent"),"Mozilla/5.0")
             calls.append(raw)
             self.assertEqual(timeout,10)
             return Response(receipt)
