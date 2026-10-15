@@ -40,3 +40,7 @@ jobs:
         run: |
           python3 tools/build_python_worker_bundle.py --output "$RUNNER_TEMP/hv-8788-worker-bundle"
           test -f "$RUNNER_TEMP/hv-8788-worker-bundle/bundle-provenance.json"
+      - name: Import exact accepted product from disposable Worker bundle
+        run: |
+          PYTHONPATH="$RUNNER_TEMP/hv-8788-worker-bundle" python3 -B -c "import client_app; import platform_adapter.worker_preload; print('PASS accepted product dependency import')"
+          python3 -m compileall -q "$RUNNER_TEMP/hv-8788-worker-bundle"
