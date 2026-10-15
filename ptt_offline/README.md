@@ -28,3 +28,16 @@ Observed HoloViewer main while preparing this slice: `bbd08ce6a0347737debdd1f1cb
 This PR intentionally does **not** choose how a future Cloudflare provider obtains a coverage-safe initial window. That provider must reconcile actual Worker wire semantics (including tail/byte truncation) and prove its bootstrap before it can satisfy `initial_window()`. Latest accepted 4174 runtime SHA also remains a source-of-truth item for the 4174 owner lane; this slice encodes the already accepted behavior recorded in Issue #48, not a local runtime inspection.
 
 Still HOLD: real PTT/owner SQLite, Collector/Publisher start, raw-history export, Worker/D1/schema/secret/route mutation, production canary, `site/**`/UI change, merge or deployment. #317 real-data G3 remains HOLD.
+
+
+## Independent review hardening — follow-up to #48 comment 6187020719
+
+Changes on the same isolated Draft branch:
+- **Atomic batch application**: stage normalized identities, canonical checks, source-day/floor checks and Collector-winning rows before committing the entire snapshot/relay page. Invalid later row leaves previous rows and cursor unchanged.
+- **Strict Taipei day key**: only canonical date-only YYYY-MM-DD is accepted; datetime-shaped keys fail.
+- **Freshness clock regression**: a now timestamp older than last checked fails closed and marks freshness unknown.
+- **Completeness evidence**: core requires explicit `verify_authority(manifest)` injection; without an injected verifier it always returns PARTIAL. Only tests inject the synthetic fixture verifier.
+- **Consumer checkpoint**: `consumer_checkpoint()` provides an opaque day-bound offline token; `check_consumer_checkpoint()` rejects foreign-day, expired or mismatched tokens. Internal per-AID cursor integers stay inside the adapter. **This is in-memory proof only**, not a durable/signed production checkpoint or a finalized #45 read-model surface.
+- Added five negative regressions: mixed-valid/invalid snapshot batch, mixed-valid/invalid relay page, malformed day keys, regressive clock and foreign-day/expired token.
+
+This does not implement a real `LocalPttProvider` or `CloudflarePttProvider`, nor authenticate a durable production resume token. Those remain separately reviewed integration work. If exact-HEAD Python execution is unavailable, report tests as **NOT RUN**, never recycle a prior HEAD's receipt.
