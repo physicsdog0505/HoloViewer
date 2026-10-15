@@ -49,6 +49,14 @@ class ProductionPackageTests(unittest.TestCase):
                 receipt["authorized_ui_overrides"]["default_hololive_keeps_unclassified_live_rail_visible"],
                 "item.hidden=filter!=='all'&&item.dataset.group!==filter&&!(filter==='hololive'&&(item.dataset.group==='unknown'||item.dataset.group==='other'));",
             )
+            self.assertEqual(
+                receipt["authorized_ui_overrides"]["all_home_states_allow_explicit_multiview_selection"],
+                'selectable_states = {"live", "waiting", "upcoming", "ended", "unknown", "stale"}',
+            )
+            self.assertIn(
+                'selectable_states = {"live", "waiting", "upcoming", "ended", "unknown", "stale"}',
+                (dest / "client_home.py").read_text(),
+            )
             packaged_home = (dest / "client_home.py").read_text()
             packaged_shell = (dest / "client_ui_shell.py").read_text()
             self.assertIn("group==='unknown'||group==='other'", packaged_home)
