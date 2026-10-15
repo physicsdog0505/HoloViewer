@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planMigration,assertInventory,decodeD1,run,UUID,ACCOUNT} from './owner_ptt_migration_preflight.mjs';
+import {planMigration,assertInventory,decodeD1,run,verifyAppliedPttLedger,UUID,ACCOUNT} from './owner_ptt_migration_preflight.mjs';
 test('freeze original migration and reject byte drift',()=>{
  const receipt=planMigration();
  assert.equal(receipt.uuid,UUID);
@@ -30,4 +30,11 @@ test('read-only only, pinned account and no write command',()=>{
 });
 test('reject invalid Cloudflare metadata',()=>{
  assert.throws(()=>decodeD1('{"success":false,"results":[]}'),/invalid/);
+});
+
+test('existing PTT objects are not treated as applied without version ledger',()=>{
+ const inventory={pttSchemaPresent:true};
+ assert.throws(()=>verifyAppliedPttLedger([],inventory),/ledger missing/);
+ assert.deepEqual(verifyAppliedPttLedger([{version:1,description:'ptt'}],inventory),
+   {applied:true,verified:true,version:1});
 });
