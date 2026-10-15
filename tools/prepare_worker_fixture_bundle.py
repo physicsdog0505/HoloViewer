@@ -68,6 +68,13 @@ class Default(worker.Default):
 '''
     (bundle / "entry_fixture.py").write_text(fixture, encoding="utf-8")
     config["main"] = "entry_fixture.py"
+    # Cloudflare Workers static-asset binding in the SAME local Worker.
+    # Static requests must bypass the Python ClientRequestHandler altogether.
+    config["assets"] = {
+        "directory": "./public",
+        "binding": "ASSETS",
+        "run_worker_first": False,
+    }
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     receipt["local_fixture_only"] = True
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
