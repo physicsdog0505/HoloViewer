@@ -82,3 +82,25 @@ test('combined host serves #47 Today consumer envelope directly to 4174 preload'
  assert.equal(body.streams[0].group,'hololive');
  assert.equal(body.streams[0].source_label,'YouTube');
 });
+
+test('combined host accepts chunked support-color payload without changing Today contract',async()=>{
+ const coverage={roster_version:'v85',last_success_at:'2026-10-16T04:45:00Z',expected_channels:85,scanned_channels:85,gap:0,checkpoint:'cp_fixture1234'};
+ const cid='UC'+'A'.repeat(22);
+ const row={video_id:'abcdefghijk',publisher_channel_id:cid,roster_version:'v85',
+  channel_group:'hololive',title:'Fixture',channel_name:'Fixture',lifecycle_state:'live',
+  lifecycle_observed_at:'2026-10-16T04:45:00Z',checked_at:'2026-10-16T04:45:00Z',
+  scheduled_start:'2026-10-16T04:30:00Z',actual_start:'2026-10-16T04:31:00Z',actual_end:null,
+  source_label:'YouTube',source_checksum:'deadbeef',trusted_channel_avatar:null};
+ const DB={prepare(sql){return {bind(){return this},first:async()=>sql.includes('public_today_catalog_meta')?coverage:null,
+   all:async()=>({results:sql.includes('FROM public_today_canonical')?[row]:[]})}}};
+ const payload=JSON.stringify({schema_version:1,fallback:'neutral',channels:[{
+  channel_id:cid,verification_status:'verified',display_mode:'solid',color_hex:'#123456'
+ }]});
+ const cut=Math.floor(payload.length/2);
+ const env={DB,TODAY_SUPPORT_COLORS_JSON_0:payload.slice(0,cut),TODAY_SUPPORT_COLORS_JSON_1:payload.slice(cut)};
+ const r=await worker.fetch(new Request('https://api.example/v1/catalog/today?day=2026-10-16'),env);
+ assert.equal(r.status,200);
+ const body=await r.json();
+ assert.equal(body.streams[0].member_accent,'#123456');
+ assert.equal(body.streams[0].support_mode,'solid');
+});
