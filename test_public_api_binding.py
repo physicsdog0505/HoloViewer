@@ -28,7 +28,7 @@ class FakeHomeStream:
 class ProviderBindingTest(unittest.TestCase):
     def test_only_canonical_https_origin(self):
         PublicAPI()
-        for bad in ("http://example.org", "https://x.test/evil",
+        for bad in ("http://example.org", "https://x.test", "https://x.test/evil",
                     "https://user:pass@x.test", "https://x.test?key=secret"):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 PublicAPI(bad)
@@ -44,6 +44,8 @@ class ProviderBindingTest(unittest.TestCase):
         live, upcoming, ended, unknown = bind_home_reader(Stub(), FakeHomeStream)()
         self.assertEqual((len(live),len(upcoming),len(ended),len(unknown)), (0,1,0,1))
         self.assertEqual(unknown[0].group,"unknown")
+        self.assertEqual(unknown[0].state,"stale")
+        self.assertEqual(upcoming[0].state,"waiting")
 
     def test_live_requires_fresh_authoritative_feed(self):
         class Stub:
