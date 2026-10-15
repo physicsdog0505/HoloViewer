@@ -67,6 +67,16 @@ class PublisherCliTests(unittest.TestCase):
         self.assertTrue(result["has_gap"])
         self.assertEqual(result["gaps"],[[11,20],[31,50]])
 
+    def test_contiguous_lines_without_terminal_page_are_not_complete(self):
+        with sqlite3.connect(self.source) as db:
+            db.execute("UPDATE articles SET last_page=2,total_pages=3")
+            db.execute("DELETE FROM article_screens WHERE source_page=3")
+            db.execute("UPDATE article_screens SET end_line=50 WHERE source_page=2")
+            result=coverage_receipt(db,"A1")
+        self.assertEqual(result["gaps"],[])
+        self.assertFalse(result["terminal_verified"])
+        self.assertFalse(result["complete"])
+
     def test_pushes_do_not_imply_complete_without_screen_coverage(self):
         with sqlite3.connect(self.source) as db:
             db.execute("DELETE FROM article_screens")
