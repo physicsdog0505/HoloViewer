@@ -54,6 +54,17 @@ class EntryPointBindingTest(unittest.TestCase):
             asyncio.run(self.entry.Default().fetch(FakeRequest()))
         self.assertEqual(order,["provider","dispatch","dispatch"])
 
+    def test_unbound_ptt_route_returns_503_without_vendor_or_provider(self):
+        class PttRequest:
+            url = "https://public.example.test/ptt-today"
+            method = "GET"
+        with (patch.object(self.entry, "bind_public_today") as bind,
+              patch.object(self.entry, "dispatch_accepted_get") as dispatch):
+            response = asyncio.run(self.entry.Default().fetch(PttRequest()))
+        self.assertEqual(response.status, 503)
+        bind.assert_not_called()
+        dispatch.assert_not_called()
+
     def test_handler_binding_never_selects_custom_provider(self):
         with patch.object(self.entry, "bind_public_today") as bind:
             self.entry._accepted_handler()
