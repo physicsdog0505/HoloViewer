@@ -58,6 +58,44 @@ class PublicAPIPreloadIsolationTests(unittest.TestCase):
         self.assertNotIn("urllib.request", sys.modules)
 
 
+class CanonicalLifecycleTests(unittest.TestCase):
+    def test_live_row_stays_live_even_when_envelope_is_stale(self):
+        from platform_adapter.product_bindings import home_groups_from_payload
+        from dataclasses import dataclass
+        from datetime import datetime
+
+        @dataclass
+        class HomeStream:
+            video_id: str
+            title: str
+            channel_title: str
+            start_label: str
+            state: str
+            source_label: str = ""
+            channel_id: str = ""
+            avatar_url: str = ""
+            group: str = "hololive"
+            start_at: datetime | None = None
+
+        payload = {
+            "freshness": {"status": "stale"},
+            "streams": [{
+                "video_id": "abcdefghijk",
+                "title": "live",
+                "channel_id": "UC0000000000000000000000",
+                "channel_name": "channel",
+                "group": "hololive",
+                "lifecycle_state": "live",
+                "start_at": "2026-10-16T01:00:00Z",
+            }],
+        }
+        live, upcoming, ended, unknown = home_groups_from_payload(payload, HomeStream)
+        self.assertEqual([x.video_id for x in live], ["abcdefghijk"])
+        self.assertEqual(upcoming, [])
+        self.assertEqual(ended, [])
+        self.assertEqual(unknown, [])
+
+
 class LightweightHomeImportTests(unittest.TestCase):
     def test_home_lightweight_module_does_not_import_client_app(self):
         sys.modules.pop("client_app", None)
