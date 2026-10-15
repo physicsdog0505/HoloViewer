@@ -12,6 +12,8 @@ Current read-only bindings:
 - `PublicAPI.read_video` is available through GET `/v1/catalog/videos/:id` but is **not yet wired** to the accepted PTT/video player resolver; do not misrepresent it as complete.
 - PTT Today/History, Watchalong, Collab, player lifecycle and CSS are **untouched** while their verified consumer transport is finalized by #47/#48/#45.
 
+Today freshness is consumed from canonical `freshness.status` (`fresh` / `stale` / `unknown`), not `freshness.state` or a scalar string. `waiting` and `stale` remain distinct on accepted `HomeStream.state` and are bucketed separately. Unknown/malformed freshness never permits a LIVE assertion.
+
 Safety: HTTPS, bounded GET response, no credentials/secrets, refused redirects, external data errors yield explicit 503 rather than fake empty/COMPLETE; LIVE is suppressed without fresh authoritative feed evidence. The UI uses accepted 4174 renderers and their existing data classes.
 
 No production Worker bindings, Cloudflare D1 migrations, writers, Cron, secrets or deployments were modified. This is a source-level integration slice; **live API availability and populated-data rendering have not yet been executed/verified**.
