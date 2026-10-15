@@ -12,8 +12,8 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 export function publicPttFreshness(lastSuccess, nowMs = Date.now()) {
   const checkedMs = typeof lastSuccess === 'string' ? Date.parse(lastSuccess) : NaN;
   const ageMs = nowMs - checkedMs;
-  return Number.isFinite(checkedMs) && Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= 30000
-    ? 'fresh' : 'unknown';
+  if (!Number.isFinite(checkedMs) || !Number.isFinite(ageMs) || ageMs < 0) return 'unknown';
+  return ageMs <= 30000 ? 'fresh' : 'stale';
 }
 
 export async function handlePttD1Read(request, db) {
