@@ -46,10 +46,12 @@ def main():
         vals=[event["event_id"],event["aid"],event["article_title"],event["source_url"],
               event["article_datetime"],event["day"],event["scheduled_time"],event["description"],
               1 if event["member_only"] else 0,imported,"ptt_watchalong_parser"]
-        lines.append("INSERT INTO public_watchalong_events(event_id,aid,article_title,source_url,article_datetime,day,scheduled_time,description,member_only,imported_at,source) VALUES("+",".join(q(x) for x in vals)+") ON CONFLICT(event_id) DO UPDATE SET aid=excluded.aid,article_title=excluded.article_title,source_url=excluded.source_url,article_datetime=excluded.article_datetime,day=excluded.day,scheduled_time=excluded.scheduled_time,description=excluded.description,member_only=excluded.member_only,imported_at=excluded.imported_at,source=excluded.source;")
-        lines.append("DELETE FROM public_watchalong_streams WHERE event_id="+q(event["event_id"])+";")
+        lines.append("INSERT INTO public_watchalong_events(event_id,aid,article_title,source_url,article_datetime,day,scheduled_time,description,member_only,imported_at,source) VALUES("+",".join(q(x) for x in vals)+") ON CONFLICT(event_id) DO UPDATE SET aid=excluded.aid,article_title=excluded.article_title,source_url=excluded.source_url,article_datetime=excluded.article_datetime,day=excluded.day,scheduled_time=excluded.scheduled_time,description=excluded.description,member_only=excluded.member_only,imported_at=excluded.imported_at,source=excluded.source WHERE excluded.article_datetime>=public_watchalong_events.article_datetime;")
+        accepted = "(SELECT 1 FROM public_watchalong_events WHERE event_id="+q(event["event_id"])+" AND imported_at="+q(imported)+")"
+        lines.append("DELETE FROM public_watchalong_streams WHERE event_id="+q(event["event_id"])+" AND EXISTS "+accepted+";")
         for i,s in enumerate(event["streams"]):
-            lines.append("INSERT INTO public_watchalong_streams(event_id,ordinal,label,video_id) VALUES("+",".join(q(x) for x in [event["event_id"],i,s["label"],s["video_id"]])+");")
+            values=",".join(q(x) for x in [event["event_id"],i,s["label"],s["video_id"]])
+            lines.append("INSERT INTO public_watchalong_streams(event_id,ordinal,label,video_id) SELECT "+values+" WHERE EXISTS "+accepted+";")
     lines.append("COMMIT;")
     args.output.write_text("\n".join(lines)+"\n")
     payload={"schema_version":"public-watchalong-export-v1","imported_at":imported,"event_count":len(out),"events":out}
