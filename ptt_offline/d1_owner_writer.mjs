@@ -1,6 +1,7 @@
 // #48 private owner-controlled D1 writer. Never mount as public route.
 // Caller supplies authenticated authority and existing holoviewer-public-api env.DB.
-const LIMIT = 5;
+const LIMIT = 25;
+const boundedCap=(value,fallback,maximum)=>{const n=Number(value??fallback);return Number.isInteger(n)&&n>=1&&n<=maximum?n:null;};
 const canonical=value=> {
  if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
  if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>
@@ -38,13 +39,17 @@ function aidMatchesUrl(aid,url) {
 }
 const URL=/^https:\/\/www\.ptt\.cc\/bbs\/C_Chat\/M\.\d+\.A\.[0-9a-fA-F]{3}\.html$/;
 
-export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
+export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority,limits={}}) {
+  const rowCap=boundedCap(limits.rows,5,LIMIT);
+  const writeCap=boundedCap(limits.writes,20,80);
+  const queryCap=boundedCap(limits.queries,30,150);
+  requireTrue(rowCap!==null&&writeCap!==null&&queryCap!==null,'invalid bounded Publisher configuration');
   requireTrue(DB && typeof DB.prepare==='function' && typeof DB.batch==='function','existing D1 binding required');
   requireTrue(typeof verifyAuthority==='function','trusted independent verifier required');
-  requireTrue(batch && Array.isArray(batch.rows) && batch.rows.length>0 && batch.rows.length<=LIMIT,'push cap 5');
+  requireTrue(batch && Array.isArray(batch.rows) && batch.rows.length>0 && batch.rows.length<=rowCap,'bounded push cap exceeded');
   requireTrue(batch.request_cap===1 && batch.retry_cap===0,'unsafe request budget');
   requireTrue(typeof batch.source_identity==='string' && batch.source_identity.length>0 &&
-    Number.isInteger(batch.write_cap) && batch.write_cap>=batch.rows.length && batch.write_cap<=LIMIT && typeof batch.digest==='string' &&
+    Number.isInteger(batch.write_cap) && batch.write_cap>=batch.rows.length && batch.write_cap<=rowCap && typeof batch.digest==='string' &&
     /^[0-9a-f]{64}$/.test(batch.digest), 'batch identity required');
   const digest=await batchDigest(batch);
   requireTrue(digest===batch.digest && batch.batch_id==='ptt48:'+digest.slice(0,24),
@@ -87,8 +92,8 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
   // at most one thread insert per AID plus one push and evidence mutation per
   // logical row. Must not rely only on post-commit meta.changes.
   const possibleWrites=2*aids.length+2*batch.rows.length;
-  requireTrue(possibleWrites<=20,'potential D1 write budget exceeded before dispatch');
-  requireTrue(queries<=30,'query budget exceeded');
+  requireTrue(possibleWrites<=writeCap,'potential D1 write budget exceeded before dispatch');
+  requireTrue(queries<=queryCap,'query budget exceeded');
   const results=await DB.batch(statements);
   requireTrue(Array.isArray(results) && results.length===statements.length,'D1 transaction failure');
   // A successful transaction response is not sufficient proof of canonical
@@ -106,7 +111,7 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
       'D1 canonical readback mismatch; remote state uncertain, do not retry');
   }
   const affected=results.reduce((sum,result)=>sum+(result?.meta?.changes??0),0);
-  requireTrue(Number.isInteger(affected) && affected>=0 && affected<=20,'affected-row budget exceeded');
+  requireTrue(Number.isInteger(affected) && affected>=0 && affected<=writeCap,'affected-row budget exceeded');
   // meta.changes is not an authoritative account-level D1 Rows Written receipt.
   // Separate Cloudflare analytics evidence is required before live canary.
   return {status:'ACK',batch_id:batch.batch_id,digest:batch.digest,
