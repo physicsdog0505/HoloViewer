@@ -69,6 +69,9 @@ class PublisherOfflineE2ETests(unittest.TestCase):
             source_prefix_digest=first["acked_prefix_digest"],
             next_prefix_digest=first["next_prefix_digest"])
         self.assertEqual(one["checkpoint"]["aids"]["A1"],6)
+        with self.assertRaises(ContractError):
+            run_synthetic_one(checkpoint_path=self.receipt,source_identity=ident,
+                day="2026-01-01",aids=["A1"],rows=first["rows"],executor=self.ack)
         second=self.stage(after=6)
         two=run_synthetic_one(checkpoint_path=self.receipt,source_identity=ident,
             day="2026-01-01",aids=["A1"],rows=second["rows"],executor=self.ack,
