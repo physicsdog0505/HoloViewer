@@ -13,6 +13,7 @@ on:
       - 'test_public_api_binding.py'
       - 'test_canonical_consumer_integration.py'
       - 'test_ptt_consumer_contract.py'
+      - 'test_ptt_provider_binding.py'
       - 'test_8788_local_router_contract.py'
       - 'tools/check_8788_local_router_contract.py'
       - '.github/workflows/8788-python-worker-offline.yml'
@@ -38,6 +39,7 @@ jobs:
             test_public_api_binding \
             test_canonical_consumer_integration \
             test_ptt_consumer_contract \
+            test_ptt_provider_binding \
             test_8788_local_router_contract \
             test_worker_preload \
             test_worker_preload_history \
