@@ -85,6 +85,19 @@ class ProviderBindingTest(unittest.TestCase):
         self.assertEqual((live[0].group,upcoming[0].group),("hololive","holostars"))
         self.assertEqual(live[0].start_label,"15:00")
 
+    def test_canonical_source_label_reaches_accepted_home_event_rules(self):
+        class Stub:
+            def read_today(self):
+                return {"freshness":{"status":"fresh"},"streams":[{
+                    "video_id":"dQw4w9WgXcQ", "title":"配信のお知らせ",
+                    "source_label":"重大告知", "group":"hololive",
+                    "lifecycle_state":"upcoming"
+                }]}
+        _, upcoming, _, _ = bind_home_reader(Stub(), FakeHomeStream)()
+        self.assertEqual(len(upcoming), 1)
+        self.assertEqual(upcoming[0].source_label, "重大告知")
+        self.assertEqual(upcoming[0].title, "配信のお知らせ")
+
     def test_missing_consumer_list_fails_closed(self):
         class Stub:
             def read_today(self):
