@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS ptt_provider_state (
     purged_through_cursor INTEGER NOT NULL DEFAULT 0,
     last_success_at TEXT,
     has_gap INTEGER NOT NULL DEFAULT 0,
+    gap_closed_at TEXT,
     PRIMARY KEY(day, aid)
 );
 CREATE TABLE IF NOT EXISTS ptt_source_evidence (
@@ -50,3 +51,12 @@ CREATE TABLE IF NOT EXISTS ptt_source_evidence (
 );
 INSERT OR IGNORE INTO public_ptt_schema_migrations(version,description)
 VALUES(1,'canonical push, thread scope, replay and forward repair state');
+
+CREATE TABLE IF NOT EXISTS ptt_gap_repairs (
+    repair_id TEXT PRIMARY KEY,
+    day TEXT NOT NULL,
+    aid TEXT NOT NULL,
+    verified_at TEXT NOT NULL,
+    covered_through_cursor INTEGER NOT NULL,
+    evidence_digest TEXT NOT NULL
+);
