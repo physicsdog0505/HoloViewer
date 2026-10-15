@@ -175,7 +175,11 @@ class ParityContract(unittest.TestCase):
         self.assertIn("function homeStartLabel(item)",js)
         self.assertIn("item?.start_at",js)
         self.assertIn("timeZone:'Asia/Taipei'",js)
-        self.assertIn("background:color-mix(in srgb,var(--member-accent,#7aa8bb) 8%,white)",css)
+        self.assertIn("hourCycle:'h23'",js)
+        self.assertIn("if(mode==='neutral'||mode==='solid'||mode==='dual_color')return ''",js)
+        self.assertIn("el.dataset.supportAccent='1'",js)
+        self.assertIn('.stream-card[data-support-accent="1"]{background:color-mix',css)
+        self.assertIn('.stream-card[data-support-accent="1"]:hover',css)
         self.assertIn('[data-support-mode="dual_color"].stream-card:hover',css)
 
     def test_4174_channel_identity_fallback_and_safe_avatars(self):
