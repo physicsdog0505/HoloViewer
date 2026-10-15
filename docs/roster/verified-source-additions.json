@@ -1,0 +1,67 @@
+{
+  "schema": "holoviewer-channel-roster-candidates-v1",
+  "purpose": "Source-confirmed nonlegacy official/group IDs; live channels.list validation still required before subscribing",
+  "source_legacy_count": 66,
+  "channels": [
+    {
+      "channel_id": "UCJFZiqLMntJufDCHc6bQixg",
+      "display_name": "hololive official",
+      "branch": "JP",
+      "kind": "organization",
+      "evidence_url": "https://files.microcms-assets.io/assets/6368857617454c2591b02acff18e76bb/4a40ac4510fb46bf9e57400b07a08f70/Press-Release-hololive-Indonesia-Gen-2-English-2.pdf",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCotXwY6s8pWmuWd_snKYjhg",
+      "display_name": "hololive English official",
+      "branch": "EN",
+      "kind": "organization",
+      "evidence_url": "https://files.microcms-assets.io/assets/6368857617454c2591b02acff18e76bb/f3c3e1ef51784160877f7292baeff6f4/PRESS-Second-Round-Auditions-for-VTuber-Group-hololive-English-Begins_v2.pdf",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCfrWoRGlawPQDQxxeIDRP0Q",
+      "display_name": "hololive Indonesia official",
+      "branch": "ID",
+      "kind": "organization",
+      "evidence_url": "https://files.microcms-assets.io/assets/6368857617454c2591b02acff18e76bb/4a40ac4510fb46bf9e57400b07a08f70/Press-Release-hololive-Indonesia-Gen-2-English-2.pdf",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCWsfcksUUpoEvhia0_ut0bA",
+      "display_name": "HOLOSTARS official",
+      "branch": "HOLOSTARS JP",
+      "kind": "organization",
+      "evidence_url": "https://files.microcms-assets.io/assets/6368857617454c2591b02acff18e76bb/f3c3e1ef51784160877f7292baeff6f4/PRESS-Second-Round-Auditions-for-VTuber-Group-hololive-English-Begins_v2.pdf",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UC10wVt6hoQiwySRhz7RdOUA",
+      "display_name": "hololive DEV_IS ReGLOSS",
+      "branch": "DEV_IS",
+      "kind": "group",
+      "evidence_url": "https://holodex.net/channel/UC10wVt6hoQiwySRhz7RdOUA",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCu2n3qHuOuQIygREMnWeQWg",
+      "display_name": "hololive DEV_IS FLOW GLOW",
+      "branch": "DEV_IS",
+      "kind": "group",
+      "evidence_url": "https://www.holo-comment.com/channels/UCu2n3qHuOuQIygREMnWeQWg",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    }
+  ]
+}
