@@ -65,6 +65,12 @@ class Default(WorkerEntrypoint):
                 headers={"Content-Type": "text/plain; charset=utf-8",
                          "Cache-Control": "no-store"},
             )
+        except Exception as exc:
+            # Source-only local Pyodide feasibility: log exception identity, not
+            # request URL, video IDs, API content or secrets. Never mask errors.
+            print("PYTHON_WORKER_FEASIBILITY_EXCEPTION:",
+                  type(exc).__module__, type(exc).__name__)
+            raise
         # Header names/values come from the accepted handler. Do not return
         # hop-by-hop server transport headers to the Worker network stack.
         headers = {
