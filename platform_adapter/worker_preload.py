@@ -18,7 +18,7 @@ async def preload_for_accepted_request(target: str, get_json):
     get_json(url) is an async injected transport. It must return a JSON dict.
     """
     parsed = urlsplit(target)
-    if parsed.path in {"/", "/api/home"}:
+    if parsed.path in {"/", "/api/home", "/custom-view", "/custom-view/session"}:
         value = await get_json(DEFAULT_API + "/v1/catalog/today")
         if not isinstance(value, dict):
             raise PublicAPIUnavailable("Invalid Today envelope")
