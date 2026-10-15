@@ -16,6 +16,7 @@ function fixture({id=V,state='live',observed='2026-10-15T11:59:00Z',end=null,gro
 function db() {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8'));
+  sqlite.exec('CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)');
   function statement(sql,params=[]){
     return {
       bind(...values){return statement(sql,values)},
@@ -146,7 +147,7 @@ test('removed publisher excluded immediately at approved roster rollover',async(
 
 test('channel avatar projects only approved existing catalog channel artwork, not thumbnails',async()=>{
  const d=db();
- d.raw.exec(`CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)`);
+
  d.raw.prepare('INSERT INTO public_catalog VALUES(?,?,?,?,?)').run('catalog0001',C,'https://yt3.ggpht.com/verified-avatar',null,'2026-10-15T12:00:00Z');
  await writeEvidence(d,fixture());
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T11:59:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
