@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {DatabaseSync} from 'node:sqlite';import {readFileSync} from 'node:fs';import {reconcileAtomFeeds} from './feed-reconcile.mjs';
 const C='UC'+'A'.repeat(22),V='abcdefghijk';
-function db(){const sqlite=new DatabaseSync(':memory:');sqlite.exec(readFileSync(new URL('./websub-event-queue.PROPOSED.sql',import.meta.url),'utf8'));return {sqlite,prepare(sql){return {bind(...params){return {run:async()=>sqlite.prepare(sql).run(...params)}}}}}}
+function db(){const sqlite=new DatabaseSync(':memory:');sqlite.exec(readFileSync(new URL('./websub-event-queue.PROPOSED.sql',import.meta.url),'utf8'));sqlite.exec(readFileSync(new URL('./websub-hardening.PROPOSED.sql',import.meta.url),'utf8'));return {sqlite,prepare(sql){return {first:async()=>sqlite.prepare(sql).get()??null,bind(...params){return {run:async()=>sqlite.prepare(sql).run(...params)}}}}}}
 test('bounded Atom reconciliation enqueues idempotent real-shape video discovery',async()=>{
  const d=db(),roster={version:'v72',channels:[{id:C}]};
  const feed='<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"><entry><yt:channelId>'+C+'</yt:channelId><yt:videoId>'+V+'</yt:videoId></entry></feed>';
