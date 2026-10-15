@@ -1,0 +1,42 @@
+name: 8788 Python Worker offline proof
+
+on:
+  push:
+    branches:
+      - dev/8788-full-4174
+    paths:
+      - 'platform_adapter/**'
+      - 'tools/build_python_worker_bundle.py'
+      - 'test_*worker*.py'
+      - 'test_public_api_binding.py'
+      - '.github/workflows/8788-python-worker-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worker-source-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify immutable accepted 4174 snapshot
+        run: python3 tools/verify_4174_snapshot.py
+      - name: Run worker/provider offline regression
+        run: |
+          python3 -B -m unittest -v \
+            test_public_api_binding \
+            test_worker_preload \
+            test_worker_preload_history \
+            test_worker_transport \
+            test_worker_transport_accepted \
+            test_cloudflare_entry_binding \
+            test_python_worker_bundle
+      - name: Build disposable manifest-pinned Worker bundle
+        run: |
+          python3 tools/build_python_worker_bundle.py --output "$RUNNER_TEMP/hv-8788-worker-bundle"
+          test -f "$RUNNER_TEMP/hv-8788-worker-bundle/bundle-provenance.json"
