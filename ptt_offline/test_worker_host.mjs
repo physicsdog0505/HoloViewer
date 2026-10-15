@@ -42,3 +42,19 @@ test('combined host serves both independent owner POST paths without enabling wr
  const legacy=await worker.fetch(new Request('https://api.example/health'),{DB:{}});
  assert.equal(legacy.status,200);
 });
+
+test('legacy CORS stays deny-by-default when ALLOWED_ORIGIN is absent',async()=>{
+ const untagged=await worker.fetch(new Request('https://api.example/health',{headers:{origin:'https://untrusted.example'}}),{DB:{}});
+ assert.equal(untagged.status,403);
+ assert.equal(untagged.headers.get('access-control-allow-origin'),null);
+ const noOrigin=await worker.fetch(new Request('https://api.example/health'),{DB:{}});
+ assert.equal(noOrigin.status,200);
+});
+test('legacy CORS recognizes exact configured origin only',async()=>{
+ const good=await worker.fetch(new Request('https://api.example/health',{headers:{origin:'https://viewer.example'}}),{DB:{},ALLOWED_ORIGIN:'https://viewer.example'});
+ assert.equal(good.status,200);
+ assert.equal(good.headers.get('access-control-allow-origin'),'https://viewer.example');
+ const bad=await worker.fetch(new Request('https://api.example/health',{headers:{origin:'https://other.example'}}),{DB:{},ALLOWED_ORIGIN:'https://viewer.example'});
+ assert.equal(bad.status,403);
+ assert.equal(bad.headers.get('access-control-allow-origin'),null);
+});
