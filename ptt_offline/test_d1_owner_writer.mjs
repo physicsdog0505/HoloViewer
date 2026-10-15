@@ -122,5 +122,5 @@ test('reviewed steady-state batch of 12 pushes is accepted with bounded accounti
   verifyAuthority:async()=>true,limits:{rows:12,writes:30,queries:70}});
  assert.equal(ack.logical_rows_acked,12);
  assert.equal(ack.d1_rows_written,26);
- assert.equal(ack.d1_query_count,63);
+ assert.equal(ack.d1_query_count,62);
 });
