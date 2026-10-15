@@ -3,7 +3,8 @@
 window.render4174SharedViewerDOM=function render4174SharedViewerDOM(showLivePtt){
  const pttPanel=showLivePtt?
  '<aside class="ptt-live-panel" aria-label="PTT 今日專串"><div class="ptt-panel-heading"><span>PTT 今日專串<small>今日公開推文・尚未與影片時間軸連動</small></span><a href="/ptt-today" target="_blank" rel="noopener">獨立閱讀 ↗</a><span class="ptt-embed-controls"><label class="ptt-embed-floor"><input id="pttEmbedShowFloor" type="checkbox" checked> 樓</label><label class="ptt-embed-font">字體 <input id="pttFontSize" type="range" min="12" max="26" value="16" step="2" aria-label="調整推文字體大小"><output id="pttFontValue">16px</output></label></span></div><iframe title="PTT 今日專串即時閱讀" src="/ptt-today?focus=1&embed=1" loading="lazy"></iframe></aside>':'';
- return `
+ const template=document.createElement('template');
+ template.innerHTML=`
 <div class="viewer-workspace">
   <div class="viewer-head">
     <h1>自訂觀看</h1>
@@ -27,4 +28,5 @@ window.render4174SharedViewerDOM=function render4174SharedViewerDOM(showLivePtt)
   </div>
   <div class="custom-content-grid${showLivePtt?'':' video-only'}"><div class="custom-player-column"><main id="stage"></main><div class="translation-slot" id="translationSlot" aria-label="VOD 翻譯字幕" hidden><div class="translation-track-controls"><button type="button" id="translationA">A方案</button><button type="button" id="translationB">B方案</button></div><div id="translationStatus" class="note"></div><div id="translationText" class="translation-text"></div></div></div>${pttPanel}</div>
 </div>`;
+ return template.content.cloneNode(true);
 };
