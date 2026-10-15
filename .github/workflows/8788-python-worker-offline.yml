@@ -17,6 +17,7 @@ on:
       - 'test_ptt_consumer_contract.py'
       - 'test_ptt_provider_binding.py'
       - 'test_8788_local_router_contract.py'
+      - 'test_production_host_wiring.py'
       - 'tools/check_8788_local_router_contract.py'
       - 'tools/check_8788_owner_api_e2e.mjs'
       - '.github/workflows/8788-python-worker-offline.yml'
@@ -60,6 +61,7 @@ jobs:
             test_ptt_consumer_contract \
             test_ptt_provider_binding \
             test_8788_local_router_contract \
+            test_production_host_wiring \
             test_worker_preload \
             test_worker_preload_history \
             test_worker_transport \
