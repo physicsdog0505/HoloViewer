@@ -61,6 +61,15 @@ class ProductionPackageTests(unittest.TestCase):
             self.assertNotIn("from youtube_metadata import YoutubeVideo", home)
             self.assertNotIn("from live_stream_discovery import LiveDiscoveryCache\nfrom today_stream_status", home)
             self.assertIn("from today_stream_status import stream_state", home)
+            self.assertEqual(
+                receipt["runtime_optimizations"]["client_watchalong_landing_lightweight_imports"],
+                "applied",
+            )
+            watchalong = (dest / "client_watchalong.py").read_text()
+            self.assertNotIn("from youtube_metadata import fetch_video, load_api_key", watchalong)
+            self.assertNotIn("from transcript_ingest import TranscriptIngestService", watchalong)
+            self.assertNotIn("from watchalong_playback_telemetry import", watchalong)
+            self.assertIn("from client_ui_shell import client_document, client_viewer_document", watchalong)
 
 if __name__ == "__main__":
     unittest.main()
