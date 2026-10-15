@@ -52,3 +52,11 @@ test('reject cross-Taipei-day timestamp before D1 access',async()=>{
   }),/invalid canonical row/);
   assert.equal(calls.length,0);
 });
+
+test('reject mismatched AID and canonical PTT URL before D1 access',async()=>{
+ const {DB,calls}=mock();
+ await assert.rejects(applyAuthorizedPttBatch({
+  DB,batch:{...batch,rows:[{...row,aid:'WrongAid'}]},
+  verifyAuthority:async()=>true}),/invalid canonical row/);
+ assert.equal(calls.length,0);
+});
