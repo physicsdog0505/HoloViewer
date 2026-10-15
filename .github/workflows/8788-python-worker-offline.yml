@@ -16,6 +16,7 @@ on:
       - 'test_ptt_provider_binding.py'
       - 'test_8788_local_router_contract.py'
       - 'tools/check_8788_local_router_contract.py'
+      - 'tools/check_8788_owner_api_e2e.mjs'
       - '.github/workflows/8788-python-worker-offline.yml'
   workflow_dispatch:
 
