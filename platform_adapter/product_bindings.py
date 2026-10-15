@@ -72,9 +72,13 @@ def bind_home_reader(api: PublicAPI, home_stream_cls: Callable):
         if not isinstance(rows, list):
             raise PublicAPIUnavailable("Today rows missing")
         groups = {"live": [], "upcoming": [], "ended": [], "unknown": []}
-        freshness = payload.get("freshness")
-        freshness = (freshness.get("state", "unknown") if isinstance(freshness, dict)
-                     else freshness if isinstance(freshness, str) else "unknown")
+        freshness_envelope = payload.get("freshness")
+        freshness = (
+            freshness_envelope.get("status")
+            if isinstance(freshness_envelope, dict) else None
+        )
+        if freshness not in {"fresh", "stale", "unknown"}:
+            freshness = "unknown"
         for raw in rows:
             item = _home_row(raw, home_stream_cls, feed_freshness=freshness)
             if item is None:
