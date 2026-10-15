@@ -6,6 +6,39 @@
 - Shared UI implementation: `client_ui_shell.py`; page implementations: `client_home.py`, History branch's History modules, `client_watchalong.py`, `client_custom_view.py`, `client_ptt_today.py` and shared viewing modules.
 - **Do not substitute current private main for the pinned accepted 4174 UI without owner approval.** Do not publish private DBs/source-only application internals to this public repo.
 
+## Owner-mandated migration method (hard rule, 2026-10-15)
+
+The Public site is **not** an independent reimplementation of 4174.
+
+The required migration sequence is:
+
+1. **Transplant the complete accepted 4174 viewing implementation first.**
+   - Move the 4174 HTML structure, CSS, browser-side JavaScript state/state-machine logic, YouTube IFrame API integration, single-view behavior, multi-view Equal/Focus behavior, immersive mode, and PTT layout together.
+   - Do not selectively rewrite these parts into a new Public implementation before the full transplant has been attempted.
+
+2. **Run the transplanted implementation in the Public environment as-is.**
+   - The first test is whether the original 4174 implementation works after deployment.
+   - Do not pre-emptively replace working 4174 logic because the server/runtime is different.
+
+3. **Only modify what actually fails after transplant.**
+   - A change is allowed only when a concrete runtime incompatibility or error has been reproduced.
+   - Record the exact failure node, error message, affected file/line, and why the original 4174 code cannot run unchanged in Public.
+   - Fix the smallest incompatible boundary only.
+
+4. **Adapters are exception paths, not the default architecture.**
+   - Use adapters only for proven environment-specific boundaries such as data access, server routing, filesystem access, local SQLite, Python-only APIs, or Cloudflare-specific runtime interfaces.
+   - The adapter must preserve the 4174-visible behavior and must not introduce a parallel Public-only player/layout implementation.
+
+5. **Do not create a second product implementation.**
+   - No Public-only rewrite of the shared viewer, Equal/Focus state machine, immersive layout, YouTube player lifecycle, or PTT viewing layout is allowed merely to make deployment easier.
+   - If a transplanted component fails, diagnose and adapt that component; do not replace it with a lookalike implementation.
+
+6. **Acceptance is behavioral, not architectural.**
+   - Public must reproduce the accepted 4174 result using the transplanted implementation.
+   - CI, static similarity, or matching screenshots alone do not prove parity; the same user flow must work in-browser.
+
+**Operational shorthand:** _copy 4174 first; run it; if it throws or proves incompatible, then adapt only that failing boundary._
+
 ## Frozen sidebar contract (exact visual order, icon, wording)
 1. 今 — 今日直播 (`/`)
 2. 史 — 歷史直播 (`/history`)
