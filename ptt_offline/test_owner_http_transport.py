@@ -32,7 +32,7 @@ class OwnerHttpTransportTests(unittest.TestCase):
             self.assertEqual(request.get_header("X-ptt-signature"),expected)
             self.assertEqual(request.get_header("User-agent"),"Mozilla/5.0")
             calls.append(raw)
-            self.assertEqual(timeout,10)
+            self.assertEqual(timeout,30)
             return Response(receipt)
         fn=owner_signed_http_executor(endpoint="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish",
             secret="s"*40,allow_write=True,opener=opener,clock_ms=lambda:1792069200000)
