@@ -141,6 +141,12 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False):
                             "pending_count":len(plan["pending_source_lines"])})
         return {**receipt,"status":"ACK","sent":len(rows),"batch_id":batch["batch_id"]}
 
+def state_for_source(state_dir,source_identity):
+    if not isinstance(source_identity,str) or len(source_identity)!=64 or any(c not in "0123456789abcdef" for c in source_identity):
+        raise ContractError("invalid canonical source identity for state isolation")
+    return str(Path(state_dir)/(source_identity+".json"))
+
+
 def main(argv=None):
     p=argparse.ArgumentParser(description="One bounded near-live genuine PTT Publisher attempt")
     p.add_argument("--source",required=True)
@@ -168,8 +174,7 @@ def main(argv=None):
             if observed["status"]!="READY":
                 print(json.dumps({"status":observed["status"],"sent":0}))
                 return
-            source_hash=sha256(observed["source_identity"].encode("ascii")).hexdigest()
-            state=str(Path(args.state_dir)/(source_hash+".json"))
+            state=state_for_source(args.state_dir,observed["source_identity"])
         result=run_live_once(db,state_path=state,secret=secret,executor=executor,send=args.send)
     print(json.dumps(result,ensure_ascii=False,sort_keys=True))
 if __name__=="__main__":main()
