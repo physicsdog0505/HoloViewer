@@ -1607,3 +1607,36 @@ body.custom-session-watching .custom-content-grid.video-only #stage .video-wrap 
 body.custom-session-watching.custom-immersive .custom-content-grid.video-only{
  overflow:auto!important;min-height:0!important
 }
+
+/* Accepted 4174 single-POV geometry: one video is never a zero-height flex
+   child, with or without the selected PTT column. Keep the original
+   video + right sidebar composition; do not erase the PTT choice. */
+@media(min-width:761px){
+ body.custom-session-watching #stage:has(> .player-card:only-child){
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:max-content!important;grid-auto-rows:max-content!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  overflow:visible!important;align-content:start!important
+ }
+ body.custom-session-watching #stage:has(> .player-card:only-child) > .player-card{
+  grid-column:1!important;grid-row:1!important;align-self:start!important;
+  height:auto!important;min-height:0!important;max-height:none!important
+ }
+ body.custom-session-watching #stage:has(> .player-card:only-child) .video-wrap{
+  display:block!important;flex:none!important;position:relative!important;
+  width:100%!important;height:auto!important;min-height:0!important;
+  aspect-ratio:16/9!important;max-height:none!important
+ }
+ body.custom-session-watching #stage:has(> .player-card:only-child) .video-wrap iframe{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  display:block!important;visibility:visible!important
+ }
+ body.custom-session-watching .custom-content-grid:not(.video-only):has(#stage > .player-card:only-child){
+  display:grid!important;grid-template-columns:minmax(0,1fr) minmax(240px,var(--ptt-width,28%))!important;
+  align-items:start!important;height:auto!important;min-height:0!important;
+  overflow:auto!important
+ }
+ body.custom-session-watching .custom-content-grid:not(.video-only):has(#stage > .player-card:only-child) .custom-player-column{
+  height:auto!important;max-height:none!important;min-height:0!important;overflow:visible!important
+ }
+}
