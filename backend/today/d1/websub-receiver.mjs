@@ -23,7 +23,7 @@ export function parseAtomEnvelope(xml){
  // raw and require a separate parser/reconciliation before publishing lifecycle.
  return {channel_id:channel,video_id:video??null};
 }
-export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrigin}={}){
+export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrigin,confirmChallenge}={}){
  const url=new URL(request.url);
  if(url.pathname!=='/internal/today/websub')return json({error:'not_found'},404);
  if(!secret||!roster||typeof saveEvent!=='function')return json({error:'receiver_disabled'},503);
@@ -35,6 +35,10 @@ export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrig
     ||!challenge||challenge.length>1024||!/^\d{1,9}$/.test(lease??''))
    return json({error:'challenge_rejected'},403);
   if(callbackOrigin&&url.origin!==callbackOrigin)return json({error:'callback_origin_mismatch'},403);
+  if(confirmChallenge){
+   try{await confirmChallenge({channelId:channel,rosterVersion:roster.version,mode,leaseSeconds:Number(lease)})}
+   catch{return json({error:'unrecognized_challenge'},403)}
+  }
   return new Response(challenge,{status:200,headers:{'content-type':'text/plain; charset=utf-8','cache-control':'no-store'}});
  }
  if(request.method!=='POST')return json({error:'method_not_allowed'},405);
