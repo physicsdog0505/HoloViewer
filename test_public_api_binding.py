@@ -33,6 +33,12 @@ class ProviderBindingTest(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 PublicAPI(bad)
 
+    def test_explicit_test_only_origin_does_not_relax_production(self):
+        alternate = PublicAPI("https://mock.example.test", _test_only_allow_alternate_origin=True)
+        self.assertEqual(alternate.origin, "https://mock.example.test")
+        with self.assertRaises(ValueError):
+            PublicAPI("https://mock.example.test")
+
     def test_home_reader_never_invents_live_state_or_group(self):
         class Stub:
             def read_today(self):
