@@ -29,6 +29,10 @@ class ContractError(ValueError):
     """Fail-closed contract violation."""
 
 
+class SourceUnavailable(ContractError):
+    """Provider-neutral source/day unavailable (never a successful empty feed)."""
+
+
 def _parse_aware(iso: str, field: str) -> datetime:
     if not isinstance(iso, str) or not iso:
         raise ContractError(f"{field} is required")
@@ -492,13 +496,44 @@ class TodayAdapter:
         return self if next_day == self.day else TodayAdapter(day=next_day, aids=aids)
 
 
+PUBLIC_PUSH_FIELDS = (
+    "push_id", "aid", "source_line", "kind", "author",
+    "content", "occurred_at", "floor", "source_url",
+)
+_PTT_ARTICLE_RE = re.compile(
+    r"^https://www\\.ptt\\.cc/bbs/C_Chat/M\\.[0-9]+\\.A\\.[A-Za-z0-9]+\\.html$"
+)
+
+
+def public_push(row: dict[str, Any]) -> dict[str, Any]:
+    """Explicit consumer allowlist. Never return provider/relay internals."""
+    # Older synthetic contract fixtures have no kind; preserve unknown as None
+    # rather than fabricating a 推/噓/→ vote that was not observed.
+    kind = row.get("kind")
+    if kind is not None and kind not in ("推", "噓", "→"):
+        raise ContractError("unsupported push kind")
+    raw_url = row.get("source_url")
+    url = raw_url if isinstance(raw_url, str) and _PTT_ARTICLE_RE.fullmatch(raw_url) else None
+    visible = {key: row.get(key) for key in PUBLIC_PUSH_FIELDS}
+    visible["kind"] = kind
+    visible["source_url"] = url
+    return visible
+
+
+def consumer_envelope(checked: dict[str, str], freshness: str,
+                      completeness: str, gap: bool, clock: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    last = min(checked.values()) if checked else None
+    return ({"status": freshness, "last_success_at": last},
+            {"status": completeness, "gap": gap})
+
+
 @dataclass(frozen=True)
 class PttTodayReadModel:
     schema_version: str
     day: str
-    freshness: str
-    completeness: str
-    history_gap: bool
+    as_of: str
+    freshness: dict[str, Any]
+    completeness: dict[str, Any]
     checkpoint: str
     pushes: list[dict[str, Any]]
     page: dict[str, Any]
@@ -508,9 +543,9 @@ class PttTodayReadModel:
 class PttHistoryReadModel:
     schema_version: str
     day: str
-    freshness: str
-    completeness: str
-    history_gap: bool
+    as_of: str
+    freshness: dict[str, Any]
+    completeness: dict[str, Any]
     checkpoint: str | None
     pushes: list[dict[str, Any]]
     page: dict[str, Any]
@@ -522,8 +557,9 @@ class PttConsumerReader:
     This offline stateful adapter is not a durable authenticated provider.
     """
 
-    def __init__(self, provider: PttProvider):
+    def __init__(self, provider: PttProvider, *, clock: Callable[[], str] | None = None):
         self._provider = provider
+        self._clock = clock or (lambda: datetime.now(timezone.utc).isoformat())
         self._today: TodayAdapter | None = None
         # Offline-only opaque continuation registry. Durable, signed tokens
         # belong to a separately authorized production provider.
@@ -536,8 +572,11 @@ class PttConsumerReader:
         if self._today is None or self._today.day != day:
             if checkpoint is not None:
                 raise ContractError("foreign day checkpoint")
-            staged = TodayAdapter.from_provider(self._provider, day)
-            staged.initialize_from_provider(self._provider)
+            try:
+                staged = TodayAdapter.from_provider(self._provider, day)
+                staged.initialize_from_provider(self._provider)
+            except Exception as error:
+                raise SourceUnavailable("PTT source unavailable") from error
             self._today = staged
         elif checkpoint is not None:
             self._today.check_consumer_checkpoint(checkpoint, day)
@@ -549,12 +588,17 @@ class PttConsumerReader:
                 pass
         adapter = self._today
         assert adapter is not None
+        clock = self._clock()
+        try:
+            adapter.freshness_at(clock)
+        except ContractError:
+            adapter.freshness = "unknown"
         ordered = adapter._ordered()
-        pushes = ordered[-limit:]
+        pushes = [public_push(row) for row in ordered[-limit:]]
+        freshness, completeness = consumer_envelope(adapter.last_checked_by_aid, adapter.freshness, adapter.completeness, adapter.history_gap, clock)
         return PttTodayReadModel(
-            schema_version="ptt-public-v1", day=day,
-            freshness=adapter.freshness, completeness=adapter.completeness,
-            history_gap=adapter.history_gap,
+            schema_version="public-consumer-v1", day=day, as_of=clock,
+            freshness=freshness, completeness=completeness,
             checkpoint=adapter.consumer_checkpoint(),
             pushes=pushes,
             page={"limit": limit, "has_more": len(ordered) > limit,
@@ -574,9 +618,12 @@ class PttConsumerReader:
         limit = page_request.get("limit", 200)
         if type(limit) is not int or not 1 <= limit <= 200:
             raise ContractError("history page bound")
-        aids = self._provider.aids_for_day(day)
-        adapter = TodayAdapter(day, aids)
-        adapter.merge_snapshot(self._provider.snapshot_for_day(day))
+        try:
+            aids = self._provider.aids_for_day(day)
+            adapter = TodayAdapter(day, aids)
+            adapter.merge_snapshot(self._provider.snapshot_for_day(day))
+        except Exception as error:
+            raise SourceUnavailable("PTT source unavailable") from error
         ordered = adapter._ordered()
         snapshot = adapter.consumer_checkpoint()
         token = page_request.get("checkpoint")
@@ -599,10 +646,12 @@ class PttConsumerReader:
                              separators=(",", ":")).encode("utf-8")
             next_token = "ptt:history-page:v1:" + sha256(material).hexdigest()
             self._history_tokens[next_token] = (day, snapshot, end)
+        clock = self._clock()
         return PttHistoryReadModel(
-            schema_version="ptt-public-v1", day=day, freshness="unknown",
-            completeness="partial", history_gap=False,
-            checkpoint=snapshot, pushes=selected,
+            schema_version="public-consumer-v1", day=day, as_of=clock,
+            freshness={"status": "unknown", "last_success_at": None},
+            completeness={"status": "partial", "gap": False},
+            checkpoint=snapshot, pushes=[public_push(row) for row in selected],
             page={"limit": limit, "has_more": has_more,
                   "next_checkpoint": next_token},
         )
