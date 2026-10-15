@@ -3,21 +3,31 @@ from unittest.mock import patch
 from ptt_offline.activate_production_publisher import parse_table_names_output, ensure_schema, REQUIRED_TABLES
 
 class ActivationPreflightTests(unittest.TestCase):
-    def test_parses_wrangler_human_table_marker(self):
+    def test_parses_wrapped_wrangler_table_rows(self):
         raw = """ ⛅️ wrangler 4.151.0
-┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ marker                                                                                                                               │
-├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ PTT_TABLES=ptt_gap_repairs,ptt_provider_state,ptt_pushes,ptt_source_evidence,ptt_threads,public_ptt_schema_migrations                │
-└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────┐
+│ name                         │
+├──────────────────────────────┤
+│ ptt_gap_repairs              │
+│ ptt_provider_state           │
+│ ptt_pushes                   │
+│ ptt_source_evidence          │
+│ ptt_threads                  │
+│ public_ptt_schema_migrations │
+└──────────────────────────────┘
 """
         self.assertEqual(parse_table_names_output(raw), {
             "ptt_gap_repairs","ptt_provider_state","ptt_pushes",
             "ptt_source_evidence","ptt_threads","public_ptt_schema_migrations"
         })
 
-    def test_parses_empty_marker(self):
-        raw = "│ PTT_TABLES= │"
+    def test_parses_line_wrapped_names_anywhere_in_output(self):
+        raw = "│ ptt_gap_\nrepairs │\n│ ptt_pushes │\n"
+        # Exact identifiers are required; a split identifier must not be fabricated.
+        self.assertEqual(parse_table_names_output(raw), {"ptt_pushes"})
+
+    def test_parses_empty_schema_table(self):
+        raw = "│ name │\n"
         self.assertEqual(parse_table_names_output(raw), set())
 
     def test_missing_marker_fails_closed(self):
