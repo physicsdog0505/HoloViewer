@@ -3,7 +3,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from ptt_offline.migration_preflight import TABLES, schema_receipt, inspect_fixture, SCHEMA
+from ptt_offline.migration_preflight import TABLES, schema_receipt, inspect_fixture, SCHEMA, MANIFEST
 
 
 class MigrationPreflightTests(unittest.TestCase):
@@ -12,6 +12,10 @@ class MigrationPreflightTests(unittest.TestCase):
         receipt = schema_receipt()
         self.assertEqual(receipt["sha256"], hashlib.sha256(SCHEMA.read_bytes()).hexdigest())
         self.assertEqual(len(receipt["sha256"]), 64)
+        self.assertTrue(receipt["manifest_verified"])
+        import json
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["sha256"], manifest["immutable_migrations"][0]["sha256"])
         self.assertEqual(set(receipt["required_tables"]), set(TABLES))
 
     def test_synthetic_fixture_preflight_and_missing_schema(self):
