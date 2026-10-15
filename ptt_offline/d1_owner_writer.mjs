@@ -43,7 +43,7 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
   requireTrue(batch && Array.isArray(batch.rows) && batch.rows.length>0 && batch.rows.length<=LIMIT,'push cap 5');
   requireTrue(batch.request_cap===1 && batch.retry_cap===0,'unsafe request budget');
   requireTrue(typeof batch.source_identity==='string' && batch.source_identity.length>0 &&
-    batch.write_cap===batch.rows.length && typeof batch.digest==='string' &&
+    Number.isInteger(batch.write_cap) && batch.write_cap>=batch.rows.length && batch.write_cap<=LIMIT && typeof batch.digest==='string' &&
     /^[0-9a-f]{64}$/.test(batch.digest), 'batch identity required');
   const digest=await batchDigest(batch);
   requireTrue(digest===batch.digest && batch.batch_id==='ptt48:'+digest.slice(0,24),
