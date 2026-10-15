@@ -9,6 +9,7 @@ function fixture(){
  const sqlite=new DatabaseSync(':memory:');
  sqlite.exec(readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8'));
  sqlite.exec(readFileSync(new URL('./websub-event-queue.PROPOSED.sql',import.meta.url),'utf8'));
+ sqlite.exec(readFileSync(new URL('./websub-hardening.PROPOSED.sql',import.meta.url),'utf8'));
  return {prepare(q){return {bind(...args){return {first:async()=>sqlite.prepare(q).get(...args)??null,all:async()=>({results:sqlite.prepare(q).all(...args)}),run:async()=>sqlite.prepare(q).run(...args)}}}},async batch(statements){sqlite.exec('BEGIN');try{for(const s of statements)await s.run();sqlite.exec('COMMIT')}catch(e){sqlite.exec('ROLLBACK');throw e}},sqlite};
 }
 test('durable event -> one videos.list -> canonical evidence -> processed',async()=>{
