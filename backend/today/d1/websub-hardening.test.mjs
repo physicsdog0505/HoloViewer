@@ -7,7 +7,7 @@ const C='UC'+'A'.repeat(22),V='abcdefghijk',hash='a'.repeat(64),t1='1'.repeat(64
 const raw=new DatabaseSync(':memory:');
 raw.exec(readFileSync(new URL('./websub-event-queue.PROPOSED.sql',import.meta.url),'utf8'));
 raw.exec(readFileSync(new URL('./websub-hardening.PROPOSED.sql',import.meta.url),'utf8'));
-const db={prepare(s){return {bind(...args){return {run:async()=>raw.prepare(s).run(...args),first:async()=>raw.prepare(s).get(...args)??null}}}}};
+const db={prepare(s){return {first:async()=>raw.prepare(s).get()??null,bind(...args){return {run:async()=>raw.prepare(s).run(...args),first:async()=>raw.prepare(s).get(...args)??null}}}}};
 test('CAS claim excludes second worker, expired claim fences old ACK',async()=>{
  raw.prepare("INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status) VALUES(?,?,?,?,?,'pending')").run(hash,C,V,'v1','2026-10-16T00:00:00Z');
  const now=new Date('2026-10-16T01:00:00Z');
