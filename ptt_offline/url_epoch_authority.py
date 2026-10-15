@@ -20,13 +20,15 @@ TIME=re.compile(r"^(\d{2}):(\d{2})$")
 MAX_UNOBSERVED_DAYS=45
 
 
-def article_epoch(*,board:str,aid:str,url:str) -> datetime:
+def article_epoch(*,board:str,aid:str,url:str,identity_verifier=None) -> datetime:
     if board != "C_Chat":
         raise ContractError("unverified board")
-    normalize_public_aid(aid)
+    aid=normalize_public_aid(aid)
     m=URL.fullmatch(url or "")
     if not m:
         raise ContractError("unverified canonical article URL")
+    if not callable(identity_verifier) or identity_verifier(board,aid,url) is not True:
+        raise ContractError("independent article AID/URL identity receipt required")
     try:
         posted=datetime.fromtimestamp(int(m.group(1)),tz=timezone.utc).astimezone(TAIPEI)
     except (OverflowError,OSError,ValueError) as exc:
@@ -36,7 +38,8 @@ def article_epoch(*,board:str,aid:str,url:str) -> datetime:
     return posted
 
 
-def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict]) -> list[dict]:
+def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict],
+                       identity_verifier=None) -> list[dict]:
     """Return UTC second events; require strict chronological source-line evidence.
 
     This intentionally does not use collected_at or captured_at. A first push
@@ -44,7 +47,8 @@ def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict]) -> list[di
     is held for separate positive evidence; this avoids silently assigning an
     unknown year to an old thread with sparse pushes.
     """
-    anchor=article_epoch(board=board,aid=aid,url=url)
+    anchor=article_epoch(board=board,aid=aid,url=url,
+                         identity_verifier=identity_verifier)
     canonical=normalize_public_aid(aid)
     output=[]
     previous=anchor
