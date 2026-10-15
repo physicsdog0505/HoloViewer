@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "vendor" / "4174-a144bb3"
 MANIFEST = ROOT / "provenance" / "4174-source-manifest.json"
 MODULE_INDEX = ROOT / "provenance" / "4174-source-module-index.json"
+CLOSURE = ROOT / "provenance" / "4174-dependency-closure.json"
 
 EXPECTED_REPOSITORY = "physicsdog0505/Hololive-PTT-Viewer"
 EXPECTED_SOURCE = "a144bb378a8bdd772faa867d608c1e7491253883"
@@ -73,6 +74,7 @@ def main() -> int:
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     module_index = json.loads(MODULE_INDEX.read_text(encoding="utf-8"))
+    closure = json.loads(CLOSURE.read_text(encoding="utf-8"))
 
     if manifest.get("schema_version") != 2:
         errors.append("manifest schema_version must be 2")
@@ -84,6 +86,10 @@ def main() -> int:
         errors.append("module index source repository is not the pinned private 4174 repo")
     if module_index.get("source_commit") != EXPECTED_SOURCE:
         errors.append("module index source commit is not pinned a144bb3")
+    if closure.get("source_repository") != EXPECTED_REPOSITORY:
+        errors.append("dependency closure source repository is not pinned 4174")
+    if closure.get("source_commit") != EXPECTED_SOURCE:
+        errors.append("dependency closure source commit is not pinned a144bb3")
 
     entries = manifest.get("product_files", [])
     if not isinstance(entries, list):
@@ -157,6 +163,19 @@ def main() -> int:
         if Path(rel).suffix == ".py"
     }
     vendored_roots = {module_root(rel) for rel in vendored_python}
+
+    declared_python = set(closure.get("python_dependency_closure", []))
+    if declared_python != vendored_python:
+        missing_declared = sorted(vendored_python - declared_python)
+        stale_declared = sorted(declared_python - vendored_python)
+        if missing_declared:
+            errors.append("vendored Python missing from dependency closure manifest: " + ", ".join(missing_declared))
+        if stale_declared:
+            errors.append("dependency closure manifest lists absent Python: " + ", ".join(stale_declared))
+
+    declared_static = set(closure.get("required_static_assets", []))
+    if declared_static != REQUIRED_STATIC:
+        errors.append("dependency closure required_static_assets does not match accepted static contract")
 
     import_graph: dict[str, set[str]] = {}
     for rel in sorted(vendored_python):
