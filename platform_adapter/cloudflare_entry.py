@@ -56,7 +56,7 @@ class Default(WorkerEntrypoint):
         # Phase-E first proof slice only. Unbound routes must never fall back
         # to the immutable product's local SQLite/file loaders in a Worker.
         # This is a data-readiness gate, NOT another product route dispatcher.
-        if parsed.path not in {"/", "/api/home", "/history", "/custom-view", "/custom-view/session"}:
+        if parsed.path not in {"/", "/api/home", "/history", "/custom-view", "/custom-view/session", "/collab", "/collab/session", "/api/collab/live"}:
             return Response(
                 "Public provider route not yet connected",
                 status=503,
