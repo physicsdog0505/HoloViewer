@@ -48,6 +48,8 @@ def run_synthetic_one(*, checkpoint_path: str, source_identity: str,
     with exclusive_lock(path.with_suffix(path.suffix+".lock")):
         checkpoint=load_checkpoint(path,source_identity=source_identity,
                                    day=day,aids=aids)
+        if checkpoint.get("acked_prefix_digest") is not None and source_prefix_digest is None:
+            raise ContractError("source prefix verification cannot be bypassed")
         if source_prefix_digest is not None:
             if not isinstance(source_prefix_digest,str) or len(source_prefix_digest)!=64:
                 raise ContractError("invalid source prefix evidence")
