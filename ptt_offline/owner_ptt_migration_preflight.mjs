@@ -63,10 +63,12 @@ export function decodeD1(value) {
  return groups.flatMap(g=>g.results);
 }
 function invoke(args) {
- const result=spawnSync('npx',['wrangler',...args],{encoding:'utf8',
+ const mutation=args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply';
+ const result=spawnSync('npx',['wrangler',...args],{
+   encoding:'utf8',stdio:mutation?'inherit':'pipe',
    env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
  if(result.error||result.status!==0)
-   throw Error('Wrangler read-only preflight failed; no mutation attempted');
+   throw Error('Wrangler command failed; inspect remote state before retry: '+(result.stderr?.slice(0,200)??result.status));
  return result.stdout;
 }
 export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
