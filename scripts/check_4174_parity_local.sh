@@ -67,16 +67,18 @@ trap cleanup EXIT INT TERM HUP
 (
   cd "$ACCEPTED_4174_ROOT"
   export PYTHONNOUSERSITE=1
+  export PYTHONUNBUFFERED=1
   export PYTHONDONTWRITEBYTECODE=1
   export PTT_CLIENT_DISABLE_TODAY_REFRESH=1
   unset PYTHONPATH
-  exec python3 client_app.py     --host 127.0.0.1     --port "$BASELINE_PORT"     --runtime-root "$BASELINE_DATA"
+  exec python3 -u client_app.py     --host 127.0.0.1     --port "$BASELINE_PORT"     --runtime-root "$BASELINE_DATA"
 ) >"$BASELINE_LOG" 2>&1 &
 BASELINE_PID=$!
 
 (
   cd "$ROOT"
-  exec python3 tools/run_4174_snapshot.py     --port "$CANDIDATE_PORT"     --runtime-data-root "$CANDIDATE_DATA"
+  export PYTHONUNBUFFERED=1
+  exec python3 -u tools/run_4174_snapshot.py     --port "$CANDIDATE_PORT"     --runtime-data-root "$CANDIDATE_DATA"
 ) >"$CANDIDATE_LOG" 2>&1 &
 CANDIDATE_PID=$!
 
