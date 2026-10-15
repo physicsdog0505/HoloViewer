@@ -4,16 +4,34 @@ import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {applyTodayMigration,sha256Hex} from './migrate.mjs';
 const SQL=readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8');
+
 function memoryD1(){
  const db=new DatabaseSync(':memory:');
- const wrap={prepare(sql){const stmt=db.prepare(sql);return {
-   bind(...values){return {first:async()=>stmt.get(...values)??null,run:async()=>stmt.run(...values)}},
-   first:async()=>stmt.get()??null,run:async()=>stmt.run()
- }},async batch(batch){
-   db.exec('BEGIN IMMEDIATE');
-   try {for(const step of batch)await step.run();db.exec('COMMIT')}
-   catch(e){db.exec('ROLLBACK');throw e}
- },raw:db,close:()=>db.close()};
+ function statement(sql,params=[]){
+   return {
+     bind(...values){return statement(sql,values)},
+     async first(){return db.prepare(sql).get(...params)??null},
+     async all(){return {results:db.prepare(sql).all(...params)}},
+     async run(){return db.prepare(sql).run(...params)}
+   };
+ }
+ const wrap={
+   prepare(sql){return statement(sql)},
+   async batch(batch){
+     db.exec('BEGIN IMMEDIATE');
+     try {
+       const result=[];
+       for(const step of batch) result.push(await step.run());
+       db.exec('COMMIT');
+       return result;
+     } catch(e) {
+       db.exec('ROLLBACK');
+       throw e;
+     }
+   },
+   raw:db,
+   close:()=>db.close()
+ };
  return wrap;
 }
 test('migration create, exact replay no-op, ledger and schema durable',async()=>{

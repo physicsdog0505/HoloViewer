@@ -16,17 +16,31 @@ function fixture({id=V,state='live',observed='2026-10-15T11:59:00Z',end=null,gro
 function db() {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8'));
-  const wrap={prepare(sql){return {bind(...params){
-    const stmt=sqlite.prepare(sql);
-    return {first:async()=>stmt.get(...params)??null,
-      all:async()=>({results:stmt.all(...params)}),
-      run:async()=>stmt.run(...params)};
-  },first:async()=>sqlite.prepare(sql).get()??null};
-  },async batch(statements){
-    sqlite.exec('BEGIN IMMEDIATE');
-    try {const result=[];for(const s of statements)result.push(await s.run());sqlite.exec('COMMIT');return result;}
-    catch(e){sqlite.exec('ROLLBACK');throw e;}
-  },close(){sqlite.close()},raw:sqlite};
+  function statement(sql,params=[]){
+    return {
+      bind(...values){return statement(sql,values)},
+      async first(){return sqlite.prepare(sql).get(...params)??null},
+      async all(){return {results:sqlite.prepare(sql).all(...params)}},
+      async run(){return sqlite.prepare(sql).run(...params)}
+    };
+  }
+  const wrap={
+    prepare(sql){return statement(sql)},
+    async batch(statements){
+      sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        const result=[];
+        for(const s of statements) result.push(await s.run());
+        sqlite.exec('COMMIT');
+        return result;
+      } catch(e) {
+        sqlite.exec('ROLLBACK');
+        throw e;
+      }
+    },
+    close(){sqlite.close()},
+    raw:sqlite
+  };
   return wrap;
 }
 test('create/replay/update/read and durable END',async()=>{
