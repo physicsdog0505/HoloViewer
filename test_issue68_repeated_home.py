@@ -41,12 +41,12 @@ class RepeatedHomeRenderTests(unittest.TestCase):
     def test_repeated_root_render_uses_preloaded_today_without_client_app(self):
         sys.modules.pop("client_app", None)
         key = ("/v1/catalog/today", ())
-        payload = today_payload(80)
+        payload = today_payload(200)
         with preloaded_public_reads({key: payload}):
             for _ in range(8):
                 result = dispatch_lightweight_home("/")
                 self.assertEqual(result.status, 200)
-                self.assertIn(b"Today", result.body)
+                self.assertIn("今日直播".encode("utf-8"), result.body)
         self.assertNotIn("client_app", sys.modules)
 
     def test_repeated_api_home_render_uses_preloaded_today_without_client_app(self):
