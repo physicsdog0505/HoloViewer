@@ -50,6 +50,22 @@ const db = {prepare(sql) {
     assert.ok(params.length > 0);
     return {all: async () => { selects++; return {results: []}; }};
   }};
+  if (sql.includes('COUNT(*) AS total FROM public_history')) return {
+    bind(day) {assert.equal(day, pttDay); return {first:async()=>({total:0})};}
+  };
+  if (sql.includes('FROM public_history WHERE day=? ORDER BY id')) return {
+    bind(day,limit,offset) {
+      assert.equal(day,pttDay);
+      assert.equal(limit,50);
+      assert.equal(offset,0);
+      return {all:async()=>({results:[]})};
+    }
+  };
+  if (sql.includes('FROM public_catalog WHERE video_id=?')) return {
+    bind(id) {return {first:async()=>({
+      video_id:id, title:'legacy-compatible test video'
+    })};}
+  };
   if (pttRoot && sql.includes('FROM ptt_provider_state')) return {
     bind(day) { assert.equal(day, pttDay); return {
       all:async()=>({results:[{aid:'M.1234567890.A.ABC',last_success_at:'2026-10-15T01:02:00Z',has_gap:0}]})
@@ -138,6 +154,16 @@ try {
     assert.equal(secondData.pushes[0].push_id,pttPushes[1].push_id);
     assert.equal(secondData.page.has_more,false);
   }
+  // Owner #47 legacy compatibility must coexist with canonical Today and
+  // #48 PTT routes. This does NOT make legacy History canonical #47/#48.
+  const legacyHistory = await fetch(localOrigin + '/v1/history?day='+pttDay+'&limit=50&offset=0');
+  assert.equal(legacyHistory.status,200);
+  const legacyHistoryBody = await legacyHistory.json();
+  assert.equal(legacyHistoryBody.day,pttDay);
+  assert.deepEqual(legacyHistoryBody.items,[]);
+  const legacyVideo = await fetch(localOrigin + '/v1/catalog/videos/dQw4w9WgXcQ');
+  assert.equal(legacyVideo.status,200);
+  assert.equal((await legacyVideo.json()).video_id,'dQw4w9WgXcQ');
   const python = spawn('python3', [
     '-B', 'tools/check_8788_local_router_contract.py',
     '--api-base', localOrigin,
@@ -169,6 +195,7 @@ try {
   console.log(JSON.stringify({
     status: 'PASS', api_source: shellUrl, api_source_sha: actualOwnerHead,
     guards: {preflight:true, preflight_no_origin:true, method:true, denied_origin:true},
+    legacy_compat: {history:true, video:true},
     shell: 'owner-owned #47 existing-API reconstruction',
     db: 'mock D1-compatible read-only prepare/bind/all',
     db_reads: selects, ptt_combined_mount: Boolean(pttRoot),
