@@ -34,6 +34,23 @@ class ProductionHostWiringTest(unittest.TestCase):
         self.assertEqual(api["db_binding"]["binding"], "DB")
         self.assertEqual(api["db_binding"]["database_name"], "holoviewer-public-v1")
 
+    def test_route_and_runtime_env_ownership_is_explicit(self):
+        host = self.spec["public_host_worker"]
+        api = self.spec["canonical_api"]
+        routing = self.spec["routing"]
+        self.assertEqual(host["runtime_vars"], {})
+        self.assertFalse(host["outbound_api"]["runtime_env_override"])
+        self.assertEqual(host["outbound_api"]["origin"], DEFAULT_API)
+        self.assertEqual(api["runtime_bindings"]["DB"]["database_name"],
+                         "holoviewer-public-v1")
+        self.assertIsNone(api["runtime_vars"]["ALLOWED_ORIGIN"]["value"])
+        self.assertTrue(api["runtime_vars"]["ALLOWED_ORIGIN"]["owner_confirmation_required"])
+        self.assertEqual(routing["static_assets"]["binding"], "ASSETS")
+        self.assertFalse(routing["static_assets"]["worker_first"])
+        self.assertEqual(routing["canonical_reads"]["methods"], ["GET"])
+        self.assertEqual(routing["d1"]["from"], "holoviewer-public-api")
+        self.assertEqual(routing["ptt_product"]["state"], "disabled-fail-closed")
+
     def test_exact_reviewed_owner_sources_are_pinned(self):
         api = self.spec["canonical_api"]
         self.assertEqual(api["issue47_source_sha"],
