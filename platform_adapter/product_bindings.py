@@ -75,7 +75,8 @@ def bind_home_reader(api: PublicAPI, home_stream_cls: Callable):
             raise PublicAPIUnavailable("Today rows missing")
         groups = {"live": [], "upcoming": [], "ended": [], "unknown": []}
         freshness = payload.get("freshness")
-        freshness = freshness if isinstance(freshness, str) else "unknown"
+        freshness = (freshness.get("state", "unknown") if isinstance(freshness, dict)
+                     else freshness if isinstance(freshness, str) else "unknown")
         for raw in rows:
             item = _home_row(raw, home_stream_cls, feed_freshness=freshness)
             if item is None:
