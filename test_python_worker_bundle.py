@@ -19,6 +19,11 @@ class WorkerBundleTest(unittest.TestCase):
             config = json.loads((output / "wrangler.jsonc").read_text())
             self.assertIn("python_workers", config["compatibility_flags"])
             self.assertFalse(receipt["deployed"])
+            self.assertFalse((output / "requirements.txt").exists())
+            if "requirements.txt -> bundle-metadata/requirements.txt" in receipt["relocated_legacy_metadata"]:
+                original = (Path(__file__).parent / "vendor" / "4174-a144bb3" / "requirements.txt").read_bytes()
+                copied = (output / "bundle-metadata" / "requirements.txt").read_bytes()
+                self.assertEqual(copied, original)
             with self.assertRaises(ValueError):
                 build(output)
 
