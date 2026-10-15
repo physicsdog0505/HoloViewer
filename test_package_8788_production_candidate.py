@@ -34,7 +34,7 @@ class ProductionPackageTests(unittest.TestCase):
             self.assertEqual(set(receipt["assets"]), set(ASSETS))
             self.assertFalse((dest / "entry_fixture.py").exists())
             shell = (dest / "client_ui_shell.py").read_text()
-            self.assertIn("top:466px", shell)
+            self.assertIn("top:376px", shell)
             self.assertIn("max-height:calc(100vh - 478px)", shell)
             self.assertNotIn("top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px)", shell)
             self.assertEqual(
@@ -52,6 +52,14 @@ class ProductionPackageTests(unittest.TestCase):
             self.assertEqual(
                 receipt["authorized_ui_overrides"]["all_home_states_allow_explicit_multiview_selection"],
                 'selectable_states = {"live", "waiting", "upcoming", "ended", "unknown", "stale"}',
+            )
+            self.assertEqual(
+                receipt["authorized_ui_overrides"]["member_accent_hover_background"],
+                "  background:color-mix(in srgb,var(--member-accent,#7aa8bb) 7%,white);\n  box-shadow:",
+            )
+            self.assertIn(
+                "background:color-mix(in srgb,var(--member-accent,#7aa8bb) 7%,white);",
+                (dest / "client_home.py").read_text(),
             )
             self.assertIn(
                 'selectable_states = {"live", "waiting", "upcoming", "ended", "unknown", "stale"}',
