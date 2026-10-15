@@ -24,7 +24,7 @@ PAGE_ROUTES = frozenset({
     "/collab", "/collab/session", "/ptt-today",
     "/watchalong", "/watchalong/session",
 })
-PAGE_ONLY_FALLBACK_ROUTES = frozenset({"/ptt-today", "/watchalong", "/watchalong/session"})
+PAGE_ONLY_FALLBACK_ROUTES = frozenset({"/ptt-today", "/watchalong", "/watchalong/session", "/collab/session", "/custom-view/session"})
 
 _bound = False
 
