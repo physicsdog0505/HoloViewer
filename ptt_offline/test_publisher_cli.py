@@ -76,6 +76,7 @@ class PublisherCliTests(unittest.TestCase):
         self.assertEqual(result["gaps"],[])
         self.assertFalse(result["terminal_verified"])
         self.assertFalse(result["complete"])
+        self.assertEqual(result["has_gap"],"UNKNOWN")
 
     def test_pushes_do_not_imply_complete_without_screen_coverage(self):
         with sqlite3.connect(self.source) as db:
