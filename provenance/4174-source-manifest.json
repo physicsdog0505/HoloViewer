@@ -437,15 +437,6 @@
       "role": "python_module"
     },
     {
-      "path": "start_client.sh",
-      "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
-      "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
-      "source_blob_sha": "ff12856738d8282424f1e1f56e4fd3879ad897e2",
-      "mode": "100644",
-      "size": 434,
-      "role": "launcher_support"
-    },
-    {
       "path": "stream_catalog.py",
       "source_repository": "physicsdog0505/Hololive-PTT-Viewer",
       "source_commit": "a144bb378a8bdd772faa867d608c1e7491253883",
