@@ -30,6 +30,51 @@ def push(i, aid="A1", origin="collector", when="2026-10-15T03:00:00+08:00", *, c
 
 
 class PttOfflineContractTest(unittest.TestCase):
+    @staticmethod
+    def fixture_authority(manifest):
+        return manifest.get("authority") == "synthetic-accepted-fixture"
+
+    def test_atomic_invalid_later_snapshot_row_keeps_all_state(self):
+        a = self.adapter()
+        a.merge_snapshot([push(1)])
+        original = dict(a.rows)
+        with self.assertRaises(ContractError):
+            a.merge_snapshot([push(2), push(3, aid="FOREIGN")])
+        self.assertEqual(a.rows, original)
+
+    def test_atomic_invalid_later_relay_row_keeps_cursor_and_rows(self):
+        a = TodayAdapter("2026-10-15", {"A1"})
+        with self.assertRaises(ContractError):
+            a.ingest_relay_page(RelayPage("A1", 0, 2, False, "2026-10-15T00:00:00Z", 0,
+                [push(1, cursor=1), push(2, cursor=2, when="2026-10-16T00:00:00+08:00")]))
+        self.assertEqual(a.rows, {})
+        self.assertEqual(a.cursors["A1"], 0)
+
+    def test_strict_date_day_key(self):
+        for invalid in ("2026-10-15T00:00:00", "2026-1-5", "2026-02-30"):
+            with self.assertRaises(ContractError):
+                TodayAdapter(invalid, {"A1"})
+
+    def test_freshness_regression_fails_closed(self):
+        a = TodayAdapter("2026-10-15", {"A1"})
+        a.ingest_relay_page(RelayPage("A1", 0, 1, False, "2026-10-15T00:00:30Z", 0, [push(1, cursor=1)]))
+        with self.assertRaisesRegex(ContractError, "clock regression"):
+            a.freshness_at("2026-10-15T00:00:29Z")
+        self.assertEqual(a.freshness, "unknown")
+
+    def test_consumer_checkpoint_is_opaque_and_day_bound(self):
+        a = self.adapter()
+        token = a.consumer_checkpoint()
+        self.assertTrue(token.startswith("ptt:checkpoint:v1:"))
+        self.assertNotIn("A1", token)
+        a.check_consumer_checkpoint(token, "2026-10-15")
+        with self.assertRaises(ContractError):
+            a.check_consumer_checkpoint(token, "2026-10-16")
+        a.cursors["A1"] = 5
+        with self.assertRaises(ContractError):
+            a.check_consumer_checkpoint(token, "2026-10-15")
+
+
     def adapter(self):
         return TodayAdapter("2026-10-15", {"A1", "A2"})
 
@@ -212,16 +257,17 @@ class PttOfflineContractTest(unittest.TestCase):
             {"authority": "synthetic-accepted-fixture", "status": "final-complete", "day": "2026-10-15", "aids": ["A1"], "caller_complete": True},
         ]
         for manifest in bad:
-            self.assertEqual(history_completeness(manifest, expected_day="2026-10-15", expected_aids={"A1", "A2"}), "partial")
+            self.assertEqual(history_completeness(manifest, verify_authority=self.fixture_authority, expected_day="2026-10-15", expected_aids={"A1", "A2"}), "partial")
         accepted = {
             "authority": "synthetic-accepted-fixture",
             "status": "final-complete",
             "day": "2026-10-15",
             "aids": ["#A1", "A2"],
         }
-        self.assertEqual(history_completeness(accepted, expected_day="2026-10-15", expected_aids={"A1", "A2"}), "complete")
-        self.assertEqual(history_completeness(accepted, expected_day="2026-10-16", expected_aids={"A1", "A2"}), "partial")
-        self.assertEqual(history_completeness(accepted, expected_day="2026-10-15", expected_aids={"A1"}), "partial")
+        self.assertEqual(history_completeness(accepted, verify_authority=self.fixture_authority, expected_day="2026-10-15", expected_aids={"A1", "A2"}), "complete")
+        self.assertEqual(history_completeness(accepted, expected_day="2026-10-15", expected_aids={"A1", "A2"}), "partial")
+        self.assertEqual(history_completeness(accepted, verify_authority=self.fixture_authority, expected_day="2026-10-16", expected_aids={"A1", "A2"}), "partial")
+        self.assertEqual(history_completeness(accepted, verify_authority=self.fixture_authority, expected_day="2026-10-15", expected_aids={"A1"}), "partial")
 
 
 if __name__ == "__main__":
