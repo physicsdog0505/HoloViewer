@@ -307,7 +307,7 @@ immerse?.addEventListener('click',async()=>{
 document.addEventListener('fullscreenchange',()=>{
  // Escape exits immersive if fullscreen was actually active. CSS-only immersive
  // remains valid when the browser refuses requestFullscreen().
- if(!document.fullscreenElement&&immersiveEnabled&&document.visibilityState==='visible'){
+ if(!document.fullscreenElement&&immersiveEnabled){
   applyImmersiveState(false);
  }else if(document.fullscreenElement){
   applyImmersiveState(true);
