@@ -45,7 +45,7 @@ export async function applyTodayMigration(db,{sql,migrationId=TODAY_MIGRATION_ID
   }
   const actions=statements.map(statement=>db.prepare(statement));
   actions.push(db.prepare(`INSERT INTO public_today_schema_migrations(migration_id,checksum,applied_at)
-    VALUES (?,?,?) ON CONFLICT(migration_id) DO NOTHING`).bind(migrationId,checksum,timestamp));
+    VALUES (?,?,?)`).bind(migrationId,checksum,timestamp));
   await db.batch(actions);
   // Re-read is mandatory: a racing applier with another checksum must fail.
   const recorded=await db.prepare('SELECT checksum FROM public_today_schema_migrations WHERE migration_id=?')
