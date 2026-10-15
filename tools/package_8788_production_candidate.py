@@ -45,6 +45,11 @@ AUTHORIZED_UI_OVERRIDES = {
         "old": "    collab_candidates = detect_collab_candidates([*live, *upcoming, *ended])\n",
         "new": "    try:\n        collab_candidates = detect_collab_candidates([*live, *upcoming, *ended])\n    except (ValueError, TypeError, OverflowError):\n        collab_candidates = ()\n",
     },
+    "member_accent_hover_background": {
+        "path": "client_home.py",
+        "old": "  background:#fff;\n  box-shadow:",
+        "new": "  background:color-mix(in srgb,var(--member-accent,#7aa8bb) 7%,white);\n  box-shadow:",
+    },
 }
 
 def apply_authorized_ui_overrides(output: Path) -> dict[str, str]:
