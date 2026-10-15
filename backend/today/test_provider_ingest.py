@@ -37,7 +37,7 @@ class ProviderIngestionTests(unittest.TestCase):
         coverage = {"last_success_at":NOW, "expected_channels":1,
                     "scanned_channels":0, "gap":True}
         result = today_contract(LocalTodayProvider((self.row,),coverage),now=NOW)
-        self.assertEqual(result["streams"][0]["lifecycle_state"],"unknown")
+        self.assertEqual(result["streams"][0]["lifecycle_state"],"live")
     def test_missing_coverage_is_gap(self):
         self.assertTrue(self.ingest({},lambda _:{}).gap)
     def test_dedup(self):

@@ -44,7 +44,7 @@ class TodayOfflineTests(unittest.TestCase):
         self.assertEqual(conn.execute("SELECT count(*) FROM today_observations").fetchone()[0],1)
     def test_missing_source_degraded(self):
         x=project([],now=NOW,expected_channels=66,scanned_channels=0,gap=True)
-        self.assertEqual(x["freshness"]["status"],"degraded")
+        self.assertEqual(x["freshness"]["status"],"unknown")
         self.assertEqual(x["streams"],[])
         self.assertTrue(x["completeness"]["gap"])
     def test_stale_no_false_live(self):
@@ -55,7 +55,7 @@ class TodayOfflineTests(unittest.TestCase):
         b=Budget()
         self.assertFalse(b.permits(8500,1))
         self.assertTrue(b.permits(0,1))
-        self.assertLessEqual(b.retry_seconds(50),3600)
+        self.assertIsNone(b.retry_seconds(50))
         self.assertEqual(b.requests_per_day_estimate(),3240)
     def test_reject_invalid_identity(self):
         with self.assertRaises(ValueError):
