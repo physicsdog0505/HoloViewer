@@ -10,6 +10,18 @@ const DAY=/^\d{4}-\d{2}-\d{2}$/;
 const PUSH=/^ptt:v1:[0-9a-f]{64}$/;
 const AID=/^[A-Za-z0-9._-]{1,32}$/;
 const UTC=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+const PTT_ALPHABET='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_';
+function aidMatchesUrl(aid,url) {
+  const m=/^https:\/\/www\.ptt\.cc\/bbs\/C_Chat\/M\.(\d{9,10})\.A\.([0-9A-Fa-f]{3})\.html$/.exec(url);
+  if(!m || typeof aid!=='string')return false;
+  const epoch=Number(m[1]);
+  if(!Number.isSafeInteger(epoch) || epoch<=0 || epoch>=2**31)return false;
+  const packed=(BigInt(epoch)<<12n)|BigInt(parseInt(m[2],16));
+  let computed='';
+  for(let position=7;position>=0;position--)
+    computed+=PTT_ALPHABET[Number((packed>>BigInt(position*6))&63n)];
+  return aid.replace(/^#/,'')===computed;
+}
 const URL=/^https:\/\/www\.ptt\.cc\/bbs\/C_Chat\/M\.\d+\.A\.[0-9a-fA-F]{3}\.html$/;
 
 export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
@@ -24,7 +36,7 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
   const keys=new Set();
   for(const row of batch.rows) {
     requireTrue(row && PUSH.test(row.push_id) && AID.test(row.aid) && URL.test(row.source_url) &&
-      row.day===batch.day && Number.isSafeInteger(row.source_line) && row.source_line>0 &&
+      row.day===batch.day && aidMatchesUrl(row.aid,row.source_url) && Number.isSafeInteger(row.source_line) && row.source_line>0 &&
       typeof row.author==='string' && typeof row.content==='string' &&
       typeof row.source_record_key==='string' && row.source_record_key.length>0 &&
       typeof row.occurred_at==='string' && UTC.test(row.occurred_at) &&
