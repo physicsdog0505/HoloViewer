@@ -4,7 +4,7 @@ import importlib
 import sys
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 from platform_adapter.public_api import DEFAULT_API
 from platform_adapter.worker_transport import TransportResponse
@@ -48,6 +48,7 @@ class EntryPointBindingTest(unittest.TestCase):
             self.assertEqual((target,method),("/api/home","GET"))
             return TransportResponse(200,(("Content-Type","application/json"),),b"{}")
         with (patch.object(self.entry, "bind_public_today", side_effect=bind),
+              patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}),
               patch.object(self.entry, "dispatch_accepted_get", side_effect=dispatch)):
             response = asyncio.run(self.entry.Default().fetch(FakeRequest()))
             self.assertEqual(response.status,200)
