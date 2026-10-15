@@ -9,8 +9,12 @@ test('valid checked_at within TTL is fresh', () => {
   assert.equal(publicPttFreshness('2026-10-15T07:59:50Z', now), 'fresh');
 });
 
-test('old, malformed, missing, future timestamps fail closed', () => {
-  for (const timestamp of ['2026-10-15T07:00:00Z', 'not-a-date', null,
+test('known old timestamp is stale', () => {
+  assert.equal(publicPttFreshness('2026-10-15T07:00:00Z', now), 'stale');
+});
+
+test('malformed, missing, future timestamps fail closed', () => {
+  for (const timestamp of ['not-a-date', null,
                            '2026-10-15T08:00:01Z']) {
     assert.equal(publicPttFreshness(timestamp, now), 'unknown');
   }
