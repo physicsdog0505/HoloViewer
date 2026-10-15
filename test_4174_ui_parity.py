@@ -118,7 +118,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.ptt-reader{border:1px solid var(--line)', css)
         self.assertIn('ptt-focus-mode', css)
         self.assertIn('document.body.classList.toggle(\'ptt-focus-mode\'', js)
-        self.assertIn('目前尚未接通經過驗證的公開 PTT 專串資料。', js)
+        self.assertIn("/v1/ptt/today?day=", js)
+        self.assertIn("public-consumer-v1", js)
+        self.assertIn("pttLastGoodCount", js)
+        self.assertIn("10 秒後重試", js)
         self.assertNotIn("message('ptt-status'", js)
 
     def test_watchalong_builder_matches_4174_source_and_mode_controls(self):
@@ -151,7 +154,8 @@ class ParityContract(unittest.TestCase):
         for name in ('三期生告知','重大告知','初配信','周年','新衣裝','生日','3D LIVE','大型聯動','歌回','新造型'):
             self.assertIn(name,js)
         self.assertIn('renderHomeHighlights(rows)',js)
-        self.assertNotIn('setInterval(',js)
+        self.assertIn("const homePollTimer=setInterval(",js)
+        self.assertIn("},30000);",js)
 
     def test_stream_id_validator_keeps_ascii_ids(self):
         js=(ROOT/"site/assets/app.js").read_text(encoding="utf-8")
@@ -261,7 +265,9 @@ class ParityContract(unittest.TestCase):
         self.assertIn("iframe.contentWindow===event.source",js)
         self.assertIn("linkedEchoUntil.set(iframe",js)
         self.assertIn("registerViewerPlayer(player)",js)
-        self.assertNotIn("setInterval(",js)
+        start=js.index("function linkedPlayPause(event)")
+        end=js.index("window.addEventListener('message'",start)
+        self.assertNotIn("setInterval(",js[start:end])
 
     def test_session_url_encodes_and_restores_explicit_stream_ids(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
@@ -269,7 +275,9 @@ class ParityContract(unittest.TestCase):
         self.assertIn("...viewing.ids.map(id=>['stream',id])",js)
         self.assertIn("params.getAll('stream')",js)
         self.assertIn("const recovered=urls.length?ids:",js)
-        self.assertIn("route(location.hash.substring(1).split('?')[0]||'home')",js)
+        self.assertIn("const hashRoute=location.hash.substring(1).split('?')[0];",js)
+        self.assertIn("const pathRoute=location.pathname==='/history'?'history':",js)
+        self.assertIn("route(hashRoute||pathRoute||'home')",js)
 
     def test_single_player_ptt_keeps_positive_aspect_ratio_contract(self):
         css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
