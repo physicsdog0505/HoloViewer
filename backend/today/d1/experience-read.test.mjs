@@ -83,3 +83,17 @@ test('experience routes reject invalid day/event ids and remain GET-only',async(
  assert.equal((await handleExperienceRead(new Request('https://api.example/v1/collab/live',{method:'POST'}),env)).status,405);
  d.close();
 });
+
+test('Watchalong recent uses limit+1 and reports has_more without over-returning',async()=>{
+ const d=db(),id1='watch:'+'a'.repeat(20),id2='watch:'+'b'.repeat(20);
+ for(const [id,day,stamp,vid] of [[id1,'2026-10-15','2026-10-15T10:00:00+08:00','aaaaaaaaaaa'],[id2,'2026-10-14','2026-10-14T10:00:00+08:00','bbbbbbbbbbb']]){
+  d.raw.prepare("INSERT INTO public_watchalong_events VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(id,'M.1','title','https://www.ptt.cc/bbs/C_Chat/M.1.A.html',stamp,day,'20:00','同時視聴',0,'2026-10-15T12:00:00Z','ptt_watchalong_parser');
+  d.raw.prepare('INSERT INTO public_watchalong_streams VALUES(?,?,?,?)').run(id,0,'Host',vid);
+ }
+ const r=await handleExperienceRead(new Request('https://api.example/v1/watchalong/recent?days=30&limit=1'),{DB:d,WATCHALONG_EVENTS_ENABLED:'true'},new Date('2026-10-15T12:00:00Z'));
+ const body=await r.json();
+ assert.equal(body.limit,1);
+ assert.equal(body.has_more,true);
+ assert.equal(body.events.length,1);
+ d.close();
+});
