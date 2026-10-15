@@ -45,7 +45,7 @@ export function createViewingRouteController(playerHost) {
     },
     navigate(route) {
       const visible = route === "custom-session";
-      if (!visible) playerHost.activate(false);
+      playerHost.activate(visible);
       currentRoute = route;
       return { route: currentRoute, playersMounted: playerHost.ids() };
     },
