@@ -35,6 +35,11 @@ AUTHORIZED_UI_OVERRIDES = {
         "old": "item.hidden=filter!=='all'&&item.dataset.group!==filter;",
         "new": "item.hidden=filter!=='all'&&item.dataset.group!==filter&&!(filter==='hololive'&&(item.dataset.group==='unknown'||item.dataset.group==='other'));",
     },
+    "all_home_states_allow_explicit_multiview_selection": {
+        "path": "client_home.py",
+        "old": 'selectable_states = {"live", "waiting", "upcoming", "ended"}',
+        "new": 'selectable_states = {"live", "waiting", "upcoming", "ended", "unknown", "stale"}',
+    },
 }
 
 def apply_authorized_ui_overrides(output: Path) -> dict[str, str]:
