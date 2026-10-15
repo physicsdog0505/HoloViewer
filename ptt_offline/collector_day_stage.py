@@ -12,9 +12,18 @@ from .collector_source_preview import verify_schema
 from .public_today_contract import ContractError, normalize_public_aid
 from .publisher_cli import coverage_receipt
 from .url_epoch_authority import reconstruct_events
+from .ptt_aid_identity import verify_aid_url
 
 MAX_SOURCE_ROWS = 50000
 MAX_STAGE_ROWS = 5
+
+
+def stage_verified_day(db, *, day: str, aid: str, limit: int=5,
+                       after_source_line: int=0) -> dict:
+    """Production-candidate entry: identity is calculated, not injected."""
+    return stage_selected_day(db,day=day,aid=aid,limit=limit,
+        after_source_line=after_source_line,identity_verifier=verify_aid_url)
+
 
 
 def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
