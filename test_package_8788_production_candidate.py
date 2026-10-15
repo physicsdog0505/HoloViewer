@@ -26,6 +26,7 @@ class ProductionPackageTests(unittest.TestCase):
             self.assertEqual(config["main"], "entry.py")
             self.assertIn("python_workers", config["compatibility_flags"])
             self.assertEqual(config["assets"]["binding"], "ASSETS")
+            self.assertEqual(config["services"], [{"binding": "PUBLIC_API", "service": "holoviewer-public-api"}])
             self.assertFalse(config["assets"]["run_worker_first"])
             self.assertNotIn("d1_databases", config)
             self.assertFalse(receipt["worker_deployed"])
