@@ -9,6 +9,28 @@ Existing Hololive-PTT-Viewer Collector → canonical owner SQLite → reviewed
 Never create another D1, Collector, Worker, snapshot backend or staging writer.
 Old `holoviewer-ptt-relay` and `holoviewer-ptt-live-v2` are NOT targets.
 
+## Immutable migration provenance condition — frozen v1
+
+The reviewed **version 1** SQL artifact is frozen under
+`ptt_offline/d1_migrations/manifest.json`:
+
+- SHA-256: `70f4a2da051b107421c443fb3bf26dda55d3c46bf4b3a66823bb84d3f19ac14f`
+- UTF-8 bytes: `2198`
+- Git blob SHA: `7466163e331b05c2b12ca559affbf2386f49460c`
+
+`python3 -B -m ptt_offline.migration_preflight` compares the actual file
+bytes/length to that immutable manifest and **raises on mismatch**. No
+migration apply command may execute if this check fails. The owner must
+approve this exact file and checksum in the runtime receipt before applying
+it to `holoviewer-public-v1`.
+
+**Never overwrite v1 or silently re-run modified v1 SQL.** Any later schema
+change requires a new forward migration `0002_*.sql`, manifest entry,
+new exact-HEAD review and production authorization. The existing D1
+`public_ptt_schema_migrations` ledger records the version/description only;
+the immutable receipt+manifest is therefore required provenance, not
+a claim of in-DB checksum verification.
+
 ## A. Freeze migration artifact and prove compatibility (offline only)
 
 From an exact PR #55 checkout:
