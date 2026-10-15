@@ -81,7 +81,8 @@ def ingest_batches(*, roster, pages, metadata, observed_at, budget=None,
                 continue
             try:
                 normalized = normalize_video(raw, observed_at=observed_at,
-                    approved_channels=roster.channels, reference_now=reference_now)
+                    approved_channels=roster.channels, reference_now=reference_now,
+                    roster_version=roster.version)
             except (ValueError, TypeError):
                 gap = True
                 errors.append((ident, "bad_metadata"))

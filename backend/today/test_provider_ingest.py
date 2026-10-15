@@ -43,6 +43,7 @@ class ProviderIngestionTests(unittest.TestCase):
     def test_dedup(self):
         result = self.ingest({C:[[V,V],[V]]},lambda ids:{V:video()})
         self.assertEqual(len(result.records),1)
+        self.assertEqual(result.records[0]["roster_version"],"fixture-v1")
         self.assertEqual(result.quota_units,1)
     def test_unapproved_publisher_quarantine(self):
         result=self.ingest({C:[[V]]},lambda ids:{V:video(publisher="UC"+"B"*22)})
