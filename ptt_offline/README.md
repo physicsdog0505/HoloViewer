@@ -41,3 +41,33 @@ Changes on the same isolated Draft branch:
 - Added five negative regressions: mixed-valid/invalid snapshot batch, mixed-valid/invalid relay page, malformed day keys, regressive clock and foreign-day/expired token.
 
 This does not implement a real `LocalPttProvider` or `CloudflarePttProvider`, nor authenticate a durable production resume token. Those remain separately reviewed integration work. If exact-HEAD Python execution is unavailable, report tests as **NOT RUN**, never recycle a prior HEAD's receipt.
+
+## #48 History pagination correction (Review #6187418898)
+
+History `read_history(day, page_request)` now advances through a real day-sorted,
+canonical-deduplicated snapshot using an **opaque next-page continuation token**.
+`PttHistoryReadModel.checkpoint` is the snapshot identity, while
+`page.next_checkpoint` is a separate page continuation; neither exposes offsets,
+cursor integers, or AID-specific progress. Resume verifies the exact selected
+Taipei day and a deterministic snapshot generation. Unknown/stale/cross-day
+tokens fail closed. Terminal pages return `has_more=false` and
+`next_checkpoint=null`. New tests cover 1/2/3 pages, distinct IDs/no duplicates,
+terminal behavior, invalid limits, unknown token, cross-day reuse and
+snapshot mutation invalidation.
+
+Also committed independent regression modules for the previous #45 integration
+boundary: all-AID initialization atomicity, mixed-success poll stale/partial,
+consumer model shape, and snapshot-only token invalidation.
+
+The token registry is intentionally in-memory for the authorized offline slice.
+It is NOT signed/restart-persistent/cloud-ready. Provider restart recovery requires
+a separately accepted production design and is not claimed here.
+
+Verification command from repository root:
+
+```sh
+python3 -B -m unittest -v ptt_offline.test_public_today_contract ptt_offline.test_consumer_boundary ptt_offline.test_consumer_paging
+```
+
+GitHub Actions: NOT RUN if no exact-head run exists. Runtime verification must
+not reuse receipts from older commits.
