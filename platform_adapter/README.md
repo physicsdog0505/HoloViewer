@@ -4,7 +4,7 @@ Checkpoint 3 was independently accepted at `0e1d2918d27b190312109b2f9d9e2fdb7cf5
 
 Canonical data source: existing `holoviewer-public-api` with Worker binding `DB` to `holoviewer-public-v1`, as frozen by Issue #45 comment 6188242451. No local DB replication, new D1, staging service, or additional API Worker is created here.
 
-The existing `scripts/start_8788_full_4174.sh` remains offline/isolated by default. To opt into canonical read-only provider mode for integration, set `HOLOVIEWER_PUBLIC_API_BASE=https://holoviewer-public-api.singlebagel.workers.dev` before launching that same script. The runner injects only accepted data-entry functions, not a second HTML/frontend implementation.
+The adapter permits only the exact canonical Public API origin for production. An alternate URL is denied by default; explicit `_test_only_allow_alternate_origin=True` exists solely for direct mock transport tests and is not exposed by production startup. The existing `scripts/start_8788_full_4174.sh` remains offline/isolated by default. To opt into canonical read-only provider mode for integration, set `HOLOVIEWER_PUBLIC_API_BASE=https://holoviewer-public-api.singlebagel.workers.dev` before launching that same script. The runner injects only accepted data-entry functions, not a second HTML/frontend implementation.
 
 Current read-only bindings:
 - `client_app.load_home_streams` and `client_home.load_home_streams` obtain Today catalog via GET `/v1/catalog/today`.
