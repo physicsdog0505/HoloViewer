@@ -222,3 +222,73 @@ test('new verified profile avatar is opt-in and legacy API remains readable befo
  assert.equal(unchanged.streams[0].avatar_url,null);
  d.close();
 });
+
+test('4174 Home envelope degrades malformed optional fields per-row instead of failing whole response',async()=>{
+ const d=db();
+ await writeEvidence(d,fixture());
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const corrupt={
+  ...d,
+  prepare(sql){
+   const stmt=d.prepare(sql);
+   if(!sql.includes('SELECT public_today_canonical.*')) return stmt;
+   return {
+    bind(...args){
+     const bound=stmt.bind(...args);
+     return {
+      async all(){
+       const out=await bound.all();
+       if(out.results?.[0]) Object.assign(out.results[0],{
+        title:null,channel_name:null,channel_group:'invalid',
+        scheduled_start:'not-a-time',actual_start:'not-a-time',
+        source_label:null,trusted_channel_avatar:'javascript:bad'
+       });
+       return out;
+      }
+     };
+    }
+   };
+  }
+ };
+ const result=await readToday(corrupt,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z')});
+ assert.equal(result.streams.length,1);
+ assert.deepEqual({
+  video_id:result.streams[0].video_id,
+  title:result.streams[0].title,
+  channel_id:result.streams[0].channel_id,
+  channel_name:result.streams[0].channel_name,
+  group:result.streams[0].group,
+  start_at:result.streams[0].start_at,
+  avatar_url:result.streams[0].avatar_url,
+  source_label:result.streams[0].source_label
+ },{video_id:V,title:'',channel_id:C,channel_name:'',group:'other',start_at:null,avatar_url:null,source_label:''});
+ d.close();
+});
+
+test('4174 Home drops a row with corrupt primary identity but preserves valid siblings',async()=>{
+ const d=db();
+ await writeEvidence(d,fixture());
+ await writeEvidence(d,fixture({id:'zzzzzzzzzzz'}));
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const corrupt={
+  ...d,
+  prepare(sql){
+   const stmt=d.prepare(sql);
+   if(!sql.includes('SELECT public_today_canonical.*')) return stmt;
+   return {
+    bind(...args){
+     const bound=stmt.bind(...args);
+     return {async all(){
+      const out=await bound.all();
+      if(out.results?.[0]) out.results[0].video_id='bad';
+      return out;
+     }};
+    }
+   };
+  }
+ };
+ const result=await readToday(corrupt,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z')});
+ assert.equal(result.streams.length,1);
+ assert.match(result.streams[0].video_id,/^[A-Za-z0-9_-]{11}$/);
+ d.close();
+});
