@@ -65,41 +65,39 @@ test('concurrent migration checksum loser rolls back all extra schema',async()=>
  const db=memoryD1();
  const accepted="CREATE TABLE IF NOT EXISTS claimed_table (id INTEGER PRIMARY KEY);";
  const unaccepted="CREATE TABLE IF NOT EXISTS unaccepted_extra_table (id INTEGER PRIMARY KEY);";
- // Force both appliers to observe absent ledger, then let the accepted
- // migration win before the second transactional batch begins.
- const startBatch=db.batch.bind(db);
+ const acceptedChecksum=await sha256Hex(accepted);
+
+ // Reproduce the D1 race deterministically: this contender observes an empty
+ // ledger, then a competing transaction commits before its batch begins.
  const originalPrepare=db.prepare.bind(db);
- let emptyReads=0;
+ let forcedAbsent=false;
  db.prepare=(sql)=>{
    const result=originalPrepare(sql);
-   if (sql.includes('SELECT checksum FROM public_today_schema_migrations')) {
+   if (!forcedAbsent && sql.includes('SELECT checksum FROM public_today_schema_migrations')) {
      return {bind(...values){
        const bound=result.bind(...values);
-       return {...bound,first:async()=>{
-         if(emptyReads++<2)return null;
-         return bound.first();
-       }};
+       return {...bound,first:async()=>{forcedAbsent=true;return null}};
      }};
    }
    return result;
  };
- let releaseSecond;
- const firstCommitted=new Promise(resolve=>{releaseSecond=resolve});
- let batches=0;
+
+ const startBatch=db.batch.bind(db);
+ let winnerInjected=false;
  db.batch=async actions=>{
-   const index=++batches;
-   if(index===2)await firstCommitted;
-   try{return await startBatch(actions)}
-   finally {if(index===1)releaseSecond()}
+   if(!winnerInjected){
+     winnerInjected=true;
+     db.raw.exec('CREATE TABLE IF NOT EXISTS claimed_table (id INTEGER PRIMARY KEY)');
+     db.raw.prepare(`INSERT INTO public_today_schema_migrations(migration_id,checksum,applied_at)
+       VALUES (?,?,?)`).run('0002_today_canonical',acceptedChecksum,'2026-10-15T00:00:00Z');
+   }
+   return startBatch(actions);
  };
- const outcomes=await Promise.allSettled([
-   applyTodayMigration(db,{sql:accepted}),
-   applyTodayMigration(db,{sql:unaccepted})
- ]);
- assert.equal(outcomes.filter(x=>x.status==='fulfilled').length,1);
- assert.equal(outcomes.filter(x=>x.status==='rejected').length,1);
+
+ await assert.rejects(()=>applyTodayMigration(db,{sql:unaccepted}),/UNIQUE|constraint/i);
  assert.equal(db.raw.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name='claimed_table'").get().n,1);
  assert.equal(db.raw.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name='unaccepted_extra_table'").get().n,0);
- assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_today_schema_migrations').get().n,1);
+ const ledger=db.raw.prepare('SELECT checksum FROM public_today_schema_migrations').get();
+ assert.equal(ledger.checksum,acceptedChecksum);
  db.close();
 });
