@@ -9,6 +9,7 @@ const app=document.getElementById('app');
 const topStatus=document.getElementById('topStatus');
 const liveRail=document.getElementById('live-channel-rail');
 const liveList=document.getElementById('live-channel-list');
+const pageStyle=document.getElementById('pageStyle');
 let catalogCache=null;
 
 const routePaths={home:'/',history:'/history',watchalong:'/watchalong',custom:'/custom-view',collab:'/collab',ptt:'/ptt-today'};
@@ -119,15 +120,10 @@ function wireYoutubeLinks(root=app){
   el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();window.open(el.dataset.youtubeHref,'_blank','noopener,noreferrer');}});
  });
 }
-function wirePathLinks(root=app){
- root.querySelectorAll('a[href^="/"]').forEach(a=>{
-  if(a.target==='_blank')return;
-  a.addEventListener('click',e=>{if(e.defaultPrevented||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.pushState(null,'',a.getAttribute('href'));renderRoute();});
- });
-}
+function setPageStyle(name){pageStyle.href='/assets/4174-'+name+'-a144bb3.css';}
 
 async function renderHome(){
- cleanupRoute();setActive('home');document.body.classList.add('home-wide');topStatus.textContent=englishDate(taipeiDay());
+ cleanupRoute();setActive('home');setPageStyle('home');document.body.classList.add('home-wide');topStatus.textContent=englishDate(taipeiDay());
  app.innerHTML='<div id="homeDynamic"><div class="page-head"><div><h1>今日直播</h1></div></div><p class="empty-note">載入中…</p></div>';
  try{
   const rows=await loadCatalog();renderRail(rows);
@@ -144,7 +140,7 @@ async function renderHome(){
    +'<a class="feature-card" href="/ptt-today"><div><span class="eyebrow">PTT</span><strong>PTT 今日專串</strong></div><span>只留下今天的 PTT 推文時間軸。</span></a>'
    +'</div></section>'+section('已結束',buckets.ended,'今天已完成的直播存檔。')+'</div>';
   app.querySelectorAll('.stream-filter-button').forEach(b=>b.onclick=()=>{const f=b.dataset.filter;app.querySelectorAll('.stream-filter-button').forEach(x=>x.classList.toggle('active',x===b));app.querySelectorAll('.stream-card').forEach(c=>c.hidden=f!=='all'&&c.dataset.group!==f);});
-  wireYoutubeLinks();wirePathLinks();
+  wireYoutubeLinks();
  }catch(e){app.innerHTML='<div class="page-head"><div><h1>今日直播</h1></div></div><p class="form-error">'+escapeHtml(e.message)+'</p>';}
 }
 
@@ -157,7 +153,7 @@ function customPicker(rows){
  }).join('')+'</div>';
 }
 async function renderCustom(){
- cleanupRoute();setActive('custom');
+ cleanupRoute();setActive('custom');setPageStyle('custom');
  app.innerHTML='<div class="page-head"><div><h1>自訂觀看</h1><p>自己挑任意直播組合，再交給系統排版。</p></div></div><p class="empty-note">載入中…</p>';
  try{
   const rows=await loadCatalog();renderRail(rows);
@@ -173,7 +169,7 @@ async function renderCustom(){
 }
 
 async function renderSession(){
- cleanupRoute();setActive('custom');
+ cleanupRoute();setActive('custom');setPageStyle('custom');
  const q=new URLSearchParams(location.search);
  const ids=[...new Set(q.getAll('stream').map(videoId).filter(Boolean))];
  if(!ids.length){history.replaceState(null,'','/custom-view');return renderCustom();}
@@ -193,29 +189,29 @@ async function renderSession(){
 }
 
 async function renderHistory(){
- cleanupRoute();setActive('history');
+ cleanupRoute();setActive('history');setPageStyle('home');
  const today=taipeiDay(),latest=shiftDay(today,-1),earliest=shiftDay(today,-30);
  const q=new URLSearchParams(location.search);let day=q.get('date')||latest;if(day<earliest||day>latest)day=latest;
  topStatus.textContent=englishDate(day);
  app.innerHTML='<div class="page-head"><div><h1>歷史直播</h1><p>依日期查看已完成的直播。</p></div></div><form class="history-picker" id="historyForm"><label>日期<input id="historyDate" type="date" min="'+earliest+'" max="'+latest+'" value="'+day+'"></label><button class="primary-action" type="submit">查看</button></form><div id="historyResult"><p class="empty-note">載入中…</p></div>';
- document.getElementById('historyForm').onsubmit=e=>{e.preventDefault();history.pushState(null,'','/history?date='+encodeURIComponent(document.getElementById('historyDate').value));renderHistory();};
+ document.getElementById('historyForm').onsubmit=e=>{e.preventDefault();location.href='/history?date='+encodeURIComponent(document.getElementById('historyDate').value);};
  try{
   const data=await api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset=0');
   const rows=Array.isArray(data.items)?data.items:[];
   document.getElementById('historyResult').innerHTML='<section class="section"><div class="section-head"><div><h2>'+day.replaceAll('-','/')+'</h2></div></div>'+(rows.length?'<div class="client-grid">'+rows.map(streamCard).join('')+'</div>':'<p class="empty-note">這一天沒有可顯示的直播。</p>')+'</section>';
-  wireYoutubeLinks();wirePathLinks();
+  wireYoutubeLinks();
  }catch(e){document.getElementById('historyResult').innerHTML='<p class="form-error">'+escapeHtml(e.message)+'</p>';}
 }
 function renderWatchalong(){
- cleanupRoute();setActive('watchalong');document.body.classList.add('watchalong-wide');
+ cleanupRoute();setActive('watchalong');setPageStyle('watchalong');document.body.classList.add('watchalong-wide');
  app.innerHTML='<div class="page-head"><div><h1>同時視聽</h1></div></div><section class="section"><div class="tool-card manual-shell"><span class="eyebrow">4174 FRONTEND</span><h2>同時視聽</h2><p class="empty-note">4174 Watchalong 前端正在同一條 clean transplant 線搬移；不會回退到舊 Public controller。</p></div></section>';
 }
 function renderCollab(){
- cleanupRoute();setActive('collab');
+ cleanupRoute();setActive('collab');setPageStyle('home');
  app.innerHTML='<div class="page-head"><div><h1>多人連動</h1><p>只顯示後端已驗證的連動事件。</p></div></div><p class="empty-note">Cloudflare Public API 目前尚未提供已驗證多人連動契約，因此不製造假資料。</p>';
 }
 function renderPtt(){
- cleanupRoute();setActive('ptt');
+ cleanupRoute();setActive('ptt');setPageStyle('ptt');
  app.innerHTML='<div class="page-head"><div><h1>PTT 今日專串</h1><p>'+taipeiDay().replaceAll('-','/')+' · 純 PTT 閱讀</p></div></div><p class="empty-note">Cloudflare Public API 的 PTT Reader 契約尚未接入；8788 不會使用 Python／SQLite fallback。</p>';
 }
 function routeKey(){
@@ -238,8 +234,6 @@ function renderRoute(){
  if(key==='ptt')return renderPtt();
  return renderHome();
 }
-document.querySelectorAll('[data-route]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();history.pushState(null,'',routePaths[a.dataset.route]||'/');renderRoute();}));
 document.getElementById('mobileNavButton').onclick=()=>{const n=document.getElementById('mobileNav');const opening=n.hidden;n.hidden=!opening;document.getElementById('mobileNavButton').setAttribute('aria-expanded',String(opening));};
-window.addEventListener('popstate',renderRoute);
 renderRoute();
 })();
