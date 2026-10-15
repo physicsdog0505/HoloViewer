@@ -8,7 +8,7 @@ The adapter permits only the exact canonical Public API origin for production. A
 
 Current read-only bindings:
 - `client_app.load_home_streams` and `client_home.load_home_streams` obtain Today catalog via GET `/v1/catalog/today`.
-- `client_app.load_history_day` obtains GET `/v1/history?day=...&limit=50&offset=...`.
+- `client_app.load_history_day` obtains **legacy-compatible** GET `/v1/history?day=...&limit=50&offset=...`; per #45 this is not #47/#48 canonical History.
 - `PublicAPI.read_video` is available through GET `/v1/catalog/videos/:id` but is **not yet wired** to the accepted PTT/video player resolver; do not misrepresent it as complete.
 - PTT Today/History, Watchalong, Collab, player lifecycle and CSS are **untouched** while their verified consumer transport is finalized by #47/#48/#45.
 
@@ -70,8 +70,10 @@ Only `/`, `/api/home`, and `/history` are in the first proof scope. The canonica
 
 Issue #45 comment `6190442416` and #68 comment `6190448478` assign the existing `holoviewer-public-api` backend shell to #47, the PTT mount to #48, and the accepted Python/Public consumer to #68. **This directory does not implement or reconstruct any backend API router.**
 
-- `test_canonical_consumer_integration.py` uses an injected asynchronous, read-only router-response stub matching the published #47 `public-consumer-v1` envelope. It drives the real accepted `client_home.HomeStream` and the bound History reader, proving fresh LIVE, preserved waiting, stale fail-closed, canonical Taipei timestamp labels and valid History page 21. The stub is not represented as the actual #47 router or D1 implementation.
+- `test_canonical_consumer_integration.py` uses an injected asynchronous, read-only router-response stub matching the published #47 `public-consumer-v1` envelope. It drives real accepted `client_home.HomeStream` objects for **canonical Today** and an injected **legacy-compatible History** consumer response for page 21. This proves fresh LIVE, preserved waiting, stale fail-closed and Taipei timestamp labels. It does not prove a canonical History D1 projection. The stub is not represented as the actual #47 router or D1 implementation.
 - `ptt_consumer_contract.py` recognizes the published #48 `PttTodayReadModel`/`PttHistoryReadModel` public envelope: `day`, `freshness`, `completeness.gap`, `checkpoint`, `pushes`, and opaque `page.next_checkpoint`. It refuses extra private cursor/origin fields, invalid days and malformed envelopes; no PTT semantics or browser renderer are copied.
 - `test_ptt_consumer_contract.py` covers public fields and negative/unavailable cases. These checks do **not** enable the accepted `/ptt-today` route: PTT stays explicit 503 until the reviewed #48 router/consumer binding is available.
 
 **Evidence categories:** mock-router consumer boundary is offline only; actual local Pyodide workerd, DOM/geometry parity and same-Worker static hash proof have already passed on exact previous heads. Production canonical data, D1 connectivity and Cloudflare deployment remain separately gated. Once #47/#48 publish the combined router, replace the stub with that exact reviewed handler under a mock D1-compatible environment and issue a new local end-to-end receipt before discussing live deploy.
+
+**Review correction (#68 comment 6191302264):** Today has a reviewed #47 canonical consumer envelope; `/v1/history` is solely the existing *legacy compatibility* API under #45. None of these synthetic History tests establish a #47/#48 canonical History read or end-to-end D1 integration. Keep separate evidence labels until the owning lane publishes a reviewed canonical History replacement. PTT #48 read envelopes are verified only at the consumer boundary and remain unmounted in the Public renderer.
