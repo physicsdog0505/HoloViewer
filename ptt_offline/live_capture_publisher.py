@@ -43,9 +43,9 @@ def recent_observed_utc(row):
         return None
     return None
 
-def inspect_latest_article(db,*,max_rows=100):
+def inspect_latest_article(db,*,max_rows=50000):
     verify_schema(db)
-    if type(max_rows) is not int or not 1<=max_rows<=100:
+    if type(max_rows) is not int or not 1<=max_rows<=50000:
         raise ContractError("bounded live source scan required")
     article=db.execute("""
         SELECT a.id,a.board,a.aid,a.url,MAX(p.collected_at) AS latest
@@ -61,9 +61,10 @@ def inspect_latest_article(db,*,max_rows=100):
     raw=db.execute("""
         SELECT source_line,kind,author,content,ptt_date,ptt_time,collected_at
         FROM pushes WHERE article_id=? ORDER BY source_line DESC LIMIT ?
-    """,(article_id,max_rows)).fetchall()
+    """,(article_id,max_rows+1)).fetchall()
+    truncated=len(raw)>max_rows
     ready=[];pending=[]
-    for record in reversed(raw):
+    for record in reversed(raw[:max_rows]):
         row=dict(zip(keys,record))
         observed=recent_observed_utc(row)
         if observed is None:
@@ -82,8 +83,8 @@ def inspect_latest_article(db,*,max_rows=100):
     return {"status":"READY","aid":receipt["aid"],"url":url,
             "source_identity":source_identity,"candidate_rows":ready,
             "pending_source_lines":pending,"checked_source_rows":len(raw),
-            "scan_truncated":len(raw)==max_rows,
-            "earliest_scanned_source_line":min((r[0] for r in raw),default=None)}
+            "scan_truncated":truncated,
+            "earliest_scanned_source_line":min((r[0] for r in raw[:max_rows]),default=None)}
 
 def content_digest(row):
     return sha256(json.dumps([row.get(k) for k in OUTPUT_KEYS if k!="time_proof"],
