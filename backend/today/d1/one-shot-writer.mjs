@@ -36,13 +36,39 @@ export function buildOneShotPlan(receipt,approvedChannels){
 export async function executeOneShot(plan,db,{explicitApproved=false}={}){
  if(!explicitApproved)throw Error('owner write approval required');
  if(!db||typeof db.prepare!=='function'||typeof db.batch!=='function')throw Error('reviewed injected D1 DB required');
- if(!plan||plan.records?.length>50||plan.records?.length<1)throw Error('invalid one-shot plan');
- // This is a local integration seam only; cannot be reached by Public HTTP GET.
- const changes=[];
- for(const r of plan.records)changes.push(await writeEvidence(db,r));
- await setCoverage(db,{roster_version:plan.roster_version,expected_channels:plan.expected_channels,
-  scanned_channels:plan.expected_channels,gap:true,last_success_at:plan.observed_at,
-  approved_channels:plan.approved_channels});
- return {mode:'ONE_SHOT_INJECTED_DB',written:changes.filter(c=>c.changed).length,
-  replayed:changes.filter(c=>c.reason==='replay').length,roster_version:plan.roster_version};
+ if(!plan||!Array.isArray(plan.records)||plan.records.length>50||plan.records.length<1)throw Error('invalid one-shot plan');
+ // Intentionally never promise cross-record atomicity: evidence rows can commit
+ // individually.  A gap=true coverage sentinel is installed BEFORE the first row,
+ // so failure at record N cannot advertise complete/fresh scan success.
+ const degraded={roster_version:plan.roster_version,expected_channels:plan.expected_channels,
+  scanned_channels:0,gap:true,last_success_at:null,approved_channels:plan.approved_channels};
+ await setCoverage(db,degraded);
+ let attempted=0,selected=0,replayed=0;
+ try{
+  for(const record of plan.records){
+   attempted++;
+   const result=await writeEvidence(db,record);
+   if(result.changed)selected++;
+   if(result.reason==='replay')replayed++;
+  }
+  // One-shot uploads+search never self-certifies complete roster coverage.
+  await setCoverage(db,{...degraded,scanned_channels:plan.expected_channels,
+   last_success_at:plan.observed_at});
+  const coverage=await db.prepare('SELECT roster_version,gap,scanned_channels,expected_channels FROM public_today_catalog_meta WHERE singleton=1').first();
+  if(!coverage||coverage.roster_version!==plan.roster_version||Number(coverage.gap)!==1||
+     Number(coverage.scanned_channels)!==plan.expected_channels)throw Error('coverage readback mismatch');
+  for(const record of plan.records){
+   const seen=await db.prepare('SELECT checksum FROM public_today_evidence WHERE video_id=? AND observed_at=? AND source_label=?')
+    .bind(record.video_id,record.observed_at,record.source_label).first();
+   if(!seen)throw Error('evidence readback incomplete');
+  }
+  return {mode:'ONE_SHOT_INJECTED_DB',status:'PARTIAL_COVERAGE',selected,replayed,
+   records_verified:plan.records.length,roster_version:plan.roster_version,gap:true};
+ }catch(err){
+  // If postcoverage verification fails, explicitly reinstate degraded coverage;
+  // if this too fails, operator must inspect remote records before any retry.
+  try{await setCoverage(db,degraded)}
+  catch{throw Error('PARTIAL WRITE; coverage reset unverified; STOP and inspect remote D1. '+err.message)}
+  throw Error('PARTIAL WRITE; coverage marked degraded; STOP and inspect remote D1. attempted='+attempted+' '+err.message);
+ }
 }
