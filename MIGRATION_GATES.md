@@ -7,81 +7,72 @@ Authoritative product source:
 - accepted local branch: `feat/4174-history-day-391`
 - vendored root: `vendor/4174-a144bb3/`
 
-## Current allowed work
+## Checkpoint status
 
-Only **Phase A + Phase B** are allowed on this branch right now.
+- Checkpoint 1 — SOURCE SNAPSHOT COMPLETE: PASS by independent #68 review
+- Checkpoint 2 — RUNTIME ISOLATED: IN PROGRESS
+- Checkpoint 3 — 4174 PARITY: BLOCKED
+- Checkpoint 4 — PLATFORM ADAPTER: BLOCKED
 
-### Phase A — complete source snapshot
+## Phase A/B — frozen source snapshot
 
-- Vendor only files justified by the pinned 4174 dependency graph.
-- Do not rewrite product behavior.
-- Keep DBs, caches, credentials, generated/runtime data, and owner-local artifacts out.
-- Required accepted roots:
-  - `client_app.py`
-  - `client_custom_view.py`
-  - `client_history.py`
-  - `client_home.py`
-  - `client_ptt_today.py`
-  - `client_ui_shell.py`
-  - `client_watchalong.py`
-  - `shared_viewing_core.py`
-- Required static/runtime assets include:
-  - `public/ptt_timeline.js`
-  - `public/ptt_player_adapter.js`
-  - `public/ptt_worker_adapter.js`
-  - `hololive_channels.prototype.json`
+The vendored product snapshot and provenance manifests remain immutable:
 
-### Phase B — provenance / anti-contamination
+- `provenance/4174-source-manifest.json`
+- `provenance/4174-source-module-index.json`
+- `provenance/4174-dependency-closure.json`
 
-Every vendored product file must be recorded in
-`provenance/4174-source-manifest.json` with:
+Product files may only come from pinned private 4174 `a144bb3...`.
 
-- relative path
-- source repository
-- source commit
-- source blob SHA
-- role
-
-Run:
-
-```sh
-python3 tools/verify_4174_snapshot.py
-```
-
-The verifier must fail closed when:
-
-- a product blob differs from pinned 4174;
-- a required local dependency is absent;
-- an unmanifested product file appears;
-- a required static path escapes the vendored snapshot;
-- old Public product files are present;
-- migration runs from either failed branch;
-- Phase C/E launcher/platform artifacts are introduced early.
-
-## Explicitly forbidden migration sources
-
-These branches are historical failed experiments only:
+Explicitly forbidden migration sources:
 
 - `dev/8788-parity`
 - `dev/8788-clean-transplant`
 
 No product HTML/CSS/JS/Python logic may be cherry-picked from them.
 
-## Blocked until later Review checkpoints
+## Phase C — clean local launcher / runtime isolation
 
-### Phase C — local 8788 launcher/runtime isolation
+This is the only implementation phase currently allowed.
 
-**Blocked.** Do not add the 8788 launcher yet.
+Required artifacts:
 
-### Phase D — runtime/UI parity
+- `scripts/start_8788_full_4174.sh`
+- `tools/run_4174_snapshot.py`
 
-**Blocked.** Do not claim visual/runtime parity from source equivalence.
+The launcher/runtime runner must:
 
-### Phase E — Cloudflare compatibility
+1. run `tools/verify_4174_snapshot.py` first;
+2. clear `PYTHONPATH` and disable user-site imports;
+3. use `vendor/4174-a144bb3/` as both code root and deterministic runtime root;
+4. resolve local 4174 imports only under the vendored snapshot;
+5. verify loaded product modules are manifest-listed;
+6. verify required PTT/static assets resolve under the snapshot;
+7. print startup provenance including:
+   - exact migration HEAD;
+   - pinned 4174 source SHA;
+   - cwd;
+   - Python executable;
+   - `sys.path`;
+   - resolved `module.__file__` for loaded product modules;
+   - resolved path + SHA-256 for required static assets;
+8. fail closed on any path escape or unmanifested product dependency.
 
-**Blocked.** No Cloudflare/platform implementation yet.
+Checkpoint 2 is not PASS until an owner-local launch proves the runtime report and an independent review accepts it.
 
-When Phase E is eventually unblocked, platform code may handle only:
+## Phase D — 4174 parity
+
+**BLOCKED pending Checkpoint 2 review.**
+
+Do not claim visual/runtime parity from source identity alone. When unblocked, verify route/state behavior against accepted 4174 with browser/DOM/computed-style evidence.
+
+## Phase E — Cloudflare compatibility
+
+**BLOCKED.**
+
+No `site/**`, `cloudflare/**`, Public static shell/controller, Worker adapter, CSP/CORS integration, or production deployment work may be added yet.
+
+When Phase E is eventually unblocked, it may handle only:
 
 - hosting/static delivery
 - route mapping
@@ -91,26 +82,20 @@ When Phase E is eventually unblocked, platform code may handle only:
 - environment/config injection
 - service endpoints required by accepted 4174 behavior
 
-It must not reimplement or alter:
+It must not reimplement or alter player lifecycle, multi-view, Custom View, Watchalong, immersive/fullscreen/ESC, audio, PTT UI/timeline/player, Home, History, navigation, layout, or CSS geometry.
 
-- player lifecycle or controls
-- multi-view layout/selection
-- Custom View behavior
-- Watchalong behavior
-- immersive/fullscreen/ESC
-- audio behavior
-- PTT UI/timeline/player behavior
-- Home UI
-- History UI
-- navigation/layout/CSS geometry
+If a platform limitation prevents accepted 4174 behavior, stop and report it.
 
-If the platform cannot preserve accepted 4174 behavior, stop and report the incompatibility.
+## Offline preflight
 
-## Checkpoint order
+```sh
+python3 tools/verify_4174_snapshot.py
+```
 
-1. SOURCE SNAPSHOT COMPLETE
-2. RUNTIME ISOLATED
-3. 4174 PARITY
-4. PLATFORM ADAPTER
+## Checkpoint 2 launch
 
-Do not skip checkpoints.
+```sh
+sh scripts/start_8788_full_4174.sh
+```
+
+No PR, CI, deployment, parity work, or Cloudflare work belongs to this checkpoint.
