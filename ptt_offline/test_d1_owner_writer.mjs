@@ -100,3 +100,27 @@ test('D1 mutation with inconsistent canonical readback never emits ACK',async()=
    /remote state uncertain, do not retry/);
  assert.equal(calls.some(c=>c[0]==='batch'),true);
 });
+
+test('reviewed steady-state batch of 12 pushes is accepted with bounded accounting',async()=>{
+ const rows=Array.from({length:12},(_,i)=>({...row,
+  push_id:'ptt:v1:'+String(i+1).padStart(64,'0'),
+  source_line:i+1,source_record_key:'1gepPtNy:'+(i+1)}));
+ const expanded=await signed({...batch,rows,write_cap:12});
+ const calls=[];
+ const DB={prepare(sql){return {bind(...args){return {sql,args,async first(){
+  calls.push(sql);
+  if(sql.includes('SELECT push_id,source_line FROM ptt_source_evidence'))
+    return {push_id:rows.find(x=>x.source_record_key===args[2]).push_id,
+      source_line:rows.find(x=>x.source_record_key===args[2]).source_line};
+  if(sql.includes('FROM ptt_pushes WHERE push_id=')){
+   const found=rows.find(x=>x.push_id===args[0]);
+   return Object.fromEntries(['aid','day','source_line','author','content','occurred_at','source_url'].map(k=>[k,found[k]]));
+  }
+  return null;
+ }}}}},async batch(stmts){return stmts.map(()=>({meta:{changes:1}}))}};
+ const ack=await applyAuthorizedPttBatch({DB,batch:expanded,
+  verifyAuthority:async()=>true,limits:{rows:12,writes:30,queries:70}});
+ assert.equal(ack.logical_rows_acked,12);
+ assert.equal(ack.d1_rows_written,26);
+ assert.equal(ack.d1_query_count,63);
+});
