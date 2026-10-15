@@ -304,6 +304,16 @@ immerse?.addEventListener('click',async()=>{
   statusBox.textContent=next?'已進入沉浸介面（瀏覽器未提供全螢幕）':'已退出沉浸介面';
  }
 });
+window.hvExit4174Immersive=async function hvExit4174Immersive(){
+ if(immersiveEnabled)applyImmersiveState(false);
+ if(document.fullscreenElement){
+  try{await document.exitFullscreen();}catch(_e){}
+ }
+};
+document.addEventListener('keydown',event=>{
+ if(event.key!=='Escape'||!immersiveEnabled)return;
+ setTimeout(()=>{if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);},0);
+});
 document.addEventListener('fullscreenchange',()=>{
  // Escape exits immersive if fullscreen was actually active. CSS-only immersive
  // remains valid when the browser refuses requestFullscreen().
