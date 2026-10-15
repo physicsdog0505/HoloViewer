@@ -96,7 +96,7 @@ await new Promise((resolveReady, rejectReady) => {
   server.once('error', rejectReady);
   server.listen(port, '127.0.0.1', resolveReady);
 });
-console.log(JSON.stringify({status:'READY', port, issue47:actual47, issue48:actual48}), flush => flush);
+console.log(JSON.stringify({status:'READY', port, issue47:actual47, issue48:actual48}));
 
 const stop = () => new Promise((resolveStop) => server.close(() => resolveStop()));
 await new Promise((resolveSignal) => {
