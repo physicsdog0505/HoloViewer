@@ -65,6 +65,7 @@ def compare_accepted_fixture(worker_base: str, *, port: int = 58085) -> dict:
                 for route, kind in (
                     ("/", "page"),
                     ("/api/home", "api"),
+                    ("/history", "page"),
                     ("/history?date=invalid", "page"),
                 ):
                     row = compare_one(baseline, worker_base, route, kind)
@@ -138,7 +139,7 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
             ]
             if fixture_mode:
                 expected_routes = [
-                    ("/", 200), ("/api/home", 200),
+                    ("/", 200), ("/api/home", 200), ("/history", 200),
                     *expected_routes,
                 ]
             for target, expected in expected_routes:
