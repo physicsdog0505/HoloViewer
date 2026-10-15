@@ -2,7 +2,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from ptt_offline.live_capture_publisher import inspect_latest_article,run_live_once
+from ptt_offline.live_capture_publisher import inspect_latest_article,run_live_once,state_for_source
 from ptt_offline.ptt_aid_identity import aid_from_article_url
 from ptt_offline.public_today_contract import ContractError
 
@@ -24,6 +24,13 @@ class LiveCapturePublisherTests(unittest.TestCase):
           (1,1,1,1,'推','a','old historical','10/14','09:00','2026-10-15T10:00:00Z'),
           (2,1,2,1,'推','b','new one','10/15','18:00','2026-10-15T10:01:05Z'),
           (3,1,3,1,'→','c','new two','10/15','18:01','2026-10-15T10:02:07Z')])
+    def test_per_thread_state_separates_day_night_receipts(self):
+        directory=Path(self.tmp.name)
+        self.assertNotEqual(state_for_source(directory,"a"*64),
+                            state_for_source(directory,"b"*64))
+        with self.assertRaisesRegex(ContractError,"invalid canonical source identity"):
+            state_for_source(directory,"not-an-identity")
+
     def test_pending_old_does_not_block_new_source_lines(self):
         inspected=inspect_latest_article(self.db)
         self.assertEqual(len(inspected["candidate_rows"]),2)
