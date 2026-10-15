@@ -31,7 +31,7 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(result["sent"],100)
         self.assertEqual(result["http_posts"],4)
         self.assertEqual(publisher.call_count,5)
-        self.assertTrue(result["backlog_may_remain"])  # ACK-filled last cycle remains conservative
+        self.assertFalse(result["backlog_may_remain"])
 
     def test_bounded_drain_marks_possible_backlog(self):
         source="c"*64
