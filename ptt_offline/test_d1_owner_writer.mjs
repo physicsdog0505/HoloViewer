@@ -14,7 +14,7 @@ function mock() {
   const calls=[];
   const DB={prepare(sql){return {bind(...args){return {
     async first(){calls.push(['read',sql,args]);return null},
-    sql,args};}}},async batch(stmts){calls.push(['batch',stmts.length]);
+    sql,args};}}},async batch(stmts){calls.push(['batch',stmts.length,stmts]);
     return stmts.map(()=>({meta:{changes:1}}));}};
   return {DB,calls};
 }
@@ -28,9 +28,11 @@ test('one atomic transactional D1 batch after authority and provenance checks',a
   const {DB,calls}=mock();
   const ack=await applyAuthorizedPttBatch({DB,batch,verifyAuthority:async()=>true});
   assert.equal(ack.logical_rows_acked,1);
-  assert.equal(ack.d1_query_count,4);
+  assert.equal(ack.d1_query_count,5);
   assert.deepEqual(calls.map(x=>x[0]),['read','batch']);
-  assert.equal(calls[1][1],3);
+  assert.equal(calls[1][1],4);
+  assert.ok(calls[1][2].some(x=>x.sql.includes('ptt_provider_state') && x.sql.includes('has_gap=1')));
+  assert.equal(ack.d1_rows_written,4);
 });
 test('refuse spoofed source identity',async()=>{
   const {DB,calls}=mock();
