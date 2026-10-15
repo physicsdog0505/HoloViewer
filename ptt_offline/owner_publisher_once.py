@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .collector_source_preview import open_source
 from .collector_day_stage import stage_verified_day
+from .source_audit_stage import audit_source_day
 from .verified_publisher_flow import run_verified_offline_one
 from .owner_http_transport import owner_signed_http_executor
 from .public_today_contract import ContractError
@@ -60,12 +61,15 @@ def main(argv=None):
     if sum(bool(x) for x in (args.inspect,args.send,args.draft_evidence)) != 1:
         p.error("choose exactly one of --inspect, --draft-evidence or --send")
     with open_source(args.source) as db:
-        initial=stage_verified_day(db,day=args.day,aid=args.aid,limit=5)
         if args.inspect:
-            receipt={"mode":"READ_ONLY","source_identity":initial["source_identity"],
-                     "day":args.day,"aid":initial["aid"],"selected_rows":initial["selected_rows_total"],
-                     "coverage":initial["coverage"],"d1_requests":0}
-        elif args.draft_evidence:
+            audit=audit_source_day(db,day=args.day,aid=args.aid)
+            receipt={"mode":"READ_ONLY","source_identity":audit["identity"],
+                     "day":args.day,"aid":audit["aid"],"source_rows_examined":audit["source_rows_examined"],
+                     "candidate_rows":len(audit["inferred_day"]),"pending_rows":len(audit["pending"]),
+                     "coverage":audit["coverage"],"d1_requests":0}
+        else:
+            initial=stage_verified_day(db,day=args.day,aid=args.aid,limit=5)
+        if args.draft_evidence:
             proposal={"source_identity":initial["source_identity"],"day":args.day,
                       "aid":initial["aid"],"authority":"PENDING_REVIEW",
                       "approved_rows":[{"source_line":row["source_line"],
