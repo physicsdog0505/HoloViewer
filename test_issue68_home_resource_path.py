@@ -48,6 +48,16 @@ class SupportStyleRuntimeIsolationTests(unittest.TestCase):
         self.assertEqual(FakeHome.fallback_calls, 0)
 
 
+class PublicAPIPreloadIsolationTests(unittest.TestCase):
+    def test_preloaded_today_does_not_import_urllib_request(self):
+        from platform_adapter.public_api import PublicAPI, preloaded_public_reads
+        sys.modules.pop("urllib.request", None)
+        payload = {"streams": []}
+        with preloaded_public_reads({("/v1/catalog/today", ()): payload}):
+            self.assertIs(PublicAPI().read_today(), payload)
+        self.assertNotIn("urllib.request", sys.modules)
+
+
 class LightweightHomeImportTests(unittest.TestCase):
     def test_home_lightweight_module_does_not_import_client_app(self):
         sys.modules.pop("client_app", None)
