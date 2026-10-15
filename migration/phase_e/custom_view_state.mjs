@@ -57,7 +57,7 @@ export function createCustomViewState() {
       audio = id; return true;
     },
     setLayout(value) {
-      if (!["auto","grid","focus"].includes(value)) return false;
+      if (!["auto","compare","focus","equal","primary"].includes(value)) return false;
       layout = videos.length > 1 ? value : "auto"; return true;
     },
     setPtt(value) {
