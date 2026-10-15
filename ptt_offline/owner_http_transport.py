@@ -15,11 +15,11 @@ from urllib.request import Request, urlopen
 
 from .public_today_contract import ContractError
 
-MAX_JSON_BYTES=65536
+MAX_JSON_BYTES=131072
 OWNER_API_HOST="holoviewer-public-api.singlebagel.workers.dev"
 
 def owner_signed_http_executor(*, endpoint: str, secret: str, allow_write: bool=False,
-                               opener=urlopen, clock_ms=None):
+                               opener=urlopen, clock_ms=None, max_rows=5, max_bytes=65536):
     if not allow_write:
         raise ContractError("owner one-shot write authorization required")
     u=urlparse(endpoint)
@@ -28,14 +28,16 @@ def owner_signed_http_executor(*, endpoint: str, secret: str, allow_write: bool=
         raise ContractError("invalid owner Publisher endpoint")
     if not isinstance(secret,str) or len(secret)<32:
         raise ContractError("publisher HMAC secret unavailable")
+    if type(max_rows) is not int or not 1<=max_rows<=25 or type(max_bytes) is not int or not 1<=max_bytes<=MAX_JSON_BYTES:
+        raise ContractError('invalid bounded Publisher transport limits')
     if clock_ms is None:
         clock_ms=lambda: int(time.time()*1000)
 
     def execute(batch):
-        if not isinstance(batch,dict) or not 1<=len(batch.get("rows",[]))<=5:
+        if not isinstance(batch,dict) or not 1<=len(batch.get("rows",[]))<=max_rows:
             raise ContractError("invalid bounded Publisher batch")
         raw=json.dumps(batch,separators=(",",":"),ensure_ascii=False,sort_keys=True).encode("utf-8")
-        if len(raw)>MAX_JSON_BYTES:
+        if len(raw)>max_bytes:
             raise ContractError("signed Publisher payload exceeds 64KiB")
         timestamp=str(clock_ms())
         signature=hmac.new(secret.encode("utf-8"),
