@@ -90,7 +90,9 @@ def content_digest(row):
     return sha256(json.dumps([row.get(k) for k in OUTPUT_KEYS if k!="time_proof"],
           ensure_ascii=False,separators=(",",":")).encode("utf-8")).hexdigest()
 
-def run_live_once(db,*,state_path,secret=None,executor=None,send=False):
+def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap=5):
+    if type(batch_cap) is not int or not 1<=batch_cap<=25:
+        raise ContractError('invalid bounded live batch cap')
     path=Path(state_path)
     with exclusive_lock(path.with_suffix(path.suffix+".lock")):
         plan=inspect_latest_article(db)
@@ -123,17 +125,18 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False):
         if not isinstance(secret,str) or len(secret)<32 or not callable(executor):
             raise ContractError("separate trusted source proof and transport required")
         if not missing:return {**receipt,"status":"NO_NEW_ROWS"}
-        selected=missing[:5]
+        selected=missing[:batch_cap]
         for row in selected:
             row["time_proof"]=sign_time_proof(row,secret)
         rows=[{k:r.get(k) for k in OUTPUT_KEYS} for r in selected]
         day=rows[0]["day"]
         rows=[r for r in rows if r["day"]==day]
         checkpoint=new_checkpoint(source_identity=plan["source_identity"],day=day,aids=[plan["aid"]])
-        batch=make_batch(checkpoint=checkpoint,rows=rows)
+        batch=make_batch(checkpoint=checkpoint,rows=rows,batch_cap=batch_cap)
         atomic_receipt(path,{"status":"REMOTE_UNCERTAIN","source_identity":plan["source_identity"],
                             "accepted":accepted,"pending_batch_id":batch["batch_id"]})
-        ack=execute_once(batch=batch,executor=executor)
+        ack=execute_once(batch=batch,executor=executor,max_rows=batch_cap,
+            max_queries=min(150,2+5*batch_cap),max_written=min(80,2+2*batch_cap))
         apply_ack(checkpoint=checkpoint,batch=batch,ack=ack)
         for row in rows:
             accepted[row["source_record_key"]]=content_digest(row)
