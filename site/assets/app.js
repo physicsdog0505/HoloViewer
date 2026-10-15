@@ -641,17 +641,15 @@ window.hvOpenCustomSession=function(ids,opts={}){
   const option=node('option',String(i+1)+' · '+id);option.value=String(i);audio.append(option);
  });
  audio.value=String(viewing.audio);
- const showPtt=opts.ptt==='live';
- $('customContentGrid').classList.toggle('video-only',!showPtt);
- if(showPtt){
-  if(!viewerPttPanel.isConnected)$('customContentGrid').append(viewerPttPanel);
-  viewerPttPanel.hidden=false;
-  $('custom-session-ptt-note').textContent='目前沒有足夠的專串來源與影片時間證據。';
- }else{
-  viewerPttPanel.hidden=true;
-  viewerPttPanel.remove();
+ // Public has no certified PTT stream for this session yet. Never reserve
+ // a second tile or sidebar for an empty source: the video stays visible.
+ viewerPttPanel.hidden=true;
+ viewerPttPanel.remove();
+ $('customContentGrid').classList.add('video-only');
+ if(opts.ptt==='live'){
+  $('session-status').textContent='PTT 資料尚未可用；先顯示完整影片畫面';
  }
- $('session-status').textContent=clean.length+' 個影片';
+ $('session-status').textContent=opts.ptt==='live'?'PTT 資料尚未可用；先顯示完整影片畫面':clean.length+' 個影片';
  replacementTarget=0;watchMode=clean.length>1?'multi':'single';$('syncPlayback').checked=clean.length>1;refreshWatchMode();
  renderFocusChoices();route('custom-session');sessionLayout();sessionAudio();globalVolume($('globalVolume').value);
 };
