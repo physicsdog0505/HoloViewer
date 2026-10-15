@@ -8,6 +8,7 @@ const router=createExistingApiRouter({
 const env={DB:null,ALLOWED_ORIGIN:ORIGIN};
 const db={prepare(sql){if(sql.includes('catalog_meta'))return {first:async()=>null};
  if(sql.includes('public_today_canonical'))return {bind(){return {all:async()=>({results:[]})}}};
+ if(sql.includes('public_history'))return {bind(){return {all:async()=>({results:[]})}}};
  throw Error('unexpected SELECT');}};
 function req(path,method='GET',origin=ORIGIN){return new Request('https://api.example'+path,{method,headers:{origin}});}
 test('known origin gets CORS, OPTIONS and GET gate',async()=>{
@@ -83,4 +84,20 @@ test('live video prefix dispatch preserves invalid ID 400 and video cache age 15
  assert.equal((await invalid.json()).error,'invalid_video_id');
  const valid=await actualRouter.fetch(req('/v1/catalog/videos/abcdefghijk'),env);
  assert.equal(valid.status,200);
+});
+
+test('Collab experience routes are mounted on the existing API shell',async()=>{
+ const live=await router.fetch(req('/v1/collab/live'),{...env,DB:db});
+ assert.equal(live.status,200);
+ const liveBody=await live.json();
+ assert.equal(liveBody.kind,'collab');
+ assert.deepEqual(liveBody.events,[]);
+ const history=await router.fetch(req('/v1/collab/history?day=2026-10-15'),{...env,DB:db});
+ assert.equal(history.status,200);
+ assert.equal((await history.json()).scope,'history');
+});
+test('Watchalong route reaches feature gate instead of falling through 404',async()=>{
+ const r=await router.fetch(req('/v1/watchalong/recent'),{...env,DB:db});
+ assert.equal(r.status,503);
+ assert.equal((await r.json()).error,'watchalong_not_enabled');
 });
