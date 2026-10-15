@@ -121,13 +121,18 @@ body.home-wide .section-head{margin-bottom:9px}
 .stream-collab-entry{position:absolute;right:8px;bottom:8px;z-index:4;min-width:54px;height:42px;padding:0 9px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:4px;background:#fff;border:1px solid var(--line);box-shadow:0 4px 12px rgba(52,44,36,.18);font-weight:900;color:#356f89;cursor:pointer}\n.stream-collab-entry .collab-glyph{font-size:25px;line-height:1}.stream-collab-entry .collab-entry-label{font-size:10px;line-height:1;letter-spacing:.02em}\n.stream-collab-entry:hover,.stream-collab-entry:focus-visible{background:var(--accent-soft);outline:2px solid #4f7f93;outline-offset:1px}\n.stream-card:hover,.stream-card:focus-visible{
   transform:none;
   border-color:color-mix(in srgb,var(--member-accent,#7aa8bb) 72%,white);
-  background:#fff;
+  background:color-mix(in srgb,var(--member-accent,#7aa8bb) 8%,white);
   box-shadow:
     0 0 0 1px color-mix(in srgb,var(--member-accent,#7aa8bb) 34%,transparent),
     0 0 14px color-mix(in srgb,var(--member-accent,#7aa8bb) 30%,transparent),
     0 9px 22px rgba(52,44,36,.07);
   animation:memberGlow 1.8s ease-in-out infinite alternate;
   outline:none
+}
+[data-support-mode="dual_color"].stream-card:hover,[data-support-mode="dual_color"].stream-card:focus-visible{
+  background:linear-gradient(135deg,
+    color-mix(in srgb,var(--member-accent,#7aa8bb) 8%,white),
+    color-mix(in srgb,var(--member-accent-secondary,#7aa8bb) 8%,white));
 }
 @keyframes memberGlow{
   from{box-shadow:0 0 0 1px color-mix(in srgb,var(--member-accent,#7aa8bb) 28%,transparent),0 0 8px color-mix(in srgb,var(--member-accent,#7aa8bb) 20%,transparent),0 9px 22px rgba(52,44,36,.06)}
@@ -374,7 +379,7 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 
 /* Verbatim accepted 4174 LIVE_RAIL_CSS from client_ui_shell.py, pinned cab0adb51. */
 .live-channel-rail{
-  position:fixed;left:2px;top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px);
+  position:fixed;left:2px;top:378px;z-index:65;width:64px;max-height:calc(100vh - 390px);
   display:flex;flex-direction:column;gap:8px;padding:8px 0;overflow-x:hidden;overflow-y:auto;
   background:rgba(255,253,250,.98);border-radius:14px;scrollbar-width:none;
   transition:width .16s ease,box-shadow .16s ease
