@@ -108,7 +108,7 @@ class EntryPointBindingTest(unittest.TestCase):
                       )) as dispatch):
                     response = asyncio.run(self.entry.Default().fetch(CustomRequest()))
                 self.assertEqual(response.status, 200)
-                bind.assert_called_once()
+                self.assertEqual(bind.call_count, 1 if route == "/custom-view" else 0)
                 self.assertEqual(preload.await_args.args[0], route)
                 self.assertEqual(dispatch.call_args.kwargs["target"], route)
 
