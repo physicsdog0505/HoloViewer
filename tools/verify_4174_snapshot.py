@@ -233,15 +233,20 @@ def main() -> int:
             errors.append(f"required Phase C isolation artifact missing: {rel}")
 
     for rel in sorted(BLOCKED_PHASE_E):
-        path = ROOT / rel
-        if not path.exists():
-            continue
-        residue = [
-            item for item in path.rglob("*")
-            if item.is_file() or item.is_symlink()
-        ] if path.is_dir() else [path]
-        if residue:
-            errors.append(f"premature Phase E product/platform tree present: {rel}")
+        try:
+            tracked = subprocess.check_output(
+                ["git", "-C", str(ROOT), "ls-files", "--", rel, rel + "/**"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).splitlines()
+        except (OSError, subprocess.CalledProcessError):
+            tracked = []
+        tracked = [item for item in tracked if item.strip()]
+        if tracked:
+            errors.append(
+                f"premature Phase E product/platform tree tracked in branch: {rel}: "
+                + ", ".join(tracked)
+            )
 
     # Explicitly reject legacy Public product residue.
     forbidden_files = [
