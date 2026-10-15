@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from pathlib import Path
 
 PINNED = "a144bb378a8bdd772faa867d608c1e7491253883"
@@ -70,6 +71,13 @@ class Default(worker.Default):
     config["main"] = "entry_fixture.py"
     # Cloudflare Workers static-asset binding in the SAME local Worker.
     # Static requests must bypass the Python ClientRequestHandler altogether.
+    # Accepted channel metadata lives at the original code root. Expose a
+    # byte-for-byte copy through the same Worker asset binding in this test
+    # bundle only; original vendored root and manifest identities stay intact.
+    shutil.copyfile(
+        bundle / "hololive_channels.prototype.json",
+        bundle / "public" / "hololive_channels.prototype.json",
+    )
     config["assets"] = {
         "directory": "./public",
         "binding": "ASSETS",
