@@ -730,14 +730,14 @@ const pathRoute=location.pathname==='/history'?'history':
 route(hashRoute||pathRoute||'home');
 
 const homePollTimer=setInterval(()=>{
- if(!document.hidden&&$('home').classList.contains('active'))loadHome();
+ if(!document.hidden&&($('home').classList.contains('active')||$('custom-session').classList.contains('active')))loadHome();
 },30000);
 const pttPollTimer=setInterval(()=>{
  if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();
 },10000);
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden)return;
- if($('home').classList.contains('active'))loadHome();
+ if($('home').classList.contains('active')||$('custom-session').classList.contains('active'))loadHome();
  if($('ptt').classList.contains('active'))loadPtt();
 });
 window.addEventListener('pagehide',()=>{
