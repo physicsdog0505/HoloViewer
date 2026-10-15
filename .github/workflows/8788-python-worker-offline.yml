@@ -35,7 +35,7 @@ jobs:
       - name: Checkout exact #47-owned existing API shell for read-only consumer E2E
         uses: actions/checkout@v4
         with:
-          ref: ef068e19cfe94bb4bc21c7e47b099cfbbc1361de
+          ref: 149a80361654b06377dbae580e1d8da2e5010cf0
           path: .owner-issue47
           persist-credentials: false
       - name: Exercise exact #47 router via local mock D1 into accepted 4174 consumer
