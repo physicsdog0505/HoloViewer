@@ -96,6 +96,34 @@ class CanonicalLifecycleTests(unittest.TestCase):
         self.assertEqual(unknown, [])
 
 
+class TodayBucketOrderingTests(unittest.TestCase):
+    def test_unknown_sorted_by_start_time_with_missing_last(self):
+        from platform_adapter.product_bindings import home_groups_from_payload
+        from dataclasses import dataclass
+        from datetime import datetime
+
+        @dataclass
+        class HomeStream:
+            video_id: str
+            title: str
+            channel_title: str
+            start_label: str
+            state: str
+            source_label: str = ""
+            channel_id: str = ""
+            avatar_url: str = ""
+            group: str = "hololive"
+            start_at: datetime | None = None
+
+        payload = {"streams": [
+            {"video_id":"bbbbbbbbbbb","channel_id":"UC0000000000000000000001","group":"hololive","lifecycle_state":"stale","start_at":"2026-10-16T13:00:00Z"},
+            {"video_id":"aaaaaaaaaaa","channel_id":"UC0000000000000000000002","group":"hololive","lifecycle_state":"stale","start_at":"2026-10-16T09:00:00Z"},
+            {"video_id":"ccccccccccc","channel_id":"UC0000000000000000000003","group":"hololive","lifecycle_state":"stale","start_at":None},
+        ]}
+        _live, _upcoming, _ended, unknown = home_groups_from_payload(payload, HomeStream)
+        self.assertEqual([x.video_id for x in unknown], ["aaaaaaaaaaa","bbbbbbbbbbb","ccccccccccc"])
+
+
 class LightweightHomeImportTests(unittest.TestCase):
     def test_home_lightweight_module_does_not_import_client_app(self):
         sys.modules.pop("client_app", None)
