@@ -158,7 +158,12 @@ try {
   assert.equal(receipt.canonical_today.schema_version, 'public-consumer-v1');
   assert.equal(receipt.production_deployment, false);
   assert.equal(receipt.ptt_mount_checked, Boolean(pttRoot));
-  if (pttRoot) assert.equal(receipt.canonical_ptt.push_count, 2);
+  if (pttRoot) {
+    assert.equal(receipt.canonical_ptt.push_count, 2);
+    assert.equal(receipt.canonical_ptt.history_first_count, 1);
+    assert.equal(receipt.canonical_ptt.history_second_count, 1);
+    assert.equal(receipt.canonical_ptt.history_continuation_checked, true);
+  }
   assert.ok(selects >= 2, 'Actual #47 DB query path must execute');
   console.log(JSON.stringify({
     status: 'PASS', api_source: shellUrl, api_source_sha: actualOwnerHead,
