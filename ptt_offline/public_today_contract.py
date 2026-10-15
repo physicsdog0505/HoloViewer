@@ -501,7 +501,7 @@ PUBLIC_PUSH_FIELDS = (
     "content", "occurred_at", "floor", "source_url",
 )
 _PTT_ARTICLE_RE = re.compile(
-    r"^https://www\\.ptt\\.cc/bbs/C_Chat/M\\.[0-9]+\\.A\\.[A-Za-z0-9]+\\.html$"
+    r"^https://www\.ptt\.cc/bbs/C_Chat/M\.[0-9]+\.A\.[A-Za-z0-9]+\.html$"
 )
 
 
