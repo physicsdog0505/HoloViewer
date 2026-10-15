@@ -98,3 +98,34 @@ projection/internal-field leakage, fresh/stale TTL without checkpoint, clock
 regression, valid/untrusted URL, kind, verified empty and typed unavailable.
 All new contracts remain offline-only and cannot authorize live PTT or D1
 integration. Exact-head execution evidence must still be collected.
+
+## Owner's single permanent D1 architecture (Issue #48, 2026-10-15)
+
+`Existing PTT Collector -> canonical local SQLite -> Publisher -> Cloudflare D1 -> Worker API -> Public/8788`.
+
+The owner has authorized **implementation source code** for the D1 lane, but
+has NOT authorized production D1 creation/migration, importing owner data,
+enabling live Publisher, secrets, deployment or merge. No staging backend,
+disposable database, second scraper, or second public provider will be built.
+
+New offline code:
+- `d1_migrations/0001_canonical_ptt.sql`: forward-only v1 schema, version
+  ledger, canonical push PK, AID/day/source line, nullable floor, kind,
+  source URL, source evidence and provider watermarks/gap state.
+- `d1_publisher.py`: canonical, idempotent upsert SQL preserving Collector
+  authority and source evidence; batch validation before writes.
+- `d1_provider.py`: D1 readback provider interface, with explicit prohibition
+  on inventing real relay continuation or claiming live authority.
+- `test_d1_publisher.py`: offline SQLite compatibility checks for
+  idempotence, Collector precedence, upsert repair, schema replay, source
+  ordering, and invalid-batch rejection.
+
+**These modules are NOT a connected production Worker or live Publisher.**
+Canonical SQLite column mapping, D1 batch transactions and Worker API routing
+must be proven against the accepted owner runtime before activation.
+Forward migrations, not drop/rebuild, are the durability policy.
+
+Current comprehensive offline verification command:
+```sh
+python3 -B -m unittest -v ptt_offline.test_public_today_contract ptt_offline.test_consumer_boundary ptt_offline.test_consumer_paging ptt_offline.test_public_consumer_envelope ptt_offline.test_d1_publisher
+```
