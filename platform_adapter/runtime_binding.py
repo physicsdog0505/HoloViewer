@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from platform_adapter.product_bindings import bind_home_reader
+from platform_adapter.product_bindings import bind_home_reader, bind_history_reader
 from platform_adapter.public_api import PublicAPI
 
 
@@ -22,8 +22,12 @@ def bind_public_today(client_app: Any, *, api_base: str) -> dict[str, str]:
     reader = bind_home_reader(provider, HomeStream)
     client_home.load_home_streams = reader
     client_app.load_home_streams = reader
+    # History renderer/pagination remain the accepted 4174 implementation.
+    history_reader = bind_history_reader(provider, HomeStream)
+    client_app.load_history_day = history_reader
     return {
         "provider": "holoviewer-public-api",
         "read_today": "/v1/catalog/today",
+        "read_day": "/v1/history?day=YYYY-MM-DD&limit=50&offset=N",
         "database_binding": "DB -> holoviewer-public-v1 (existing API owns binding)",
     }
