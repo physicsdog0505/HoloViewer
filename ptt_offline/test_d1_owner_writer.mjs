@@ -13,7 +13,13 @@ async function signed(value){const d=await batchDigest(value);return {...value,d
 function mock() {
   const calls=[];
   const DB={prepare(sql){return {bind(...args){return {
-    async first(){calls.push(['read',sql,args]);return null},
+    async first(){calls.push(['read',sql,args]);
+      if(sql.includes('FROM ptt_pushes WHERE push_id='))return {
+        aid:row.aid,day:row.day,source_line:row.source_line,
+        author:row.author,content:row.content,occurred_at:row.occurred_at,source_url:row.source_url};
+      if(sql.includes('SELECT push_id,source_line FROM ptt_source_evidence'))
+        return {push_id:row.push_id,source_line:row.source_line};
+      return null},
     sql,args};}}},async batch(stmts){calls.push(['batch',stmts.length,stmts]);
     return stmts.map(()=>({meta:{changes:1}}));}};
   return {DB,calls};
@@ -28,8 +34,8 @@ test('one atomic transactional D1 batch after authority and provenance checks',a
   const {DB,calls}=mock();
   const ack=await applyAuthorizedPttBatch({DB,batch,verifyAuthority:async()=>true});
   assert.equal(ack.logical_rows_acked,1);
-  assert.equal(ack.d1_query_count,5);
-  assert.deepEqual(calls.map(x=>x[0]),['read','batch']);
+  assert.equal(ack.d1_query_count,7);
+  assert.deepEqual(calls.map(x=>x[0]),['read','batch','read','read']);
   assert.equal(calls[1][1],4);
   assert.ok(calls[1][2].some(x=>x.sql.includes('ptt_provider_state') && x.sql.includes('has_gap=1')));
   assert.equal(ack.d1_rows_written,4);
@@ -78,5 +84,19 @@ test('publisher terminal 2-of-5 rows preserves Python canonical digest',async()=
  const terminal=await signed({...batch,write_cap:5});
  const ack=await applyAuthorizedPttBatch({DB,batch:terminal,verifyAuthority:async()=>true});
  assert.equal(ack.logical_rows_acked,1);
+ assert.equal(calls.some(c=>c[0]==='batch'),true);
+});
+
+test('D1 mutation with inconsistent canonical readback never emits ACK',async()=>{
+ const {DB,calls}=mock();
+ const faulty={...DB,prepare(sql){
+   const original=DB.prepare(sql);
+   if(!sql.includes('FROM ptt_pushes WHERE push_id='))return original;
+   return {bind(...args){const bound=original.bind(...args);
+     return {...bound,first:async()=>({...await bound.first(),content:'tampered'})};
+   }};
+ }};
+ await assert.rejects(applyAuthorizedPttBatch({DB:faulty,batch,verifyAuthority:async()=>true}),
+   /remote state uncertain, do not retry/);
  assert.equal(calls.some(c=>c[0]==='batch'),true);
 });
