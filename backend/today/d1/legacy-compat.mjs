@@ -19,5 +19,5 @@ export async function legacyVideo(request,env){
  if(!videoId.test(id))return response({error:'invalid_video_id'},400,0);
  const video=await env.DB.prepare('SELECT '+VIDEO_FIELDS+' FROM public_catalog WHERE video_id=?').bind(id).first();
  if(!video)return response({error:'not_found'},404,0);
- return response(video);
+ return response(video,200,15);
 }
