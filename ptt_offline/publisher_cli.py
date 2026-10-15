@@ -113,10 +113,10 @@ def coverage_receipt(db, aid: str):
             "article_total_pages":total_pages,"gaps":gaps,
             "malformed_screen_evidence":False,"complete":complete,
             "terminal_verified":terminal_valid,
-            "has_gap":not complete,
-            "reason":("continuous article_screens coverage through canonical "
-                      "last_source_line and terminal page" if complete else
-                      "incomplete source range or unverified terminal page")}
+            "has_gap":(True if gaps else ("UNKNOWN" if not terminal_valid else False)),
+            "reason":("continuous coverage with verified terminal page" if complete else
+                      "observed source line gaps" if gaps else
+                      "terminal snapshot not independently verified")}
 
 def atomic_receipt(destination: Path, body: dict):
     destination.parent.mkdir(parents=True,exist_ok=True)
