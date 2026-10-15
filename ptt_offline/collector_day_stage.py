@@ -5,6 +5,7 @@ by schema-preview first-N query. No publication or D1 mutation is performed.
 """
 from __future__ import annotations
 
+from datetime import date
 from .collector_source_preview import verify_schema
 from .public_today_contract import ContractError, normalize_public_aid
 from .publisher_cli import coverage_receipt
@@ -15,11 +16,17 @@ MAX_STAGE_ROWS = 5
 
 
 def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
-                       after_source_line: int=0) -> dict:
+                       after_source_line: int=0,
+                       identity_verifier=None) -> dict:
     if type(limit) is not int or not 1 <= limit <= MAX_STAGE_ROWS:
         raise ContractError("first-window staging cap exceeded")
     if type(after_source_line) is not int or after_source_line < 0:
         raise ContractError("invalid ACKed source checkpoint")
+    try:
+        if date.fromisoformat(day).isoformat() != day:
+            raise ValueError
+    except (TypeError,ValueError) as exc:
+        raise ContractError("invalid exact selected Taipei day") from exc
     canonical=normalize_public_aid(aid)
     verify_schema(db)
     article=db.execute(
@@ -43,6 +50,7 @@ def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
     keys=("source_line","source_page","kind","author","content","ptt_date","ptt_time")
     chronological=reconstruct_events(
         board=board,aid=raw_aid,url=url,
+        identity_verifier=identity_verifier,
         pushes=[dict(zip(keys,r)) for r in raw],
     )
     selected=[{**r,"source_url":url,"origin":"collector"}
@@ -54,5 +62,7 @@ def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
         "selected_rows_total":len(selected),
         "rows":selected[:limit],
         "has_more":len(selected)>limit,
+        "next_after_source_line":(selected[min(len(selected),limit)-1]["source_line"]
+                                   if selected else after_source_line),
         "coverage":coverage,
     }
