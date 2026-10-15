@@ -222,3 +222,21 @@ test('new verified profile avatar is opt-in and legacy API remains readable befo
  assert.equal(unchanged.streams[0].avatar_url,null);
  d.close();
 });
+
+test('4174 Today consumer row stays bounded with missing optional metadata',async()=>{
+ const d=db();
+ await writeEvidence(d,{...fixture({id:'safecons001',state:'unknown'}),title:'',channel_name:'',actual_start:null,scheduled_start:null,source_label:''});
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:01:00Z')});
+ assert.equal(x.streams.length,1);
+ const row=x.streams[0];
+ assert.equal(row.video_id,'safecons001');
+ assert.equal(row.title,'safecons001');
+ assert.equal(row.channel_name,'');
+ assert.equal(row.group,'hololive');
+ assert.equal(row.start_at,null);
+ assert.equal(row.avatar_url,null);
+ assert.equal(row.source_label,'');
+ assert.ok(['unknown','stale'].includes(row.lifecycle_state));
+ d.close();
+});
