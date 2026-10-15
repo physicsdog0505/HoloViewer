@@ -1,9 +1,5 @@
 name: Deploy HoloViewer Cloudflare production
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'site/**'
   workflow_dispatch:
     inputs:
       confirm:
@@ -25,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY' && inputs.baseline_confirmed == 'BASELINE-CHECKED'))
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY' && inputs.baseline_confirmed == 'BASELINE-CHECKED'
     runs-on: ubuntu-latest
     environment: cloudflare-production
     steps:
@@ -34,7 +30,7 @@ jobs:
           persist-credentials: false
       - name: Pin exactly reviewed production revision
         env:
-          REQUESTED_SHA: ${{ github.event_name == 'push' && github.sha || inputs.release_sha }}
+          REQUESTED_SHA: ${{ inputs.release_sha }}
         run: |
           test "${#REQUESTED_SHA}" -eq 40
           test "$REQUESTED_SHA" = "$(git rev-parse HEAD)"
