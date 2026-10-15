@@ -66,3 +66,11 @@ test('Today response retains reviewed route cache policy, no global no-store',as
  const r=await router.fetch(req('/v1/catalog/today?day=2026-10-15'),{...env,DB:db});
  assert.equal(r.headers.get('cache-control'),'public, max-age=30');
 });
+
+test('accepted OPTIONS exposes preflight max age 600 and no response cache override',async()=>{
+ const res=await router.fetch(req('/health','OPTIONS'),{...env,DB:db});
+ assert.equal(res.status,204);
+ assert.equal(res.headers.get('access-control-max-age'),'600');
+ assert.equal(res.headers.get('access-control-allow-headers'),'Accept');
+ assert.equal(res.headers.get('cache-control'),null);
+});

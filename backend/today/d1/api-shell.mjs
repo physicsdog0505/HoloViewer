@@ -1,3 +1,4 @@
+import {legacyHistory as defaultLegacyHistory,legacyVideo as defaultLegacyVideo} from './legacy-compat.mjs';
 /** #47 legacy Worker shell behavior-preserving reviewable seam. Never deploy without exact owner source comparison. */
 import {handleTodayRead} from './worker-read.mjs';
 function allowed(env){return new Set(String(env?.ALLOWED_ORIGIN??'').split(',').map(x=>x.trim()).filter(Boolean));}
@@ -9,6 +10,7 @@ function wrap(response,origin,origins){
   headers.set('access-control-allow-origin',origin);
   headers.set('access-control-allow-methods','GET, OPTIONS');
   headers.set('access-control-allow-headers','Accept');
+  if(response.status===204)headers.set('access-control-max-age','600');
  }
  return new Response(response.body,{status:response.status,headers});
 }
@@ -19,14 +21,14 @@ function json(data,status=200,age=0){
   'x-content-type-options':'nosniff'
  }});
 }
-export function createExistingApiRouter({legacyHistory,legacyVideo,pttHandler=null}={}){
+export function createExistingApiRouter({legacyHistory=defaultLegacyHistory,legacyVideo=defaultLegacyVideo,pttHandler=null}={}){
  return {async fetch(request,env){
   const u=new URL(request.url),origin=request.headers.get('origin');
   const origins=allowed(env);
   if(origin&&!origins.has(origin))return wrap(json({error:'origin_not_allowed'},403),origin,origins);
   if(request.method==='OPTIONS'){
    if(!origin)return wrap(json({error:'origin_required'},400),origin,origins);
-   return wrap(new Response(null,{status:204,headers:{'cache-control':'public, max-age=0'}}),origin,origins);
+   return wrap(new Response(null,{status:204}),origin,origins);
   }
   if(request.method!=='GET')return wrap(json({error:'method_not_allowed'},405),origin,origins);
   if(u.pathname==='/health')return wrap(json({
