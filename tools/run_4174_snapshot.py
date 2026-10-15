@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -216,6 +217,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Isolated 4174 snapshot runner")
     parser.add_argument("--port", type=int, default=8788)
     parser.add_argument("--runtime-data-root", required=True)
+    parser.add_argument("--public-api-base", default="", help="opt-in canonical Public API origin for platform integration")
     args = parser.parse_args()
 
     runtime_data_root = validate_runtime_data_root(Path(args.runtime_data_root))
@@ -237,6 +239,23 @@ def main() -> int:
     manifest_paths = load_manifest_paths(manifest)
 
     client_app = importlib.import_module("client_app")
+    if args.public_api_base:
+        # Import the platform-only package by a pinned repository path without
+        # adding the repository root to sys.path (vendor resolution stays closed).
+        adapter_root = ROOT / "platform_adapter"
+        spec = importlib.util.spec_from_file_location(
+            "platform_adapter", adapter_root / "__init__.py",
+            submodule_search_locations=[str(adapter_root)],
+        )
+        if spec is None or spec.loader is None:
+            raise RuntimeError("missing canonical platform adapter")
+        package = importlib.util.module_from_spec(spec)
+        sys.modules["platform_adapter"] = package
+        spec.loader.exec_module(package)
+        from platform_adapter.runtime_binding import bind_public_today
+        binding = bind_public_today(client_app, api_base=args.public_api_base)
+        print("=== 8788 PUBLIC API BINDING ===")
+        print(json.dumps(binding, ensure_ascii=False, sort_keys=True))
     module_rows = audit_loaded_modules(product_roots, manifest_paths)
     assets = asset_rows(manifest_paths)
     print_provenance(runtime_data_root, module_rows, assets)
