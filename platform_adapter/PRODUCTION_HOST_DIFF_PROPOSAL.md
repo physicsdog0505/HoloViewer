@@ -123,3 +123,18 @@ The exact-head workflow now executes this proof in addition to the existing comb
 3. **Real D1 read canary:** current proof is D1-compatible mock only. Real `holoviewer-public-v1` access is a production/staging mutation boundary and is not attempted here.
 4. **Cloudflare API Worker production wiring:** exact combined #47+#48 production source, API Worker deployment/config and D1 binding must be reviewed independently; #68 only consumes it.
 5. **Mutation authorization:** no deployment, D1 migration/write, Publisher/Cron activation, secret change, merge or cutover without explicit Owner authorization.
+
+
+## Explicit production routing / environment ownership
+
+The inert wiring spec now records the actual ownership boundary rather than leaving environment behavior implicit:
+
+| Hop | Runtime owner | Required binding / variable | Offline disposition |
+|---|---|---|---|
+| Browser -> accepted product/static | Public Python Worker | `ASSETS`, `run_worker_first=false` | verified local shape; production Worker name/route still owner-confirmed |
+| Accepted Python Worker -> canonical data API | Public Python Worker | hard-pinned `platform_adapter.public_api.DEFAULT_API`; no runtime API-base override | prevents deployment-time origin drift |
+| Canonical API -> data store | `holoviewer-public-api` | D1 binding `DB -> holoviewer-public-v1` | belongs only to API Worker; UI Worker has zero D1 bindings |
+| Browser-origin CORS at canonical API | `holoviewer-public-api` | `ALLOWED_ORIGIN` | exact production value remains owner-confirmed; do not guess it |
+| Accepted product PTT | Public Python Worker | none yet | disabled/fail-closed until #48 independent acceptance + owner cutover |
+
+No secret is required by the accepted Python Worker for read-only canonical API access. Any future credential/service-binding proposal is a new review item, not implied by this host diff.
