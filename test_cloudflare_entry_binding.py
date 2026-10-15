@@ -171,6 +171,7 @@ class EntryPointBindingTest(unittest.TestCase):
             response = asyncio.run(self.entry.Default().fetch(HomeRequest()))
         self.assertEqual(response.status, 200)
         self.assertEqual(response.body, "<html>safe-home</html>")
+        self.assertEqual(response.headers["X-HoloViewer-Recovered-Stage"], "home-render")
         fallback.assert_called_once_with("/")
 
     def test_page_and_fallback_exception_returns_owned_503_not_raise(self):
@@ -183,6 +184,7 @@ class EntryPointBindingTest(unittest.TestCase):
             response = asyncio.run(self.entry.Default().fetch(HomeRequest()))
         self.assertEqual(response.status, 503)
         self.assertEqual(response.body, "Public page temporarily unavailable")
+        self.assertEqual(response.headers["X-HoloViewer-Recovered-Stage"], "home-render")
 
     def test_handler_binding_never_selects_custom_provider(self):
         with patch.object(self.entry, "bind_public_today") as bind:
