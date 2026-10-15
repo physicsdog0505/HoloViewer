@@ -7,6 +7,14 @@ from urllib.parse import parse_qs, urlsplit
 
 def scenario(browser, root, width):
     context = browser.new_context(viewport={"width": width, "height": 900}, reduced_motion="reduce")
+    allowed_origin = urlsplit(root).netloc
+    def isolated_request(route):
+        target = urlsplit(route.request.url)
+        if target.hostname in {"127.0.0.1", "localhost"} and target.netloc == allowed_origin:
+            route.continue_()
+        else:
+            route.abort()
+    context.route("**/*", isolated_request)
     page = context.new_page()
     try:
         page.goto(root.rstrip("/") + "/custom-view", wait_until="domcontentloaded")
@@ -28,10 +36,24 @@ def scenario(browser, root, width):
         page.wait_for_url("**/custom-view/session?**", wait_until="domcontentloaded")
         url = urlsplit(page.url)
         q = parse_qs(url.query)
+        geometry = page.evaluate("""() => {
+          const selectors = ['.client-main','.viewer-workspace','#stage','.video-wrap','.ptt-panel','.player-toolbar'];
+          const result = {};
+          for (const selector of selectors) {
+            const node = document.querySelector(selector);
+            if (!node) { result[selector] = null; continue; }
+            const r=node.getBoundingClientRect(),c=getComputedStyle(node);
+            result[selector]={width:Math.round(r.width),height:Math.round(r.height),
+              display:c.display,position:c.position,grid:c.gridTemplateColumns,
+              fontSize:c.fontSize,lineHeight:c.lineHeight,gap:c.gap,overflow:c.overflow,
+              zIndex:c.zIndex,visibility:c.visibility};
+          }
+          return result;
+        }""")
         session = {"path": url.path, "streams": q.get("stream", []),
                    "layout": q.get("layout", []), "primary": q.get("primary", []),
                    "audio": q.get("audio", []), "ptt": q.get("ptt", []),
-                   "iframes": page.locator("iframe").count()}
+                   "iframes": page.locator("iframe").count(), "geometry": geometry}
         page.goto(root.rstrip("/") + "/custom-view", wait_until="domcontentloaded")
         page.locator("#url").fill("dQw4w9WgXcQ")
         page.locator("#add").click()
