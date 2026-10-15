@@ -1,6 +1,8 @@
 import json, tempfile, unittest
 from pathlib import Path
-from ptt_offline.deploy_today_backend_release import load_config, safe_deploy_config
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from ptt_offline.deploy_today_backend_release import load_config, safe_deploy_config, ptt_operational_day
 
 class TodayBackendReleaseTests(unittest.TestCase):
     def config(self):
@@ -32,6 +34,11 @@ class TodayBackendReleaseTests(unittest.TestCase):
                 self.assertEqual(cfg["vars"]["ALLOWED_ORIGIN"],"https://example.test")
             finally:
                 holder.cleanup()
+
+    def test_ptt_operational_day_rolls_at_0600_taipei(self):
+        tz=ZoneInfo("Asia/Taipei")
+        self.assertEqual(ptt_operational_day(datetime(2026,10,16,5,59,tzinfo=tz)),"2026-10-15")
+        self.assertEqual(ptt_operational_day(datetime(2026,10,16,6,0,tzinfo=tz)),"2026-10-16")
 
     def test_wrong_worker_fails_closed(self):
         cfg=self.config(); cfg["name"]="wrong-worker"
