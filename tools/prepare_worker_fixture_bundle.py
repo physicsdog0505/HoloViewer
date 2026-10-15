@@ -38,7 +38,33 @@ async def fixture_public_json(url):
 
 
 worker.fetch_canonical_json = fixture_public_json
-Default = worker.Default
+
+# Local fixture proof only: verify Pyodide can read the *original* packaged
+# accepted 4174 static files. This endpoint never enters production source.
+from workers import Response
+from pathlib import Path
+import hashlib
+import json
+
+class Default(worker.Default):
+    async def fetch(self, request):
+        if str(request.url).split("?", 1)[0].endswith("/__local_proof_assets"):
+            names = (
+                "public/ptt_timeline.js",
+                "public/ptt_player_adapter.js",
+                "public/ptt_worker_adapter.js",
+                "hololive_channels.prototype.json",
+            )
+            root = Path(__file__).resolve().parent
+            payload = {}
+            for name in names:
+                data = (root / name).read_bytes()
+                payload[name] = hashlib.sha256(data).hexdigest()
+            return Response(json.dumps(payload), headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "Cache-Control": "no-store",
+            })
+        return await super().fetch(request)
 '''
     (bundle / "entry_fixture.py").write_text(fixture, encoding="utf-8")
     config["main"] = "entry_fixture.py"
