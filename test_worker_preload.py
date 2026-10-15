@@ -17,20 +17,19 @@ class RequestLocalProviderTest(unittest.TestCase):
                 return \'{"streams":[],"source":"d1_public_projection"}\'
         class Binding:
             def __init__(self): self.calls = []
-            async def fetch(self, url, options):
-                self.calls.append((url, options))
+            async def fetch(self, url):
+                self.calls.append(url)
                 return Response()
         binding = Binding()
         result = asyncio.run(fetch_canonical_json(DEFAULT_API + "/v1/catalog/today", api_service=binding))
         self.assertEqual(result["streams"], [])
-        self.assertEqual(binding.calls[0][0], DEFAULT_API + "/v1/catalog/today")
-        self.assertEqual(binding.calls[0][1]["method"], "GET")
+        self.assertEqual(binding.calls[0], DEFAULT_API + "/v1/catalog/today")
 
     def test_service_binding_http_failure_fails_closed(self):
         from platform_adapter.worker_preload import fetch_canonical_json
         from platform_adapter.public_api import DEFAULT_API
         class Binding:
-            async def fetch(self, url, options):
+            async def fetch(self, url):
                 class Response: status = 403
                 return Response()
         with self.assertRaises(PublicAPIUnavailable):
