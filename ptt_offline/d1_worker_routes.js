@@ -54,9 +54,13 @@ export async function handlePttD1Read(request, db) {
     // History uses forward paging. Today serves newest N in consumer order.
     const visible = history ? raw.slice(0,limit) : raw.slice(0,limit).reverse();
     const hasMore = raw.length > limit;
-    const newestCheck = (scope.results || []).map(x=>x.last_success_at).filter(Boolean);
-    const lastSuccess = newestCheck.length ? newestCheck.sort()[0] : null;
-    const freshness = publicPttFreshness(lastSuccess);
+    const required = new Set(threads.results.map(row=>row.aid));
+    const evidence = new Map((scope.results || []).map(row=>[row.aid,row]));
+    const checks = [...required].map(aid=>evidence.get(aid)?.last_success_at ?? null);
+    const statuses = checks.map(value=>publicPttFreshness(value));
+    const freshness = statuses.includes('unknown') ? 'unknown'
+      : statuses.includes('stale') ? 'stale' : 'fresh';
+    const lastSuccess = checks.every(Boolean) ? checks.sort()[0] : null;
     const gap = (scope.results || []).some(x=>Boolean(x.has_gap));
     const projected = visible.map(row => Object.fromEntries(keys.map(k=>[k,row[k] ?? null])));
     return json({
