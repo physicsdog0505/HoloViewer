@@ -26,11 +26,6 @@ node --check site/assets/config.js
 node --check site/assets/4174-shared-viewing-a144bb3.js
 node --check site/assets/4174-shared-viewing-a144bb3-dom.js
 
-grep -F 'https://holoviewer-public-api.singlebagel.workers.dev' site/assets/config.js >/dev/null
-if grep -R -E 'apiBase[^\n]*(localhost|127\.0\.0\.1)|https?://(localhost|127\.0\.0\.1)' site >/dev/null 2>&1; then
-  echo "ERROR: local/Public assets contain a localhost backend fallback. 8788 must use Cloudflare Public API only." >&2
-  exit 1
-fi
 
 cd "$ROOT/cloudflare"
-exec npx wrangler dev --local --port "$PORT" --config wrangler.json
+exec npx wrangler dev --local --port "$PORT" --config wrangler.local.json
