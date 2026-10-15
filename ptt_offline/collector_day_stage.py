@@ -6,6 +6,8 @@ by schema-preview first-N query. No publication or D1 mutation is performed.
 from __future__ import annotations
 
 from datetime import date
+from hashlib import sha256
+import json
 from .collector_source_preview import verify_schema
 from .public_today_contract import ContractError, normalize_public_aid
 from .publisher_cli import coverage_receipt
@@ -56,8 +58,10 @@ def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
     selected=[{**r,"source_url":url,"origin":"collector"}
               for r in chronological if r["day"] == day
               and r["source_line"] > after_source_line]
+    source_identity=sha256(json.dumps([board,canonical,url,article_id],
+        separators=(",",":"),ensure_ascii=False).encode("utf-8")).hexdigest()
     return {
-        "day":day,"aid":canonical,
+        "day":day,"aid":canonical,"source_identity":source_identity,
         "source_rows_examined":len(raw),
         "selected_rows_total":len(selected),
         "rows":selected[:limit],
