@@ -3,8 +3,20 @@ set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 ACCEPTED_4174_ROOT="${ACCEPTED_4174_ROOT:-}"
-BASELINE_PORT="${BASELINE_PORT:-4174}"
-CANDIDATE_PORT="${CANDIDATE_PORT:-8788}"
+pick_port() {
+  python3 - <<'PY'
+import socket
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind(("127.0.0.1", 0))
+    print(s.getsockname()[1])
+PY
+}
+
+BASELINE_PORT="${BASELINE_PORT:-$(pick_port)}"
+CANDIDATE_PORT="${CANDIDATE_PORT:-$(pick_port)}"
+if [ "$BASELINE_PORT" = "$CANDIDATE_PORT" ]; then
+  CANDIDATE_PORT="$(pick_port)"
+fi
 
 if [ -z "$ACCEPTED_4174_ROOT" ]; then
   echo "ACCEPTED_4174_ROOT is required and must point to the clean accepted 4174 checkout." >&2
@@ -72,8 +84,15 @@ wait_ready() {
   url="$1"
   label="$2"
   log="$3"
+  pid="$4"
+  expected_runtime_root="$5"
   n=0
   while [ "$n" -lt 50 ]; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "$label process exited before readiness: pid=$pid" >&2
+      cat "$log" >&2
+      return 1
+    fi
     if python3 - "$url" <<'PY'
 import sys
 from urllib.request import urlopen
@@ -84,7 +103,23 @@ except Exception:
     raise SystemExit(1)
 PY
     then
-      return 0
+      n=0
+      while [ "$n" -lt 20 ]; do
+        if grep -F "Client runtime data: $expected_runtime_root" "$log" >/dev/null 2>&1; then
+          return 0
+        fi
+        if ! kill -0 "$pid" 2>/dev/null; then
+          echo "$label process exited before provenance confirmation: pid=$pid" >&2
+          cat "$log" >&2
+          return 1
+        fi
+        n=$((n + 1))
+        sleep 0.1
+      done
+      echo "$label responded, but provenance did not confirm expected runtime root" >&2
+      echo "expected: $expected_runtime_root" >&2
+      cat "$log" >&2
+      return 1
     fi
     n=$((n + 1))
     sleep 0.2
@@ -94,8 +129,8 @@ PY
   return 1
 }
 
-wait_ready "http://127.0.0.1:$BASELINE_PORT/" "accepted 4174" "$BASELINE_LOG"
-wait_ready "http://127.0.0.1:$CANDIDATE_PORT/" "candidate 8788" "$CANDIDATE_LOG"
+wait_ready "http://127.0.0.1:$BASELINE_PORT/" "accepted 4174" "$BASELINE_LOG" "$BASELINE_PID" "$BASELINE_DATA"
+wait_ready "http://127.0.0.1:$CANDIDATE_PORT/" "candidate 8788" "$CANDIDATE_LOG" "$CANDIDATE_PID" "$CANDIDATE_DATA"
 
 python3 tools/check_4174_http_parity.py   --baseline "http://127.0.0.1:$BASELINE_PORT"   --candidate "http://127.0.0.1:$CANDIDATE_PORT"
 
