@@ -50,3 +50,15 @@ sh scripts/check_public_local.sh
 7. Re-enter single/multi within the same SPA session to catch YouTube API lifecycle bugs.
 
 Only after these pass locally should a PR/CI/deploy be used.
+
+
+## 4174 retirement checkpoint
+
+Owner decision (2026-10-15):
+
+- The current Mac 4174 environment remains the temporary parity source only until the local Public runtime at `127.0.0.1:8788` reproduces the accepted 4174 UI and behavior.
+- Acceptance must cover at least: single view, multi-view Equal, multi-view Focus, immersive enter/ESC exit, YouTube player lifecycle, PTT layout, and same-session SPA re-entry.
+- Once the owner accepts 8788 parity, **8788 becomes the sole active development and acceptance environment for this product line.**
+- At that point, 4174 is frozen as an archival reference and is no longer an active development target.
+- Future fixes must be developed and accepted on the local Public runtime first, then promoted to production through one reviewed checkpoint.
+- Do not reintroduce a second independently evolving 4174 implementation after retirement.
