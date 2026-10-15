@@ -11,8 +11,8 @@ Authoritative product source:
 
 - Checkpoint 1 — SOURCE SNAPSHOT COMPLETE: PASS by independent #68 review
 - Checkpoint 2 — RUNTIME ISOLATED: PASS by independent #68 review at `a05fbcada2b688b1fe58c8f6c21b5e93ddaf757d`
-- Checkpoint 3 — 4174 PARITY: IN PROGRESS
-- Checkpoint 4 — PLATFORM ADAPTER: BLOCKED
+- Checkpoint 3 — 4174 PARITY: PASS by independent #68 review at `0e1d2918d27b190312109b2f9d9e2fdb7cf59cb8` (21/21 HTTP, 23/23 browser)
+- Checkpoint 4 — MINIMAL PLATFORM ADAPTER: UNBLOCKED; NOT DEPLOYED
 
 ## Phase A/B — frozen source snapshot
 
@@ -80,11 +80,9 @@ Do not claim Checkpoint 3 PASS from source identity alone. Actual route/runtime/
 
 ## Phase E — Cloudflare compatibility
 
-**BLOCKED.**
+**UNBLOCKED FOR MINIMAL ADAPTER IMPLEMENTATION ONLY**, per independent #68 disposition `6188543537`. Production mutations, binding changes, migrations, live writer enablement and deploy/cutover remain owner-only stop gates. No new D1 or staging architecture.
 
-No `site/**`, `cloudflare/**`, Public static shell/controller, Worker adapter, CSP/CORS integration, or production deployment work may be added yet.
-
-When Phase E is eventually unblocked, it may handle only:
+The currently authorized Phase E may handle only:
 
 - hosting/static delivery
 - route mapping
@@ -95,6 +93,8 @@ When Phase E is eventually unblocked, it may handle only:
 - service endpoints required by accepted 4174 behavior
 
 It must not reimplement or alter player lifecycle, multi-view, Custom View, Watchalong, immersive/fullscreen/ESC, audio, PTT UI/timeline/player, Home, History, navigation, layout, or CSS geometry.
+
+The existing canonical platform target is `Public/8788 -> holoviewer-public-api` -> D1 binding `DB` -> `holoviewer-public-v1` (Issue #45 canonical record `6188242451`). Do not use the PTT-specific D1s, add a new D1, or create a parallel product.
 
 If a platform limitation prevents accepted 4174 behavior, stop and report it.
 
