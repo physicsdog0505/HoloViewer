@@ -178,7 +178,6 @@ def asset_rows(manifest_paths: set[str]) -> list[dict[str, str]]:
 
 def validate_runtime_data_root(path: Path) -> Path:
     resolved = path.expanduser().resolve()
-    resolved.mkdir(parents=True, exist_ok=True)
     if resolved == VENDOR or under(resolved, VENDOR):
         raise RuntimeError(
             f"runtime-data root must be outside vendored code root: {resolved}"
@@ -187,6 +186,7 @@ def validate_runtime_data_root(path: Path) -> Path:
         raise RuntimeError(
             f"runtime-data root must not contain vendored code root: {resolved}"
         )
+    resolved.mkdir(parents=True, exist_ok=True)
     return resolved
 
 
