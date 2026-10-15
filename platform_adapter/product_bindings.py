@@ -39,10 +39,8 @@ def _home_row(row: dict, home_stream_cls: Callable, *, feed_freshness: str = "un
     if lifecycle not in ALLOWED_STATES:
         lifecycle = "unknown"
     state = lifecycle
-    # A positive LIVE assertion requires fresh feed evidence, not simply
-    # an old persisted lifecycle label from the canonical store.
-    if state == "live" and feed_freshness != "fresh":
-        state = "unknown"
+    # Canonical Today already computes per-row freshness/lifecycle.
+    # Do not apply an envelope-level second lifecycle decision here.
     group = str(row.get("group") or "").lower()
     if group not in VISIBLE_GROUPS:
         group = "unknown"  # Never classify an unverified channel as Hololive.
