@@ -36,6 +36,57 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def git_blob_sha(data: bytes) -> str:
+    header = f"blob {len(data)}\\0".encode("ascii")
+    return hashlib.sha1(header + data).hexdigest()
+
+
+def load_manifest() -> dict:
+    data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    if data.get("source_commit") != SOURCE_COMMIT:
+        raise RuntimeError("manifest source commit mismatch")
+    return data
+
+
+def snapshot_signature(manifest: dict) -> dict[str, str]:
+    sig: dict[str, str] = {}
+    for entry in manifest.get("product_files", []):
+        rel = entry.get("path")
+        if not isinstance(rel, str):
+            continue
+        path = VENDOR / rel
+        if not path.is_file():
+            raise RuntimeError(f"manifested source file missing at runtime: {rel}")
+        sig[rel] = git_blob_sha(path.read_bytes())
+    return sig
+
+
+def verify_snapshot_unchanged(before: dict[str, str]) -> None:
+    after_manifest = load_manifest()
+    after = snapshot_signature(after_manifest)
+    if before != after:
+        changed = sorted(set(before) | set(after))
+        diffs = [rel for rel in changed if before.get(rel) != after.get(rel)]
+        raise RuntimeError(
+            "vendored source snapshot changed during runtime: " + ", ".join(diffs)
+        )
+
+    actual = {
+        str(path.relative_to(VENDOR))
+        for path in VENDOR.rglob("*")
+        if path.is_file()
+        and "__pycache__" not in path.parts
+        and path.suffix != ".pyc"
+    }
+    expected = set(before)
+    extra = sorted(actual - expected)
+    if extra:
+        raise RuntimeError(
+            "generated/unmanifested file appeared inside vendored snapshot: "
+            + ", ".join(extra)
+        )
+
+
 def isolate_sys_path() -> None:
     prefixes = {Path(sys.prefix).resolve(), Path(sys.base_prefix).resolve()}
     safe = [str(VENDOR)]
@@ -64,13 +115,10 @@ def load_product_roots() -> set[str]:
     return roots
 
 
-def load_manifest_paths() -> set[str]:
-    data = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    if data.get("source_commit") != SOURCE_COMMIT:
-        raise RuntimeError("manifest source commit mismatch")
+def load_manifest_paths(manifest: dict) -> set[str]:
     return {
         entry["path"]
-        for entry in data.get("product_files", [])
+        for entry in manifest.get("product_files", [])
         if isinstance(entry, dict) and isinstance(entry.get("path"), str)
     }
 
@@ -128,14 +176,34 @@ def asset_rows(manifest_paths: set[str]) -> list[dict[str, str]]:
     return rows
 
 
-def print_provenance(module_rows: list[dict[str, str]], assets: list[dict[str, str]]) -> None:
+def validate_runtime_data_root(path: Path) -> Path:
+    resolved = path.expanduser().resolve()
+    resolved.mkdir(parents=True, exist_ok=True)
+    if resolved == VENDOR or under(resolved, VENDOR):
+        raise RuntimeError(
+            f"runtime-data root must be outside vendored code root: {resolved}"
+        )
+    if under(VENDOR, resolved):
+        raise RuntimeError(
+            f"runtime-data root must not contain vendored code root: {resolved}"
+        )
+    return resolved
+
+
+def print_provenance(
+    runtime_data_root: Path,
+    module_rows: list[dict[str, str]],
+    assets: list[dict[str, str]],
+) -> None:
     report = {
         "migration_head": git_head(),
         "pinned_4174_source": SOURCE_COMMIT,
         "cwd": str(Path.cwd()),
         "python_executable": sys.executable,
         "sys_path": list(sys.path),
-        "runtime_root": str(VENDOR),
+        "code_root": str(VENDOR),
+        "runtime_data_root": str(runtime_data_root),
+        "today_refresh_disabled": os.environ.get("PTT_CLIENT_DISABLE_TODAY_REFRESH") == "1",
         "loaded_product_modules": module_rows,
         "static_assets": assets,
     }
@@ -147,32 +215,45 @@ def print_provenance(module_rows: list[dict[str, str]], assets: list[dict[str, s
 def main() -> int:
     parser = argparse.ArgumentParser(description="Isolated 4174 snapshot runner")
     parser.add_argument("--port", type=int, default=8788)
+    parser.add_argument("--runtime-data-root", required=True)
     args = parser.parse_args()
+
+    runtime_data_root = validate_runtime_data_root(Path(args.runtime_data_root))
 
     os.environ.pop("PYTHONPATH", None)
     os.environ["PYTHONNOUSERSITE"] = "1"
     os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+    os.environ["PTT_CLIENT_DISABLE_TODAY_REFRESH"] = "1"
 
     isolate_sys_path()
-    os.chdir(VENDOR)
+    if str(runtime_data_root) in sys.path:
+        raise RuntimeError("runtime-data root must never be present in sys.path")
 
+    manifest = load_manifest()
+    before_signature = snapshot_signature(manifest)
+
+    os.chdir(VENDOR)
     product_roots = load_product_roots()
-    manifest_paths = load_manifest_paths()
+    manifest_paths = load_manifest_paths(manifest)
 
     client_app = importlib.import_module("client_app")
     module_rows = audit_loaded_modules(product_roots, manifest_paths)
     assets = asset_rows(manifest_paths)
-    print_provenance(module_rows, assets)
+    print_provenance(runtime_data_root, module_rows, assets)
 
-    # Checkpoint 2 deliberately uses the vendored snapshot itself as runtime root.
-    # External owner data is not required to prove code/static isolation.
     sys.argv = [
         str(VENDOR / "client_app.py"),
         "--host", "127.0.0.1",
         "--port", str(args.port),
-        "--runtime-root", str(VENDOR),
+        "--runtime-root", str(runtime_data_root),
     ]
-    return int(client_app.main())
+
+    try:
+        result = int(client_app.main())
+    finally:
+        verify_snapshot_unchanged(before_signature)
+        print("PASS: vendored source snapshot unchanged after runtime")
+    return result
 
 
 if __name__ == "__main__":
