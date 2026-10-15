@@ -32,7 +32,12 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
             ready = False
             while time.monotonic() < deadline:
                 if process.poll() is not None:
-                    raise RuntimeError("Pyodide workerd process exited before ready")
+                    log.flush()
+                    details = log_path.read_text(encoding="utf-8", errors="replace")[-6000:]
+                    raise RuntimeError(
+                        "Pyodide workerd exited before ready (exit "
+                        + str(process.returncode) + "):\\n" + details
+                    )
                 try:
                     request = urllib.request.Request(base + "/history?date=invalid")
                     with urllib.request.urlopen(request, timeout=2):
@@ -45,7 +50,9 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
                 except (OSError, TimeoutError):
                     time.sleep(2)
             if not ready:
-                raise TimeoutError("Local Python Worker did not start")
+                log.flush()
+                details = log_path.read_text(encoding="utf-8", errors="replace")[-6000:]
+                raise TimeoutError("Local Python Worker did not start:\\n" + details)
 
             for target, expected in (
                 ("/history?date=invalid", 400),
