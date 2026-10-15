@@ -7,46 +7,110 @@ Authoritative product source:
 - accepted local branch: `feat/4174-history-day-391`
 - vendored root: `vendor/4174-a144bb3/`
 
-## Hard rules
+## Current allowed work
 
-1. Product behavior comes only from the vendored 4174 snapshot.
-2. Vendored files are immutable. Their Git blob SHA must match
-   `provenance/4174-source-manifest.json`.
-3. No legacy Public product tree is allowed. In particular, no `site/**`,
-   legacy `cloudflare/**`, Public `app.py`, Public static shell/controller,
-   or old Public smoke/parity implementation may be used as a migration source.
-4. `dev/8788-parity` and `dev/8788-clean-transplant` are failed experiments
-   and are forbidden as source branches.
-5. The launcher must clear `PYTHONPATH`, disable user-site imports, and run
-   through `tools/run_4174_snapshot.py`. Local 4174 modules must resolve under
-   `vendor/4174-a144bb3/`; system/external packages may resolve only from the
-   Python installation.
-6. Runtime data is external to the code snapshot and must be named explicitly
-   with `PTT_4174_RUNTIME_ROOT`. The launcher refuses an implicit data checkout.
-7. Before launch, `tools/verify_4174_snapshot.py` must pass:
-   - manifest completeness
-   - Git blob identity
-   - local Python import closure
-   - no unmanifested vendored files
-   - no legacy Public product residue
-8. Cloudflare compatibility work is blocked until source/runtime parity review.
-   When unblocked, it may adapt only hosting, route transport, API transport,
-   CSP/CORS, and Worker runtime boundaries.
-9. Cloudflare/platform code must not reimplement or alter player, multi-view,
-   layout, audio, immersive/fullscreen/ESC, PTT UI, Custom View, Watchalong,
-   Home, History, or other 4174 product behavior.
+Only **Phase A + Phase B** are allowed on this branch right now.
 
-## Local preflight
+### Phase A — complete source snapshot
+
+- Vendor only files justified by the pinned 4174 dependency graph.
+- Do not rewrite product behavior.
+- Keep DBs, caches, credentials, generated/runtime data, and owner-local artifacts out.
+- Required accepted roots:
+  - `client_app.py`
+  - `client_custom_view.py`
+  - `client_history.py`
+  - `client_home.py`
+  - `client_ptt_today.py`
+  - `client_ui_shell.py`
+  - `client_watchalong.py`
+  - `shared_viewing_core.py`
+- Required static/runtime assets include:
+  - `public/ptt_timeline.js`
+  - `public/ptt_player_adapter.js`
+  - `public/ptt_worker_adapter.js`
+  - `hololive_channels.prototype.json`
+
+### Phase B — provenance / anti-contamination
+
+Every vendored product file must be recorded in
+`provenance/4174-source-manifest.json` with:
+
+- relative path
+- source repository
+- source commit
+- source blob SHA
+- role
+
+Run:
 
 ```sh
 python3 tools/verify_4174_snapshot.py
 ```
 
-## Isolated 8788 launch
+The verifier must fail closed when:
 
-```sh
-PTT_4174_RUNTIME_ROOT=/absolute/path/to/runtime-data \
-  sh scripts/start_8788_full_4174.sh
-```
+- a product blob differs from pinned 4174;
+- a required local dependency is absent;
+- an unmanifested product file appears;
+- a required static path escapes the vendored snapshot;
+- old Public product files are present;
+- migration runs from either failed branch;
+- Phase C/E launcher/platform artifacts are introduced early.
 
-No PR, CI, deployment, or Cloudflare adapter is part of this source-snapshot gate.
+## Explicitly forbidden migration sources
+
+These branches are historical failed experiments only:
+
+- `dev/8788-parity`
+- `dev/8788-clean-transplant`
+
+No product HTML/CSS/JS/Python logic may be cherry-picked from them.
+
+## Blocked until later Review checkpoints
+
+### Phase C — local 8788 launcher/runtime isolation
+
+**Blocked.** Do not add the 8788 launcher yet.
+
+### Phase D — runtime/UI parity
+
+**Blocked.** Do not claim visual/runtime parity from source equivalence.
+
+### Phase E — Cloudflare compatibility
+
+**Blocked.** No Cloudflare/platform implementation yet.
+
+When Phase E is eventually unblocked, platform code may handle only:
+
+- hosting/static delivery
+- route mapping
+- API transport/proxy
+- CSP/CORS
+- Worker/runtime compatibility
+- environment/config injection
+- service endpoints required by accepted 4174 behavior
+
+It must not reimplement or alter:
+
+- player lifecycle or controls
+- multi-view layout/selection
+- Custom View behavior
+- Watchalong behavior
+- immersive/fullscreen/ESC
+- audio behavior
+- PTT UI/timeline/player behavior
+- Home UI
+- History UI
+- navigation/layout/CSS geometry
+
+If the platform cannot preserve accepted 4174 behavior, stop and report the incompatibility.
+
+## Checkpoint order
+
+1. SOURCE SNAPSHOT COMPLETE
+2. RUNTIME ISOLATED
+3. 4174 PARITY
+4. PLATFORM ADAPTER
+
+Do not skip checkpoints.
