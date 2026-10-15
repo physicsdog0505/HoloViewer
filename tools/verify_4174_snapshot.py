@@ -42,9 +42,11 @@ ALLOWED_ROLES = {
     "runtime_requirement_manifest",
     "runtime_asset",
 }
-PREMATURE_PHASE_C_OR_E = {
+REQUIRED_PHASE_C = {
     "scripts/start_8788_full_4174.sh",
     "tools/run_4174_snapshot.py",
+}
+BLOCKED_PHASE_E = {
     "cloudflare",
     "site",
 }
@@ -223,20 +225,23 @@ def main() -> int:
         elif not path.is_file():
             errors.append(f"required static asset missing: {rel}")
 
-    # Phase A+B only. Do not let premature launcher/platform work creep back in.
-    for rel in sorted(PREMATURE_PHASE_C_OR_E):
+    # Checkpoint 2 requires the isolated launcher/runtime runner, while
+    # Cloudflare/platform work remains blocked until later review.
+    for rel in sorted(REQUIRED_PHASE_C):
         path = ROOT / rel
-        if path.is_file() or path.is_symlink():
-            errors.append(f"premature Phase C/E artifact present: {rel}")
-        elif path.is_dir():
-            residue = [
-                item for item in path.rglob("*")
-                if item.is_file() or item.is_symlink()
-            ]
-            if residue:
-                errors.append(
-                    f"premature Phase C/E product tree present: {rel}"
-                )
+        if not path.is_file():
+            errors.append(f"required Phase C isolation artifact missing: {rel}")
+
+    for rel in sorted(BLOCKED_PHASE_E):
+        path = ROOT / rel
+        if not path.exists():
+            continue
+        residue = [
+            item for item in path.rglob("*")
+            if item.is_file() or item.is_symlink()
+        ] if path.is_dir() else [path]
+        if residue:
+            errors.append(f"premature Phase E product/platform tree present: {rel}")
 
     # Explicitly reject legacy Public product residue.
     forbidden_files = [
@@ -268,7 +273,8 @@ def main() -> int:
     print(f"PASS: {len(vendored_python)} vendored Python modules have closed local imports")
     print("PASS: required PTT/static assets resolve inside vendor/4174-a144bb3")
     print("PASS: no old Public or failed-branch product source is admitted")
-    print("PASS: Phase C/E artifacts are absent; Phase A+B gate only")
+    print("PASS: Phase C isolation artifacts are present")
+    print("PASS: Phase E Cloudflare/static-shell artifacts remain absent")
     return 0
 
 
