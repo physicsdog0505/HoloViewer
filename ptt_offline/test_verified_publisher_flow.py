@@ -46,6 +46,7 @@ class VerifiedPublisherFlowTests(unittest.TestCase):
     def test_all_verified_five_then_two_resume(self):
         one=self.call(lambda row:True)
         self.assertEqual(one["checkpoint"]["aids"][self.aid],5)
+        self.assertTrue(one["batch_id"].startswith("ptt48:"))
         two=self.call(lambda row:True)
         self.assertEqual(two["checkpoint"]["aids"][self.aid],7)
         self.assertEqual(self.call(lambda row:True)["status"],"NO_NEW_ROWS")
