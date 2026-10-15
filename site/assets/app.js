@@ -87,7 +87,9 @@ function route(r){
  history.replaceState(null,'',sessionHash);
  const viewerActive=r==='custom-session';
  if(!viewerActive)window.hvStopFocusCarousel?.();
- $('viewer-4174-css').media=viewerActive?'all':'not all';
+ $('viewer-4174-css').media='not all';
+ const transplantCss=document.getElementById('viewer-4174-transplant-css');
+ if(transplantCss)transplantCss.media=viewerActive?'all':'not all';
  document.body.classList.toggle('custom-session-watching',viewerActive);
  if(!viewerActive&&document.body.classList.contains('custom-immersive')){
   applyViewerImmersive(false);
@@ -622,38 +624,44 @@ window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
  try{sessionStorage.setItem('hvCustomViewing',JSON.stringify({ids:clean,layout:opts.layout||'auto',ptt:opts.ptt||'video',primary:opts.primary||0,audio:opts.audio||0}));}catch{}
- stopFocusCarousel();
- verifiedTimelineStarts=new Map();
- const timeline=opts.verifiedTimelineStarts;
- if(timeline&&typeof timeline==='object'){
-  clean.forEach(id=>{
-   const value=timeline[id];
-   // Missing/null/boolean values are not verified timestamp evidence.
-   if(typeof value==='number'&&Number.isFinite(value))verifiedTimelineStarts.set(id,value);
-  });
- }
- viewing.ids=clean;viewing.ptt=opts.ptt==='live'?'live':'video';viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
+ viewing.ids=clean;
+ viewing.ptt=opts.ptt==='live'?'live':'video';
+ viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
  viewing.primary=Math.max(0,Math.min(clean.length-1,Number(opts.primary)||0));
  viewing.audio=Math.max(0,Math.min(clean.length-1,Number(opts.audio)||0));
- const box=$('stage');viewerTimeline.clear();box.replaceChildren();const audio=$('session-audio');audio.replaceChildren();
- clean.forEach((id,i)=>{
-  box.append(makeWatchCard(id,i));
-  const option=node('option',String(i+1)+' · '+id);option.value=String(i);audio.append(option);
- });
- audio.value=String(viewing.audio);
- const showPtt=opts.ptt==='live';
- $('customContentGrid').classList.toggle('video-only',!showPtt);
- if(showPtt){
-  if(!viewerPttPanel.isConnected)$('customContentGrid').append(viewerPttPanel);
-  viewerPttPanel.hidden=false;
-  $('custom-session-ptt-note').textContent='目前沒有足夠的專串來源與影片時間證據。';
- }else{
-  viewerPttPanel.hidden=true;
-  viewerPttPanel.remove();
+ replacementTarget=0;
+ watchMode=clean.length>1?'multi':'single';
+
+ const section=$('custom-session');
+ if(typeof window.render4174SharedViewerDOM!=='function'||typeof window.mount4174SharedViewer!=='function'){
+  section.innerHTML='<p class="form-error">4174 viewer transplant assets failed to load.</p>';
+  route('custom-session');
+  return;
  }
- $('session-status').textContent=clean.length+' 個影片';
- replacementTarget=0;watchMode=clean.length>1?'multi':'single';$('syncPlayback').checked=clean.length>1;refreshWatchMode();
- renderFocusChoices();route('custom-session');sessionLayout();sessionAudio();globalVolume($('globalVolume').value);
+ section.innerHTML=window.render4174SharedViewerDOM(viewing.ptt==='live');
+ route('custom-session');
+
+ const streamMetadata=new Map([...document.querySelectorAll('.live-channel-rail-item[data-live-video-id]')].map(item=>[
+  item.dataset.liveVideoId,
+  {label:item.dataset.title||item.dataset.channel||item.dataset.liveVideoId,channelId:item.dataset.channelId||item.dataset.channel||''}
+ ]));
+ const streams=clean.map((id,index)=>{
+  const meta=streamMetadata.get(id)||{};
+  return {videoId:id,label:meta.label||('Stream '+(index+1)),channelId:meta.channelId||''};
+ });
+ window.mount4174SharedViewer({
+  streams,
+  layout:viewing.layout,
+  primaryIndex:viewing.primary,
+  audioMasterIndex:viewing.audio,
+  singlePttKind:viewing.ptt==='live'?'live':'',
+  translationA:[],
+  translationB:[],
+  verifiedTimelineStarts:opts.verifiedTimelineStarts&&typeof opts.verifiedTimelineStarts==='object'?opts.verifiedTimelineStarts:{},
+  manualTimelineStarts:{},
+  collabPollUrl:'',
+  collabLabel:''
+ });
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
