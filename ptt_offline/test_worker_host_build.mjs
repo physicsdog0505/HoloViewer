@@ -10,6 +10,9 @@ const config={name:'holoviewer-public-api',
  vars:{ALLOWED_ORIGIN:'https://holoviewer.example',PTT_PUBLISH_ENABLED:'false'}};
 test('one existing API Worker and DB required; Publisher not automatically enabled',()=>{
  assert.equal(validateExistingConfig(config).publisher_default_off,true);
+ const absent={...config,vars:{PTT_PUBLISH_ENABLED:'false'}};
+ assert.equal(validateExistingConfig(absent).cors_origin_mode,'absent_preserved');
+ assert.equal(validateExistingConfig({...config,vars:undefined}).cors_origin_mode,'absent_preserved');
  assert.throws(()=>validateExistingConfig({...config,name:'new-worker'}),/existing API Worker/);
  assert.throws(()=>validateExistingConfig({...config,vars:{ALLOWED_ORIGIN:''}}),/ALLOWED_ORIGIN/);
  assert.throws(()=>validateExistingConfig({...config,vars:{...config.vars,PTT_PUBLISH_ENABLED:'true'}}),/silently enable/);
@@ -17,11 +20,13 @@ test('one existing API Worker and DB required; Publisher not automatically enabl
 test('build invokes only existing-worker Wrangler dry run',()=>{
  const dir=mkdtempSync(join(tmpdir(),'ptt48-host-test-'));
  try{
-  const source=join(dir,'current.json');writeFileSync(source,JSON.stringify(config));
+  const source=join(dir,'current.json');
+  writeFileSync(source,JSON.stringify({...config,vars:undefined}));
   let seen;
   const receipt=build(['--existing-config',source,'--outdir',join(dir,'bundle')],
     (bin,args)=>{seen={bin,args};});
   assert.equal(receipt.deployed,false);
+  assert.equal(receipt.cors_origin_mode,'absent_preserved');
   assert.equal(seen.bin,'npx');
   assert.ok(seen.args.includes('--dry-run'));
   assert.ok(seen.args.includes('--outdir'));
