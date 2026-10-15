@@ -234,8 +234,9 @@ async function watchalongRecent(db,{days=30,limit=60,now=new Date()}={}){
  const cutoffDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(cutoff);
  const rows=await db.prepare(`SELECT event_id,aid,article_title,source_url,article_datetime,day,scheduled_time,description,member_only,source
  FROM public_watchalong_events WHERE day>=? AND day<=? ORDER BY article_datetime DESC,scheduled_time DESC,event_id DESC LIMIT ?`)
-  .bind(cutoffDay,localDay,limit).all();
- return {schema_version:'public-experience-v1',kind:'watchalong',scope:'recent',days,as_of:now.toISOString().replace(/\.\d{3}Z$/,'Z'),events:await hydrateWatchRows(db,rows.results??[])};
+  .bind(cutoffDay,localDay,limit+1).all();
+ const raw=rows.results??[],has_more=raw.length>limit;
+ return {schema_version:'public-experience-v1',kind:'watchalong',scope:'recent',days,limit,has_more,as_of:now.toISOString().replace(/\.\d{3}Z$/,'Z'),events:await hydrateWatchRows(db,raw.slice(0,limit))};
 }
 async function watchalongDetail(db,eventId){
  const row=await db.prepare(`SELECT event_id,aid,article_title,source_url,article_datetime,day,scheduled_time,description,member_only,source
