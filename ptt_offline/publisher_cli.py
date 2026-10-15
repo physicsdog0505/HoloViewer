@@ -100,16 +100,23 @@ def coverage_receipt(db, aid: str):
     if merged_end < last_source_line:
         gaps.append([merged_end+1,last_source_line])
     gaps=[g for g in gaps if g[0] <= g[1]]
-    complete=(covered_start == 1 and merged_end >= last_source_line and not gaps)
+    terminal_valid=(type(last_page) is int and type(total_pages) is int
+                    and total_pages >= 1 and last_page == total_pages
+                    and any(page == total_pages and page_total == total_pages
+                            and end >= last_source_line
+                            for page,page_total,start,end in rows))
+    complete=(covered_start == 1 and merged_end >= last_source_line
+              and not gaps and terminal_valid)
     return {"article_verified":True,"screen_rows":len(rows),
             "covered_start":covered_start,"covered_end":merged_end,
             "last_source_line":last_source_line,"last_page":last_page,
             "article_total_pages":total_pages,"gaps":gaps,
             "malformed_screen_evidence":False,"complete":complete,
+            "terminal_verified":terminal_valid,
             "has_gap":not complete,
             "reason":("continuous article_screens coverage through canonical "
-                      "last_source_line" if complete else
-                      "article_screens does not continuously cover 1..last_source_line")}
+                      "last_source_line and terminal page" if complete else
+                      "incomplete source range or unverified terminal page")}
 
 def atomic_receipt(destination: Path, body: dict):
     destination.parent.mkdir(parents=True,exist_ok=True)
