@@ -125,17 +125,18 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
         OR (actual_end>=? AND actual_end<?)
         OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL AND lifecycle_observed_at>=?))
     ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ?`)
-    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\.\d{3}Z$/,'Z'),limit).all();
+    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\.\d{3}Z$/,'Z'),limit+1).all();
+  const truncated=(rows.results??[]).length>limit;
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
   const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
   return {schema_version:'public-consumer-v1',as_of:nowStamp,
     freshness:{status:freshness,last_success_at:last},
     completeness:{status:coverage?(coverage.gap||coverage.scanned_channels>0?'partial':'unverified'):'unverified',
-                  gap:!coverage||Boolean(coverage.gap)},
+                  gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated},
     checkpoint:coverage?.checkpoint??null,
-    streams:(rows.results??[]).map(r=>{
-      const evidenceAge=Date.parse(nowStamp)-Date.parse(r.lifecycle_observed_at),valid=evidenceAge>=0&&evidenceAge<=1800000;
+    streams:(rows.results??[]).slice(0,limit).map(r=>{
+      const evidenceAge=Date.parse(nowStamp)-Date.parse(r.lifecycle_observed_at),valid=evidenceAge>=0&&evidenceAge<=1200000;
       const state=r.lifecycle_state==='ended'&&r.actual_end?'ended':!valid?'stale':
         r.lifecycle_state==='upcoming'&&r.scheduled_start&&r.scheduled_start<=nowStamp?'waiting':r.lifecycle_state;
       return {video_id:r.video_id,title:r.title,channel_id:r.publisher_channel_id,channel_name:r.channel_name,
