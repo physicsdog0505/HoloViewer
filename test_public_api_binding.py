@@ -58,15 +58,16 @@ class ProviderBindingTest(unittest.TestCase):
             def __init__(self, freshness):
                 self.freshness=freshness
             def read_today(self):
-                return {"freshness":self.freshness,"items":[
+                return {"freshness":self.freshness,"streams":[
                     {"video_id":"dQw4w9WgXcQ","lifecycle_state":"live"}
                 ]}
-        for state in ("stale","unknown",None):
+        for state in ({"status":"stale"},{"status":"unknown"},None,{"state":"fresh"},{"status":"bad"}, "fresh"):
             live,_,_,unknown=bind_home_reader(Stub(state),FakeHomeStream)()
             self.assertEqual(len(live),0)
             self.assertEqual(len(unknown),1)
-        live,_,_,_=bind_home_reader(Stub("fresh"),FakeHomeStream)()
+        live,_,_,_=bind_home_reader(Stub({"status":"fresh","last_success_at":"2026-10-15T08:00:00Z"}),FakeHomeStream)()
         self.assertEqual(len(live),1)
+        self.assertEqual(live[0].state,"live")
 
     def test_missing_consumer_list_fails_closed(self):
         class Stub:
