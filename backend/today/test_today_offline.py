@@ -19,7 +19,7 @@ def raw(state, start=None, end=None, owner=CID):
 
 class TodayOfflineTests(unittest.TestCase):
     def observe(self, data, at=NOW):
-        return normalize_video(data, observed_at=at, approved_channels={CID})
+        return normalize_video(data, observed_at=at, approved_channels={CID}, reference_now=NOW+timedelta(hours=1))
     def test_verified_live(self):
         self.assertEqual(self.observe(raw("live","2026-10-15T11:00:00Z"))["lifecycle_state"],"live")
     def test_positive_ended(self):
