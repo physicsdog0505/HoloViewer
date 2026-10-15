@@ -81,7 +81,9 @@ def inspect_latest_article(db,*,max_rows=100):
         separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
     return {"status":"READY","aid":receipt["aid"],"url":url,
             "source_identity":source_identity,"candidate_rows":ready,
-            "pending_source_lines":pending,"checked_source_rows":len(raw)}
+            "pending_source_lines":pending,"checked_source_rows":len(raw),
+            "scan_truncated":len(raw)==max_rows,
+            "earliest_scanned_source_line":min((r[0] for r in raw),default=None)}
 
 def content_digest(row):
     return sha256(json.dumps([row.get(k) for k in OUTPUT_KEYS if k!="time_proof"],
@@ -101,6 +103,11 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False):
             if current.get("source_identity")!=plan["source_identity"]:
                 raise ContractError("live source identity changed; separate state needed")
         accepted=dict(current.get("accepted",{}))
+        # Last-N scanning cannot establish that older source rows were ever
+        # inspected. Refuse first-time live publication from a truncated scan;
+        # otherwise an old backlog could disappear without gap evidence.
+        if plan["scan_truncated"] and not current:
+            raise ContractError("initial live source scan truncated; inspect full coverage before publishing")
         missing=[]
         for row in plan["candidate_rows"]:
             key=row["source_record_key"]
