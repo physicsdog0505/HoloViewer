@@ -41,6 +41,14 @@ class ProductionPackageTests(unittest.TestCase):
                 receipt["authorized_ui_overrides"]["live_channel_rail_clear_navigation"],
                 "position:fixed;left:2px;top:466px;z-index:65;width:64px;max-height:calc(100vh - 478px);",
             )
+            self.assertEqual(
+                receipt["runtime_optimizations"]["client_home_lazy_runtime_imports"],
+                "applied",
+            )
+            home = (dest / "client_home.py").read_text()
+            self.assertNotIn("from youtube_metadata import YoutubeVideo", home)
+            self.assertNotIn("from live_stream_discovery import LiveDiscoveryCache\nfrom today_stream_status", home)
+            self.assertIn("from today_stream_status import stream_state", home)
 
 if __name__ == "__main__":
     unittest.main()
