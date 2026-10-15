@@ -144,7 +144,9 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False):
 def main(argv=None):
     p=argparse.ArgumentParser(description="One bounded near-live genuine PTT Publisher attempt")
     p.add_argument("--source",required=True)
-    p.add_argument("--state",required=True)
+    state_group=p.add_mutually_exclusive_group(required=True)
+    state_group.add_argument("--state")
+    state_group.add_argument("--state-dir")
     p.add_argument("--endpoint")
     p.add_argument("--inspect",action="store_true")
     p.add_argument("--send",action="store_true")
@@ -160,6 +162,14 @@ def main(argv=None):
         executor=owner_signed_http_executor(endpoint=args.endpoint or "",
             secret=os.environ.get("PTT_PUBLISH_HMAC_SECRET",""),allow_write=True)
     with open_source(args.source) as db:
-        result=run_live_once(db,state_path=args.state,secret=secret,executor=executor,send=args.send)
+        state=args.state
+        if args.state_dir:
+            observed=inspect_latest_article(db)
+            if observed["status"]!="READY":
+                print(json.dumps({"status":observed["status"],"sent":0}))
+                return
+            source_hash=sha256(observed["source_identity"].encode("ascii")).hexdigest()
+            state=str(Path(args.state_dir)/(source_hash+".json"))
+        result=run_live_once(db,state_path=state,secret=secret,executor=executor,send=args.send)
     print(json.dumps(result,ensure_ascii=False,sort_keys=True))
 if __name__=="__main__":main()
