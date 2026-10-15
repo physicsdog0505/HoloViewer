@@ -23,6 +23,8 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
     command = ["uvx", "--from", "workers-py", "pywrangler", "dev", "--local",
                "--ip", "127.0.0.1", "--port", str(port)]
     env = {**os.environ, "CI": "1", "NO_COLOR": "1"}
+    bundle_evidence = json.loads((bundle / "bundle-provenance.json").read_text())
+    fixture_mode = bundle_evidence.get("local_fixture_only") is True
     results = []
     with log_path.open("w", encoding="utf-8") as log:
         process = subprocess.Popen(command, cwd=bundle, stdout=log,
@@ -54,10 +56,16 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
                 details = log_path.read_text(encoding="utf-8", errors="replace")[-6000:]
                 raise TimeoutError("Local Python Worker did not start:\\n" + details)
 
-            for target, expected in (
+            expected_routes = [
                 ("/history?date=invalid", 400),
                 ("/ptt-today", 503),
-            ):
+            ]
+            if fixture_mode:
+                expected_routes = [
+                    ("/", 200), ("/api/home", 200),
+                    *expected_routes,
+                ]
+            for target, expected in expected_routes:
                 try:
                     response = urllib.request.urlopen(base + target, timeout=15)
                 except urllib.error.HTTPError as exc:
@@ -67,6 +75,14 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
                     media_type = response.headers.get("Content-Type", "").split(";", 1)[0]
                     payload = response.read(1024 * 1024)
                 okay = status == expected
+                if target == "/api/home" and okay:
+                    try:
+                        document = json.loads(payload)
+                        okay = isinstance(document.get("html"), str)
+                    except (UnicodeDecodeError, ValueError):
+                        okay = False
+                if target == "/" and okay:
+                    okay = b"<html" in payload.lower()
                 results.append({"path": target, "status": status,
                                 "expected_status": expected,
                                 "content_type": media_type, "pass": okay,
