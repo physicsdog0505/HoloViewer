@@ -101,6 +101,7 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
     bundle_evidence = json.loads((bundle / "bundle-provenance.json").read_text())
     fixture_mode = bundle_evidence.get("local_fixture_only") is True
     results = []
+    parity = None
     with log_path.open("w", encoding="utf-8") as log:
         process = subprocess.Popen(command, cwd=bundle, stdout=log,
                                    stderr=subprocess.STDOUT, env=env)
@@ -170,6 +171,8 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
                 print(details, flush=True)
                 print("=== END PYODIDE ERROR LOG ===", flush=True)
                 raise RuntimeError("Local Python Worker HTTP proof failed")
+            if fixture_mode:
+                parity = compare_accepted_fixture(base)
         finally:
             process.terminate()
             try:
@@ -177,7 +180,6 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
-    parity = compare_accepted_fixture(base) if fixture_mode else None
     return {"runtime": "local Python Workers/Pyodide workerd",
             "bundle": json.loads((bundle / "bundle-provenance.json").read_text()),
             "checks": results, "accepted_parity": parity, "production_deployment": False,
