@@ -159,6 +159,7 @@ class ParityContract(unittest.TestCase):
             self.assertIn(name,js)
         self.assertIn('renderHomeHighlights(rows)',js)
         self.assertIn("const homePollTimer=setInterval(",js)
+        self.assertIn("$('custom-session').classList.contains('active')",js)
         self.assertIn("},30000);",js)
 
     def test_stream_id_validator_keeps_ascii_ids(self):
