@@ -89,8 +89,8 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
   const coverage=await db.prepare('SELECT * FROM public_today_catalog_meta WHERE singleton=1').first();
   // Taipei day boundaries are UTC+08:00. Scope includes this day's activity and
   // actively LIVE streams crossing midnight, but not unrelated historical rows.
-  const start=new Date(day+'T00:00:00+08:00').toISOString().replace(/\\.\\d{3}Z$/,'Z');
-  const end=new Date(new Date(day+'T00:00:00+08:00').getTime()+86400000).toISOString().replace(/\\.\\d{3}Z$/,'Z');
+  const start=new Date(day+'T00:00:00+08:00').toISOString().replace(/\.\d{3}Z$/,'Z');
+  const end=new Date(new Date(day+'T00:00:00+08:00').getTime()+86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
   const rows=await db.prepare(`SELECT * FROM public_today_canonical
     WHERE roster_version=?
       AND ((lifecycle_observed_at>=? AND lifecycle_observed_at<?)
@@ -99,7 +99,7 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
         OR (actual_end>=? AND actual_end<?)
         OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL AND lifecycle_observed_at>=?))
     ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ?`)
-    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\\.\\d{3}Z$/,'Z'),limit).all();
+    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\.\d{3}Z$/,'Z'),limit).all();
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
   const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
