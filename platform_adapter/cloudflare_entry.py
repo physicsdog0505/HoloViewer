@@ -11,6 +11,20 @@ from urllib.parse import urlsplit
 
 from workers import WorkerEntrypoint, Response
 from platform_adapter.worker_transport import dispatch_accepted_get
+from platform_adapter.public_api import DEFAULT_API
+from platform_adapter.runtime_binding import bind_public_today
+
+_bound = False
+
+
+def _accepted_handler():
+    """Bind the one canonical provider before invoking original product routes."""
+    global _bound
+    import client_app
+    if not _bound:
+        bind_public_today(client_app, api_base=DEFAULT_API)
+        _bound = True
+    return client_app.ClientRequestHandler
 
 
 class Default(WorkerEntrypoint):
@@ -25,10 +39,8 @@ class Default(WorkerEntrypoint):
         # Import only the accepted product handler, never a cloned route table.
         # Packaging/import support must be proved on the actual Python Workers
         # runtime before this experimental entrypoint can be promoted.
-        from client_app import ClientRequestHandler
-
         result = dispatch_accepted_get(
-            ClientRequestHandler, target=target, method=str(request.method)
+            _accepted_handler(), target=target, method=str(request.method)
         )
         # Header names/values come from the accepted handler. Do not return
         # hop-by-hop server transport headers to the Worker network stack.
