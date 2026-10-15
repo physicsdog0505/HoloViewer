@@ -12,6 +12,7 @@ on:
       - 'test_*worker*.py'
       - 'test_public_api_binding.py'
       - 'test_canonical_consumer_integration.py'
+      - 'test_ptt_consumer_contract.py'
       - '.github/workflows/8788-python-worker-offline.yml'
   workflow_dispatch:
 
@@ -34,6 +35,7 @@ jobs:
           python3 -B -m unittest -v \
             test_public_api_binding \
             test_canonical_consumer_integration \
+            test_ptt_consumer_contract \
             test_worker_preload \
             test_worker_preload_history \
             test_worker_transport \
