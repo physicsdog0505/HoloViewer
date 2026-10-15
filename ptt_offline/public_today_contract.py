@@ -1,70 +1,237 @@
-"""Offline-only PTT Public Today contract adapter. No network, SQLite or process access.
+"""Offline-only provider-neutral PTT Today/History contract for Issue #48.
 
-All payloads in this module are synthetic/test inputs until an accepted data-service
-producer supplies verified source and coverage evidence. Fields are PROPOSED.
+No network, SQLite, Cloudflare, Collector, Publisher, or runtime process access occurs
+here. Inputs are synthetic fixtures until a separately authorized provider adapter is
+reviewed. Public fields in this module are contract candidates, not production proof.
 """
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha256
 from json import dumps
-from typing import Any
+import re
+from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
 TAIPEI = ZoneInfo("Asia/Taipei")
-MAX_PAGE = 200
-MAX_BYTES = 512 * 1024
+MAX_RELAY_PAGE = 500
+MAX_READ_BYTES = 512 * 1024
+INITIAL_WINDOW = 300
+_PUSH_ID_RE = re.compile(r"^ptt:v1:[0-9a-f]{64}$")
+_AID_RE = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
 
 
 class ContractError(ValueError):
     """Fail-closed contract violation."""
 
 
-def taipei_day(iso: str) -> str:
-    dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+def _parse_aware(iso: str, field: str) -> datetime:
+    if not isinstance(iso, str) or not iso:
+        raise ContractError(f"{field} is required")
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ContractError(f"{field} must be ISO-8601") from error
     if dt.tzinfo is None:
-        raise ContractError("timestamp requires timezone")
-    return dt.astimezone(TAIPEI).date().isoformat()
+        raise ContractError(f"{field} requires timezone")
+    return dt
+
+
+def taipei_day(iso: str) -> str:
+    return _parse_aware(iso, "timestamp").astimezone(TAIPEI).date().isoformat()
+
+
+def normalize_public_aid(value: str) -> str:
+    """Exact reviewed #311 normalization: strip Collector's leading '#' only."""
+    if not isinstance(value, str):
+        raise ContractError("aid must be text")
+    aid = value.strip()
+    if aid.startswith("#"):
+        aid = aid[1:]
+    if not _AID_RE.fullmatch(aid):
+        raise ContractError("aid is invalid")
+    return aid
 
 
 def canonical_id(push: dict[str, Any]) -> str:
-    """Reuse the reviewed AID/source-line/author/UTC-time/content key concept.
-
-    Canonical digest encoding MUST be cross-checked against private #311 before
-    production use. This proposed adapter never claims byte parity by itself.
-    """
-    aid = push.get("aid")
+    """Byte-compatible with reviewed private PR #311 canonical_public_push_id()."""
+    aid = normalize_public_aid(push.get("aid"))
     line = push.get("source_line")
     author = push.get("author")
     content = push.get("content")
     when = push.get("occurred_at")
-    if not aid or type(line) is not int or line < 1 or not isinstance(author, str) or not isinstance(content, str) or not when:
-        raise ContractError("missing canonical push identity")
-    dt = datetime.fromisoformat(when.replace("Z", "+00:00"))
-    if dt.tzinfo is None:
-        raise ContractError("naive timestamp")
-    utc = dt.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    if type(line) is not int or line < 1:
+        raise ContractError("source_line must be a positive integer")
+    if not isinstance(author, str):
+        raise ContractError("author must be text")
+    if not isinstance(content, str):
+        raise ContractError("content must be text")
+    utc = _parse_aware(when, "occurred_at").astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     wire = dumps([aid, line, author, utc, content], ensure_ascii=False, separators=(",", ":"))
-    return sha256(wire.encode("utf-8")).hexdigest()
+    return "ptt:v1:" + sha256(wire.encode("utf-8")).hexdigest()
 
 
-def history_completeness(manifest: dict[str, Any] | None, claimed_complete: bool = False, *, expected_day: str | None = None, expected_aids: set[str] | None = None) -> str:
-    """Never trust caller claims/checksum alone; only external accepted evidence.
+def history_completeness(
+    manifest: dict[str, Any] | None,
+    *,
+    expected_day: str | None,
+    expected_aids: set[str] | None,
+) -> str:
+    """Only independently accepted fixture evidence may grant COMPLETE offline.
 
-    Synthetic accepted manifests must explicitly bind day and all relevant AIDs.
-    Real issuer/signature verification is a future authorized integration gate.
+    No caller complete flag, checksum self-consistency, title-only row, or empty day
+    is considered authority. Production issuer/signature verification remains gated.
     """
     if not isinstance(manifest, dict):
         return "partial"
-    if (manifest.get("authority") != "synthetic-accepted-fixture"
-            or manifest.get("status") != "final-complete"
-            or not isinstance(manifest.get("day"), str)
-            or not isinstance(manifest.get("aids"), list)
-            or not manifest["aids"]
-            or len(manifest["aids"]) != len(set(manifest["aids"]))):
+    aids = manifest.get("aids")
+    if (
+        manifest.get("authority") != "synthetic-accepted-fixture"
+        or manifest.get("status") != "final-complete"
+        or not isinstance(manifest.get("day"), str)
+        or not isinstance(aids, list)
+        or not aids
+        or any(not isinstance(aid, str) for aid in aids)
+        or len(aids) != len(set(aids))
+        or expected_day is None
+        or not expected_aids
+    ):
         return "partial"
-    if expected_day is None or expected_aids is None or not expected_aids:\n        return "partial"\n    if manifest["day"] != expected_day or set(manifest["aids"]) != expected_aids:\n        return "partial"\n    return "complete" if claimed_complete else "partial"
+    normalized_expected = {normalize_public_aid(aid) for aid in expected_aids}
+    normalized_manifest = {normalize_public_aid(aid) for aid in aids}
+    if manifest["day"] != expected_day or normalized_manifest != normalized_expected:
+        return "partial"
+    return "complete"
+
+
+@dataclass(frozen=True)
+class InitialWindow:
+    aid: str
+    pushes: list[dict[str, Any]]
+    checkpoint_cursor: int
+    checked_at: str
+    purged_through_cursor: int = 0
+    history_gap: bool = False
+    safe: bool = True
+
+
+@dataclass(frozen=True)
+class RelayPage:
+    aid: str
+    after_cursor: int
+    next_cursor: int
+    has_more: bool
+    checked_at: str
+    purged_through_cursor: int
+    pushes: list[dict[str, Any]]
+    history_gap: bool = False
+
+
+class PttProvider(ABC):
+    """Provider-neutral seam: 8788/UI must not know SQLite or D1 schemas."""
+
+    @abstractmethod
+    def aids_for_day(self, day: str) -> set[str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def snapshot_for_day(self, day: str) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def initial_window(self, aid: str, *, limit: int) -> InitialWindow:
+        """Return a safely assembled recent window plus future-delta checkpoint."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def relay_after(self, aid: str, *, after_cursor: int, limit: int) -> RelayPage:
+        raise NotImplementedError
+
+
+@dataclass
+class SyntheticPttProvider(PttProvider):
+    """In-memory provider used only by offline tests."""
+
+    day_aids: dict[str, set[str]]
+    snapshots: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    relay_rows: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    purged: dict[str, int] = field(default_factory=dict)
+    checked_at: str = "2026-10-15T00:00:00Z"
+    byte_limit: int = MAX_READ_BYTES
+    tail_chunk_limit: int | None = None
+
+    def aids_for_day(self, day: str) -> set[str]:
+        return {normalize_public_aid(a) for a in self.day_aids.get(day, set())}
+
+    def snapshot_for_day(self, day: str) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.snapshots.get(day, [])]
+
+    def _page(self, aid: str, rows: list[dict[str, Any]], *, after: int, requested_limit: int) -> RelayPage:
+        aid = normalize_public_aid(aid)
+        if requested_limit < 1:
+            raise ContractError("invalid relay limit")
+        visible: list[dict[str, Any]] = []
+        cap = min(requested_limit, MAX_RELAY_PAGE)
+        for raw in rows[:cap]:
+            row = dict(raw)
+            probe = visible + [row]
+            body = {
+                "schema_version": 1,
+                "next_cursor": row["cursor"],
+                "has_more": False,
+                "checked_at": self.checked_at,
+                "history_gap": after < self.purged.get(aid, 0),
+                "purged_through_cursor": self.purged.get(aid, 0),
+                "pushes": probe,
+            }
+            if len(dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > self.byte_limit:
+                break
+            visible.append(row)
+        has_more = len(rows) > len(visible)
+        next_cursor = visible[-1]["cursor"] if visible else after
+        return RelayPage(
+            aid=aid,
+            after_cursor=after,
+            next_cursor=next_cursor,
+            has_more=has_more,
+            checked_at=self.checked_at,
+            purged_through_cursor=self.purged.get(aid, 0),
+            pushes=visible,
+            history_gap=after < self.purged.get(aid, 0),
+        )
+
+    def initial_window(self, aid: str, *, limit: int) -> InitialWindow:
+        aid = normalize_public_aid(aid)
+        if limit < 1:
+            raise ContractError("invalid initial limit")
+        rows = sorted(self.relay_rows.get(aid, []), key=lambda row: row["cursor"])
+        selected = [dict(row) for row in rows[-limit:]]
+        return InitialWindow(
+            aid=aid,
+            pushes=selected,
+            checkpoint_cursor=max((row["cursor"] for row in rows), default=0),
+            checked_at=self.checked_at,
+            purged_through_cursor=self.purged.get(aid, 0),
+            history_gap=False,
+            safe=True,
+        )
+
+    def relay_tail(self, aid: str, *, limit: int) -> RelayPage:
+        """Raw synthetic tail page used only to prove unsafe bootstrap rejection."""
+        aid = normalize_public_aid(aid)
+        rows = sorted(self.relay_rows.get(aid, []), key=lambda row: row["cursor"])
+        effective = min(limit, self.tail_chunk_limit) if self.tail_chunk_limit else limit
+        selected = rows[-effective:]
+        page = self._page(aid, selected, after=0, requested_limit=effective)
+        older_exist = bool(selected) and rows[0]["cursor"] < selected[0]["cursor"]
+        return RelayPage(**{**page.__dict__, "has_more": page.has_more or older_exist})
+
+    def relay_after(self, aid: str, *, after_cursor: int, limit: int) -> RelayPage:
+        aid = normalize_public_aid(aid)
+        rows = [r for r in sorted(self.relay_rows.get(aid, []), key=lambda row: row["cursor"]) if r["cursor"] > after_cursor]
+        return self._page(aid, rows, after=after_cursor, requested_limit=limit)
 
 
 @dataclass
@@ -74,21 +241,37 @@ class TodayAdapter:
     rows: dict[str, dict[str, Any]] = field(default_factory=dict)
     cursors: dict[str, int] = field(default_factory=dict)
     purged: dict[str, int] = field(default_factory=dict)
-    last_checked: str | None = None
+    last_checked_by_aid: dict[str, str] = field(default_factory=dict)
     freshness: str = "unknown"
     completeness: str = "partial"
     history_gap: bool = False
-    source: str = "synthetic-only"
+    source: str = "offline-contract"
 
     def __post_init__(self) -> None:
-        datetime.fromisoformat(self.day)
-        if not self.aids or not all(isinstance(a, str) and a for a in self.aids):
+        try:
+            datetime.fromisoformat(self.day)
+        except ValueError as error:
+            raise ContractError("day must be ISO date") from error
+        normalized = {normalize_public_aid(aid) for aid in self.aids}
+        if not normalized:
             raise ContractError("explicit verified AIDs required")
+        self.aids = normalized
+        for aid in self.aids:
+            self.cursors.setdefault(aid, 0)
+            self.purged.setdefault(aid, 0)
 
-    def merge_snapshot(self, pushes: list[dict[str, Any]], *, collector_first: bool = True) -> None:
+    @classmethod
+    def from_provider(cls, provider: PttProvider, day: str) -> "TodayAdapter":
+        aids = provider.aids_for_day(day)
+        adapter = cls(day=day, aids=aids)
+        adapter.merge_snapshot(provider.snapshot_for_day(day))
+        return adapter
+
+    def merge_snapshot(self, pushes: Iterable[dict[str, Any]], *, collector_first: bool = True) -> None:
         for raw in pushes:
             row = dict(raw)
-            aid = row.get("aid")
+            aid = normalize_public_aid(row.get("aid"))
+            row["aid"] = aid
             if aid not in self.aids:
                 raise ContractError("cross-thread AID")
             if taipei_day(row["occurred_at"]) != self.day:
@@ -104,75 +287,142 @@ class TodayAdapter:
             if prior is None or (collector_first and row["origin"] == "collector" and prior.get("origin") != "collector"):
                 self.rows[identity] = row
 
-    def read_initial(self, limit: int = 300) -> list[dict[str, Any]]:
-        if limit != 300:
-            raise ContractError("accepted initial window is 300")
-        return self._ordered()[-300:]
-
     def _ordered(self) -> list[dict[str, Any]]:
-        return sorted(self.rows.values(), key=lambda r: (r["occurred_at"], r["aid"], r["source_line"], r["push_id"]))
+        return sorted(
+            self.rows.values(),
+            key=lambda r: (
+                _parse_aware(r["occurred_at"], "occurred_at").astimezone(timezone.utc),
+                r["aid"],
+                r["source_line"],
+                r["push_id"],
+            ),
+        )
 
-    def read_after_key(self, key: str, limit: int = MAX_PAGE) -> list[dict[str, Any]]:
-        if not 1 <= limit <= MAX_PAGE:
+    def read_initial(self, limit: int = INITIAL_WINDOW) -> list[dict[str, Any]]:
+        if limit != INITIAL_WINDOW:
+            raise ContractError("accepted initial window is 300")
+        return self._ordered()[-INITIAL_WINDOW:]
+
+    def read_after_key(self, key: str, limit: int = 200) -> list[dict[str, Any]]:
+        if not 1 <= limit <= 200:
             raise ContractError("page bound")
         ordered = self._ordered()
-        positions = [i for i, row in enumerate(ordered) if row["push_id"] == key]
-        if not positions:
-            self.history_gap = True
-            self.completeness = "partial"
-            return []
-        return ordered[positions[0] + 1:positions[0] + 1 + limit]
+        for index, row in enumerate(ordered):
+            if row["push_id"] == key:
+                return ordered[index + 1:index + 1 + limit]
+        self.history_gap = True
+        self.completeness = "partial"
+        return []
 
-    def ingest_relay_page(self, *, aid: str, after_cursor: int, pushes: list[dict[str, Any]],
-                          next_cursor: int, has_more: bool, checked_at: str,
-                          purged_through_cursor: int = 0, max_bytes: int = MAX_BYTES) -> None:
-        if aid not in self.aids or type(after_cursor) is not int or after_cursor < 0:
-            raise ContractError("invalid AID/cursor")
-        if type(next_cursor) is not int or next_cursor < after_cursor:
+    def ingest_relay_page(self, page: RelayPage) -> None:
+        aid = normalize_public_aid(page.aid)
+        if aid not in self.aids:
+            raise ContractError("invalid AID")
+        if type(page.after_cursor) is not int or page.after_cursor < 0:
+            raise ContractError("invalid after_cursor")
+        if type(page.next_cursor) is not int or page.next_cursor < page.after_cursor:
             raise ContractError("regressive cursor")
-        if not 1 <= max_bytes <= MAX_BYTES or len(dumps(pushes, ensure_ascii=False).encode("utf-8")) > max_bytes:
-            raise ContractError("oversize response")
-        if len(pushes) > MAX_PAGE:
-            raise ContractError("too many pushes")
-        if after_cursor < self.purged.get(aid, 0) or after_cursor < purged_through_cursor:
+        if page.history_gap != (page.after_cursor < page.purged_through_cursor):
+            raise ContractError("retention gap flag mismatch")
+        if page.after_cursor < self.purged.get(aid, 0) or page.history_gap:
             self.history_gap = True
             self.completeness = "partial"
             raise ContractError("retention gap / purged floor")
-        if after_cursor != self.cursors.get(aid, 0):
+        if page.after_cursor != self.cursors.get(aid, 0):
             raise ContractError("expired or wrong replay cursor")
-        last = after_cursor
-        for row in pushes:
-            if row.get("aid") != aid or type(row.get("cursor")) is not int or row["cursor"] <= last:
+        if len(page.pushes) > MAX_RELAY_PAGE:
+            raise ContractError("too many pushes")
+        checked = _parse_aware(page.checked_at, "checked_at")
+        last = page.after_cursor
+        normalized_rows = []
+        for raw in page.pushes:
+            row = dict(raw)
+            if normalize_public_aid(row.get("aid")) != aid or type(row.get("cursor")) is not int or row["cursor"] <= last:
                 raise ContractError("out-of-order/cross-AID relay")
             last = row["cursor"]
-        if pushes and next_cursor != last:
+            normalized_rows.append(row)
+        if normalized_rows and page.next_cursor != last:
             raise ContractError("next cursor does not match page")
-        if not pushes and next_cursor != after_cursor:
+        if not normalized_rows and page.next_cursor != page.after_cursor:
             raise ContractError("empty page cursor mismatch")
-        # Parse checked_at before committing; failures must retain last good rows.
-        checked = datetime.fromisoformat(checked_at.replace("Z", "+00:00"))
-        if checked.tzinfo is None:
-            raise ContractError("naive checked_at")
-        self.merge_snapshot(pushes)
-        self.cursors[aid] = next_cursor
-        self.purged[aid] = max(self.purged.get(aid, 0), purged_through_cursor)
-        self.last_checked = checked_at
+        wire = {
+            "schema_version": 1,
+            "next_cursor": page.next_cursor,
+            "has_more": page.has_more,
+            "checked_at": page.checked_at,
+            "history_gap": page.history_gap,
+            "purged_through_cursor": page.purged_through_cursor,
+            "pushes": normalized_rows,
+        }
+        if len(dumps(wire, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > MAX_READ_BYTES:
+            raise ContractError("oversize response")
+        self.merge_snapshot(normalized_rows)
+        self.cursors[aid] = page.next_cursor
+        self.purged[aid] = max(self.purged.get(aid, 0), page.purged_through_cursor)
+        self.last_checked_by_aid[aid] = checked.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
         self.freshness = "fresh"
-        # has_more=True requires caller continuation; a latest cursor is not completeness.
-        if has_more:
+        if page.has_more:
             self.completeness = "partial"
 
+    @staticmethod
+    def reject_unsafe_tail_bootstrap(page: RelayPage) -> None:
+        """Known bug guard: tail has_more cannot become a forward checkpoint."""
+        if page.has_more:
+            raise ContractError("tail has_more cannot establish initial checkpoint")
+
+    def initialize_from_provider(self, provider: PttProvider, *, target: int = INITIAL_WINDOW) -> None:
+        """Load safe recent windows per AID, then adopt a per-AID cursor vector."""
+        for aid in sorted(self.aids):
+            window = provider.initial_window(aid, limit=target)
+            if not window.safe:
+                raise ContractError("provider initial window is not coverage-safe")
+            if normalize_public_aid(window.aid) != aid:
+                raise ContractError("cross-AID initial window")
+            if len(window.pushes) > target:
+                raise ContractError("initial window exceeds target")
+            checked = _parse_aware(window.checked_at, "checked_at")
+            previous = 0
+            for row in window.pushes:
+                if normalize_public_aid(row.get("aid")) != aid:
+                    raise ContractError("cross-AID initialization row")
+                cursor = row.get("cursor")
+                if type(cursor) is not int or cursor <= previous:
+                    raise ContractError("initial cursors must be strictly increasing")
+                previous = cursor
+            if type(window.checkpoint_cursor) is not int or window.checkpoint_cursor < previous:
+                raise ContractError("initial checkpoint precedes visible rows")
+            if window.history_gap:
+                self.history_gap = True
+                self.completeness = "partial"
+            self.merge_snapshot(window.pushes)
+            self.cursors[aid] = window.checkpoint_cursor
+            self.purged[aid] = max(self.purged.get(aid, 0), window.purged_through_cursor)
+            self.last_checked_by_aid[aid] = checked.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        self.freshness = "fresh" if self.last_checked_by_aid else "unknown"
+
+    def poll_provider(self, provider: PttProvider, *, page_limit: int = 200, max_pages_per_aid: int = 3) -> None:
+        """Bounded per-AID delta polling; cursors are a vector, never one global cursor."""
+        if not 1 <= page_limit <= MAX_RELAY_PAGE or not 1 <= max_pages_per_aid <= 3:
+            raise ContractError("poll bounds")
+        for aid in sorted(self.aids):
+            for _ in range(max_pages_per_aid):
+                after = self.cursors.get(aid, 0)
+                page = provider.relay_after(aid, after_cursor=after, limit=page_limit)
+                self.ingest_relay_page(page)
+                if not page.has_more:
+                    break
+            else:
+                self.completeness = "partial"
+
     def mark_fetch_failure(self) -> None:
-        self.freshness = "stale"  # preserve self.rows, cursor, last success
+        self.freshness = "stale"
 
     def freshness_at(self, now_iso: str, stale_after_seconds: int = 30) -> str:
-        if not self.last_checked:
+        now = _parse_aware(now_iso, "now")
+        if not self.last_checked_by_aid:
             return "unknown"
-        a = datetime.fromisoformat(self.last_checked.replace("Z", "+00:00"))
-        b = datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
-        if a.tzinfo is None or b.tzinfo is None:
-            raise ContractError("naive freshness timestamp")
-        if (b - a).total_seconds() > stale_after_seconds:
+        oldest = min(_parse_aware(value, "checked_at") for value in self.last_checked_by_aid.values())
+        if (now - oldest).total_seconds() > stale_after_seconds:
             self.freshness = "stale"
         return self.freshness
 
