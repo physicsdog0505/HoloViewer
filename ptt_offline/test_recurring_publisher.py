@@ -23,6 +23,7 @@ class RecurringPublisherTests(unittest.TestCase):
         responses=[{"status":"ACK","sent":25} for _ in range(4)]+[{"status":"NO_NEW_ROWS","sent":0}]
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
              patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
              patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
              patch("ptt_offline.recurring_publisher.run_live_once",side_effect=responses) as publisher:
             result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
@@ -30,11 +31,12 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(result["sent"],100)
         self.assertEqual(result["http_posts"],4)
         self.assertEqual(publisher.call_count,5)
-        self.assertFalse(result["backlog_may_remain"])
+        self.assertTrue(result["backlog_may_remain"])  # ACK-filled last cycle remains conservative
 
     def test_bounded_drain_marks_possible_backlog(self):
         source="c"*64
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
              patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
              patch("ptt_offline.recurring_publisher.run_live_once",return_value={"status":"ACK","sent":25}) as publisher:
             result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
@@ -55,6 +57,7 @@ class RecurringPublisherTests(unittest.TestCase):
     def test_source_specific_state_and_no_repeat_when_dry_run(self):
         source="a"*64
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
              patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
              patch("ptt_offline.recurring_publisher.run_live_once",return_value={"status":"READ_ONLY","eligible":4,"sent":0}) as runner:
             result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test")
