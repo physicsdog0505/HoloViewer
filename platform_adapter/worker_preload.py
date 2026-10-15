@@ -1,0 +1,46 @@
+"""Prepare request-local canonical API payloads before synchronous 4174 rendering.
+
+No product route output, renderer or navigation logic is copied. The only
+routing here selects which approved external data entry must be read in advance.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+from urllib.parse import parse_qs, urlencode, urlsplit
+
+from platform_adapter.public_api import DEFAULT_API, PublicAPIUnavailable
+
+
+async def preload_for_accepted_request(target: str, get_json):
+    """Map one accepted request to its canonical API reads.
+
+    get_json(url) is an async injected transport. It must return a JSON dict.
+    """
+    parsed = urlsplit(target)
+    if parsed.path in {"/", "/api/home"}:
+        value = await get_json(DEFAULT_API + "/v1/catalog/today")
+        if not isinstance(value, dict):
+            raise PublicAPIUnavailable("Invalid Today envelope")
+        return {("/v1/catalog/today", ()): value}
+    if parsed.path != "/history":
+        return {}
+
+    # Use accepted date and bounds rules, never duplicate date semantics.
+    from frontend_time import TAIPEI
+    from client_history import parse_history_day, history_day_bounds
+
+    now = datetime.now(TAIPEI)
+    _, default_day = history_day_bounds(now)
+    query = parse_qs(parsed.query)
+    try:
+        selected = parse_history_day(query.get("date", [default_day.isoformat()])[0], now=now)
+        page = int(query.get("page", ["1"])[0])
+    except (ValueError, OverflowError):
+        return {}  # accepted handler itself produces its 400 error
+    if page < 1 or page > 20:
+        return {}
+    params = {"day": selected.isoformat(), "limit": "50", "offset": str((page - 1) * 50)}
+    value = await get_json(DEFAULT_API + "/v1/history?" + urlencode(params))
+    if not isinstance(value, dict):
+        raise PublicAPIUnavailable("Invalid History envelope")
+    return {("/v1/history", tuple(sorted(params.items()))): value}
