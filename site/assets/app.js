@@ -331,10 +331,40 @@ async function loadCollab(){
  $('collab-empty').textContent='目前沒有偵測到可用的多人連動。';
 }
 async function loadPtt(){
- const today=taipeiDay();$('ptt-today-meta').textContent=today.replaceAll('-','/')+' · 推文資料尚未接通 · 純 PTT 閱讀';
- $('ptt-list').hidden=true;
- $('ptt-empty').hidden=false;
- $('ptt-empty').textContent='目前尚未接通經過驗證的公開 PTT 專串資料。';
+ const today=taipeiDay();
+ const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty');
+ meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
+ list.replaceChildren();list.hidden=true;empty.hidden=false;empty.textContent='讀取今日 PTT 推文中…';
+ if(!config.apiBase){meta.textContent=today.replaceAll('-','/')+' · API 未設定 · 純 PTT 閱讀';empty.textContent='PTT 正式 API 尚未接通。';return}
+ try{
+  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
+  for(const row of data.pushes){
+   if(!row||typeof row.content!=='string')continue;
+   const push=node('div',undefined,'push');
+   const head=node('div',undefined,'ptt-push-meta');
+   const kind=typeof row.kind==='string'?row.kind:'→';
+   head.append(node('span',kind,'ptt-push-kind'));
+   head.append(node('strong',String(row.author||'unknown'),'ptt-push-author'));
+   if(Number.isInteger(row.floor)&&row.floor>0)head.append(node('span','#'+row.floor,'ptt-push-floor'));
+   const when=new Date(String(row.occurred_at||''));
+   if(Number.isFinite(when.getTime())){
+    const label=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(when);
+    head.append(node('time',label,'ptt-push-time'));
+   }
+   push.append(head,node('div',row.content,'ptt-push-content'));
+   list.append(push);
+  }
+  const freshness=String(data.freshness?.status||'unknown');
+  const freshnessLabel=freshness==='fresh'?'即時':freshness==='stale'?'資料稍舊':'狀態未知';
+  meta.textContent=today.replaceAll('-','/')+' · '+freshnessLabel+' · '+list.childElementCount+' 則 · 純 PTT 閱讀';
+  list.hidden=!list.childElementCount;
+  empty.hidden=Boolean(list.childElementCount);
+  if(!list.childElementCount)empty.textContent='目前沒有今天的推文。';
+ }catch(e){
+  meta.textContent=today.replaceAll('-','/')+' · 讀取失敗 · 純 PTT 閱讀';
+  empty.hidden=false;empty.textContent='無法讀取今日 PTT：'+(e instanceof Error?e.message:'未知錯誤');
+ }
 }
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
@@ -639,7 +669,15 @@ window.hvOpenCustomSession=function(ids,opts={}){
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();route(location.hash.substring(1).split('?')[0]||'home');
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
+const hashRoute=location.hash.substring(1).split('?')[0];
+const pathRoute=location.pathname==='/history'?'history':
+ location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):
+ location.pathname==='/custom-view'?'single':
+ location.pathname==='/collab'?'multi':
+ location.pathname==='/watchalong'?'watchalong':
+ location.pathname==='/'?'home':'';
+route(hashRoute||pathRoute||'home');
 
 /* Accepted 4174 custom-view selection controller with public read-only catalog adapter. */
 (function(){
