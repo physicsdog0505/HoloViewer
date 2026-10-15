@@ -1,0 +1,110 @@
+/**
+ * Issue #47, single canonical D1 store. No Cloudflare bindings, network or Cron side effects.
+ * Inject a D1-compatible db. A write is an atomic batch of evidence and projection.
+ */
+const idPattern=/^[A-Za-z0-9_-]{11}$/;
+const channelPattern=/^UC[A-Za-z0-9_-]{22}$/;
+const groups=new Set(['hololive','holostars','mekpark','other']);
+const lifecycles=new Set(['unknown','upcoming','live','ended']);
+const ckPattern=/^cp_[A-Za-z0-9_-]{8,128}$/;
+function validTime(x) {return typeof x==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(x) && !Number.isNaN(Date.parse(x));}
+export function validateEvidence(r) {
+  if (!r || !idPattern.test(r.video_id) || !channelPattern.test(r.channel_id) ||
+      typeof r.roster_version!=='string' || !r.roster_version ||
+      !groups.has(r.group) || !lifecycles.has(r.lifecycle_state) ||
+      !validTime(r.observed_at) || typeof r.title!=='string' ||
+      typeof r.source_label!=='string' || !r.source_label) throw Error('invalid Today evidence');
+  for (const k of ['scheduled_start','actual_start','actual_end']) if (r[k]!=null && !validTime(r[k])) throw Error('invalid evidence time');
+  if (r.actual_start && r.actual_start>r.observed_at || r.actual_end && r.actual_end>r.observed_at) throw Error('future actual evidence');
+  if (r.actual_start && r.actual_end && r.actual_end<r.actual_start) throw Error('invalid lifecycle ordering');
+  if (r.lifecycle_state==='ended' && !r.actual_end) throw Error('end requires positive evidence');
+  return r;
+}
+function canonicalJson(r) {
+  const keys=['video_id','channel_id','roster_version','group','title','channel_name','lifecycle_state','observed_at','scheduled_start','actual_start','actual_end','source_label'];
+  return JSON.stringify(Object.fromEntries(keys.map(k=>[k,r[k]??null])));
+}
+// Stable portable checksum for evidence identity. Non-cryptographic: not a security signature.
+export function evidenceChecksum(r) {
+  const s=canonicalJson(r);let h=2166136261;
+  for (let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+  return (h>>>0).toString(16).padStart(8,'0');
+}
+export async function writeEvidence(db, evidence) {
+  const r=validateEvidence(evidence), hash=evidenceChecksum(r);
+  const oldEvidence=await db.prepare('SELECT checksum FROM public_today_evidence WHERE video_id=? AND observed_at=? AND source_label=?')
+    .bind(r.video_id,r.observed_at,r.source_label).first();
+  if (oldEvidence) {
+    if (oldEvidence.checksum!==hash) throw Error('same-key contradictory evidence');
+    return {changed:false,reason:'replay'};
+  }
+  const current=await db.prepare('SELECT lifecycle_state,lifecycle_observed_at,publisher_channel_id,roster_version,source_checksum FROM public_today_canonical WHERE video_id=?')
+    .bind(r.video_id).first();
+  if (current && (current.publisher_channel_id!==r.channel_id || current.roster_version!==r.roster_version))
+    throw Error('canonical publisher/roster mismatch');
+  const newer=(!current || r.observed_at>current.lifecycle_observed_at);
+  const canSelect=newer && !(current?.lifecycle_state==='ended' && r.lifecycle_state!=='ended');
+  const evidenceSql=`INSERT INTO public_today_evidence
+    (video_id,observed_at,source_label,checksum,publisher_channel_id,roster_version,channel_group,lifecycle_state,
+     scheduled_start,actual_start,actual_end,title,channel_name)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+  const mutations=[db.prepare(evidenceSql).bind(r.video_id,r.observed_at,r.source_label,hash,r.channel_id,r.roster_version,r.group,
+    r.lifecycle_state,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.title,r.channel_name??'')];
+  if (canSelect) {
+    const sql=`INSERT INTO public_today_canonical
+      (video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,
+       lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(video_id) DO UPDATE SET
+      channel_group=excluded.channel_group,title=excluded.title,channel_name=excluded.channel_name,
+      lifecycle_state=excluded.lifecycle_state,lifecycle_observed_at=excluded.lifecycle_observed_at,
+      checked_at=excluded.checked_at,scheduled_start=excluded.scheduled_start,actual_start=excluded.actual_start,
+      actual_end=excluded.actual_end,source_label=excluded.source_label,source_checksum=excluded.source_checksum
+      WHERE excluded.lifecycle_observed_at>public_today_canonical.lifecycle_observed_at
+        AND (public_today_canonical.lifecycle_state!='ended' OR excluded.lifecycle_state='ended')
+        AND public_today_canonical.roster_version=excluded.roster_version
+        AND public_today_canonical.publisher_channel_id=excluded.publisher_channel_id`;
+    mutations.push(db.prepare(sql).bind(r.video_id,r.channel_id,r.roster_version,r.group,r.title,r.channel_name??'',
+      r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.source_label,hash));
+  }
+  await db.batch(mutations);
+  return {changed:canSelect,reason:canSelect?'selected':'evidence_only'};
+}
+export async function setCoverage(db, c) {
+  if (!c || typeof c.roster_version!=='string' || !c.roster_version ||
+      !Number.isInteger(c.expected_channels) || !Number.isInteger(c.scanned_channels) ||
+      c.scanned_channels<0 || c.scanned_channels>c.expected_channels ||
+      (c.last_success_at!=null && !validTime(c.last_success_at))) throw Error('invalid coverage');
+  // Fail closed on gap: a fresh scan is not an authoritative completeness proof.
+  const sql=`INSERT INTO public_today_catalog_meta(singleton,roster_version,last_success_at,expected_channels,scanned_channels,gap,checkpoint)
+    VALUES (1,?,?,?,?,?,?)
+    ON CONFLICT(singleton) DO UPDATE SET roster_version=excluded.roster_version,last_success_at=excluded.last_success_at,
+      expected_channels=excluded.expected_channels,scanned_channels=excluded.scanned_channels,gap=excluded.gap,checkpoint=excluded.checkpoint`;
+  await db.prepare(sql).bind(c.roster_version,c.last_success_at??null,c.expected_channels,c.scanned_channels,c.gap?1:0,
+    typeof c.checkpoint==='string'&&ckPattern.test(c.checkpoint)?c.checkpoint:null).run();
+}
+export async function readToday(db,{day,limit=200,now=new Date()}={}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
+    throw Error('invalid canonical Today day');
+  if (!Number.isInteger(limit)||limit<1||limit>200) throw Error('invalid limit');
+  const coverage=await db.prepare('SELECT * FROM public_today_catalog_meta WHERE singleton=1').first();
+  const rows=await db.prepare('SELECT * FROM public_today_canonical WHERE roster_version=? ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ?')
+    .bind(coverage?.roster_version??'',limit).all();
+  const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
+  const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
+  const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
+  return {schema_version:'public-consumer-v1',as_of:nowStamp,
+    freshness:{status:freshness,last_success_at:last},
+    completeness:{status:coverage?(coverage.gap||coverage.scanned_channels>0?'partial':'unverified'):'unverified',
+                  gap:!coverage||Boolean(coverage.gap)},
+    checkpoint:coverage?.checkpoint??null,
+    streams:(rows.results??[]).map(r=>{
+      const evidenceAge=Date.parse(nowStamp)-Date.parse(r.lifecycle_observed_at),valid=evidenceAge>=0&&evidenceAge<=1800000;
+      const state=r.lifecycle_state==='ended'&&r.actual_end?'ended':!valid?'stale':
+        r.lifecycle_state==='upcoming'&&r.scheduled_start&&r.scheduled_start<=nowStamp?'waiting':r.lifecycle_state;
+      return {video_id:r.video_id,title:r.title,channel_id:r.publisher_channel_id,channel_name:r.channel_name,
+        group:r.channel_group,lifecycle_state:state,observed_at:r.lifecycle_observed_at,
+        start_at:r.actual_start??r.scheduled_start,avatar_url:null,member_accent:null,
+        source_label:r.source_label,stale:state==='stale'};
+    })};
+}
