@@ -7,6 +7,7 @@ on:
     paths:
       - 'platform_adapter/**'
       - 'tools/build_python_worker_bundle.py'
+      - 'tools/probe_python_worker_local.py'
       - 'test_*worker*.py'
       - 'test_public_api_binding.py'
       - '.github/workflows/8788-python-worker-offline.yml'
@@ -44,3 +45,18 @@ jobs:
         run: |
           PYTHONPATH="$RUNNER_TEMP/hv-8788-worker-bundle" python3 -B -c "import client_app; import platform_adapter.worker_preload; print('PASS accepted product dependency import')"
           python3 -m compileall -q "$RUNNER_TEMP/hv-8788-worker-bundle"
+      - uses: astral-sh/setup-uv@v6
+      - name: Exercise actual local Python Worker/Pyodide runtime (no deploy)
+        run: |
+          python3 tools/probe_python_worker_local.py \
+            --bundle "$RUNNER_TEMP/hv-8788-worker-bundle" \
+            --output "$RUNNER_TEMP/python-worker-runtime-receipt.json"
+      - name: Preserve local Pyodide probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 8788-python-worker-local-proof
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/python-worker-runtime-receipt.json
+            ${{ runner.temp }}/worker-local-proof.log
