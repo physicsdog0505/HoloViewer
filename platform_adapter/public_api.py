@@ -113,7 +113,7 @@ class PublicAPI:
         return self._read("/v1/catalog/videos/" + video_id)
 
     def read_day(self, day: date, *, limit: int = 50, offset: int = 0) -> dict:
-        """Canonical History pagination; no fake complete marker."""
+        """Legacy-compatible History consumption; not a #47/#48 canonical projection."""
         if not isinstance(day, date) or not 1 <= limit <= 100 or offset < 0:
             raise ValueError("Invalid history page")
         result = self._read("/v1/history", query={
