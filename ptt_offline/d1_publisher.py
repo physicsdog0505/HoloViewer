@@ -42,7 +42,7 @@ INSERT INTO ptt_pushes
 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(push_id) DO UPDATE SET
   floor=CASE WHEN excluded.source_priority >= ptt_pushes.source_priority
-             THEN excluded.floor ELSE ptt_pushes.floor END,
+             THEN COALESCE(excluded.floor,ptt_pushes.floor) ELSE ptt_pushes.floor END,
   kind=CASE WHEN excluded.source_priority >= ptt_pushes.source_priority
             THEN COALESCE(excluded.kind,ptt_pushes.kind) ELSE ptt_pushes.kind END,
   source_url=COALESCE(ptt_pushes.source_url,excluded.source_url),
@@ -77,6 +77,14 @@ def publish_batch(db: Any, day: str, aids: Iterable[str],
         for aid in sorted(canonical_aids):
             db.execute("INSERT OR IGNORE INTO ptt_threads(day,aid) VALUES (?,?)", (day, aid))
         for row in staged:
+            key = row.get("source_record_key")
+            if key:
+                found = db.execute(
+                    "SELECT push_id FROM ptt_source_evidence WHERE day=? AND aid=? AND source_record_key=?",
+                    (day, row["aid"], key),
+                ).fetchone()
+                if found and found[0] != row["push_id"]:
+                    raise ContractError("stable source evidence canonical identity conflict")
             db.execute(UPSERT_PUSH, record_params(row))
             if row.get("source_record_key"):
                 db.execute("""INSERT INTO ptt_source_evidence
