@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {webcrypto} from 'node:crypto';
+import worker from './worker_host/index.mjs';
+import {canonicalTimeMessage,verifyPublisherTimeProof} from './worker_host/time_authority.mjs';
+const secret='time-proof-owner-key-at-least-32-bytes';
+async function sign(row) {
+ const key=await webcrypto.subtle.importKey('raw',new TextEncoder().encode(secret),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ return Buffer.from(await webcrypto.subtle.sign('HMAC',key,
+  new TextEncoder().encode(canonicalTimeMessage(row)))).toString('hex');
+}
+test('actual bundled existing-worker entry preserves health with binding',async()=>{
+ const r=await worker.fetch(new Request('https://api.example/health'),{DB:{}});
+ assert.equal(r.status,200);
+ assert.equal((await r.json()).service,'holoviewer-public-read');
+});
+test('existing-worker entry blocks private POST until explicitly enabled',async()=>{
+ const r=await worker.fetch(new Request('https://api.example/private/ptt/publish',
+  {method:'POST',body:'{}'}),{DB:{}});
+ assert.equal(r.status,503);
+});
+test('reviewed exact event time HMAC passes and tampering fails',async()=>{
+ const row={aid:'1gepPtNy',source_line:1,source_record_key:'1gepPtNy:1',
+  push_id:'ptt:v1:'+'a'.repeat(64),occurred_at:'2026-10-15T10:00:00Z',
+  source_url:'https://www.ptt.cc/bbs/C_Chat/M.1789081207.A.5FC.html'};
+ const signed={...row,time_proof:await sign(row)};
+ assert.equal(await verifyPublisherTimeProof(signed,{PTT_TIME_AUTHORITY_SECRET:secret}),true);
+ assert.equal(await verifyPublisherTimeProof({...signed,occurred_at:'2026-10-15T11:00:00Z'},
+  {PTT_TIME_AUTHORITY_SECRET:secret}),false);
+ assert.equal(await verifyPublisherTimeProof(signed,{}),false);
+});
