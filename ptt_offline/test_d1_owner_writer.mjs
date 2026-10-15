@@ -43,3 +43,12 @@ test('conflicting replay refuses mutation',async()=>{
   await assert.rejects(applyAuthorizedPttBatch({DB:conflict,batch,verifyAuthority:async()=>true}),/evidence conflict/);
   assert.equal(calls.some(c=>c[0]==='batch'),false);
 });
+
+test('reject cross-Taipei-day timestamp before D1 access',async()=>{
+  const {DB,calls}=mock();
+  const wrong={...row,occurred_at:'2026-10-14T10:00:00Z'};
+  await assert.rejects(applyAuthorizedPttBatch({
+    DB,batch:{...batch,rows:[wrong]},verifyAuthority:async()=>true
+  }),/invalid canonical row/);
+  assert.equal(calls.length,0);
+});
