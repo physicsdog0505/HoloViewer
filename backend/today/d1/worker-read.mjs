@@ -23,8 +23,10 @@ export async function handleTodayRead(request,env,now=new Date()) {
   const day=url.searchParams.get('day')??taipeiDay;
   const rawLimit=url.searchParams.get('limit')??'200';
   if (!/^[1-9][0-9]{0,2}$/.test(rawLimit) || Number(rawLimit)>200) return json({error:'bad_limit'},400);
+  const rawOffset=url.searchParams.get('offset')??'0';
+  if (!/^(0|[1-9][0-9]{0,4})$/.test(rawOffset) || Number(rawOffset)>10000) return json({error:'bad_offset'},400);
   try {
-    const result=await readToday(env.DB,{day,limit:Number(rawLimit),now});
+    const result=await readToday(env.DB,{day,limit:Number(rawLimit),offset:Number(rawOffset),now});
     const serialized=JSON.stringify(result);
     if (new TextEncoder().encode(serialized).length>MAX_BODY) return json({error:'response_limit'},503);
     return new Response(serialized,{status:200,headers:{
@@ -33,7 +35,7 @@ export async function handleTodayRead(request,env,now=new Date()) {
       'x-content-type-options':'nosniff'
     }});
   } catch (error) {
-    if (/invalid (canonical Today day|limit)/.test(String(error?.message??''))) return json({error:'invalid_request'},400);
+    if (/invalid (canonical Today day|limit|offset)/.test(String(error?.message??''))) return json({error:'invalid_request'},400);
     return json({error:'temporarily_unavailable'},503);
   }
 }
