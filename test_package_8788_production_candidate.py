@@ -73,6 +73,18 @@ class ProductionPackageTests(unittest.TestCase):
                 receipt["runtime_optimizations"]["client_watchalong_landing_lightweight_imports"],
                 "applied",
             )
+            self.assertEqual(
+                receipt["runtime_optimizations"]["client_shell_request_local_live_rail"],
+                "applied",
+            )
+            shell_text = (dest / "client_ui_shell.py").read_text()
+            self.assertIn("from platform_adapter.live_rail_binding import current_live_rail_html", shell_text)
+            self.assertNotIn("live, _, _, _ = load_home_streams()", shell_text)
+            self.assertEqual(
+                receipt["authorized_ui_overrides"]["home_collab_detection_is_nonfatal"],
+                "    try:\n        collab_candidates = detect_collab_candidates([*live, *upcoming, *ended])\n    except (ValueError, TypeError, OverflowError):\n        collab_candidates = ()\n",
+            )
+            self.assertIn("except (ValueError, TypeError, OverflowError):", (dest / "client_home.py").read_text())
             watchalong = (dest / "client_watchalong.py").read_text()
             self.assertNotIn("from youtube_metadata import fetch_video, load_api_key", watchalong)
             self.assertNotIn("from transcript_ingest import TranscriptIngestService", watchalong)
