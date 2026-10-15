@@ -19,9 +19,10 @@ export async function sha256Hex(sql) {
 export function splitMigrationSql(sql) {
   // Our locked migration has plain CREATE TABLE / INDEX; no triggers or quoted semicolons.
   // Fail closed rather than executing unsupported SQL shape.
-  if (typeof sql!=='string' || /\b(DROP|TRUNCATE|DELETE|REPLACE|ATTACH|VACUUM)\b/i.test(sql))
-    throw Error('unsafe migration SQL');
+  if (typeof sql!=='string') throw Error('unsafe migration SQL');
   const withoutComments=sql.split('\n').map(line=>line.trimStart().startsWith('--')?'':line).join('\n');
+  if (/\b(DROP|TRUNCATE|DELETE|REPLACE|ATTACH|VACUUM)\b/i.test(withoutComments))
+    throw Error('unsafe migration SQL');
   const statements=withoutComments.split(';').map(v=>v.trim()).filter(Boolean);
   if (!statements.length || statements.some(v=>!/^CREATE (TABLE|INDEX) IF NOT EXISTS\b/i.test(v)))
     throw Error('unsupported migration SQL');
