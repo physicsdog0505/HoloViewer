@@ -72,6 +72,17 @@ class EntryPointBindingTest(unittest.TestCase):
         bind.assert_not_called()
         dispatch.assert_not_called()
 
+    def test_non_get_never_preloads_or_dispatches(self):
+        class PostRequest:
+            url = "https://public.example.test/api/home"
+            method = "POST"
+        with (patch.object(self.entry, "preload_for_accepted_request") as preload,
+              patch.object(self.entry, "dispatch_accepted_get") as dispatch):
+            response = asyncio.run(self.entry.Default().fetch(PostRequest()))
+        self.assertEqual(response.status, 405)
+        preload.assert_not_called()
+        dispatch.assert_not_called()
+
     def test_handler_binding_never_selects_custom_provider(self):
         with patch.object(self.entry, "bind_public_today") as bind:
             self.entry._accepted_handler()
