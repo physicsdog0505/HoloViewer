@@ -88,6 +88,7 @@ class Default(WorkerEntrypoint):
         # Import only the accepted product handler, never a cloned route table.
         # Packaging/import support must be proved on the actual Python Workers
         # runtime before this experimental entrypoint can be promoted.
+        stage = "preload"
         try:
             # Cloudflare/Pyodide uses async fetch. Accepted 4174 data loaders
             # remain synchronous but consume request-local preloaded values.
@@ -98,8 +99,10 @@ class Default(WorkerEntrypoint):
             preload = await preload_for_accepted_request(target, getter)
             with preloaded_public_reads(preload):
                 if parsed.path in {"/", "/api/home"}:
+                    stage = "home-render"
                     result = dispatch_lightweight_home(target)
                 else:
+                    stage = "accepted-dispatch"
                     result = dispatch_accepted_get(
                         _accepted_handler(), target=target, method=str(request.method)
                     )
@@ -124,7 +127,7 @@ class Default(WorkerEntrypoint):
             # back to the accepted 4174 page-first shell. Data APIs remain
             # explicit failures and are never fabricated.
             print("PYTHON_WORKER_PAGE_EXCEPTION:",
-                  type(exc).__module__, type(exc).__name__)
+                  stage, type(exc).__module__, type(exc).__name__)
             if parsed.path in PAGE_ROUTES:
                 try:
                     fallback = render_page_fallback(target)
