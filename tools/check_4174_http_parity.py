@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 
 ROUTES = [
@@ -56,6 +56,10 @@ class Receipt:
     kind: str
     baseline_status: int
     candidate_status: int
+    baseline_content_type: str
+    candidate_content_type: str
+    baseline_location: str
+    candidate_location: str
     baseline_sha256: str
     candidate_sha256: str
     structural_equal: bool
@@ -63,17 +67,27 @@ class Receipt:
     note: str = ""
 
 
-def fetch(base: str, path: str) -> tuple[int, bytes, str]:
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+OPENER = build_opener(NoRedirect)
+
+
+def fetch(base: str, path: str) -> tuple[int, bytes, str, str]:
     url = urljoin(base.rstrip("/") + "/", path.lstrip("/"))
     req = Request(url, headers={"User-Agent": "HoloViewer-4174-Parity/1"})
     try:
-        with urlopen(req, timeout=15) as response:
+        with OPENER.open(req, timeout=15) as response:
             body = response.read()
-            content_type = response.headers.get("Content-Type", "")
-            return response.status, body, content_type
+            return (response.status, body,
+                    response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower(),
+                    response.headers.get("Location", ""))
     except HTTPError as exc:
-        body = exc.read()
-        return exc.code, body, exc.headers.get("Content-Type", "")
+        return (exc.code, exc.read(),
+                exc.headers.get("Content-Type", "").split(";", 1)[0].strip().lower(),
+                exc.headers.get("Location", ""))
     except URLError as exc:
         raise RuntimeError(f"cannot fetch {url}: {exc}") from exc
 
@@ -122,8 +136,8 @@ def sha(data: bytes) -> str:
 
 
 def compare_one(baseline: str, candidate: str, path: str, kind: str) -> Receipt:
-    bs, bb, bct = fetch(baseline, path)
-    cs, cb, cct = fetch(candidate, path)
+    bs, bb, bct, bloc = fetch(baseline, path)
+    cs, cb, cct, cloc = fetch(candidate, path)
 
     if kind == "api":
         try:
@@ -142,6 +156,10 @@ def compare_one(baseline: str, candidate: str, path: str, kind: str) -> Receipt:
     note = ""
     if bs != cs:
         note = "status mismatch"
+    elif bct != cct or bct != ("application/json" if kind == "api" else "text/html"):
+        note = "Content-Type mismatch or invalid media type"
+    elif bloc != cloc:
+        note = "redirect Location mismatch"
     elif not struct_equal:
         note = "DOM/JSON structural mismatch"
         if kind == "page":
@@ -156,6 +174,10 @@ def compare_one(baseline: str, candidate: str, path: str, kind: str) -> Receipt:
         kind=kind,
         baseline_status=bs,
         candidate_status=cs,
+        baseline_content_type=bct,
+        candidate_content_type=cct,
+        baseline_location=bloc,
+        candidate_location=cloc,
         baseline_sha256=sha(bb),
         candidate_sha256=sha(cb),
         structural_equal=struct_equal,
@@ -176,7 +198,7 @@ def main() -> int:
     for path, kind in ROUTES:
         receipt = compare_one(args.baseline, args.candidate, path, kind)
         receipts.append(receipt)
-        status = "PASS" if receipt.baseline_status == receipt.candidate_status and receipt.structural_equal else "FAIL"
+        status = "PASS" if receipt.baseline_status == receipt.candidate_status and receipt.baseline_content_type == receipt.candidate_content_type and receipt.baseline_content_type == ("application/json" if kind == "api" else "text/html") and receipt.baseline_location == receipt.candidate_location and receipt.structural_equal else "FAIL"
         print(f"{status}: {path} baseline={receipt.baseline_status} candidate={receipt.candidate_status} {receipt.note}")
         if status == "FAIL":
             failed = True
@@ -190,7 +212,7 @@ def main() -> int:
             "count": len(receipts),
             "structural_pass": sum(
                 1 for r in receipts
-                if r.baseline_status == r.candidate_status and r.structural_equal
+                if r.baseline_status == r.candidate_status and r.baseline_content_type == r.candidate_content_type and r.baseline_content_type == ("application/json" if r.kind == "api" else "text/html") and r.baseline_location == r.candidate_location and r.structural_equal
             ),
             "raw_body_equal": sum(1 for r in receipts if r.body_equal),
         },
