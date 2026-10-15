@@ -4,13 +4,16 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 VENDOR="$ROOT/vendor/4174-a144bb3"
 PORT="${PORT:-8788}"
-RUNTIME_ROOT="${PTT_4174_RUNTIME_ROOT:-$HOME/Downloads/Hololive-PTT-Viewer}"
+RUNTIME_ROOT="${PTT_4174_RUNTIME_ROOT:-}"
 
 python3 "$ROOT/tools/verify_4174_snapshot.py"
 
+if [ -z "$RUNTIME_ROOT" ]; then
+  echo "PTT_4174_RUNTIME_ROOT is required; refusing an implicit runtime-data checkout." >&2
+  exit 1
+fi
 if [ ! -d "$RUNTIME_ROOT" ]; then
   echo "Missing runtime data root: $RUNTIME_ROOT" >&2
-  echo "Set PTT_4174_RUNTIME_ROOT to the existing 4174 runtime-data checkout." >&2
   exit 1
 fi
 
