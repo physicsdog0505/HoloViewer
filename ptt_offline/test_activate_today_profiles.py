@@ -44,5 +44,11 @@ class ActivateTodayProfilesTests(unittest.TestCase):
     def test_sql_quote(self):
         self.assertEqual(q("A'B"), "'A''B'")
 
+    def test_import_source_avoids_explicit_sql_transaction(self):
+        source=Path(__file__).with_name("activate_today_profiles.py").read_text(encoding="utf-8")
+        self.assertNotIn('lines=["BEGIN TRANSACTION;"]',source)
+        self.assertNotIn('lines.append("COMMIT;")',source)
+        self.assertIn("ON CONFLICT(channel_id) DO UPDATE",source)
+
 if __name__=="__main__":
     unittest.main()

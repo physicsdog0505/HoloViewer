@@ -77,7 +77,10 @@ def ensure_schema(config):
 def import_profiles(config,rows,fetched_at,roster_version):
     if not isinstance(fetched_at,str) or not fetched_at:
         raise SystemExit("avatar export missing fetched_at")
-    lines=["BEGIN TRANSACTION;"]
+    # Wrangler remote D1 rejects explicit BEGIN/COMMIT in uploaded SQL files.
+    # Keep the import replay-safe with independent idempotent UPSERT statements;
+    # exact 66/66 readback below is the release gate before enabling profiles.
+    lines=[]
     for cid,title,avatar in rows:
         lines.append(
           "INSERT INTO public_today_channel_profiles(channel_id,roster_version,channel_title,avatar_url,fetched_at,source) VALUES ("+
@@ -86,7 +89,6 @@ def import_profiles(config,rows,fetched_at,roster_version):
           "channel_title=excluded.channel_title,avatar_url=excluded.avatar_url,"
           "fetched_at=excluded.fetched_at,source=excluded.source;"
         )
-    lines.append("COMMIT;")
     with tempfile.NamedTemporaryFile("w",suffix=".sql",delete=False,encoding="utf-8") as f:
         f.write("\n".join(lines)+"\n"); sql_path=f.name
     try:
