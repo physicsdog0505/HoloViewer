@@ -112,6 +112,26 @@ class EntryPointBindingTest(unittest.TestCase):
                 self.assertEqual(preload.await_args.args[0], route)
                 self.assertEqual(dispatch.call_args.kwargs["target"], route)
 
+    def test_collab_routes_use_canonical_preload_and_accepted_dispatch(self):
+        routes = (
+            "/collab",
+            "/collab/session?collab=ark&stream=dQw4w9WgXcQ",
+            "/api/collab/live?collab=ark&stream=dQw4w9WgXcQ",
+        )
+        for route in routes:
+            with self.subTest(route=route):
+                class CollabRequest:
+                    url = "https://public.example.test" + route
+                    method = "GET"
+                with (patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}) as preload,
+                      patch.object(self.entry, "dispatch_accepted_get", return_value=TransportResponse(
+                          200, (("Content-Type", "text/html"),), b"<html></html>"
+                      )) as dispatch):
+                    response = asyncio.run(self.entry.Default().fetch(CollabRequest()))
+                self.assertEqual(response.status, 200)
+                self.assertEqual(preload.await_args.args[0], route)
+                self.assertEqual(dispatch.call_args.kwargs["target"], route)
+
     def test_handler_binding_never_selects_custom_provider(self):
         with patch.object(self.entry, "bind_public_today") as bind:
             self.entry._accepted_handler()
