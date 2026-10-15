@@ -51,19 +51,31 @@ def main(argv=None):
     p.add_argument("--aid",required=True)
     p.add_argument("--checkpoint",required=True)
     p.add_argument("--inspect",action="store_true")
+    p.add_argument("--draft-evidence")
     p.add_argument("--send",action="store_true")
     p.add_argument("--approve-source")
     p.add_argument("--evidence")
     p.add_argument("--endpoint")
     args=p.parse_args(argv)
-    if args.inspect==args.send:
-        p.error("choose exactly one of --inspect or --send")
+    if sum(bool(x) for x in (args.inspect,args.send,args.draft_evidence)) != 1:
+        p.error("choose exactly one of --inspect, --draft-evidence or --send")
     with open_source(args.source) as db:
         initial=stage_verified_day(db,day=args.day,aid=args.aid,limit=5)
         if args.inspect:
             receipt={"mode":"READ_ONLY","source_identity":initial["source_identity"],
                      "day":args.day,"aid":initial["aid"],"selected_rows":initial["selected_rows_total"],
                      "coverage":initial["coverage"],"d1_requests":0}
+        elif args.draft_evidence:
+            proposal={"source_identity":initial["source_identity"],"day":args.day,
+                      "aid":initial["aid"],"authority":"PENDING_REVIEW",
+                      "approved_rows":[{"source_line":row["source_line"],
+                        "row_sha256":row_fingerprint(row),
+                        "displayed_time":str(row.get("ptt_date"))+" "+str(row.get("ptt_time")),
+                        "candidate_utc":row["occurred_at"]} for row in initial["rows"]]}
+            with open(args.draft_evidence,"x",encoding="utf-8") as output:
+                json.dump(proposal,output,ensure_ascii=False,indent=2)
+            receipt={"mode":"EVIDENCE_DRAFT_NOT_APPROVED","path":args.draft_evidence,
+                     "rows":len(proposal["approved_rows"]),"d1_requests":0}
         else:
             if args.approve_source!=initial["source_identity"] or not args.evidence:
                 raise ContractError("specific owner source approval and external evidence required")
