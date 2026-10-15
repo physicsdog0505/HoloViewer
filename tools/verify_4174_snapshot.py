@@ -91,16 +91,28 @@ def main() -> int:
     for rel, names in sorted(missing_imports.items()):
         errors.append(f"local import escapes snapshot in {rel}: {', '.join(sorted(names))}")
 
-    forbidden = [
-        ROOT / "site",
-        ROOT / "cloudflare",
+    forbidden_files = [
         ROOT / "app.py",
         ROOT / "public_snapshot.py",
         ROOT / "scripts" / "start_public_local.sh",
     ]
-    for path in forbidden:
+    for path in forbidden_files:
         if path.exists():
             errors.append(f"legacy Public residue present: {path.relative_to(ROOT)}")
+
+    forbidden_dirs = [ROOT / "site", ROOT / "cloudflare"]
+    for path in forbidden_dirs:
+        if not path.exists():
+            continue
+        residue = sorted(
+            str(item.relative_to(ROOT))
+            for item in path.rglob("*")
+            if item.is_file() or item.is_symlink()
+        )
+        if residue:
+            errors.append(
+                "legacy Public residue present: " + ", ".join(residue)
+            )
 
     try:
         branch = subprocess.check_output(
