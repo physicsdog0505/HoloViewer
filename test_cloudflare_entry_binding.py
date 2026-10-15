@@ -101,12 +101,14 @@ class EntryPointBindingTest(unittest.TestCase):
                 class CustomRequest:
                     url = "https://public.example.test" + route
                     method = "GET"
-                with (patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}) as preload,
+                with (patch.object(self.entry, "bind_public_today") as bind,
+                      patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}) as preload,
                       patch.object(self.entry, "dispatch_accepted_get", return_value=TransportResponse(
                           200, (("Content-Type", "text/html"),), b"<html></html>"
                       )) as dispatch):
                     response = asyncio.run(self.entry.Default().fetch(CustomRequest()))
                 self.assertEqual(response.status, 200)
+                bind.assert_called_once()
                 self.assertEqual(preload.await_args.args[0], route)
                 self.assertEqual(dispatch.call_args.kwargs["target"], route)
 
