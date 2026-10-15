@@ -15,9 +15,19 @@ class ProductionHostWiringTest(unittest.TestCase):
 
     def test_host_identity_stays_owner_gated(self):
         host = self.spec["public_host_worker"]
-        self.assertIsNone(host["name"])
-        self.assertTrue(host["owner_confirmation_required"])
+        self.assertEqual(host["name"], "holoviewer-public")
+        self.assertFalse(host["owner_confirmation_required"])
+        self.assertTrue(host["repository_identity_verified"])
+        self.assertFalse(host["runtime_deployed_revision_verified"])
         self.assertEqual(host["d1_bindings"], [])
+        baseline = self.spec["current_repository_baseline"]
+        self.assertEqual(baseline["ref"], "main")
+        self.assertEqual(baseline["worker_name"], "holoviewer-public")
+        self.assertEqual(baseline["static_assets"], {"directory": "../site"})
+        self.assertFalse(baseline["has_worker_script"])
+        self.assertFalse(baseline["has_d1_binding"])
+        self.assertEqual(baseline["deploy_trigger"], "workflow_dispatch-manual-only")
+        self.assertFalse(baseline["runtime_deployed_revision_verified"])
 
     def test_python_worker_and_same_worker_assets_are_explicit(self):
         host = self.spec["public_host_worker"]
