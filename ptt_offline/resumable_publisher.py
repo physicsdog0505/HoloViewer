@@ -12,9 +12,9 @@ import json
 
 from .public_today_contract import ContractError, normalize_public_aid
 
-MAX_ROWS_PER_BATCH = 5
+MAX_ROWS_PER_BATCH = 25
 MAX_REQUESTS_PER_BATCH = 1
-MAX_WRITES_PER_BATCH = 5
+MAX_WRITES_PER_BATCH = 25
 
 
 def _stable_json(value) -> bytes:
