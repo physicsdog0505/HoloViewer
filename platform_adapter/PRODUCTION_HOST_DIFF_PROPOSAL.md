@@ -57,3 +57,11 @@ python3 tools/check_8788_local_router_contract.py \
 ```
 
 It uses only `GET /v1/catalog/today`, validates `public-consumer-v1`, runs the real accepted `HomeStream` mapping and produces a bounded receipt. Add `--ptt-day YYYY-MM-DD` only after #48's two routes have been mounted and reviewed. The probe *forbids production origins and cross-host redirects*, cannot perform writes, and does not emulate the backend Router. It is not yet an executed owner-Router end-to-end receipt.
+
+## #68 PTT Consumer readiness gate (review 6191562731)
+
+The platform adapter now provides `PttPublicReader` for exactly the owner-reviewed #48 `/v1/ptt/today` and `/v1/ptt/history` public envelopes. **Default disabled**; any attempt to read before explicit local reviewed mount availability raises `PublicAPIUnavailable` *before* invoking an HTTP transport. It has no Writer, D1/SQLite read, custom PTT business semantics, or product HTML renderer. The #68 Python Worker continues to return 503 for unmounted PTT paths.
+
+Only after the exact #47 base shell + #48 mount receives owner review and is executed in disposable local/mock-D1 mode may #68 instantiate the reader with `enabled=True` **in a test/integration environment**. The local-only consumer canary `tools/check_8788_local_router_contract.py --api-base http://127.0.0.1:8789 --ptt-day YYYY-MM-DD` verifies the target envelope using the reviewed #48 model without touching a production endpoint.
+
+The PTT adapter unit suite validates fresh/stale/unknown, completeness gap true/false, opaque continuation, cross-day envelopes, malformed/missing responses, and rejects private `cursor`/`origin` fields. **Unit success is not an end-to-end DB/router receipt**. This production proposal remains nondeployable until #45 confirms host identity, exact combined API source and live owner gating.
