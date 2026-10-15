@@ -97,7 +97,7 @@ from pyodide.http import pyfetch
 
 LOCAL_API = {local_api!r}
 
-async def local_owner_router_json(url):
+async def local_owner_router_json(url, *, api_service=None):
     if not url.startswith(DEFAULT_API + "/"):
         raise PublicAPIUnavailable("noncanonical request in local E2E")
     target = LOCAL_API + url[len(DEFAULT_API):]
