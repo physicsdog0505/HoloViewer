@@ -14,7 +14,6 @@ if [ ! -d "$RUNTIME_ROOT" ]; then
   exit 1
 fi
 
-cd "$VENDOR"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONNOUSERSITE=1
 unset PYTHONPATH
@@ -24,4 +23,4 @@ echo "4174 code root: $VENDOR"
 echo "Runtime data root: $RUNTIME_ROOT"
 echo "URL: http://127.0.0.1:$PORT/"
 
-exec python3 client_app.py --host 127.0.0.1 --port "$PORT" --runtime-root "$RUNTIME_ROOT"
+exec python3 "$ROOT/tools/run_4174_snapshot.py" --port "$PORT" --runtime-root "$RUNTIME_ROOT"
