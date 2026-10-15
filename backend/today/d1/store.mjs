@@ -7,6 +7,13 @@ const channelPattern=/^UC[A-Za-z0-9_-]{22}$/;
 const groups=new Set(['hololive','holostars','mekpark','other']);
 const lifecycles=new Set(['unknown','upcoming','live','ended']);
 const ckPattern=/^cp_[A-Za-z0-9_-]{8,128}$/;
+// Legacy public_catalog avatar is channel artwork, never the video thumbnail.
+export function verifiedChannelAvatar(value){
+ if(typeof value!=='string'||value.length>2048)return null;
+ try{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password||u.port)return null;
+  return ['yt3.ggpht.com','yt3.googleusercontent.com','yt3.google.com'].includes(u.hostname)?u.href:null;
+ }catch{return null}
+}
 function validTime(x) {return typeof x==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(x) && !Number.isNaN(Date.parse(x));}
 export function validateEvidence(r) {
   if (!r || !idPattern.test(r.video_id) || !channelPattern.test(r.channel_id) ||
@@ -105,7 +112,11 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
   // actively LIVE streams crossing midnight, but not unrelated historical rows.
   const start=new Date(day+'T00:00:00+08:00').toISOString().replace(/\.\d{3}Z$/,'Z');
   const end=new Date(new Date(day+'T00:00:00+08:00').getTime()+86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
-  const rows=await db.prepare(`SELECT public_today_canonical.* FROM public_today_canonical
+  const rows=await db.prepare(`SELECT public_today_canonical.*,
+    (SELECT c.avatar_url FROM public_catalog c
+       WHERE c.channel_id=public_today_canonical.publisher_channel_id AND c.avatar_url IS NOT NULL
+       ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC LIMIT 1) AS trusted_channel_avatar
+    FROM public_today_canonical
     JOIN public_today_approved_channels ac
       ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
     WHERE ((lifecycle_observed_at>=? AND lifecycle_observed_at<?)
@@ -129,7 +140,7 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
         r.lifecycle_state==='upcoming'&&r.scheduled_start&&r.scheduled_start<=nowStamp?'waiting':r.lifecycle_state;
       return {video_id:r.video_id,title:r.title,channel_id:r.publisher_channel_id,channel_name:r.channel_name,
         group:r.channel_group,lifecycle_state:state,observed_at:r.lifecycle_observed_at,
-        start_at:r.actual_start??r.scheduled_start,avatar_url:null,member_accent:null,
+        start_at:r.actual_start??r.scheduled_start,avatar_url:verifiedChannelAvatar(r.trusted_channel_avatar),member_accent:null,
         source_label:r.source_label,stale:state==='stale'};
     })};
 }
