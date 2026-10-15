@@ -7,7 +7,7 @@
 
 Status: IMPLEMENTED OFFLINE, **NOT ACTIVATED**, 24-hour cloud cost/latency ACCEPTANCE PENDING.
 
-The previous five-row single-POST canary is NOT the production Publisher. The
+The previous five-row single-POST canary is NOT the production Publisher. The recurring source now inspects up to **four** latest active AIDs per snapshot (configurable max eight), each with independent state and bounded fair per-AID batch windows. Within the default eight total batches and 25 rows/batch, it can send up to 200 source rows per snapshot when the work is concentrated in one AID. For four simultaneously active AIDs, the initial fair share is two batches each; anything beyond the limit remains for a subsequent cycle. This is not full fair rotation across all historical articles. The
 latest #48 source includes a bounded recurring entry `ptt_offline.recurring_publisher`.
 It performs one local checkpoint inspection every 60 seconds (120 optional).
 No new/changed rows means no signed POST; no full-table upload. AID-specific
@@ -48,7 +48,7 @@ python3 -B -m ptt_offline.recurring_publisher \
   --source /path/to/hololive_ptt.sqlite3 \
   --state-dir /persistent/ptt-publisher-state \
   --metrics /persistent/ptt-publisher-state/minute-metrics.jsonl \
-  --iterations 1440 --batch-cap 25 \
+  --iterations 1440 --batch-cap 25 --max-batches 8 --max-articles 4 \
   --send --approve-live-capture-policy
 ```
 
