@@ -47,6 +47,24 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertEqual(len(inspected["candidate_rows"]),2)
         self.assertEqual(inspected["pending_source_lines"],[1])
         self.assertTrue(all(x["day"]=="2026-10-15" for x in inspected["candidate_rows"]))
+    def test_verified_chronology_recovers_25_minute_delayed_collector_row(self):
+        self.db.execute(
+            "INSERT INTO pushes VALUES(4,1,4,1,'→','late','delayed live row','10/16','06:36','2026-10-15T23:01:23Z')"
+        )
+        plan=inspect_latest_article(self.db)
+        row=next(x for x in plan["candidate_rows"] if x["source_line"]==4)
+        self.assertEqual(row["occurred_at"],"2026-10-15T22:36:00Z")
+        self.assertEqual(row["day"],"2026-10-16")
+        self.assertNotIn(4,plan["pending_source_lines"])
+
+    def test_verified_chronology_still_rejects_more_than_two_hour_collection_delay(self):
+        self.db.execute(
+            "INSERT INTO pushes VALUES(4,1,4,1,'→','late','too late','10/16','06:36','2026-10-16T01:01:23Z')"
+        )
+        plan=inspect_latest_article(self.db)
+        self.assertIn(4,plan["pending_source_lines"])
+        self.assertFalse(any(x["source_line"]==4 for x in plan["candidate_rows"]))
+
     def test_bounded_scan_tracks_all_normal_100_plus_lines(self):
         self.db.executemany("INSERT INTO pushes VALUES(?,?,?,?,?,?,?,?,?,?)",[
           (n,1,n,1,'推','a',f'bulk-{n}','10/15','18:01','2026-10-15T10:02:07Z')
