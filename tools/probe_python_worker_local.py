@@ -8,11 +8,86 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
+import tempfile
+from dataclasses import asdict
 from pathlib import Path
 import subprocess
 import time
 import urllib.error
 import urllib.request
+
+
+
+def compare_accepted_fixture(worker_base: str, *, port: int = 58085) -> dict:
+    """Run the SHA-pinned product locally and reuse existing DOM/JSON comparator."""
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root))
+    from tools.check_4174_http_parity import compare_one, fetch
+
+    with tempfile.TemporaryDirectory(prefix="hv-accepted-parity-") as runtime:
+        vendor = root / "vendor" / "4174-a144bb3"
+        log_path = Path(runtime) / "accepted-4174.log"
+        env = {**os.environ,
+               "PTT_CLIENT_DISABLE_TODAY_REFRESH": "1",
+               "PTT_CLIENT_RUNTIME_ROOT": runtime,
+               "PYTHONDONTWRITEBYTECODE": "1"}
+        command = [
+            sys.executable, "-B", str(vendor / "client_app.py"),
+            "--host", "127.0.0.1", "--port", str(port),
+            "--runtime-root", runtime,
+        ]
+        with log_path.open("w", encoding="utf-8") as log:
+            process = subprocess.Popen(command, cwd=vendor, env=env,
+                                       stdout=log, stderr=subprocess.STDOUT)
+            try:
+                baseline = f"http://127.0.0.1:{port}"
+                deadline = time.monotonic() + 45
+                ready = False
+                while time.monotonic() < deadline:
+                    if process.poll() is not None:
+                        break
+                    try:
+                        response = fetch(baseline, "/history?date=invalid")
+                        if response[0] == 400:
+                            ready = True
+                            break
+                    except (OSError, RuntimeError):
+                        time.sleep(0.5)
+                if not ready:
+                    log.flush()
+                    raise RuntimeError(
+                        "accepted 4174 parity process unavailable: "
+                        + log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
+                    )
+
+                receipts = []
+                for route, kind in (
+                    ("/", "page"),
+                    ("/api/home", "api"),
+                    ("/history?date=invalid", "page"),
+                ):
+                    row = compare_one(baseline, worker_base, route, kind)
+                    okay = (
+                        row.baseline_status == row.candidate_status
+                        and row.baseline_content_type == row.candidate_content_type
+                        and row.structural_equal
+                    )
+                    print(("PASS" if okay else "FAIL") +
+                          ": accepted-vs-Pyodide " + route + " " + row.note,
+                          flush=True)
+                    receipts.append({"pass": okay, **asdict(row)})
+                if not all(r["pass"] for r in receipts):
+                    raise RuntimeError("Accepted 4174 vs Worker DOM/JSON parity failed")
+                return {"accepted_source": "a144bb378a8bdd772faa867d608c1e7491253883",
+                        "routes": receipts, "status": "PASS"}
+            finally:
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
 
 
 def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
@@ -102,9 +177,10 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+    parity = compare_accepted_fixture(base) if fixture_mode else None
     return {"runtime": "local Python Workers/Pyodide workerd",
             "bundle": json.loads((bundle / "bundle-provenance.json").read_text()),
-            "checks": results, "production_deployment": False,
+            "checks": results, "accepted_parity": parity, "production_deployment": False,
             "log": str(log_path)}
 
 
