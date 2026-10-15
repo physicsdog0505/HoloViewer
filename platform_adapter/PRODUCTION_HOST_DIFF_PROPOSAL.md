@@ -65,3 +65,17 @@ The platform adapter now provides `PttPublicReader` for exactly the owner-review
 Only after the exact #47 base shell + #48 mount receives owner review and is executed in disposable local/mock-D1 mode may #68 instantiate the reader with `enabled=True` **in a test/integration environment**. The local-only consumer canary `tools/check_8788_local_router_contract.py --api-base http://127.0.0.1:8789 --ptt-day YYYY-MM-DD` verifies the target envelope using the reviewed #48 model without touching a production endpoint.
 
 The PTT adapter unit suite validates fresh/stale/unknown, completeness gap true/false, opaque continuation, cross-day envelopes, malformed/missing responses, and rejects private `cursor`/`origin` fields. **Unit success is not an end-to-end DB/router receipt**. This production proposal remains nondeployable until #45 confirms host identity, exact combined API source and live owner gating.
+
+## Exact local combined-API evidence (2026-10-15; NO DEPLOY)
+
+Source HEADs pinned in the executed offline workflow:
+- existing #47 API shell and canonical Today: `149a80361654b06377dbae580e1d8da2e5010cf0`;
+- #48 PTT injection module: `b96d0902a504bc26019efd693a1b3586cfb3d3d2`;
+- #68 Consumer test HEAD: `589a0a69e0ea7af9f4d03eb19fa15bee9b43ecf0`;
+- executed workflow: [38736532548](https://github.com/physicsdog0505/HoloViewer/actions/runs/38736532548), SUCCESS.
+
+The test imports the **actual #47 + #48 owner-authored modules** (no copied API/router) and runs the single combined shell via local Node HTTP with deterministic, read-only D1-compatible `prepare/bind/all/first` fixtures. #68's actual Python consumer mapping then calls the loopback API to consume canonical Today and PTT Today, reads PTT History page one with `limit=1`, carries its opaque `next_checkpoint` through `PttPublicReader.read_history`, maps the query to `after`, and verifies the second distinct push appears. Actual `history_continuation_checked=true`, `history_second_count=1`, `db_reads=7` in the successful combined receipt. A separate unmounted Today-only router check has `db_reads=2`.
+
+The **same CI run** also records 42/42 offline tests, local Pyodide Python Worker startup, four exact original asset bytes and six Playwright Home/History geometry comparisons. The combined API/router runs through the accepted **Python consumer contract**; the local Pyodide rendering fixture is a separate CI step. This is *not yet* a single HTTP trace from Pyodide `fetch()` through the combined router. Do not claim production deployed D1, live PTT publication, or PTT UI cutover.
+
+**Source-only/mocked milestone:** the 4174 Consumer can consume the actual combined owner-authored Router using a D1-compatible mock. Remaining production gates: independent acceptance of the #48 mount against the precise #47 base, real existing Worker account/binding identity, end-to-end Pyodide fetch against owner Router where required, D1 read-only canary, and owner-authorized deployment/merge. PTT product routes remain explicit 503 until those gates are cleared.
