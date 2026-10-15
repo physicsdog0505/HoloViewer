@@ -251,7 +251,8 @@ export async function handleExperienceRead(request,env,now=new Date()){
    let events;
    if(day!=null){
     if(!validDay(day))return json({error:'invalid_day'},400,0);
-    events=(await collabHistory(env.DB,day,{limit:100,offset:0})).events;
+    const source=await historyRows(env.DB,day);
+    events=detectCollabCandidates(source.streams);
    }else events=(await collabLive(env.DB,{now,profileTableEnabled:env.TODAY_PROFILES_ENABLED==='true'})).events;
    const event=events.find(x=>x.event_id===eventId);
    return event?json({schema_version:'public-experience-v1',event}):json({error:'not_found'},404,0);
