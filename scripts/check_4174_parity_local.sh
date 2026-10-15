@@ -139,6 +139,12 @@ wait_ready "http://127.0.0.1:$CANDIDATE_PORT/" "candidate 8788" "$CANDIDATE_LOG"
 
 python3 tools/check_4174_http_parity.py   --baseline "http://127.0.0.1:$BASELINE_PORT"   --candidate "http://127.0.0.1:$CANDIDATE_PORT"
 
+if [ "${RUN_BROWSER_PARITY:-0}" = "1" ]; then
+  python3 tools/check_4174_browser_state_parity.py \
+    --baseline "http://127.0.0.1:$BASELINE_PORT" \
+    --candidate "http://127.0.0.1:$CANDIDATE_PORT"
+fi
+
 echo "=== ACCEPTED 4174 LOG ==="
 cat "$BASELINE_LOG"
 echo "=== ISOLATED 8788 LOG ==="
