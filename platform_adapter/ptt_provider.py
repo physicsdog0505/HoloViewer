@@ -45,7 +45,7 @@ class PttPublicReader:
         if limit is not None:
             params["limit"] = str(limit)
         if checkpoint is not None:
-            params["checkpoint"] = checkpoint
+            # #48 public History wire contract uses after=<opaque push_id>.\n            # Preserve consumer-facing checkpoint without parsing or rewriting it.\n            params["after"] = checkpoint
         # get_json is the owner's async router transport, never an owned
         # backend implementation. The URL remains on the canonical origin.
         url = DEFAULT_API + "/v1/ptt/" + kind + "?" + urlencode(params)
