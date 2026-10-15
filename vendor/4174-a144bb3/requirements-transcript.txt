@@ -1,0 +1,7 @@
+# Optional dependencies for local ASR benchmark work only.
+# Do not install these into the normal frontend/runtime environment unless needed.
+# faster-whisper 1.2.x still passes metadata_errors to av.open(); PyAV 19 removed
+# that argument, so keep PyAV below 19 until upstream compatibility lands.
+faster-whisper>=1.2,<2
+av>=11,<19
+google-genai>=2.23,<3
