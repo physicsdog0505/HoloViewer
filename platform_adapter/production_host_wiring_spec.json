@@ -1,0 +1,45 @@
+{
+  "schema": "holoviewer-8788-production-host-wiring-proposal-v1",
+  "status": "review-only-no-deploy",
+  "accepted_product_source": {
+    "repository": "physicsdog0505/Hololive-PTT-Viewer",
+    "commit": "a144bb378a8bdd772faa867d608c1e7491253883"
+  },
+  "public_host_worker": {
+    "name": null,
+    "owner_confirmation_required": true,
+    "main": "entry.py",
+    "compatibility_date": "2026-10-15",
+    "compatibility_flags": ["python_workers"],
+    "assets": {
+      "directory": "./public",
+      "binding": "ASSETS",
+      "run_worker_first": false
+    },
+    "d1_bindings": []
+  },
+  "canonical_api": {
+    "worker_name": "holoviewer-public-api",
+    "origin": "https://holoviewer-public-api.singlebagel.workers.dev",
+    "issue47_source_sha": "149a80361654b06377dbae580e1d8da2e5010cf0",
+    "issue48_mount_sha": "b96d0902a504bc26019efd693a1b3586cfb3d3d2",
+    "db_binding": {
+      "owner": "canonical_api",
+      "binding": "DB",
+      "database_name": "holoviewer-public-v1"
+    }
+  },
+  "ptt_product": {
+    "enabled": false,
+    "fail_closed": true,
+    "enable_gate": "independent #48 acceptance plus owner-authorized production cutover"
+  },
+  "forbidden_mutations_without_owner_gate": [
+    "deploy",
+    "route_or_domain_change",
+    "d1_migration_or_write",
+    "publisher_or_cron_activation",
+    "secret_change",
+    "merge_or_cutover"
+  ]
+}
