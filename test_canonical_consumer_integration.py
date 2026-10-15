@@ -108,7 +108,7 @@ class ConsumerIntegrationTest(unittest.TestCase):
         self.assertEqual(unknown[0].state, "unknown")
         self.assertEqual(len(upcoming), 1)
 
-    def test_canonical_history_page_21_reaches_accepted_history_reader(self):
+    def test_legacy_compatible_history_page_21_reaches_accepted_history_reader(self):
         from datetime import datetime
         from frontend_time import TAIPEI
         from client_history import history_day_bounds
