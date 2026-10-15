@@ -103,15 +103,20 @@ export async function setCoverage(db, c) {
     typeof c.checkpoint==='string'&&ckPattern.test(c.checkpoint)?c.checkpoint:null));
   await db.batch(statements);
 }
-export async function readToday(db,{day,limit=200,now=new Date()}={}) {
+export async function readToday(db,{day,limit=200,offset=0,now=new Date()}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
     throw Error('invalid canonical Today day');
   if (!Number.isInteger(limit)||limit<1||limit>200) throw Error('invalid limit');
+  if (!Number.isSafeInteger(offset)||offset<0||offset>10000) throw Error('invalid offset');
   const coverage=await db.prepare('SELECT * FROM public_today_catalog_meta WHERE singleton=1').first();
   // Taipei day boundaries are UTC+08:00. Scope includes this day's activity and
   // actively LIVE streams crossing midnight, but not unrelated historical rows.
-  const start=new Date(day+'T00:00:00+08:00').toISOString().replace(/\.\d{3}Z$/,'Z');
-  const end=new Date(new Date(day+'T00:00:00+08:00').getTime()+86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
+  const requestedStart=new Date(day+'T00:00:00+08:00');
+  const localHour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',hourCycle:'h23'}).format(now));
+  const localDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  const overnight=day===localDay&&localHour<6;
+  const start=new Date(requestedStart.getTime()-(overnight?86400000:0)).toISOString().replace(/\.\d{3}Z$/,'Z');
+  const end=new Date(requestedStart.getTime()+86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
   const rows=await db.prepare(`SELECT public_today_canonical.*,
     (SELECT c.avatar_url FROM public_catalog c
        WHERE c.channel_id=public_today_canonical.publisher_channel_id AND c.avatar_url IS NOT NULL
@@ -124,8 +129,8 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
         OR (actual_start>=? AND actual_start<?)
         OR (actual_end>=? AND actual_end<?)
         OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL AND lifecycle_observed_at>=?))
-    ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ?`)
-    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\.\d{3}Z$/,'Z'),limit+1).all();
+    ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ? OFFSET ?`)
+    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\.\d{3}Z$/,'Z'),limit+1,offset).all();
   const truncated=(rows.results??[]).length>limit;
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
@@ -133,7 +138,7 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
   return {schema_version:'public-consumer-v1',as_of:nowStamp,
     freshness:{status:freshness,last_success_at:last},
     completeness:{status:coverage?(coverage.gap||coverage.scanned_channels>0?'partial':'unverified'):'unverified',
-                  gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated},
+                  gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated,has_more:truncated,offset,overnight},
     checkpoint:coverage?.checkpoint??null,
     streams:(rows.results??[]).slice(0,limit).map(r=>{
       const evidenceAge=Date.parse(nowStamp)-Date.parse(r.lifecycle_observed_at),valid=evidenceAge>=0&&evidenceAge<=1200000;
