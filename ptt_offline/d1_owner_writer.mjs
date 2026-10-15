@@ -9,6 +9,7 @@ const SQL_EVIDENCE='INSERT INTO ptt_source_evidence(day,aid,source_record_key,pu
 const DAY=/^\d{4}-\d{2}-\d{2}$/;
 const PUSH=/^ptt:v1:[0-9a-f]{64}$/;
 const AID=/^[A-Za-z0-9._-]{1,32}$/;
+const UTC=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const URL=/^https:\/\/www\.ptt\.cc\/bbs\/C_Chat\/M\.\d+\.A\.[0-9a-fA-F]{3}\.html$/;
 
 export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
@@ -26,7 +27,9 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
       row.day===batch.day && Number.isSafeInteger(row.source_line) && row.source_line>0 &&
       typeof row.author==='string' && typeof row.content==='string' &&
       typeof row.source_record_key==='string' && row.source_record_key.length>0 &&
-      typeof row.occurred_at==='string' && !Number.isNaN(Date.parse(row.occurred_at)),
+      typeof row.occurred_at==='string' && UTC.test(row.occurred_at) &&
+      !Number.isNaN(Date.parse(row.occurred_at)) &&
+      new Date(Date.parse(row.occurred_at)+8*3600000).toISOString().slice(0,10)===row.day,
       'invalid canonical row');
     const key=row.aid+':'+row.source_record_key;
     requireTrue(!keys.has(key),'duplicate source identity'); keys.add(key);
