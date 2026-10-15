@@ -41,7 +41,7 @@ No production services, credentials, local 4174 checkout, database or Cloudflare
 ## Implementation progress (isolated, unpromoted)
 
 - `catalog_projection.mjs`: conservative Today/History state grouping; missing lifecycle remains unknown, missing completeness is never promoted.
-- `custom_view_state.mjs`: accepted selection, order, primary/audio identities, five viewing layouts and session query generation.
+- `custom_view_state.mjs`: accepted selection, order, primary/audio identities, three accepted custom-view layouts and session query generation.
 - `persistent_player_host.mjs`: mounts YouTube iframe nodes once under the long-lived application shell, pauses when navigation hides the viewing route, and reuses retained nodes on return. Browser/YouTube integration still needs review; background playback is not asserted.
 - `viewing_route_controller.mjs`: strict accepted session URL rehydration and route visibility transition.
 - `extract_accepted_assets.py`: extracts exact accepted literal CSS and JS without importing the product Python server. Output is a **build input**, not a finished Cloudflare website.
