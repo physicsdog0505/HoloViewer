@@ -11,7 +11,8 @@ from urllib.parse import urlsplit
 
 from workers import WorkerEntrypoint, Response
 from platform_adapter.worker_transport import dispatch_accepted_get
-from platform_adapter.public_api import DEFAULT_API
+from platform_adapter.public_api import DEFAULT_API, PublicAPIUnavailable, preloaded_public_reads
+from platform_adapter.worker_preload import preload_for_accepted_request, fetch_canonical_json
 from platform_adapter.runtime_binding import bind_public_today
 
 _bound = False
@@ -50,9 +51,20 @@ class Default(WorkerEntrypoint):
         # Import only the accepted product handler, never a cloned route table.
         # Packaging/import support must be proved on the actual Python Workers
         # runtime before this experimental entrypoint can be promoted.
-        result = dispatch_accepted_get(
-            _accepted_handler(), target=target, method=str(request.method)
-        )
+        try:
+            # Cloudflare/Pyodide uses async fetch. Accepted 4174 data loaders
+            # remain synchronous but consume request-local preloaded values.
+            preload = await preload_for_accepted_request(target, fetch_canonical_json)
+            with preloaded_public_reads(preload):
+                result = dispatch_accepted_get(
+                    _accepted_handler(), target=target, method=str(request.method)
+                )
+        except PublicAPIUnavailable:
+            return Response(
+                "Public data temporarily unavailable", status=503,
+                headers={"Content-Type": "text/plain; charset=utf-8",
+                         "Cache-Control": "no-store"},
+            )
         # Header names/values come from the accepted handler. Do not return
         # hop-by-hop server transport headers to the Worker network stack.
         headers = {
