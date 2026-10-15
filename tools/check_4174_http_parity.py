@@ -83,10 +83,38 @@ def canonical_json(body: bytes) -> bytes:
     return json.dumps(parsed, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def html_structure(body: bytes) -> bytes:
+def html_items(body: bytes) -> list[tuple]:
     parser = StructuralHTML()
     parser.feed(body.decode("utf-8", errors="replace"))
-    return json.dumps(parser.items, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return parser.items
+
+
+def html_structure(body: bytes) -> bytes:
+    return json.dumps(
+        html_items(body),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def first_structure_diff(left: bytes, right: bytes) -> dict | None:
+    a = html_items(left)
+    b = html_items(right)
+    limit = min(len(a), len(b))
+    index = next((i for i in range(limit) if a[i] != b[i]), None)
+    if index is None:
+        if len(a) == len(b):
+            return None
+        index = limit
+    lo = max(0, index - 3)
+    hi = index + 4
+    return {
+        "index": index,
+        "baseline_count": len(a),
+        "candidate_count": len(b),
+        "baseline_context": a[lo:hi],
+        "candidate_context": b[lo:hi],
+    }
 
 
 def sha(data: bytes) -> str:
@@ -116,6 +144,10 @@ def compare_one(baseline: str, candidate: str, path: str, kind: str) -> Receipt:
         note = "status mismatch"
     elif not struct_equal:
         note = "DOM/JSON structural mismatch"
+        if kind == "page":
+            detail = first_structure_diff(bb, cb)
+            if detail is not None:
+                note += " | " + json.dumps(detail, ensure_ascii=False)
     elif not body_equal:
         note = "structure equal; raw body differs"
 
