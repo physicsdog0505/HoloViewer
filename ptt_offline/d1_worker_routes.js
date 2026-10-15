@@ -49,12 +49,14 @@ export async function handlePttD1Read(request, db) {
     const hasMore = raw.length > limit;
     const newestCheck = (scope.results || []).map(x=>x.last_success_at).filter(Boolean);
     const lastSuccess = newestCheck.length ? newestCheck.sort()[0] : null;
-    const stale = !lastSuccess || (Date.now() - Date.parse(lastSuccess)) > 30000;
+    const checkedMs = lastSuccess === null ? NaN : Date.parse(lastSuccess);
+    const ageMs = Date.now() - checkedMs;
+    const fresh = Number.isFinite(checkedMs) && Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= 30000;
     const gap = (scope.results || []).some(x=>Boolean(x.has_gap));
     const projected = visible.map(row => Object.fromEntries(keys.map(k=>[k,row[k] ?? null])));
     return json({
       schema_version:'public-consumer-v1', day, as_of:asOf,
-      freshness:{status:stale?'stale':'fresh',last_success_at:lastSuccess},
+      freshness:{status:fresh?'fresh':'unknown',last_success_at:lastSuccess},
       completeness:{status:'partial',gap},
       checkpoint:null,
       pushes:projected,
