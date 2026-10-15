@@ -120,18 +120,21 @@ class EntryPointBindingTest(unittest.TestCase):
             "/collab/session?collab=ark&stream=dQw4w9WgXcQ",
             "/api/collab/live?collab=ark&stream=dQw4w9WgXcQ",
         )
+        fake_handler = type("AcceptedHandler", (), {})
         for route in routes:
             with self.subTest(route=route):
                 class CollabRequest:
                     url = "https://public.example.test" + route
                     method = "GET"
                 with (patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}) as preload,
+                      patch.object(self.entry, "_accepted_handler", return_value=fake_handler) as accepted,
                       patch.object(self.entry, "dispatch_accepted_get", return_value=TransportResponse(
                           200, (("Content-Type", "text/html"),), b"<html></html>"
                       )) as dispatch):
                     response = asyncio.run(self.entry.Default().fetch(CollabRequest()))
                 self.assertEqual(response.status, 200)
                 self.assertEqual(preload.await_args.args[0], route)
+                accepted.assert_called_once_with()
                 self.assertEqual(dispatch.call_args.kwargs["target"], route)
 
     def test_page_only_routes_render_fallback_without_provider(self):
