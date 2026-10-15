@@ -71,7 +71,7 @@ def build(output: Path) -> dict:
         'name = "holoviewer-8788-feasibility"\n'
         'version = "0.0.0"\n'
         'requires-python = ">=3.13"\n'
-        'dependencies = []\n'
+        'dependencies = ["tzdata>=2025.2"]\n'
         '[dependency-groups]\n'
         'dev = ["workers-py", "workers-runtime-sdk"]\n',
         encoding="utf-8",
