@@ -39,7 +39,7 @@ test('existing PTT objects are not treated as applied without version ledger',()
    {applied:true,verified:true,version:1});
 });
 
-test('owner pinned apply invokes exactly one existing-D1 file mutation and verifies',()=>{
+test('owner pinned apply uses one transactional Wrangler migration and verifies',()=>{
  const plan=planMigration();
  const existing=['public_catalog','public_history','public_today_schema_migrations','d1_migrations'];
  const after=[...existing,'ptt_threads','ptt_pushes','ptt_source_evidence',
@@ -48,7 +48,7 @@ test('owner pinned apply invokes exactly one existing-D1 file mutation and verif
  const execute=(args)=>{
   commands.push(args);
   if(args[0]==='whoami')return ACCOUNT;
-  if(args.includes('--file')){wrote=true;return 'ok';}
+  if(args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply'){wrote=true;return 'ok';}
   const sql=args[args.length-1];
   const rows=sql.includes('SELECT version,description')?
     [{version:1,description:'canonical push, thread scope, replay and forward repair state'}]:
@@ -57,8 +57,8 @@ test('owner pinned apply invokes exactly one existing-D1 file mutation and verif
  };
  const result=run(['--apply','--approve='+plan.sha256],execute,()=>{});
  assert.equal(result.mode,'OWNER_APPLIED_VERIFIED');
- assert.equal(commands.filter(c=>c.includes('--file')).length,1);
- assert.equal(commands.find(c=>c.includes('--file'))[2],UUID);
+ assert.equal(commands.filter(c=>c[1]==='migrations'&&c[2]==='apply').length,1);
+ assert.equal(commands.find(c=>c[1]==='migrations'&&c[2]==='apply')[3],plan.database);
 });
 
 test('remote failure after mutation attempt forces STOP without retry',()=>{
@@ -67,7 +67,7 @@ test('remote failure after mutation attempt forces STOP without retry',()=>{
  const existing=['public_catalog','public_history','public_today_schema_migrations','d1_migrations'];
  const exec=(args)=>{
   if(args[0]==='whoami')return ACCOUNT;
-  if(args.includes('--file')){mutations++;throw Error('network lost after possible commit');}
+  if(args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply'){mutations++;throw Error('network lost after possible commit');}
   return JSON.stringify([{success:true,results:existing.map(name=>({name,type:'table'}))}]);
  };
  assert.throws(()=>run(['--apply','--approve='+plan.sha256],exec,()=>{}),
@@ -82,7 +82,7 @@ test('existing PTT migration aborts before any write',()=>{
  let writes=0;
  const exec=(args)=>{
   if(args[0]==='whoami')return ACCOUNT;
-  if(args.includes('--file')){writes++;throw Error('must not happen')}
+  if(args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply'){writes++;throw Error('must not happen')}
   if(String(args.at(-1)).includes('SELECT version,description'))
     return JSON.stringify([{success:true,results:[{version:1,description:'ptt'}]}]);
   return JSON.stringify([{success:true,results:existing.map(name=>({name,type:'table'}))}]);
