@@ -19,3 +19,16 @@ Safety: HTTPS, bounded GET response, no credentials/secrets, refused redirects, 
 No production Worker bindings, Cloudflare D1 migrations, writers, Cron, secrets or deployments were modified. This is a source-level integration slice; **live API availability and populated-data rendering have not yet been executed/verified**.
 
 Production platform caveat: the accepted product includes Python server-rendering and local SQLite dependencies. This integration mode proves the provider-neutral data entry seam, **not** that the Python server itself runs inside Cloudflare Workers. A faithful host/static delivery strategy for the original accepted renderer remains a real platform integration decision; no competing reimplementation is authorized.
+
+## Cloudflare Python Worker transport feasibility (source-only)
+
+Issue #68 comments `6189311810` and `6189323248` authorize a **transport shim** over the accepted 4174 handler, not another product.
+
+- `worker_transport.py` constructs an in-memory, socketless request for the original `ClientRequestHandler.do_GET` and extracts status, response headers and body. It duplicates **no route dispatch or HTML renderer**.
+- `cloudflare_entry.py` shows the official `WorkerEntrypoint.fetch` integration with the Cloudflare Python `Response` API. It is **not wired into Wrangler or deployed**; the accepted vendor module must be bundled and its runtime imports verified.
+- `test_worker_transport.py` exercises ordinary HTML, JSON, invalid-history and method/target rejection with a transport fixture.
+- `tools/check_worker_transport_parity.py` offers an owner-local comparison against a running accepted 4174 HTTP handler for `/`, `/api/home`, and `/history?date=invalid`. Its output is a candidate receipt, **not already executed**.
+
+**Unproven concrete compatibility points**: direct Python Worker import of the vendored `client_app` dependency closure (including `sqlite3`, `threading`, filesystem and other modules), non-blocking Worker fetch compatibility with synchronous `urllib` in `PublicAPI`, and packaging static PTT assets without local writable storage. The accepted HTTP dispatcher still handles route semantics; no Worker-local DB or thread may be started. The source adapter should not be represented as production-runnable until tested inside the Python Workers runtime and reconciled with the existing `holoviewer-public-api` service.
+
+No Cloudflare account operation, D1 migration, new runtime backend, Wrangler deploy, or product rewrite has been performed.
