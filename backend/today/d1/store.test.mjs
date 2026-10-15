@@ -158,3 +158,25 @@ test('channel avatar projects only approved existing catalog channel artwork, no
  assert.equal(denied.streams[0].avatar_url,null);
  d.close();
 });
+
+test('Today LIMIT explicitly reports truncation, retaining title and source for client highlight scoring',async()=>{
+ const d=db();
+ for(let i=0;i<201;i++){
+  const video_id='v'+String(i).padStart(10,'0');
+  await writeEvidence(d,{...fixture({id:video_id,observed:'2026-10-15T11:59:00Z'}),title:i===0?'重大告知 生日':'Other',source_label:'YouTube'});
+ }
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-15',limit:200,now:new Date('2026-10-15T12:00:00Z')});
+ assert.equal(x.streams.length,200);assert.equal(x.completeness.limited,true);assert.equal(x.completeness.gap,true);
+ assert.equal(x.streams[0].source_label,'YouTube');
+ d.close();
+});
+test('accepted 20-minute item freshness status at 19, 21 and 31 minutes',async()=>{
+ const d=db();await writeEvidence(d,fixture({observed:'2026-10-15T12:00:00Z'}));
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ for(const [minutes,expected] of [[19,'live'],[21,'stale'],[31,'stale']]){
+  const x=await readToday(d,{day:'2026-10-15',now:new Date(Date.parse('2026-10-15T12:00:00Z')+minutes*60000)});
+  assert.equal(x.streams[0].lifecycle_state,expected);
+ }
+ d.close();
+});
