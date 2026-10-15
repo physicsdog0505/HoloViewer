@@ -273,9 +273,9 @@ class TodayAdapter:
         adapter.merge_snapshot(provider.snapshot_for_day(day))
         return adapter
 
-    def _stage_rows(self, pushes: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    def _stage_rows(self, pushes: Iterable[dict[str, Any]], *, base_rows: dict[str, dict[str, Any]] | None = None) -> dict[str, dict[str, Any]]:
         """Validate all rows and winner selection before mutating any adapter state."""
-        staged = dict(self.rows)
+        staged = dict(self.rows if base_rows is None else base_rows)
         for raw in pushes:
             row = dict(raw)
             aid = normalize_public_aid(row.get("aid"))
@@ -305,9 +305,13 @@ class TodayAdapter:
 
         Offline in-memory token only. Production persistence/authentication is gated.
         """
-        import base64
+        # A consumer page checkpoint changes when visible content changes, even
+        # if the relay cursor vector does not (snapshot-only/Collector wins).
+        visible = [(row["push_id"], row.get("origin"), row.get("floor"), row.get("kind"))
+                   for row in self._ordered()]
         material = dumps(
-            [self.day, sorted(self.cursors.items()), sorted(self.purged.items())],
+            [self.day, sorted(self.cursors.items()), sorted(self.purged.items()), visible,
+             self.completeness, self.history_gap],
             separators=(",", ":"), ensure_ascii=False,
         ).encode("utf-8")
         return "ptt:checkpoint:v1:" + sha256(material).hexdigest()
@@ -401,7 +405,14 @@ class TodayAdapter:
             raise ContractError("tail has_more cannot establish initial checkpoint")
 
     def initialize_from_provider(self, provider: PttProvider, *, target: int = INITIAL_WINDOW) -> None:
-        """Load safe recent windows per AID, then adopt a per-AID cursor vector."""
+        """Validate every AID window before committing any day-level state."""
+        if not 1 <= target <= INITIAL_WINDOW:
+            raise ContractError("initial limit")
+        staged_rows = dict(self.rows)
+        staged_cursors = dict(self.cursors)
+        staged_purged = dict(self.purged)
+        staged_checked = dict(self.last_checked_by_aid)
+        gap = self.history_gap
         for aid in sorted(self.aids):
             window = provider.initial_window(aid, limit=target)
             if not window.safe:
@@ -421,28 +432,45 @@ class TodayAdapter:
                 previous = cursor
             if type(window.checkpoint_cursor) is not int or window.checkpoint_cursor < previous:
                 raise ContractError("initial checkpoint precedes visible rows")
-            if window.history_gap:
-                self.history_gap = True
-                self.completeness = "partial"
-            self.merge_snapshot(window.pushes)
-            self.cursors[aid] = window.checkpoint_cursor
-            self.purged[aid] = max(self.purged.get(aid, 0), window.purged_through_cursor)
-            self.last_checked_by_aid[aid] = checked.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-        self.freshness = "fresh" if self.last_checked_by_aid else "unknown"
+            if type(window.purged_through_cursor) is not int or window.purged_through_cursor < 0:
+                raise ContractError("invalid purge watermark")
+            # _stage_rows reads self.rows, but no externally visible mutation occurs.
+            staged_rows = self._stage_rows(window.pushes, base_rows=staged_rows)
+            staged_cursors[aid] = window.checkpoint_cursor
+            staged_purged[aid] = max(staged_purged.get(aid, 0), window.purged_through_cursor)
+            staged_checked[aid] = checked.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            gap = gap or window.history_gap
+        self.rows = staged_rows
+        self.cursors = staged_cursors
+        self.purged = staged_purged
+        self.last_checked_by_aid = staged_checked
+        self.history_gap = gap
+        if gap:
+            self.completeness = "partial"
+        self.freshness = "fresh" if staged_checked else "unknown"
 
     def poll_provider(self, provider: PttProvider, *, page_limit: int = 200, max_pages_per_aid: int = 3) -> None:
-        """Bounded per-AID delta polling; cursors are a vector, never one global cursor."""
+        """Bounded delta polling: successful per-AID progress is retained on failure.
+
+        Last-good rows/checkpoints remain valid, but freshness is globally stale
+        and completeness partial if *any* provider call fails.
+        """
         if not 1 <= page_limit <= MAX_RELAY_PAGE or not 1 <= max_pages_per_aid <= 3:
             raise ContractError("poll bounds")
-        for aid in sorted(self.aids):
-            for _ in range(max_pages_per_aid):
-                after = self.cursors.get(aid, 0)
-                page = provider.relay_after(aid, after_cursor=after, limit=page_limit)
-                self.ingest_relay_page(page)
-                if not page.has_more:
-                    break
-            else:
-                self.completeness = "partial"
+        try:
+            for aid in sorted(self.aids):
+                for _ in range(max_pages_per_aid):
+                    after = self.cursors.get(aid, 0)
+                    page = provider.relay_after(aid, after_cursor=after, limit=page_limit)
+                    self.ingest_relay_page(page)
+                    if not page.has_more:
+                        break
+                else:
+                    self.completeness = "partial"
+        except Exception:
+            self.freshness = "stale"
+            self.completeness = "partial"
+            raise
 
     def mark_fetch_failure(self) -> None:
         self.freshness = "stale"
@@ -462,3 +490,93 @@ class TodayAdapter:
     def roll_to(self, now_iso: str, aids: set[str]) -> "TodayAdapter":
         next_day = taipei_day(now_iso)
         return self if next_day == self.day else TodayAdapter(day=next_day, aids=aids)
+
+
+@dataclass(frozen=True)
+class PttTodayReadModel:
+    schema_version: str
+    day: str
+    freshness: str
+    completeness: str
+    history_gap: bool
+    checkpoint: str
+    pushes: list[dict[str, Any]]
+    page: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PttHistoryReadModel:
+    schema_version: str
+    day: str
+    freshness: str
+    completeness: str
+    history_gap: bool
+    checkpoint: str | None
+    pushes: list[dict[str, Any]]
+    page: dict[str, Any]
+
+
+class PttConsumerReader:
+    """Frozen #45 consumer seam, with backend-only cursor/AID operations hidden.
+
+    This offline stateful adapter is not a durable authenticated provider.
+    """
+
+    def __init__(self, provider: PttProvider):
+        self._provider = provider
+        self._today: TodayAdapter | None = None
+
+    def read_today(self, day: str, checkpoint: str | None = None,
+                   limit: int = INITIAL_WINDOW) -> PttTodayReadModel:
+        if type(limit) is not int or not 1 <= limit <= INITIAL_WINDOW:
+            raise ContractError("read limit")
+        if self._today is None or self._today.day != day:
+            if checkpoint is not None:
+                raise ContractError("foreign day checkpoint")
+            staged = TodayAdapter.from_provider(self._provider, day)
+            staged.initialize_from_provider(self._provider)
+            self._today = staged
+        elif checkpoint is not None:
+            self._today.check_consumer_checkpoint(checkpoint, day)
+            try:
+                self._today.poll_provider(self._provider)
+            except Exception:
+                # The previous good rows are still returned and marked stale;
+                # success is never fabricated for a partial day refresh.
+                pass
+        adapter = self._today
+        assert adapter is not None
+        ordered = adapter._ordered()
+        pushes = ordered[-limit:]
+        return PttTodayReadModel(
+            schema_version="ptt-public-v1", day=day,
+            freshness=adapter.freshness, completeness=adapter.completeness,
+            history_gap=adapter.history_gap,
+            checkpoint=adapter.consumer_checkpoint(),
+            pushes=pushes,
+            page={"limit": limit, "has_more": len(ordered) > limit,
+                  "next_checkpoint": adapter.consumer_checkpoint()},
+        )
+
+    def read_history(self, day: str, page_request: dict[str, Any]) -> PttHistoryReadModel:
+        if not isinstance(page_request, dict):
+            raise ContractError("invalid history page request")
+        # History remains independently PARTIAL without authenticated evidence.
+        aids = self._provider.aids_for_day(day)
+        adapter = TodayAdapter(day, aids)
+        adapter.merge_snapshot(self._provider.snapshot_for_day(day))
+        limit = page_request.get("limit", 200)
+        if type(limit) is not int or not 1 <= limit <= 200:
+            raise ContractError("history page bound")
+        ordered = adapter._ordered()
+        token = page_request.get("checkpoint")
+        if token is not None:
+            adapter.check_consumer_checkpoint(token, day)
+        selected = ordered[:limit]
+        return PttHistoryReadModel(
+            schema_version="ptt-public-v1", day=day, freshness="unknown",
+            completeness="partial", history_gap=False,
+            checkpoint=adapter.consumer_checkpoint(), pushes=selected,
+            page={"limit": limit, "has_more": len(ordered) > limit,
+                  "next_checkpoint": adapter.consumer_checkpoint()},
+        )
