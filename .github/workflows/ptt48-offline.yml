@@ -42,6 +42,7 @@ jobs:
             ptt_offline.test_resumable_publisher \
             ptt_offline.test_d1_transport_contract \
             ptt_offline.test_url_epoch_authority \
-            ptt_offline.test_collector_day_stage
+            ptt_offline.test_collector_day_stage \
+            ptt_offline.test_publisher_session
       - name: Cloudflare Worker pure offline regressions
         run: node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshness.mjs ptt_offline/test_api_shell_ptt_extension.mjs
