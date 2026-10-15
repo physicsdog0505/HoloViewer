@@ -160,6 +160,7 @@ try {
   assert.equal(receipt.ptt_mount_checked, Boolean(pttRoot));
   if (pttRoot) {
     assert.equal(receipt.canonical_ptt.push_count, 2);
+    assert.equal(receipt.canonical_ptt.today_enabled_reader_checked, true);
     assert.equal(receipt.canonical_ptt.history_first_count, 1);
     assert.equal(receipt.canonical_ptt.history_second_count, 1);
     assert.equal(receipt.canonical_ptt.history_continuation_checked, true);
