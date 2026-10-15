@@ -33,8 +33,11 @@ class PublicAPIUnavailable(RuntimeError):
 class PublicAPI:
     origin: str = DEFAULT_API
     timeout_seconds: float = 8.0
+    _test_only_allow_alternate_origin: bool = False
 
     def __post_init__(self) -> None:
+        if self.origin != DEFAULT_API and not self._test_only_allow_alternate_origin:
+            raise ValueError("Only the canonical holoviewer-public-api is authorized")
         parsed = urllib.parse.urlsplit(self.origin)
         if (parsed.scheme != "https" or not parsed.hostname or parsed.username
                 or parsed.password or parsed.query or parsed.fragment
