@@ -224,3 +224,32 @@ history. Actual runtime migration is explicitly owner-gated.
 Tests remain the six-module Python suite plus
 `node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshness.mjs`.
 Neither source commits nor missing Actions may be described as test PASS.
+
+## Canonical Collector source-inspection progress (#48)
+
+Inspected **repository source**, not private DB rows:
+`physicsdog0505/Hololive-PTT-Viewer/ptt_storage.py`.
+`PttDatabase` defines `articles(id,board,aid,url,title_hint,created_at,
+last_seen_at,...)` and `pushes(id,article_id,source_line,source_page,kind,
+author,content,ptt_date,ptt_time,collected_at)`.
+`UNIQUE(article_id,source_line)` is canonical source-location evidence.
+`article_screens` stores page/line coverage and must eventually contribute
+to gap/completeness evidence. Source `ptt_date` and `ptt_time` are separate,
+so the Publisher **must not invent year/timezone/full timestamp**.
+
+`collector_source_preview.py` is now an explicit-path, read-only,
+synthetic-friendly source preflight. It checks those exact source columns and
+produces a bounded, redacted, **zero publishable rows** receipt whenever time
+identity is unproven. Sample invocation only after authorized source access:
+`python3 -B -m ptt_offline.collector_source_preview --source /explicit/approved/fixture.sqlite3 --day 2026-10-15 --dry-run --limit 5`.
+It never uploads or writes rows, has no inferred owner DB path, and is
+**not** a live Publisher/D1 CLI. Synthetic tests cover read-only guarantees,
+schema mismatch, bounded preview and fail-closed source time.
+
+Before a live Publisher can exist, separately review:
+- trustworthy per-row Taipei day/year/time reconstruction from canonical
+  Collector/article source evidence;
+- explicit selected day/AID scope, article source URLs and coverage/gap;
+- bounded transaction, one-process exclusivity and resumable checkpoint;
+- actual D1 transport/binding and hard first-window budget.
+No owner SQLite has been opened.
