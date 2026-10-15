@@ -66,7 +66,7 @@ a separately accepted production design and is not claimed here.
 Verification command from repository root:
 
 ```sh
-python3 -B -m unittest -v ptt_offline.test_public_today_contract ptt_offline.test_consumer_boundary ptt_offline.test_consumer_paging
+python3 -B -m unittest -v ptt_offline.test_public_today_contract ptt_offline.test_consumer_boundary ptt_offline.test_consumer_paging ptt_offline.test_public_consumer_envelope
 ```
 
 GitHub Actions: NOT RUN if no exact-head run exists. Runtime verification must
