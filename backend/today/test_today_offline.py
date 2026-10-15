@@ -48,7 +48,7 @@ class TodayOfflineTests(unittest.TestCase):
         self.assertEqual(x["streams"],[])
         self.assertTrue(x["completeness"]["gap"])
     def test_stale_no_false_live(self):
-        a=self.observe(raw("live","2026-10-15T11:00:00Z"),NOW-timedelta(hours=2))
+        a=self.observe(raw("live","2026-10-15T09:00:00Z"),NOW-timedelta(hours=2))
         x=project([a],now=NOW,last_success_at=NOW-timedelta(hours=2))
         self.assertEqual(x["streams"][0]["lifecycle_state"],"stale")
     def test_budget_and_retry(self):
