@@ -47,6 +47,7 @@ jobs:
             ptt_offline.test_publisher_offline_e2e \
             ptt_offline.test_ptt_aid_identity \
             ptt_offline.test_source_time_partition \
-            ptt_offline.test_verified_publisher_flow
+            ptt_offline.test_verified_publisher_flow \
+            ptt_offline.test_source_audit_stage
       - name: Cloudflare Worker pure offline regressions
         run: node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshness.mjs ptt_offline/test_api_shell_ptt_extension.mjs
