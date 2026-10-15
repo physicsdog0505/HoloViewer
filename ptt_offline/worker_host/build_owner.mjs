@@ -14,14 +14,15 @@ export function validateExistingConfig(config) {
  const db=(config.d1_databases||[]).find(x=>x.binding==='DB');
  if(db?.database_id!==EXPECTED_DB_ID||db.database_name!=='holoviewer-public-v1')
    throw Error('existing D1 identity mismatch');
- const value=config.vars?.ALLOWED_ORIGIN;
- if(typeof value!=='string'||!value.trim())throw Error('preserve accepted ALLOWED_ORIGIN value');
+ const hasOrigin=Object.prototype.hasOwnProperty.call(config.vars??{},'ALLOWED_ORIGIN');
+ if(hasOrigin && (typeof config.vars.ALLOWED_ORIGIN!=='string'||!config.vars.ALLOWED_ORIGIN.trim()))
+   throw Error('invalid existing ALLOWED_ORIGIN value; do not invent replacement');
  if(config.vars?.PTT_PUBLISH_ENABLED==='true')
    throw Error('build must not silently enable Publisher');
  if(config.main && resolve(config.main)===ENTRY)
    throw Error('do not overwrite accepted owner source config automatically');
  return {worker:config.name,database_id:db.database_id,
-   cors_preserved:true,publisher_default_off:true};
+   cors_preserved:true,cors_origin_mode:hasOrigin?'configured':'absent_preserved',publisher_default_off:true};
 }
 export function build(args=process.argv.slice(2),invoke=(bin,argv)=>{
  const r=spawnSync(bin,argv,{stdio:'inherit',env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
