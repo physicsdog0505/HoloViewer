@@ -180,3 +180,28 @@ test('accepted 20-minute item freshness status at 19, 21 and 31 minutes',async()
  }
  d.close();
 });
+
+test('offset paging surfaces older highlight candidates instead of silently dropping them',async()=>{
+ const d=db();
+ for(let i=0;i<205;i++)await writeEvidence(d,{...fixture({id:'p'+String(i).padStart(10,'0')}),title:i===0?'誕生日 重大告知':'regular stream'});
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const first=await readToday(d,{day:'2026-10-15',limit:200,offset:0,now:new Date('2026-10-15T12:00:00Z')});
+ const second=await readToday(d,{day:'2026-10-15',limit:200,offset:200,now:new Date('2026-10-15T12:00:00Z')});
+ assert.equal(first.completeness.has_more,true);
+ assert.equal(second.completeness.has_more,false);
+ assert.equal(second.streams.length,5);
+ assert.equal(new Set([...first.streams,...second.streams].map(x=>x.video_id)).size,205);
+ assert.ok([...first.streams,...second.streams].some(x=>x.title.includes('誕生日')));
+ await assert.rejects(()=>readToday(d,{day:'2026-10-15',offset:10001}),/offset/);
+ d.close();
+});
+test('overnight Home reads previous day until 05:59 Taipei but not after 06:00',async()=>{
+ const d=db();
+ await writeEvidence(d,{...fixture({id:'oldnight001',state:'ended',observed:'2026-10-15T15:55:00Z',end:'2026-10-15T15:56:00Z'}),actual_start:'2026-10-15T15:00:00Z',scheduled_start:'2026-10-15T15:00:00Z'});
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T16:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ for(const [time,count] of [['2026-10-15T16:15:00Z',1],['2026-10-15T21:59:00Z',1],['2026-10-15T22:00:00Z',0]]){
+  const x=await readToday(d,{day:'2026-10-16',now:new Date(time)});
+  assert.equal(x.streams.length,count,time);
+ }
+ d.close();
+});
