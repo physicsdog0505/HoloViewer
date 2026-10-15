@@ -30,7 +30,11 @@ def bind_public_today(client_app: Any, *, api_base: str) -> dict[str, str]:
     # The accepted request handler has no external-provider failure branch.
     # Add only a transport-level 503 boundary, without changing product HTML,
     # navigation, PTT reader, player, or successful response code paths.
-    original_get = client_app.ClientRequestHandler.do_GET
+    original_get = getattr(
+        client_app.ClientRequestHandler,
+        "_holoviewer_original_do_GET",
+        client_app.ClientRequestHandler.do_GET,
+    )
     def provider_safe_get(handler):
         try:
             return original_get(handler)
@@ -45,6 +49,8 @@ def bind_public_today(client_app: Any, *, api_base: str) -> dict[str, str]:
                     '<p role="alert">' + escape("正式資料服務暫時無法讀取，請稍後重新整理。") + '</p>',
                     HTTPStatus.SERVICE_UNAVAILABLE,
                 )
+    # Rebinding is idempotent: never wrap an already-wrapped dispatcher.
+    client_app.ClientRequestHandler._holoviewer_original_do_GET = original_get
     client_app.ClientRequestHandler.do_GET = provider_safe_get
     return {
         "provider": "holoviewer-public-api",
