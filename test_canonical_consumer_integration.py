@@ -1,8 +1,8 @@
-"""Contract-bound #68 consumer proof with injected #47/#48 router responses.
+"""Consumer-only proof: #47 canonical Today and legacy-compatible History.
 
-This tests the *consumer*, not an independently invented backend Worker.
-The injected async callback stands in for the owner-owned canonical router
-read endpoints. No D1 writes, second API implementation, or network traffic.
+An injected async callback supplies owner-public read envelopes for tests.
+This is NOT the #47+#48 combined backend router, actual D1 integration, or
+canonical History projection. No D1 writes, backend implementation or network.
 """
 from __future__ import annotations
 
