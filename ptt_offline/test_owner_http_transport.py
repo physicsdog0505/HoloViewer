@@ -27,7 +27,7 @@ class OwnerHttpTransportTests(unittest.TestCase):
         def opener(request,timeout):
             raw=request.data
             timestamp=request.get_header("X-ptt-timestamp")
-            expected=hmac.new(("s"*40).encode(),timestamp.encode()+b"\\n"+raw,
+            expected=hmac.new(("s"*40).encode(),timestamp.encode()+b"\n"+raw,
                               hashlib.sha256).hexdigest()
             self.assertEqual(request.get_header("X-ptt-signature"),expected)
             calls.append(raw)
