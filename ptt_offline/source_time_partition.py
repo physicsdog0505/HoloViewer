@@ -22,7 +22,8 @@ def partition_candidate_rows(*,board,aid,url,rows,timezone_evidence=False,max_ro
         raise ContractError("bounded explicit push rows required")
     epoch=int(re.search(r"/M\.(\d+)\.A\.",url).group(1))
     article=datetime.fromtimestamp(epoch,tz=timezone.utc)
-    output={"identity":evidence,"inferred":[],"pending":[],"verified":[]}
+    output={"identity":evidence,"inferred":[],"pending":[],"verified":[],
+            "unblocked_prefix":[],"checkpoint_blocked_at":None}
     last=0
     for row in rows:
         src=dict(row)
@@ -66,10 +67,15 @@ def partition_candidate_rows(*,board,aid,url,rows,timezone_evidence=False,max_ro
                 if len(candidates)!=1:
                     pending_reason="multiple-possible-years" if candidates else "no-valid-year"
         if pending_reason:
+            if output["checkpoint_blocked_at"] is None:
+                output["checkpoint_blocked_at"]=line
             output["pending"].append({"source_line":line,"reason":pending_reason,
                 "ptt_date":src.get("ptt_date"),"ptt_time":src.get("ptt_time")})
         else:
-            output["inferred"].append({"source_line":line,
+            inferred_row={"source_line":line,
                 "occurred_at":candidates[0].isoformat(timespec="seconds").replace("+00:00","Z"),
-                "classification":"INFERRED_NOT_VERIFIED"})
+                "classification":"INFERRED_NOT_VERIFIED"}
+            output["inferred"].append(inferred_row)
+            if output["checkpoint_blocked_at"] is None:
+                output["unblocked_prefix"].append(inferred_row)
     return output
