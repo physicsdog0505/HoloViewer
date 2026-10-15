@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {applyAuthorizedPttBatch} from './d1_owner_writer.mjs';
-const row={push_id:'ptt:v1:'+'a'.repeat(64),aid:'A1',day:'2026-10-15',
+const row={push_id:'ptt:v1:'+'a'.repeat(64),aid:'1gepPtNy',day:'2026-10-15',
   source_line:1,kind:'推',author:'a',content:'genuine-source-required',
   occurred_at:'2026-10-15T10:00:00Z',floor:null,
   source_url:'https://www.ptt.cc/bbs/C_Chat/M.1789081207.A.5FC.html',
-  source_record_key:'A1:1'};
+  source_record_key:'1gepPtNy:1'};
 const batch={rows:[row],day:row.day,batch_id:'ptt48:fixture',digest:'sha-test',
   request_cap:1,retry_cap:0};
 function mock() {
