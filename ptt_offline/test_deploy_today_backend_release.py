@@ -31,7 +31,7 @@ class TodayBackendReleaseTests(unittest.TestCase):
                 self.assertNotIn("PTT_PUBLISH_ENABLED",cfg["vars"])
                 self.assertNotIn("PTT_PUBLISH_MAX_ROWS",cfg["vars"])
                 self.assertEqual(cfg["vars"]["TODAY_CADENCE_ENABLED"],"true")
-                self.assertEqual(cfg["vars"]["TODAY_DISCOVERY_ENABLED"],"true")
+                self.assertEqual(cfg["vars"]["TODAY_DISCOVERY_ENABLED"],"false")
                 self.assertEqual(cfg["vars"]["ALLOWED_ORIGIN"],"https://example.test")
             finally:
                 holder.cleanup()
