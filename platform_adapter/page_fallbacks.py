@@ -104,32 +104,17 @@ def render_page_fallback(target: str) -> tuple[int, str] | None:
         )
 
     if parsed.path == "/watchalong/session":
-        from client_watchalong import (
-            build_companion_session_html,
-            build_watchalong_landing_html,
-            build_watchalong_session_html,
-        )
+        # Page-first: until Watchalong providers are connected, never import or
+        # execute the heavyweight session/translation/runtime path. Preserve
+        # the user's inputs and return the accepted 4174 builder page instead.
+        from client_watchalong import build_watchalong_landing_html
         master = query.get("master", [""])[0]
-        try:
-            if query.get("source_kind", ["youtube"])[0] == "external":
-                return 200, build_companion_session_html(
-                    master, query.get("external_source", [""])[0]
-                )
-            if query.get("youtube_mode", ["single"])[0] == "playlist":
-                raise ValueError("Playlist 資料服務尚未接通。")
-            return 200, build_watchalong_session_html(
-                master,
-                query.get("source", [""])[0],
-                progressive_enabled=False,
-                progressive_requested=False,
-                ab_translation_enabled=False,
-            )
-        except (ValueError, TypeError):
-            return 200, build_watchalong_landing_html(
-                recent_pool=(),
-                error="同時視聽資料暫未接通。",
-                master_value=master,
-                source_value=query.get("source", [""])[0],
-            )
+        source = query.get("source", [""])[0]
+        return 200, build_watchalong_landing_html(
+            recent_pool=(),
+            error="同時視聽資料暫未接通；設定已保留，可返回修改。",
+            master_value=master,
+            source_value=source,
+        )
 
     return None
