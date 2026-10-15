@@ -16,9 +16,9 @@ test("accepted custom builder retains order and selection by video identity",()=
  assert.equal(s.snapshot().primary,B);
  assert.equal(s.snapshot().layout,"auto");
 });
-test("accepted five-mode layout and validated session URL",()=>{
+test("accepted custom-view layout and validated session URL",()=>{
  const s=createCustomViewState();s.add(A);s.add(B);
- for(const name of ["auto","compare","focus","equal","primary"]){
+ for(const name of ["auto","equal","primary"]){
   assert.equal(s.setLayout(name),true);
   assert.equal(parseAcceptedSession(s.sessionQuery()).layout,name);
  }
