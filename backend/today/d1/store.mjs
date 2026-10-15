@@ -2,6 +2,7 @@
  * Issue #47, single canonical D1 store. No Cloudflare bindings, network or Cron side effects.
  * Inject a D1-compatible db. A write is an atomic batch of evidence and projection.
  */
+import {supportColorFor} from './support-colors.mjs';
 const idPattern=/^[A-Za-z0-9_-]{11}$/;
 const channelPattern=/^UC[A-Za-z0-9_-]{22}$/;
 const groups=new Set(['hololive','holostars','mekpark','other']);
@@ -103,7 +104,7 @@ export async function setCoverage(db, c) {
     typeof c.checkpoint==='string'&&ckPattern.test(c.checkpoint)?c.checkpoint:null));
   await db.batch(statements);
 }
-export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false}={}) {
+export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false,supportColors=null}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
     throw Error('invalid canonical Today day');
   if (!Number.isInteger(limit)||limit<1||limit>200) throw Error('invalid limit');
@@ -147,9 +148,10 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
       const evidenceAge=Date.parse(nowStamp)-Date.parse(r.lifecycle_observed_at),valid=evidenceAge>=0&&evidenceAge<=1200000;
       const state=r.lifecycle_state==='ended'&&r.actual_end?'ended':!valid?'stale':
         r.lifecycle_state==='upcoming'&&r.scheduled_start&&r.scheduled_start<=nowStamp?'waiting':r.lifecycle_state;
+      const color=supportColorFor(r.publisher_channel_id,supportColors);
       return {video_id:r.video_id,title:r.title,channel_id:r.publisher_channel_id,channel_name:r.channel_name,
         group:r.channel_group,lifecycle_state:state,observed_at:r.lifecycle_observed_at,
-        start_at:r.actual_start??r.scheduled_start,avatar_url:verifiedChannelAvatar(r.trusted_channel_avatar),member_accent:null,
+        start_at:r.actual_start??r.scheduled_start,avatar_url:verifiedChannelAvatar(r.trusted_channel_avatar),member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,support_mode:color.support_mode,support_color_source:color.support_color_source,
         source_label:r.source_label,stale:state==='stale'};
     })};
 }
