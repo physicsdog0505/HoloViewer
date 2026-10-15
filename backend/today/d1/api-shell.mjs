@@ -42,7 +42,7 @@ export function createExistingApiRouter({legacyHistory=defaultLegacyHistory,lega
   if(u.pathname==='/v1/catalog/today')response=await handleTodayRead(request,env);
   else if((u.pathname==='/v1/ptt/today'||u.pathname==='/v1/ptt/history')&&pttHandler)response=await pttHandler(request,env);
   else if(u.pathname==='/v1/history'&&legacyHistory)response=await legacyHistory(request,env);
-  else if(/^\/v1\/catalog\/videos\/[A-Za-z0-9_-]{11}$/.test(u.pathname)&&legacyVideo)response=await legacyVideo(request,env);
+  else if(u.pathname.startsWith('/v1/catalog/videos/')&&legacyVideo)response=await legacyVideo(request,env);
   else response=json({error:'not_found'},404);
   } catch (error) {
    response=json({error:'read_projection_unavailable'},503);
