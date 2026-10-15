@@ -123,9 +123,11 @@ def assert_gate_open():
     print(json.dumps({"private_writer_gate":"enabled","unsigned_probe_http":401}))
 
 def taipei_day():
-    from datetime import datetime
+    from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
-    return datetime.now(ZoneInfo("Asia/Taipei")).date().isoformat()
+    local=datetime.now(ZoneInfo("Asia/Taipei"))
+    day=local.date()-timedelta(days=1) if local.hour<6 else local.date()
+    return day.isoformat()
 
 def public_readback():
     url=API+"/v1/ptt/today?day="+taipei_day()+"&limit=10"
