@@ -6,7 +6,7 @@ never opens owner SQLite, invokes Worker, or creates production resources.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Callable
 from .public_today_contract import canonical_id, normalize_public_aid, taipei_day, public_push, ContractError
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -139,7 +139,60 @@ def publish_provider_state(db: Any, *, day: str, aid: str,
             WHEN ptt_provider_state.last_success_at IS NULL THEN excluded.last_success_at
             WHEN excluded.last_success_at > ptt_provider_state.last_success_at THEN excluded.last_success_at
             ELSE ptt_provider_state.last_success_at END,
-          has_gap=MAX(ptt_provider_state.has_gap,excluded.has_gap)
+          has_gap=CASE
+            WHEN excluded.has_gap=0 THEN ptt_provider_state.has_gap
+            WHEN ptt_provider_state.gap_closed_at IS NOT NULL
+              AND (excluded.last_success_at IS NULL OR
+                   excluded.last_success_at <= ptt_provider_state.gap_closed_at)
+              THEN ptt_provider_state.has_gap
+            ELSE 1 END
         """, (day, aid, relay_cursor if relay_cursor is not None else 0,
               purged_through_cursor if purged_through_cursor is not None else 0,
               last_success_at, int(has_gap)))
+
+
+def close_verified_gap(db: Any, evidence: dict[str, Any], *,
+                       verify_coverage: Callable[[dict[str, Any]], bool]) -> None:
+    """Explicit, verifiable coverage repair; ordinary publish cannot clear gap.
+
+    Requires an independently verified positive repair record identifying the
+    day/AID, covered purged watermark and a stable nonempty evidence digest.
+    Replayed repairs are idempotent; older repairs cannot clear later gaps.
+    """
+    from .public_today_contract import _parse_aware
+    if not callable(verify_coverage) or not verify_coverage(evidence):
+        raise ContractError("unverified gap repair authority")
+    day = evidence.get("day")
+    aid = normalize_public_aid(evidence.get("aid"))
+    checked = _parse_aware(evidence.get("verified_at"), "verified_at")
+    verified_at = checked.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    covered = evidence.get("covered_through_cursor")
+    digest = evidence.get("evidence_digest")
+    repair_id = evidence.get("repair_id")
+    if (type(covered) is not int or covered < 0 or
+        not isinstance(digest, str) or len(digest) < 16 or
+        not isinstance(repair_id, str) or not repair_id or
+        not isinstance(day, str)):
+        raise ContractError("missing positive gap coverage evidence")
+    with db:
+        state = db.execute(
+            """SELECT purged_through_cursor,last_success_at,gap_closed_at
+               FROM ptt_provider_state WHERE day=? AND aid=?""",
+            (day, aid),
+        ).fetchone()
+        if state is None or covered < state[0]:
+            raise ContractError("repair does not cover purged source watermark")
+        if state[1] is not None and verified_at < state[1]:
+            raise ContractError("repair evidence predates current source state")
+        if state[2] is not None and verified_at < state[2]:
+            raise ContractError("regressive gap repair")
+        db.execute("""INSERT OR IGNORE INTO ptt_gap_repairs
+            (repair_id,day,aid,verified_at,covered_through_cursor,evidence_digest)
+            VALUES(?,?,?,?,?,?)""",
+            (repair_id,day,aid,verified_at,covered,digest))
+        db.execute("""UPDATE ptt_provider_state SET has_gap=0,
+            gap_closed_at=?,last_success_at=CASE
+                WHEN last_success_at IS NULL OR last_success_at<? THEN ?
+                ELSE last_success_at END
+            WHERE day=? AND aid=?""",
+            (verified_at, verified_at, verified_at, day, aid))
