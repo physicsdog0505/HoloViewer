@@ -26,7 +26,8 @@ def _accepted_handler():
     if not _bound:
         bind_public_today(client_app, api_base=DEFAULT_API)
         _bound = True
-    return client_app.ClientRequestHandler
+    from platform_adapter.playback_routes import playback_handler
+    return playback_handler(client_app.ClientRequestHandler)
 
 
 class Default(WorkerEntrypoint):
@@ -43,10 +44,19 @@ class Default(WorkerEntrypoint):
             return Response("Method Not Allowed", status=405,
                             headers={"Allow": "GET", "Cache-Control": "no-store"})
 
+        # Keep the accepted iframe footprint while #48 PTT is not connected.
+        # Only the embedded reader is blank; standalone PTT remains gated.
+        if (parsed.path == "/ptt-today"
+                and "focus=1" in parsed.query.split("&")
+                and "embed=1" in parsed.query.split("&")):
+            return Response("", status=200,
+                            headers={"Content-Type": "text/html; charset=utf-8",
+                                     "Cache-Control": "no-store"})
+
         # Phase-E first proof slice only. Unbound routes must never fall back
         # to the immutable product's local SQLite/file loaders in a Worker.
         # This is a data-readiness gate, NOT another product route dispatcher.
-        if parsed.path not in {"/", "/api/home", "/history"}:
+        if parsed.path not in {"/", "/api/home", "/history", "/custom-view", "/custom-view/session"}:
             return Response(
                 "Public provider route not yet connected",
                 status=503,
