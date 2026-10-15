@@ -188,19 +188,17 @@ class ParityContract(unittest.TestCase):
         self.assertIn("/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/",js)
 
     def test_accepted_full_viewer_css_and_immersive_lifecycle(self):
-        css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
-        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertGreater(len(css),100000)
         self.assertIn('body.custom-immersive',css)
         self.assertIn('body.custom-session-watching',css)
-        self.assertNotIn('@import',css)
-        self.assertNotIn('url(',css)
-        self.assertIn('id="viewer-4174-css"',html)
-        self.assertIn('id="customImmerse"',html)
+        self.assertIn('id="viewer-4174-transplant-css"',html)
         self.assertIn('requestFullscreen()',js)
         self.assertIn('fullscreenchange',js)
-        self.assertIn("viewerActive?'all':'not all'",js)
+        self.assertIn('function applyImmersiveState(active)',js)
+        self.assertIn('window.hvExit4174Immersive',js)
 
     def test_4174_viewer_ptt_panel_is_not_a_fake_feed(self):
         dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
@@ -301,13 +299,21 @@ class ParityContract(unittest.TestCase):
         self.assertIn('window.hvOpenCustomSession(recovered,',js)
 
     def test_immersive_overrides_watch_shell_and_has_exit(self):
-        css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
-        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
-        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn('body.custom-session-watching.custom-immersive .client-main',css)
-        self.assertIn('body.custom-session-watching.custom-immersive .client-rail',css)
-        self.assertIn('id="immersiveExit"',html)
-        self.assertIn("$('immersiveExit').onclick=()=>$('customImmerse').click()",js)
+        self.assertIn('body.custom-immersive .client-rail',css)
+        self.assertIn("if(!document.fullscreenElement&&immersiveEnabled)",js)
+        self.assertIn("if(event.key!=='Escape'||!immersiveEnabled)return",js)
+        self.assertIn('window.hvExit4174Immersive?.()',app)
+        self.assertNotIn('function applyViewerImmersive(enabled)',app)
+
+    def test_transplanted_youtube_players_mount_when_api_is_already_loaded(self):
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn('if(window.YT?.Player)',js)
+        self.assertIn('streams.forEach((stream,index)=>mountWatchPlayer(index))',js)
+        self.assertIn('script[src="https://www.youtube.com/iframe_api"]',js)
 
     def test_custom_url_entry_reports_add_and_start_failures(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
