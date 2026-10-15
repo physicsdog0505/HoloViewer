@@ -126,13 +126,17 @@ const HOME_CHANNEL_ACCENTS=[
 function homeChannelAccent(item){
  const audited=String(item.member_accent||'');
  if(/^#[0-9a-fA-F]{6}$/.test(audited))return audited;
+ const mode=String(item?.support_mode||'');
+ // Accepted 4174 semantics: an explicit audited neutral row stays neutral.
+ // Name fallback is only for payloads that do not expose support_mode at all.
+ if(mode==='neutral'||mode==='solid'||mode==='dual_color')return '';
  const title=String(item.channel_title||item.channel_name||'').toUpperCase();
  for(const [needles,accent] of HOME_CHANNEL_ACCENTS)if(needles.some(word=>title.includes(word.toUpperCase())))return accent;
  return '';
 }
 function applyHomeSupportStyle(el,item){
  const accent=homeChannelAccent(item);
- if(accent)el.style.setProperty('--member-accent',accent);
+ if(accent){el.style.setProperty('--member-accent',accent);el.dataset.supportAccent='1'}
  const dual=Array.isArray(item?.member_accent_dual)?item.member_accent_dual:[];
  const validDual=dual.length===2&&dual.every(value=>/^#[0-9a-fA-F]{6}$/.test(String(value)));
  const mode=String(item?.support_mode||'');
@@ -152,7 +156,7 @@ function homeStartLabel(item){
  if(!raw)return '時間未明';
  const date=new Date(raw);
  if(!Number.isFinite(date.getTime()))return '時間未明';
- const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date);
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
  const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
  return out.month+'/'+out.day+' '+out.hour+':'+out.minute;
 }
