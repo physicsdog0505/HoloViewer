@@ -26,4 +26,4 @@ jobs:
       - name: Pin migration SHA-256 receipt (offline only)
         run: node backend/today/d1/check-release-preflight.mjs
       - name: Python provider and contract tests
-        run: python -B -m unittest -v backend.today.test_today_offline backend.today.test_provider_ingest backend.today.test_today_contract
+        run: python -B -m unittest -v backend.today.test_today_offline backend.today.test_provider_ingest backend.today.test_today_contract backend.today.test_youtube_readonly
