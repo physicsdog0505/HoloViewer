@@ -146,7 +146,7 @@ def main():
                 "AND c.lifecycle_observed_at>='2026-10-15T22:22:00Z';")
     verify_out=run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,
                     "--command",verify_sql],capture=True).stdout
-    marker=__import__("re").search(r"NONLIVE_DISCOVERY_ROWS=(\\d+)",verify_out)
+    marker=__import__("re").search(r"NONLIVE_DISCOVERY_ROWS=(\d+)",verify_out)
     if not marker or int(marker.group(1))!=0:
         raise SystemExit("non-live discovery cleanup did not converge to zero")
 
