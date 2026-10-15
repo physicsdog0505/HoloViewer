@@ -2,7 +2,7 @@
 // #48 existing D1 identity + immutable migration preparation.
 // Offline default; --inspect only issues read-only Wrangler commands.
 // Never modifies existing Today objects, migrations or production D1.
-import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdtempSync,rmSync,mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
@@ -82,18 +82,24 @@ export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
    applied=verifyAppliedPttLedger(ledger,inspection);
  }
  const receipt={...plan,mode:'READ_ONLY_ACCOUNT_PREFLIGHT',...inspection,...applied};
+ if(apply&&!inspection.wranglerLedgerPresent)throw Error('existing Wrangler ledger required for controlled migration');
  if(!apply){print(JSON.stringify(receipt,null,2));return receipt;}
  if(inspection.pttSchemaPresent)throw Error('PTT migration already applied; do not rerun');
- // Explicitly use the existing D1 by UUID, without touching Wrangler's
- // already-populated Today migration directory/ledger.
- // Temporary file contains byte-verified immutable SQL only.
+ // Wrangler's existing Today ledger has an applied 0001_today_canonical.sql.
+ // Retain that name in this temporary migration directory, so migrations apply
+ // only the NEW 0002 PTT file without replaying Today or resetting the ledger.
  const dir=mkdtempSync(join(tmpdir(),'ptt48-d1-'));
- const file=join(dir,'0001_canonical_ptt.sql');
+ const migrations=join(dir,'migrations');
+ const file=join(migrations,'0002_canonical_ptt.sql');
  let mutationAttempted=false;
  try{
+   mkdirSync(migrations);
+   writeFileSync(join(migrations,'0001_today_canonical.sql'),'-- previously applied Today migration; must never execute again\n',{mode:0o600});
    writeFileSync(file,readFileSync(FILE),{mode:0o600});
+   const config=join(dir,'wrangler.json');
+   writeFileSync(config,JSON.stringify({name:'holoviewer-public-api',compatibility_date:'2026-10-14',d1_databases:[{binding:'DB',database_name:DB,database_id:UUID,migrations_dir:'migrations',migrations_table:'d1_migrations'}]}),{mode:0o600});
    mutationAttempted=true;
-   exec(['d1','execute',UUID,'--remote','--file',file]);
+   exec(['d1','migrations','apply',DB,'--remote','--config',config]);
    const after=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
      '--command',"SELECT name,type FROM sqlite_master WHERE type IN ('table','index') ORDER BY name;"]));
    const state=assertInventory(after);
