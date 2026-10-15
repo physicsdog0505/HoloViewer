@@ -6,11 +6,9 @@
 const ROUTES = Object.freeze({
   today: "/v1/catalog/today",
   history: "/v1/history",
-  ptt: "/v1/ptt",
 });
 const VIDEO_RE = /^[A-Za-z0-9_-]{11}$/;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-const AID_RE = /^[A-Za-z0-9._-]{1,32}$/;
 
 export function endpointFor(kind, input = {}) {
   if (!Object.hasOwn(ROUTES, kind)) throw new TypeError("unsupported endpoint");
@@ -24,15 +22,6 @@ export function endpointFor(kind, input = {}) {
     query.set("day", input.day);
     query.set("limit", String(limit));
     query.set("offset", String(offset));
-  }
-  if (kind === "ptt") {
-    if (!AID_RE.test(input.aid ?? "")) throw new TypeError("verified PTT AID required");
-    query.set("aid", input.aid);
-    if (input.cursor != null) {
-      if (typeof input.cursor !== "string" || input.cursor.length > 512)
-        throw new TypeError("invalid cursor");
-      query.set("cursor", input.cursor);
-    }
   }
   return ROUTES[kind] + (query.size ? "?" + query : "");
 }
