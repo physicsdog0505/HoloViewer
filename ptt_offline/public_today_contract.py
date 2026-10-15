@@ -525,6 +525,9 @@ class PttConsumerReader:
     def __init__(self, provider: PttProvider):
         self._provider = provider
         self._today: TodayAdapter | None = None
+        # Offline-only opaque continuation registry. Durable, signed tokens
+        # belong to a separately authorized production provider.
+        self._history_tokens: dict[str, tuple[str, str, int]] = {}
 
     def read_today(self, day: str, checkpoint: str | None = None,
                    limit: int = INITIAL_WINDOW) -> PttTodayReadModel:
@@ -559,24 +562,47 @@ class PttConsumerReader:
         )
 
     def read_history(self, day: str, page_request: dict[str, Any]) -> PttHistoryReadModel:
+        """Forward pagination over a pinned day/snapshot generation.
+
+        A token points to the *next offset*, unlike the snapshot checkpoint.
+        Unknown/foreign-day/stale tokens fail closed. No integer offset is
+        exposed to the consumer. The in-memory registry is deliberately not a
+        production-grade restart-resumable checkpoint store.
+        """
         if not isinstance(page_request, dict):
             raise ContractError("invalid history page request")
-        # History remains independently PARTIAL without authenticated evidence.
-        aids = self._provider.aids_for_day(day)
-        adapter = TodayAdapter(day, aids)
-        adapter.merge_snapshot(self._provider.snapshot_for_day(day))
         limit = page_request.get("limit", 200)
         if type(limit) is not int or not 1 <= limit <= 200:
             raise ContractError("history page bound")
+        aids = self._provider.aids_for_day(day)
+        adapter = TodayAdapter(day, aids)
+        adapter.merge_snapshot(self._provider.snapshot_for_day(day))
         ordered = adapter._ordered()
+        snapshot = adapter.consumer_checkpoint()
         token = page_request.get("checkpoint")
-        if token is not None:
-            adapter.check_consumer_checkpoint(token, day)
-        selected = ordered[:limit]
+        if token is None:
+            offset = 0
+        else:
+            if not isinstance(token, str) or token not in self._history_tokens:
+                raise ContractError("unknown or expired history continuation")
+            expected_day, expected_snapshot, offset = self._history_tokens[token]
+            if expected_day != day or expected_snapshot != snapshot:
+                raise ContractError("foreign-day or stale history continuation")
+            if offset < 1 or offset >= len(ordered):
+                raise ContractError("history continuation beyond snapshot")
+        selected = ordered[offset:offset + limit]
+        end = offset + len(selected)
+        has_more = end < len(ordered)
+        next_token = None
+        if has_more:
+            material = dumps([day, snapshot, end], ensure_ascii=False,
+                             separators=(",", ":")).encode("utf-8")
+            next_token = "ptt:history-page:v1:" + sha256(material).hexdigest()
+            self._history_tokens[next_token] = (day, snapshot, end)
         return PttHistoryReadModel(
             schema_version="ptt-public-v1", day=day, freshness="unknown",
             completeness="partial", history_gap=False,
-            checkpoint=adapter.consumer_checkpoint(), pushes=selected,
-            page={"limit": limit, "has_more": len(ordered) > limit,
-                  "next_checkpoint": adapter.consumer_checkpoint()},
+            checkpoint=snapshot, pushes=selected,
+            page={"limit": limit, "has_more": has_more,
+                  "next_checkpoint": next_token},
         )
