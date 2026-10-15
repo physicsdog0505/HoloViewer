@@ -53,12 +53,14 @@ async function fetchFeed(channel,fetchImpl){
 
 async function reconcileWave(db,roster,{fetchImpl,now}){
   const window=await nextReconcileWindow(db,roster,{now,limit:CHANNELS_PER_WAVE});
-  const results=await Promise.all(window.selected.map(async channel=>({
+  const settled=await Promise.allSettled(window.selected.map(async channel=>({
     channel,
     items:await fetchFeed(channel,fetchImpl)
   })));
-  let discovered=0;
-  for(const result of results){
+  let discovered=0,failed=0;
+  for(const item of settled){
+    if(item.status!=='fulfilled'){failed++;continue;}
+    const result=item.value;
     for(const entry of result.items){
       const bytes=new TextEncoder().encode(
         'feed-reconcile-v2:'+entry.channel_id+':'+entry.video_id+':'+roster.version
@@ -76,8 +78,11 @@ async function reconcileWave(db,roster,{fetchImpl,now}){
       discovered++;
     }
   }
+  // Never let one temporarily unavailable channel freeze the rotating discovery
+  // cursor forever. Successful channels are durable; failed channels are revisited
+  // on the next roster rotation and the run reports an explicit gap count.
   await commitReconcileWindow(db,window);
-  return {channels:window.selected.length,discovered};
+  return {channels:window.selected.length,discovered,failed};
 }
 
 function videoFetcher(env,fetchImpl){
@@ -105,11 +110,12 @@ export async function refreshTodayDiscovery(env,{fetchImpl=fetch,now=new Date()}
   if(!env?.DB?.prepare||!env?.YOUTUBE_API_KEY)throw Error('Today discovery configuration missing');
 
   const roster=await loadApprovedRoster(env.DB);
-  let channels=0,discovered=0;
+  let channels=0,discovered=0,feed_failures=0;
   for(let i=0;i<WAVES_PER_RUN;i++){
     const wave=await reconcileWave(env.DB,roster,{fetchImpl,now});
     channels+=wave.channels;
     discovered+=wave.discovered;
+    feed_failures+=wave.failed??0;
   }
   const status=await refreshPendingVideos({
     db:env.DB,
@@ -124,6 +130,7 @@ export async function refreshTodayDiscovery(env,{fetchImpl=fetch,now=new Date()}
     feed_requests:channels,
     channels,
     discovered,
+    feed_failures,
     updated:status.updated??0,
     failed:status.failed??0,
     quota_units:status.quota_units??0
