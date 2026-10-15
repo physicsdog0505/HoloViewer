@@ -129,3 +129,38 @@ Current comprehensive offline verification command:
 ```sh
 python3 -B -m unittest -v ptt_offline.test_public_today_contract ptt_offline.test_consumer_boundary ptt_offline.test_consumer_paging ptt_offline.test_public_consumer_envelope ptt_offline.test_d1_publisher
 ```
+
+## Canonical Public DB binding and 2026-10-15 review correction
+
+The **only** intended production Public D1 is `holoviewer-public-v1`,
+exposed through the **existing** `holoviewer-public-api` Worker binding
+`DB`. `holoviewer-ptt-relay` and `holoviewer-ptt-live-v2` are NOT
+the unified Public target. Never create a fourth D1 or apply the proposed
+migration to either legacy PTT D1. Actual migration/route binding remains
+owner-gated. Schema SQL is a proposed additive migration for the existing
+Public D1; check deployed schema compatibility before any application.
+
+Four exact-head production review blockers addressed in source:
+- Stable source evidence conflict is now **fail closed** in the same
+  transaction, rejecting reparse to a different canonical `push_id`
+  instead of repointing evidence and leaving two visible rows.
+- Higher/equal-priority replay with null floor cannot erase known enrichment.
+- `D1PttProvider` now requires the selected day at construction and
+  constrains `initial_window` by day **and** AID.
+- The Worker only claims fresh when parsed `last_success_at` has a finite,
+  nonnegative age within 30 seconds. Invalid/future/missing timestamps
+  become unknown.
+
+Python offline regression command:
+```sh
+python3 -B -m unittest -v ptt_offline.test_public_today_contract ptt_offline.test_consumer_boundary ptt_offline.test_consumer_paging ptt_offline.test_public_consumer_envelope ptt_offline.test_d1_publisher ptt_offline.test_d1_provider
+```
+
+Node offline Worker freshness regressions:
+```sh
+node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshness.mjs
+```
+
+No CI or exact-head local execution is implied by committed test source;
+report these as NOT RUN until genuinely executed. No production DB
+mutation, SQLite owner-data read, Publisher activation or deploy authorized.
