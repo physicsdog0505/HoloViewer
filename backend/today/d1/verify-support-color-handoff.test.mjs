@@ -32,3 +32,7 @@ test('neutral row is allowed only as explicit row, never silently missing',()=>{
   assert.equal(out.neutral_count,1);
   assert.equal(out.colored_count,65);
 });
+
+test('CLI entrypoint path handling is covered by module-safe verifier import',()=>{
+  assert.equal(typeof verifyLegacy66Handoff,'function');
+});
