@@ -18,6 +18,7 @@ class WorkerBundleTest(unittest.TestCase):
                              "from platform_adapter.cloudflare_entry import Default\n")
             config = json.loads((output / "wrangler.jsonc").read_text())
             self.assertIn("python_workers", config["compatibility_flags"])
+            self.assertIn('tzdata>=2025.2', (output / "pyproject.toml").read_text())
             self.assertFalse(receipt["deployed"])
             self.assertFalse((output / "requirements.txt").exists())
             if "requirements.txt -> bundle-metadata/requirements.txt" in receipt["relocated_legacy_metadata"]:
