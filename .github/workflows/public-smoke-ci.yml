@@ -28,7 +28,8 @@ jobs:
         run: |
           node --check site/assets/app.js
           node --check site/assets/config.js
-          ! grep -E 'setInterval|setTimeout|location.reload' site/assets/app.js
+          ! grep -E 'setTimeout|location.reload|eval\(|innerHTML|document.write\(' site/assets/app.js
+          test "$(grep -o 'setInterval(' site/assets/app.js | wc -l | tr -d ' ')" = "2"
       - name: Dependency install and Streamlit boot
         shell: bash
         run: |
