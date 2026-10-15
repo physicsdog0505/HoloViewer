@@ -40,6 +40,12 @@ export function assertInventory(rows) {
    todayPresent:true,legacyPreserved:true,
    wranglerLedgerPresent:names.has('d1_migrations')};
 }
+export function verifyAppliedPttLedger(rows,inventory) {
+ if(!inventory?.pttSchemaPresent)return {applied:false,verified:false};
+ if(!Array.isArray(rows)||rows.length!==1||rows[0]?.version!==1)
+   throw Error('PTT applied schema ledger missing or unexpected');
+ return {applied:true,verified:true,version:1};
+}
 export function decodeD1(value) {
  const items=JSON.parse(value);
  const groups=Array.isArray(items)?items:[items];
@@ -63,7 +69,13 @@ export function run(argv=process.argv.slice(2),exec=invoke,print=console.log) {
  const objects=decodeD1(exec(['d1','execute',UUID,'--remote','--json',
    '--command',"SELECT name,type FROM sqlite_master WHERE type IN ('table','index') ORDER BY name;"]));
  const inspection=assertInventory(objects);
- const receipt={...plan,mode:'READ_ONLY_ACCOUNT_PREFLIGHT',...inspection};
+ let applied={applied:false,verified:false};
+ if(inspection.pttSchemaPresent) {
+   const ledger=decodeD1(exec(['d1','execute',UUID,'--remote','--json','--command',
+     'SELECT version,description FROM public_ptt_schema_migrations ORDER BY version;']));
+   applied=verifyAppliedPttLedger(ledger,inspection);
+ }
+ const receipt={...plan,mode:'READ_ONLY_ACCOUNT_PREFLIGHT',...inspection,...applied};
  print(JSON.stringify(receipt,null,2));return receipt;
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
