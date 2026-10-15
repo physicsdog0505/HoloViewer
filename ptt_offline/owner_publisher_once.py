@@ -17,6 +17,7 @@ from .source_audit_stage import audit_source_day
 from .verified_publisher_flow import run_verified_offline_one
 from .owner_http_transport import owner_signed_http_executor
 from .d1_publisher import canonical_record
+from .realtime_capture_candidate import near_capture_candidate
 from .public_today_contract import ContractError
 
 
@@ -26,6 +27,17 @@ def row_fingerprint(row):
     raw=json.dumps({k:row.get(k) for k in keys},sort_keys=True,separators=(",",":"),
                    ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def sign_time_proof(row,secret):
+    if not isinstance(secret,str) or len(secret)<32:
+        raise ContractError("separate time-proof secret required")
+    normalized=canonical_record(row)
+    message=json.dumps([normalized["aid"],normalized["source_line"],
+        normalized["source_record_key"],normalized["push_id"],
+        normalized["occurred_at"],normalized["source_url"]],
+        separators=(",",":"),ensure_ascii=False).encode("utf-8")
+    return hmac.new(secret.encode("utf-8"),message,hashlib.sha256).hexdigest()
 
 
 def load_manual_evidence(path, *, source_identity, day, aid, proof_secret=None):
@@ -49,14 +61,7 @@ def load_manual_evidence(path, *, source_identity, day, aid, proof_secret=None):
             return False
         if proof_secret is None:
             return True
-        if not isinstance(proof_secret,str) or len(proof_secret)<32:
-            raise ContractError("separate time-proof secret required")
-        normalized=canonical_record(row)
-        message=json.dumps([normalized["aid"],normalized["source_line"],
-            normalized["source_record_key"],normalized["push_id"],
-            normalized["occurred_at"],normalized["source_url"]],
-            separators=(",",":"),ensure_ascii=False).encode("utf-8")
-        return hmac.new(proof_secret.encode("utf-8"),message,hashlib.sha256).hexdigest()
+        return sign_time_proof(row,proof_secret)
     return check
 
 
@@ -71,6 +76,7 @@ def main(argv=None):
     p.add_argument("--send",action="store_true")
     p.add_argument("--approve-source")
     p.add_argument("--evidence")
+    p.add_argument("--near-realtime-approve")
     p.add_argument("--endpoint")
     args=p.parse_args(argv)
     if sum(bool(x) for x in (args.inspect,args.send,args.draft_evidence)) != 1:
@@ -98,17 +104,25 @@ def main(argv=None):
             receipt={"mode":"EVIDENCE_DRAFT_NOT_APPROVED","path":args.draft_evidence,
                      "rows":len(proposal["approved_rows"]),"d1_requests":0}
         else:
-            if args.approve_source!=initial["source_identity"] or not args.evidence:
-                raise ContractError("specific owner source approval and external evidence required")
+            if args.approve_source!=initial["source_identity"]:
+                raise ContractError("specific owner source approval required")
             secret=os.environ.get("PTT_PUBLISH_HMAC_SECRET","")
             proof_secret=os.environ.get("PTT_TIME_AUTHORITY_SECRET","")
             if len(proof_secret)<32:
                 raise ContractError("separate manual time-authority signing secret required")
             sender=owner_signed_http_executor(endpoint=args.endpoint or "",secret=secret,
                                                allow_write=True)
-            verify=load_manual_evidence(args.evidence,
+            if args.evidence and not args.near_realtime_approve:
+                verify=load_manual_evidence(args.evidence,
                     source_identity=initial["source_identity"],
                     day=args.day,aid=initial["aid"],proof_secret=proof_secret)
+            elif (args.near_realtime_approve==initial["source_identity"]
+                  and not args.evidence
+                  and os.environ.get("PTT_ALLOW_CAPTURE_TIME_POLICY")=="true"):
+                verify=lambda row:(sign_time_proof(row,proof_secret)
+                                   if near_capture_candidate(row) else False)
+            else:
+                raise ContractError("positive reviewed evidence or explicit bounded realtime policy required")
             receipt=run_verified_offline_one(db,day=args.day,aid=initial["aid"],
                 checkpoint_path=args.checkpoint,time_verifier=verify,executor=sender)
     print(json.dumps(receipt,ensure_ascii=False,sort_keys=True,default=str))
