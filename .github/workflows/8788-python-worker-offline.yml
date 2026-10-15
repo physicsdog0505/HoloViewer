@@ -7,6 +7,8 @@ on:
     paths:
       - 'platform_adapter/**'
       - 'tools/build_python_worker_bundle.py'
+      - 'tools/package_8788_production_candidate.py'
+      - 'test_package_8788_production_candidate.py'
       - 'tools/probe_python_worker_local.py'
       - 'tools/prepare_worker_fixture_bundle.py'
       - 'tools/probe_pyodide_combined_router.py'
@@ -79,7 +81,12 @@ jobs:
             test_worker_transport \
             test_worker_transport_accepted \
             test_cloudflare_entry_binding \
-            test_python_worker_bundle
+            test_python_worker_bundle \
+            test_package_8788_production_candidate
+      - name: Package existing production Worker target (NO DEPLOY)
+        run: |
+          python3 tools/package_8788_production_candidate.py --output "$RUNNER_TEMP/holoviewer-public-candidate"
+          test -f "$RUNNER_TEMP/holoviewer-public-candidate/wrangler.jsonc"
       - name: Build disposable manifest-pinned Worker bundle
         run: |
           python3 tools/build_python_worker_bundle.py --output "$RUNNER_TEMP/hv-8788-worker-bundle"
