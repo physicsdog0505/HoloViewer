@@ -16,7 +16,7 @@ from platform_adapter.public_api import DEFAULT_API, PublicAPIUnavailable, prelo
 from platform_adapter.worker_preload import preload_for_accepted_request, fetch_canonical_json
 from platform_adapter.runtime_binding import bind_public_today
 from platform_adapter.page_fallbacks import render_page_fallback
-from platform_adapter.home_lightweight import dispatch_lightweight_home, build_request_live_rail
+from platform_adapter.home_lightweight import dispatch_lightweight_home
 from platform_adapter.live_rail_binding import using_live_rail_html
 
 PAGE_ROUTES = frozenset({
@@ -103,9 +103,11 @@ class Default(WorkerEntrypoint):
                     stage = "home-render"
                     result = dispatch_lightweight_home(target)
                 else:
-                    stage = "live-rail"
-                    rail_html = build_request_live_rail() if ("/v1/catalog/today", ()) in preload else ""
-                    with using_live_rail_html(rail_html):
+                    # Stability first: never add a second Home-render dependency
+                    # before another accepted route can dispatch. The packaged
+                    # shell consumes request-local rail HTML and an empty rail is
+                    # preferable to taking down the page.
+                    with using_live_rail_html(""):
                         stage = "accepted-dispatch"
                         result = dispatch_accepted_get(
                             _accepted_handler(), target=target, method=str(request.method)
