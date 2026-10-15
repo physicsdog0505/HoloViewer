@@ -11,7 +11,7 @@ from datetime import datetime,timezone,timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from .collector_source_preview import open_source
-from .live_capture_publisher import inspect_latest_article,run_live_once,state_for_source
+from .live_capture_publisher import active_article_ids,inspect_latest_article,run_live_once,state_for_source
 from .owner_http_transport import owner_signed_http_executor
 from .publisher_cli import exclusive_lock
 from .public_today_contract import ContractError
@@ -35,36 +35,49 @@ def seconds_until_next_snapshot(now=None):
         target=local.replace(hour=next_minute//60,minute=next_minute%60,second=0,microsecond=0)
     return max(0,(target-local).total_seconds())
 
-def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=8):
+def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=8,max_articles=4):
     if type(max_batches) is not int or not 1<=max_batches<=16:
         raise ContractError('invalid bounded batches per snapshot')
     started=clock()
     with open_source(source) as db:
-        discovered=inspect_latest_article(db)
-        if discovered["status"]!="READY":
-            result={"status":discovered["status"],"sent":0,"eligible":0}
+        article_ids=active_article_ids(db,limit=max_articles)
+        if not article_ids:
+            result={"status":"NO_REAL_COLLECTOR_ROWS","sent":0,"eligible":0,"http_posts":0}
         else:
-            state=state_for_source(state_dir,discovered["source_identity"])
-            if not send:
-                result=run_live_once(db,state_path=state,secret=secret,executor=executor,
-                                     send=False,batch_cap=batch_cap)
-            else:
-                sent=0
-                posts=0
-                last=None
-                for _ in range(max_batches):
-                    last=run_live_once(db,state_path=state,secret=secret,executor=executor,
-                                       send=True,batch_cap=batch_cap)
-                    if last.get("status")!="ACK":
+            total_sent=0
+            total_posts=0
+            last_status="NO_NEW_ROWS"
+            backlog=False
+            pending=0
+            for article_id in article_ids:
+                plan=inspect_latest_article(db,article_id=article_id)
+                if plan["status"]!="READY":
+                    continue
+                state=state_for_source(state_dir,plan["source_identity"])
+                if not send:
+                    result=run_live_once(db,state_path=state,secret=secret,
+                       executor=executor,send=False,batch_cap=batch_cap,article_id=article_id)
+                    pending+=result.get("eligible",0)
+                    continue
+                # A per-article cap prevents a busy thread starving another.
+                per_article_cap=max(1,(max_batches-total_posts)//max(1,len(article_ids)))
+                count=0
+                for _ in range(per_article_cap):
+                    batch=run_live_once(db,state_path=state,secret=secret,
+                        executor=executor,send=True,batch_cap=batch_cap,article_id=article_id)
+                    last_status=batch.get("status",last_status)
+                    if batch.get("status")!="ACK":
                         break
-                    posts+=1
-                    count=last.get("sent",0)
-                    sent+=count
+                    total_posts+=1
+                    count=batch.get("sent",0)
+                    total_sent+=count
                     if count<batch_cap:
                         break
-                result={**(last or {}),"sent":sent,"http_posts":posts,
-                        "batch_count":posts,
-                        "backlog_may_remain":posts==max_batches and last.get("sent",0)==batch_cap}
+                backlog=backlog or (count==batch_cap)
+            result={"status":last_status if send else "READ_ONLY",
+                    "sent":total_sent,"eligible":pending,
+                    "http_posts":total_posts,"batch_count":total_posts,
+                    "articles_checked":len(article_ids),"backlog_may_remain":backlog}
     return {**result,"elapsed_ms":round((clock()-started)*1000),
         "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "publisher_mode":"OWNER_APPROVED_SEND" if send else "DRY_RUN",
@@ -81,6 +94,7 @@ def main(argv=None):
     p.add_argument("--send",action="store_true")
     p.add_argument("--batch-cap",type=int,default=5)
     p.add_argument("--max-batches",type=int,default=8)
+    p.add_argument("--max-articles",type=int,default=4)
     p.add_argument("--approve-live-capture-policy",action="store_true")
     p.add_argument("--endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish")
     args=p.parse_args(argv)
@@ -88,6 +102,8 @@ def main(argv=None):
         p.error("maximum 1440 bounded iterations allowed")
     if not 1<=args.batch_cap<=25:
         p.error('batch cap must be 1-25 and match approved Worker configuration')
+    if not 1<=args.max_articles<=8:
+        p.error('max articles must be 1-8')
     if not 1<=args.max_batches<=16:
         p.error('max batches must be 1-16')
     import os
@@ -106,7 +122,7 @@ def main(argv=None):
             started=time.monotonic()
             try:
                 result=run_snapshot(source=args.source,state_dir=args.state_dir,send=args.send,
-                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches)
+                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches,max_articles=args.max_articles)
             except Exception as exc:
                 failure={"status":"STOP_RECONCILE","error_class":type(exc).__name__,
                          "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
