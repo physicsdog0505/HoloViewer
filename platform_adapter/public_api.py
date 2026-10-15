@@ -17,6 +17,14 @@ DEFAULT_API = "https://holoviewer-public-api.singlebagel.workers.dev"
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
+_READ_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 class PublicAPIUnavailable(RuntimeError):
     """The canonical API could not provide a valid consumer read."""
 
@@ -43,7 +51,7 @@ class PublicAPI:
             url, method="GET", headers={"Accept": "application/json"}
         )
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+            with _READ_OPENER.open(request, timeout=self.timeout_seconds) as response:
                 if response.status != 200:
                     raise PublicAPIUnavailable(f"Public API HTTP {response.status}")
                 content_type = response.headers.get_content_type()
