@@ -1,0 +1,12 @@
+{
+  "name": "holoviewer-public-api",
+  "main": "./api-worker-entry.mjs",
+  "compatibility_date": "2026-10-14",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "holoviewer-public-v1",
+      "database_id": "64e1a0ee-1455-4377-9640-3922e8f4d061"
+    }
+  ]
+}
