@@ -40,6 +40,12 @@ class CollectorDayStageTests(unittest.TestCase):
         self.assertEqual(later["rows"][0]["occurred_at"],"2025-12-31T16:01:00Z")
         self.assertTrue(later["coverage"]["complete"])
 
+    def test_resume_after_ack_does_not_restage_old_source_line(self):
+        result=stage_selected_day(self.db,day="2026-01-01",aid="A1",
+                                  after_source_line=6)
+        self.assertEqual(result["selected_rows_total"],0)
+        self.assertEqual(result["rows"],[])
+
     def test_unknown_aid_and_cap_fail_closed(self):
         with self.assertRaises(ContractError):
             stage_selected_day(self.db,day="2026-01-01",aid="missing")
