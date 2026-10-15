@@ -16,6 +16,7 @@ on:
       - 'tools/check_production_host_baseline.py'
       - 'test_*worker*.py'
       - 'test_public_api_binding.py'
+      - 'test_playback_routes.py'
       - 'test_canonical_consumer_integration.py'
       - 'test_ptt_consumer_contract.py'
       - 'test_ptt_provider_binding.py'
