@@ -14,6 +14,7 @@ WORKER="holoviewer-public-api"
 DB_NAME="holoviewer-public-v1"
 DB_ID="64e1a0ee-1455-4377-9640-3922e8f4d061"
 API="https://holoviewer-public-api.singlebagel.workers.dev"
+BROWSER_USER_AGENT="Mozilla/5.0"
 REQUIRED_TABLES={
     "public_ptt_schema_migrations","ptt_threads","ptt_pushes",
     "ptt_provider_state","ptt_source_evidence","ptt_gap_repairs"
@@ -108,7 +109,7 @@ def write_local_secrets(state_root,hmac_secret,time_secret):
 
 def assert_gate_open():
     req=Request(API+"/private/ptt/publish",data=b"{}",method="POST",
-                headers={"Content-Type":"application/json"})
+                headers={"Content-Type":"application/json","User-Agent":BROWSER_USER_AGENT})
     try:
         with urlopen(req,timeout=15) as r:
             code=r.status
@@ -128,7 +129,7 @@ def taipei_day():
 
 def public_readback():
     url=API+"/v1/ptt/today?day="+taipei_day()+"&limit=10"
-    req=Request(url,headers={"Accept":"application/json"})
+    req=Request(url,headers={"Accept":"application/json","User-Agent":BROWSER_USER_AGENT})
     try:
         with urlopen(req,timeout=15) as r:
             data=json.loads(r.read())
