@@ -45,6 +45,21 @@ class ProviderBindingTest(unittest.TestCase):
         self.assertEqual((len(live),len(upcoming),len(ended),len(unknown)), (0,1,0,1))
         self.assertEqual(unknown[0].group,"unknown")
 
+    def test_live_requires_fresh_authoritative_feed(self):
+        class Stub:
+            def __init__(self, freshness):
+                self.freshness=freshness
+            def read_today(self):
+                return {"freshness":self.freshness,"items":[
+                    {"video_id":"dQw4w9WgXcQ","lifecycle_state":"live"}
+                ]}
+        for state in ("stale","unknown",None):
+            live,_,_,unknown=bind_home_reader(Stub(state),FakeHomeStream)()
+            self.assertEqual(len(live),0)
+            self.assertEqual(len(unknown),1)
+        live,_,_,_=bind_home_reader(Stub("fresh"),FakeHomeStream)()
+        self.assertEqual(len(live),1)
+
     def test_missing_consumer_list_fails_closed(self):
         class Stub:
             def read_today(self):
