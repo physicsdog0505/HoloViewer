@@ -4,7 +4,7 @@
 import { createCustomViewState } from "./custom_view_state.mjs";
 
 const VIDEO_RE = /^[A-Za-z0-9_-]{11}$/;
-const LAYOUTS = new Set(["auto", "compare", "focus", "equal", "primary"]);
+const LAYOUTS = new Set(["auto", "equal", "primary"]);
 
 export function parseAcceptedSession(search) {
   const q = new URLSearchParams(String(search || "").replace(/^\?/, ""));
