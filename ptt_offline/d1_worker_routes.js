@@ -9,6 +9,13 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: {'content-type':'application/json; charset=utf-8', 'cache-control':'no-store'}
 });
 
+export function publicPttFreshness(lastSuccess, nowMs = Date.now()) {
+  const checkedMs = typeof lastSuccess === 'string' ? Date.parse(lastSuccess) : NaN;
+  const ageMs = nowMs - checkedMs;
+  return Number.isFinite(checkedMs) && Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= 30000
+    ? 'fresh' : 'unknown';
+}
+
 export async function handlePttD1Read(request, db) {
   const u = new URL(request.url);
   const history = u.pathname === '/v1/ptt/history';
@@ -49,14 +56,12 @@ export async function handlePttD1Read(request, db) {
     const hasMore = raw.length > limit;
     const newestCheck = (scope.results || []).map(x=>x.last_success_at).filter(Boolean);
     const lastSuccess = newestCheck.length ? newestCheck.sort()[0] : null;
-    const checkedMs = lastSuccess === null ? NaN : Date.parse(lastSuccess);
-    const ageMs = Date.now() - checkedMs;
-    const fresh = Number.isFinite(checkedMs) && Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= 30000;
+    const freshness = publicPttFreshness(lastSuccess);
     const gap = (scope.results || []).some(x=>Boolean(x.has_gap));
     const projected = visible.map(row => Object.fromEntries(keys.map(k=>[k,row[k] ?? null])));
     return json({
       schema_version:'public-consumer-v1', day, as_of:asOf,
-      freshness:{status:fresh?'fresh':'unknown',last_success_at:lastSuccess},
+      freshness:{status:freshness,last_success_at:lastSuccess},
       completeness:{status:'partial',gap},
       checkpoint:null,
       pushes:projected,
