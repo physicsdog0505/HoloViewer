@@ -55,6 +55,6 @@ def bind_public_today(client_app: Any, *, api_base: str) -> dict[str, str]:
     return {
         "provider": "holoviewer-public-api",
         "read_today": "/v1/catalog/today",
-        "read_day": "/v1/history?day=YYYY-MM-DD&limit=50&offset=N",
+        "read_day_legacy_compatible": "/v1/history?day=YYYY-MM-DD&limit=50&offset=N",
         "database_binding": "DB -> holoviewer-public-v1 (existing API owns binding)",
     }
