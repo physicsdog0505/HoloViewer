@@ -23,6 +23,9 @@ jobs:
           node-version: '22'
       - name: Migration SHA256 evidence (no cloud)
         run: python3 -B -m ptt_offline.migration_preflight
+      - name: Cross-check reviewed Git blob identity
+        run: |
+          test "$(git hash-object ptt_offline/d1_migrations/0001_canonical_ptt.sql)" = "7466163e331b05c2b12ca559affbf2386f49460c"
       - name: All PTT offline Python regressions
         run: |
           python3 -B -m unittest -v \
