@@ -60,3 +60,34 @@ test('owner pinned apply invokes exactly one existing-D1 file mutation and verif
  assert.equal(commands.filter(c=>c.includes('--file')).length,1);
  assert.equal(commands.find(c=>c.includes('--file'))[2],UUID);
 });
+
+test('remote failure after mutation attempt forces STOP without retry',()=>{
+ const plan=planMigration();
+ let mutations=0;
+ const existing=['public_catalog','public_history','public_today_schema_migrations','d1_migrations'];
+ const exec=(args)=>{
+  if(args[0]==='whoami')return ACCOUNT;
+  if(args.includes('--file')){mutations++;throw Error('network lost after possible commit');}
+  return JSON.stringify([{success:true,results:existing.map(name=>({name,type:'table'}))}]);
+ };
+ assert.throws(()=>run(['--apply','--approve='+plan.sha256],exec,()=>{}),
+   /REMOTE MUTATION MAY HAVE OCCURRED; STOP, INSPECT, DO NOT RETRY/);
+ assert.equal(mutations,1);
+});
+test('existing PTT migration aborts before any write',()=>{
+ const plan=planMigration();
+ const existing=['public_catalog','public_history','public_today_schema_migrations',
+   'd1_migrations','ptt_threads','ptt_pushes','ptt_source_evidence',
+   'ptt_provider_state','ptt_gap_repairs','public_ptt_schema_migrations'];
+ let writes=0;
+ const exec=(args)=>{
+  if(args[0]==='whoami')return ACCOUNT;
+  if(args.includes('--file')){writes++;throw Error('must not happen')}
+  if(String(args.at(-1)).includes('SELECT version,description'))
+    return JSON.stringify([{success:true,results:[{version:1,description:'ptt'}]}]);
+  return JSON.stringify([{success:true,results:existing.map(name=>({name,type:'table'}))}]);
+ };
+ assert.throws(()=>run(['--apply','--approve='+plan.sha256],exec,()=>{}),
+   /migration already applied/);
+ assert.equal(writes,0);
+});
