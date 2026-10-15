@@ -32,17 +32,20 @@ def prepare_verified_batch(db, *, day, aid, checkpoint_path, time_verifier):
             approved=time_verifier(row)
         except Exception:
             approved=False
-        if approved is not True:
+        if approved is not True and not (isinstance(approved,str) and len(approved)==64 and all(c in '0123456789abcdef' for c in approved)):
             pending.append({"source_line":row["source_line"],
                             "reason":"timestamp-authority-not-verified"})
         elif not pending:
             record=canonical_record({**row,
                 'floor':row.get('floor'),
                 'source_record_key':row['source_record_key']})
+            if isinstance(approved,str):
+                record['time_proof']=approved
             # D1 sender receives only the contract fields; raw PTT time text
             # remains audit evidence, never a guessed canonical field.
             accepted=('push_id','aid','day','source_line','kind','author',
-                      'content','occurred_at','floor','source_url','source_record_key')
+                      'content','occurred_at','floor','source_url','source_record_key',
+                      'time_proof')
             verified.append({field:record.get(field) for field in accepted})
         else:
             pending.append({"source_line":row["source_line"],
