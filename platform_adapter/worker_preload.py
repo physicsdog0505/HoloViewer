@@ -44,3 +44,21 @@ async def preload_for_accepted_request(target: str, get_json):
     if not isinstance(value, dict):
         raise PublicAPIUnavailable("Invalid History envelope")
     return {("/v1/history", tuple(sorted(params.items()))): value}
+
+async def fetch_canonical_json(url: str) -> dict:
+    """Pyodide HTTP adapter; never performs synchronous urllib in a Worker."""
+    if not url.startswith(DEFAULT_API + "/"):
+        raise PublicAPIUnavailable("Non-canonical Public API URL rejected")
+    try:
+        from pyodide.http import pyfetch
+        response = await pyfetch(url, method="GET", headers={"Accept": "application/json"})
+        if response.status != 200:
+            raise PublicAPIUnavailable("Canonical Public API HTTP error")
+        data = await response.json()
+    except PublicAPIUnavailable:
+        raise
+    except Exception as exc:
+        raise PublicAPIUnavailable("Canonical Public API fetch failed") from exc
+    if not isinstance(data, dict):
+        raise PublicAPIUnavailable("Invalid Public API JSON")
+    return data
