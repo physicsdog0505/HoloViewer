@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import worker from './api-worker-entry.mjs';
 const ORIGIN='https://holoviewer-public.singlebagel.workers.dev';
 const queries=[];
-const DB={prepare(sql){queries.push(sql);return {bind(...args){return {
- async first(){return sql.includes('COUNT(*)')?{total:0}:null},
- async all(){return {results:[]}
- }},async first(){return null}}}};
+const DB={prepare(sql){queries.push(sql);return {
+  bind(...args){return {async first(){return sql.includes('COUNT(*)')?{total:0}:null},async all(){return {results:[]}}}},
+  async first(){return null}
+}}};
 const env={DB,ALLOWED_ORIGIN:ORIGIN};
 test('deployment entry preserves health and legacy history envelope',async()=>{
  const health=await worker.fetch(new Request('https://api.example/health',{headers:{origin:ORIGIN}}),env);
