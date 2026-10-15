@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planMigration,assertInventory,decodeD1,run,verifyAppliedPttLedger,UUID,ACCOUNT} from './owner_ptt_migration_preflight.mjs';
+import {planMigration,assertInventory,decodeD1,run,verifyAppliedPttLedger,assertWranglerLedger,UUID,ACCOUNT} from './owner_ptt_migration_preflight.mjs';
 test('freeze original migration and reject byte drift',()=>{
  const receipt=planMigration();
  assert.equal(receipt.uuid,UUID);
@@ -19,12 +19,13 @@ test('read-only only, pinned account and no write command',()=>{
  const invoke=(args)=>{
   calls.push(args);
   if(args[0]==='whoami') return ACCOUNT;
-  return JSON.stringify([{success:true,results:inventory.map(name=>({name,type:'table'}))}]);
+  const ledger=String(args.at(-1)).includes('FROM d1_migrations');
+  return JSON.stringify([{success:true,results:ledger?[{name:'0001_today_canonical.sql'}]:inventory.map(name=>({name,type:'table'}))}]);
  };
  assert.throws(()=>run(['--apply'],invoke,()=>{}),/exact owner checksum approval required/);
  const result=run(['--inspect'],invoke,()=>{});
  assert.equal(result.mode,'READ_ONLY_ACCOUNT_PREFLIGHT');
- assert.equal(calls.length,2);
+ assert.equal(calls.length,3);
  assert.equal(calls[1][2],UUID);
  assert.equal(calls.some(a=>a.includes('apply')||a.includes('--file')),false);
 });
@@ -50,7 +51,9 @@ test('owner pinned apply uses one transactional Wrangler migration and verifies'
   if(args[0]==='whoami')return ACCOUNT;
   if(args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply'){wrote=true;return 'ok';}
   const sql=args[args.length-1];
-  const rows=sql.includes('SELECT version,description')?
+  const rows=sql.includes('FROM d1_migrations')?
+    (wrote?[{name:'0001_today_canonical.sql'},{name:'0002_canonical_ptt.sql'}]:[{name:'0001_today_canonical.sql'}]):
+    sql.includes('SELECT version,description')?
     [{version:1,description:'canonical push, thread scope, replay and forward repair state'}]:
     (wrote?after:existing).map(name=>({name,type:'table'}));
   return JSON.stringify([{success:true,results:rows}]);
@@ -68,7 +71,8 @@ test('remote failure after mutation attempt forces STOP without retry',()=>{
  const exec=(args)=>{
   if(args[0]==='whoami')return ACCOUNT;
   if(args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply'){mutations++;throw Error('network lost after possible commit');}
-  return JSON.stringify([{success:true,results:existing.map(name=>({name,type:'table'}))}]);
+  const ledger=String(args.at(-1)).includes('FROM d1_migrations');
+  return JSON.stringify([{success:true,results:ledger?[{name:'0001_today_canonical.sql'}]:existing.map(name=>({name,type:'table'}))}]);
  };
  assert.throws(()=>run(['--apply','--approve='+plan.sha256],exec,()=>{}),
    /REMOTE MUTATION MAY HAVE OCCURRED; STOP, INSPECT, DO NOT RETRY/);
@@ -83,9 +87,11 @@ test('existing PTT migration aborts before any write',()=>{
  const exec=(args)=>{
   if(args[0]==='whoami')return ACCOUNT;
   if(args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply'){writes++;throw Error('must not happen')}
+  if(String(args.at(-1)).includes('FROM d1_migrations'))return JSON.stringify([{success:true,results:[{name:'0001_today_canonical.sql'},{name:'0002_canonical_ptt.sql'}]}]);
   if(String(args.at(-1)).includes('SELECT version,description'))
     return JSON.stringify([{success:true,results:[{version:1,description:'ptt'}]}]);
-  return JSON.stringify([{success:true,results:existing.map(name=>({name,type:'table'}))}]);
+  const ledger=String(args.at(-1)).includes('FROM d1_migrations');
+  return JSON.stringify([{success:true,results:ledger?[{name:'0001_today_canonical.sql'}]:existing.map(name=>({name,type:'table'}))}]);
  };
  assert.throws(()=>run(['--apply','--approve='+plan.sha256],exec,()=>{}),
    /migration already applied/);
