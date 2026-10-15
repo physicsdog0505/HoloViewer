@@ -10,7 +10,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
@@ -37,10 +37,14 @@ class PublicSmokeTests(unittest.TestCase):
         config = json.loads((ROOT / "cloudflare/wrangler.json").read_text())
         self.assertEqual(set(config), {"name", "compatibility_date", "assets"})
         self.assertEqual(config["name"], "holoviewer-public")
-        self.assertEqual(config["assets"], {"directory": "../site"})
+        self.assertEqual(config["assets"], {"directory": "../site", "not_found_handling": "single-page-application"})
+        self.assertNotIn("main", config)
         js = (ROOT / "site/assets/app.js").read_text()
-        for token in ("setInterval(", "setTimeout(", "location.reload(", "eval(", "innerHTML", "document.write("):
+        for token in ("setTimeout(", "location.reload(", "eval(", "innerHTML", "document.write("):
             self.assertNotIn(token, js)
+        self.assertEqual(js.count("setInterval("), 2)
+        self.assertIn("},30000);", js)
+        self.assertIn("},10000);", js)
         self.assertIn("credentials:'omit'", js)
         self.assertIn("textContent=", js)
         frontend_config = (ROOT / "site/assets/config.js").read_text()
@@ -59,10 +63,10 @@ class PublicSmokeTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/deploy-cloudflare-production.yml").read_text()
         for token in ("workflow_dispatch:", "BASELINE-CHECKED", "release_sha", "git rev-parse HEAD", "cloudflare-production", "refs/heads/main", "persist-credentials: false"):
             self.assertIn(token, workflow)
-        self.assertIn("  push:", workflow)
-        self.assertIn("      - 'site/**'", workflow)
-        self.assertIn("github.event_name == 'push'", workflow)
+        self.assertNotIn("  push:", workflow)
+        self.assertNotIn("github.event_name == 'push'", workflow)
         self.assertNotIn("  schedule:", workflow)
+        self.assertIn("workflow_dispatch:", workflow)
 
     def test_absent_snapshot(self):
         with tempfile.TemporaryDirectory() as t:

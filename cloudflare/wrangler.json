@@ -1,7 +1,8 @@
 {
   "name": "holoviewer-public",
-  "compatibility_date": "2026-10-14",
+  "compatibility_date": "2026-10-16",
   "assets": {
-    "directory": "../site"
+    "directory": "../site",
+    "not_found_handling": "single-page-application"
   }
 }

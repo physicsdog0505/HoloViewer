@@ -47,7 +47,8 @@ jobs:
         run: |
           node --check site/assets/app.js
           node --check site/assets/config.js
-          ! grep -E 'setInterval|setTimeout|location.reload' site/assets/app.js
+          ! grep -E 'setTimeout|location.reload|eval\(|innerHTML|document.write\(' site/assets/app.js
+          test "$(grep -o 'setInterval(' site/assets/app.js | wc -l | tr -d ' ')" = "2"
           python -B -m unittest -v test_public_smoke test_4174_ui_parity
       - name: Validate Wrangler static assets config (no script, D1, KV or routes)
         run: |
@@ -57,7 +58,8 @@ jobs:
           cfg=json.loads(Path('cloudflare/wrangler.json').read_text())
           assert set(cfg)=={'name','compatibility_date','assets'}, cfg.keys()
           assert cfg['name']=='holoviewer-public'
-          assert cfg['assets']=={'directory':'../site'}
+          assert cfg['assets']=={'directory':'../site','not_found_handling':'single-page-application'}
+          assert 'main' not in cfg
           PY
       - name: Deploy static assets to existing production Worker
         uses: cloudflare/wrangler-action@v4

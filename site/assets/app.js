@@ -130,6 +130,32 @@ function homeChannelAccent(item){
  for(const [needles,accent] of HOME_CHANNEL_ACCENTS)if(needles.some(word=>title.includes(word.toUpperCase())))return accent;
  return '';
 }
+function applyHomeSupportStyle(el,item){
+ const accent=homeChannelAccent(item);
+ if(accent)el.style.setProperty('--member-accent',accent);
+ const dual=Array.isArray(item?.member_accent_dual)?item.member_accent_dual:[];
+ const validDual=dual.length===2&&dual.every(value=>/^#[0-9a-fA-F]{6}$/.test(String(value)));
+ const mode=String(item?.support_mode||'');
+ if(mode==='dual_color'&&validDual){
+  el.dataset.supportMode='dual_color';
+  el.style.setProperty('--member-accent',String(dual[0]));
+  el.style.setProperty('--member-accent-secondary',String(dual[1]));
+  el.style.setProperty('--member-accent-dual','linear-gradient(135deg,'+dual[0]+' 0 50%,'+dual[1]+' 50% 100%)');
+ }else if(accent){
+  el.dataset.supportMode=mode==='neutral'?'neutral':'solid';
+ }
+}
+function homeStartLabel(item){
+ const legacy=String(item?.start_label||item?.start_time_label||'').trim();
+ if(legacy)return legacy;
+ const raw=String(item?.start_at||'').trim();
+ if(!raw)return '時間未明';
+ const date=new Date(raw);
+ if(!Number.isFinite(date.getTime()))return '時間未明';
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date);
+ const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return out.month+'/'+out.day+' '+out.hour+':'+out.minute;
+}
 function homeAvatarUrl(item){
  const raw=String(item.avatar_url||'');
  try{
@@ -151,14 +177,14 @@ function homeCard(item,container){
  const group=String(item.group||item.channel_group||'other').toLowerCase();
  const href='/custom-view/session?stream='+encodeURIComponent(id)+'&layout=auto&primary=0&audio=0';
  const card=node('a',undefined,'client-card stream-card');card.href=href;card.dataset.group=group;card.id='stream-'+id;
- const accent=homeChannelAccent(item);if(accent)card.style.setProperty('--member-accent',accent);
+ applyHomeSupportStyle(card,item);
  const states={live:['LIVE','live'],waiting:['等待中','upcoming'],upcoming:['即將開始','upcoming'],ended:['已結束','ended'],unknown:['狀態待更新',''],stale:['狀態待更新','']};
  const status=states[lifecycle]||states.unknown;
  if(['live','waiting','upcoming','ended'].includes(lifecycle)){card.dataset.multiviewId=id;card.setAttribute('aria-selected','false')}
  const thumb=node('div',undefined,'card-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
  const youTube=node('span','YouTube ↗','youtube-source-link');youTube.role='link';youTube.tabIndex=0;youTube.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;thumb.append(youTube);
  const overlay=node('div',undefined,'thumb-overlay');overlay.append(node('span',status[0],'thumb-badge '+status[1]));
- const time=String(item.start_label||item.start_time_label||'');overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
+ const time=homeStartLabel(item);overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
@@ -175,7 +201,7 @@ function homeRail(items){const box=$('live-channel-list');box.replaceChildren();
  items.forEach(item=>{const id=item.video_id;if(!/^[A-Za-z0-9_-]{11}$/.test(id||''))return;const key=item.channel_id||item.channel_name||item.channel_title||id;if(seen.has(key))return;seen.add(key);
  const link=node('a',undefined,'live-channel-rail-item');link.href='#stream-'+id;link.dataset.liveVideoId=id;link.dataset.channelId=String(item.channel_id||'');link.dataset.group=String(item.group||item.channel_group||'other').toLowerCase();
  const avatar=node('span',undefined,'live-channel-avatar');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
- const accent=homeChannelAccent(item);if(accent)link.style.setProperty('--member-accent',accent);
+ applyHomeSupportStyle(link,item);
  const avatarNode=homeAvatarChild(item,name);if(!avatarNode.matches('img'))avatarNode.className='';avatar.append(avatarNode);avatar.append(node('i'));link.append(avatar);link.append(node('strong',name));
  link.onclick=event=>{event.preventDefault();if($('custom-session').classList.contains('active')){selectWatchRailVideo(id,name);return}const card=$('stream-'+id);card?.scrollIntoView({block:'center',behavior:'smooth'})};box.append(link)});
  $('live-channel-rail').hidden=!box.children.length||(!$('home').classList.contains('active')&&!$('custom-session').classList.contains('active'));
@@ -281,8 +307,11 @@ function renderHomeHighlights(rows){
  section.append(carousel);highlights.append(section);
 }
 
+let homeLoadInFlight=false;
 async function loadHome(){
+ if(homeLoadInFlight)return;
  if(!config.apiBase){$('home-empty').textContent='正式直播資料 API 尚未接通。';return}
+ homeLoadInFlight=true;
  try{
  const data=await api('/v1/catalog/today');const rows=data.streams||data.items;
  if(!Array.isArray(rows))throw Error('資料格式錯誤');
@@ -296,6 +325,7 @@ async function loadHome(){
  $('home-empty').textContent=rows.length?'':'目前沒有今天的直播資料。';
  $('connection').textContent='API 已連線';
  }catch(e){$('home-empty').textContent='無法讀取正式直播資料：'+e.message}
+ finally{homeLoadInFlight=false}
 }
 function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));return o.year+'-'+o.month+'-'+o.day}
 function shiftDay(day,delta){const date=new Date(day+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+delta);return date.toISOString().slice(0,10)}
@@ -330,11 +360,57 @@ async function loadCollab(){
  }
  $('collab-empty').textContent='目前沒有偵測到可用的多人連動。';
 }
+let pttLastGoodCount=0,pttLastGoodDay='',pttLoadInFlight=false;
 async function loadPtt(){
- const today=taipeiDay();$('ptt-today-meta').textContent=today.replaceAll('-','/')+' · 推文資料尚未接通 · 純 PTT 閱讀';
- $('ptt-list').hidden=true;
- $('ptt-empty').hidden=false;
- $('ptt-empty').textContent='目前尚未接通經過驗證的公開 PTT 專串資料。';
+ if(pttLoadInFlight)return;
+ const today=taipeiDay();
+ const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty');
+ if(pttLastGoodDay&&pttLastGoodDay!==today){
+  pttLastGoodCount=0;pttLastGoodDay='';list.replaceChildren();list.hidden=true;
+ }
+ if(!pttLastGoodCount){
+  meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
+  empty.hidden=false;empty.textContent='讀取今日 PTT 推文中…';
+ }
+ if(!config.apiBase){
+  meta.textContent=today.replaceAll('-','/')+' · API 未設定 · 純 PTT 閱讀';
+  if(!pttLastGoodCount){empty.hidden=false;empty.textContent='PTT 正式 API 尚未接通。'}
+  return;
+ }
+ pttLoadInFlight=true;
+ try{
+  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
+  const next=document.createDocumentFragment();let count=0;
+  for(const row of data.pushes){
+   if(!row||typeof row.content!=='string')continue;
+   const push=node('div',undefined,'push');
+   const head=node('div',undefined,'ptt-push-meta');
+   const kind=typeof row.kind==='string'?row.kind:'→';
+   head.append(node('span',kind,'ptt-push-kind'));
+   head.append(node('strong',String(row.author||'unknown'),'ptt-push-author'));
+   if(Number.isInteger(row.floor)&&row.floor>0)head.append(node('span','#'+row.floor,'ptt-push-floor'));
+   const when=new Date(String(row.occurred_at||''));
+   if(Number.isFinite(when.getTime())){
+    const label=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(when);
+    head.append(node('time',label,'ptt-push-time'));
+   }
+   push.append(head,node('div',row.content,'ptt-push-content'));
+   next.append(push);count++;
+  }
+  list.replaceChildren(next);pttLastGoodCount=count;pttLastGoodDay=today;
+  const freshness=String(data.freshness?.status||'unknown');
+  const freshnessLabel=freshness==='fresh'?'即時':freshness==='stale'?'資料稍舊':'狀態未知';
+  meta.textContent=today.replaceAll('-','/')+' · '+freshnessLabel+' · '+count+' 則 · 純 PTT 閱讀';
+  list.hidden=!count;empty.hidden=Boolean(count);
+  if(!count)empty.textContent='目前沒有今天的推文。';
+ }catch(e){
+  meta.textContent=today.replaceAll('-','/')+' · 後端暫未就緒 · 10 秒後重試 · 純 PTT 閱讀';
+  if(!pttLastGoodCount){
+   list.hidden=true;empty.hidden=false;
+   empty.textContent='今日 PTT 後端資料暫未就緒；頁面會每 10 秒自動重試。';
+  }
+ } finally{pttLoadInFlight=false}
 }
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
@@ -639,7 +715,30 @@ window.hvOpenCustomSession=function(ids,opts={}){
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();route(location.hash.substring(1).split('?')[0]||'home');
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
+const hashRoute=location.hash.substring(1).split('?')[0];
+const pathRoute=location.pathname==='/history'?'history':
+ location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):
+ location.pathname==='/custom-view'?'single':
+ location.pathname==='/collab'?'multi':
+ location.pathname==='/watchalong'?'watchalong':
+ location.pathname==='/'?'home':'';
+route(hashRoute||pathRoute||'home');
+
+const homePollTimer=setInterval(()=>{
+ if(!document.hidden&&$('home').classList.contains('active'))loadHome();
+},30000);
+const pttPollTimer=setInterval(()=>{
+ if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();
+},10000);
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden)return;
+ if($('home').classList.contains('active'))loadHome();
+ if($('ptt').classList.contains('active'))loadPtt();
+});
+window.addEventListener('pagehide',()=>{
+ clearInterval(homePollTimer);clearInterval(pttPollTimer);
+},{once:true});
 
 /* Accepted 4174 custom-view selection controller with public read-only catalog adapter. */
 (function(){

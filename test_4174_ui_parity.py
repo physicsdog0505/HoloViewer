@@ -118,7 +118,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.ptt-reader{border:1px solid var(--line)', css)
         self.assertIn('ptt-focus-mode', css)
         self.assertIn('document.body.classList.toggle(\'ptt-focus-mode\'', js)
-        self.assertIn('目前尚未接通經過驗證的公開 PTT 專串資料。', js)
+        self.assertIn("/v1/ptt/today?day=", js)
+        self.assertIn("public-consumer-v1", js)
+        self.assertIn("pttLastGoodCount", js)
+        self.assertIn("pttLastGoodDay", js)
+        self.assertIn("pttLoadInFlight", js)
+        self.assertIn("homeLoadInFlight", js)
+        self.assertIn("pttLastGoodDay&&pttLastGoodDay!==today", js)
+        self.assertIn("10 秒後重試", js)
         self.assertNotIn("message('ptt-status'", js)
 
     def test_watchalong_builder_matches_4174_source_and_mode_controls(self):
@@ -151,12 +158,25 @@ class ParityContract(unittest.TestCase):
         for name in ('三期生告知','重大告知','初配信','周年','新衣裝','生日','3D LIVE','大型聯動','歌回','新造型'):
             self.assertIn(name,js)
         self.assertIn('renderHomeHighlights(rows)',js)
-        self.assertNotIn('setInterval(',js)
+        self.assertIn("const homePollTimer=setInterval(",js)
+        self.assertIn("},30000);",js)
 
     def test_stream_id_validator_keeps_ascii_ids(self):
         js=(ROOT/"site/assets/app.js").read_text(encoding="utf-8")
         self.assertNotIn("[\\\\w-]", js, "Double escaped regex rejects real YouTube IDs")
         self.assertGreaterEqual(js.count("[A-Za-z0-9_-]{11}"), 3)
+
+    def test_public_support_color_and_time_projection(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        self.assertIn('function applyHomeSupportStyle(el,item)',js)
+        self.assertIn("item?.member_accent_dual",js)
+        self.assertIn("el.dataset.supportMode='dual_color'",js)
+        self.assertIn("function homeStartLabel(item)",js)
+        self.assertIn("item?.start_at",js)
+        self.assertIn("timeZone:'Asia/Taipei'",js)
+        self.assertIn("background:color-mix(in srgb,var(--member-accent,#7aa8bb) 8%,white)",css)
+        self.assertIn('[data-support-mode="dual_color"].stream-card:hover',css)
 
     def test_4174_channel_identity_fallback_and_safe_avatars(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
@@ -172,7 +192,7 @@ class ParityContract(unittest.TestCase):
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         self.assertIn("Verbatim accepted 4174 LIVE_RAIL_CSS", css)
-        self.assertIn("position:fixed;left:2px;top:270px;z-index:65;width:64px", css)
+        self.assertIn("position:fixed;left:2px;top:378px;z-index:65;width:64px", css)
         self.assertIn(".live-channel-rail:hover,.live-channel-rail:focus-within{width:222px", css)
         self.assertIn("body:has(.client-rail:hover) .live-channel-rail", css)
         self.assertIn("@media(max-width:760px){.live-channel-rail{display:none}}", css)
@@ -261,7 +281,9 @@ class ParityContract(unittest.TestCase):
         self.assertIn("iframe.contentWindow===event.source",js)
         self.assertIn("linkedEchoUntil.set(iframe",js)
         self.assertIn("registerViewerPlayer(player)",js)
-        self.assertNotIn("setInterval(",js)
+        start=js.index("function linkedPlayPause(event)")
+        end=js.index("window.addEventListener('message'",start)
+        self.assertNotIn("setInterval(",js[start:end])
 
     def test_session_url_encodes_and_restores_explicit_stream_ids(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
@@ -269,7 +291,9 @@ class ParityContract(unittest.TestCase):
         self.assertIn("...viewing.ids.map(id=>['stream',id])",js)
         self.assertIn("params.getAll('stream')",js)
         self.assertIn("const recovered=urls.length?ids:",js)
-        self.assertIn("route(location.hash.substring(1).split('?')[0]||'home')",js)
+        self.assertIn("const hashRoute=location.hash.substring(1).split('?')[0];",js)
+        self.assertIn("const pathRoute=location.pathname==='/history'?'history':",js)
+        self.assertIn("route(hashRoute||pathRoute||'home')",js)
 
     def test_single_player_ptt_keeps_positive_aspect_ratio_contract(self):
         css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
