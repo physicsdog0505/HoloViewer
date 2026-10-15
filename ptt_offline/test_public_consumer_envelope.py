@@ -8,9 +8,11 @@ from ptt_offline.public_today_contract import (
 
 
 def post(n, **extra):
-    return dict(aid="A1", source_line=n, floor=None, author="viewer",
-                content=f"message {n}", occurred_at="2026-10-15T03:00:00+08:00",
-                kind="推", **extra)
+    result = dict(aid="A1", source_line=n, floor=None, author="viewer",
+                  content=f"message {n}", occurred_at="2026-10-15T03:00:00+08:00",
+                  kind="推")
+    result.update(extra)
+    return result
 
 
 class PublicConsumerEnvelopeTests(unittest.TestCase):
