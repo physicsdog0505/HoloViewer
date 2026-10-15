@@ -12,6 +12,7 @@ from pathlib import Path
 from .collector_source_preview import open_source
 from .live_capture_publisher import inspect_latest_article,run_live_once,state_for_source
 from .owner_http_transport import owner_signed_http_executor
+from .publisher_cli import exclusive_lock
 from .public_today_contract import ContractError
 
 def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5):
@@ -55,16 +56,26 @@ def main(argv=None):
               if args.send else None)
     metric=Path(args.metrics)
     metric.parent.mkdir(parents=True,exist_ok=True)
-    for iteration in range(args.iterations):
-        start=time.monotonic()
-        # Error = STOP. Never continue an ambiguous remote POST automatically.
-        result=run_snapshot(source=args.source,state_dir=args.state_dir,send=args.send,
-                            secret=proof_secret,executor=executor,batch_cap=args.batch_cap)
-        with metric.open("a",encoding="utf-8") as handle:
-            handle.write(json.dumps(result,ensure_ascii=False,sort_keys=True)+"\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        print(json.dumps(result,ensure_ascii=False,sort_keys=True),flush=True)
-        if iteration+1<args.iterations:
-            time.sleep(max(0,args.interval_seconds-(time.monotonic()-start)))
+    with exclusive_lock(Path(args.state_dir)/".single-publisher.lock"):
+        for iteration in range(args.iterations):
+            started=time.monotonic()
+            try:
+                result=run_snapshot(source=args.source,state_dir=args.state_dir,send=args.send,
+                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap)
+            except Exception as exc:
+                failure={"status":"STOP_RECONCILE","error_class":type(exc).__name__,
+                         "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                         "remote_outcome":"UNKNOWN_NO_RETRY"}
+                with metric.open("a",encoding="utf-8") as handle:
+                    handle.write(json.dumps(failure,sort_keys=True)+"\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                raise
+            with metric.open("a",encoding="utf-8") as handle:
+                handle.write(json.dumps(result,ensure_ascii=False,sort_keys=True)+"\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            print(json.dumps(result,ensure_ascii=False,sort_keys=True),flush=True)
+            if iteration+1<args.iterations:
+                time.sleep(max(0,args.interval_seconds-(time.monotonic()-started)))
 if __name__=="__main__":main()
