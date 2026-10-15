@@ -275,6 +275,16 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const recovered=urls.length?ids:",js)
         self.assertIn("route(location.hash.substring(1).split('?')[0]||'home')",js)
 
+    def test_public_viewer_does_not_mount_uncertified_ptt_or_collapse_video(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
+        self.assertIn("viewerPttPanel.remove();",js)
+        self.assertIn("$('customContentGrid').classList.add('video-only')",js)
+        self.assertIn("PTT 資料尚未可用；先顯示完整影片畫面",js)
+        self.assertIn('body.custom-session-watching .custom-content-grid.video-only #stage .video-wrap{',css)
+        self.assertIn('aspect-ratio:16/9!important',css)
+        self.assertIn('grid-auto-rows:max-content!important',css)
+
     def test_custom_session_restores_on_reload_without_blank_shell(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn("sessionStorage.setItem('hvCustomViewing'",js)
