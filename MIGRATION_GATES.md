@@ -10,8 +10,8 @@ Authoritative product source:
 ## Checkpoint status
 
 - Checkpoint 1 — SOURCE SNAPSHOT COMPLETE: PASS by independent #68 review
-- Checkpoint 2 — RUNTIME ISOLATED: IN PROGRESS
-- Checkpoint 3 — 4174 PARITY: BLOCKED
+- Checkpoint 2 — RUNTIME ISOLATED: PASS by independent #68 review at `a05fbcada2b688b1fe58c8f6c21b5e93ddaf757d`
+- Checkpoint 3 — 4174 PARITY: IN PROGRESS
 - Checkpoint 4 — PLATFORM ADAPTER: BLOCKED
 
 ## Phase A/B — frozen source snapshot
@@ -66,9 +66,17 @@ Checkpoint 2 is not PASS until an owner-local launch proves the runtime report a
 
 ## Phase D — 4174 parity
 
-**BLOCKED pending Checkpoint 2 review.**
+**Authorized and in progress after Checkpoint 2 PASS.**
 
-Do not claim visual/runtime parity from source identity alone. When unblocked, verify route/state behavior against accepted 4174 with browser/DOM/computed-style evidence.
+Required evidence:
+
+- `provenance/4174-parity-matrix.json` is the route/state inventory.
+- `scripts/check_4174_parity_local.sh` launches accepted 4174 and isolated 8788 against separate disposable runtime-data roots.
+- `tools/check_4174_http_parity.py` compares route HTTP status plus HTML DOM structure / canonical JSON.
+- Browser-only states (fullscreen/ESC, audio master, player interaction, responsive/computed style) remain pending until explicit browser evidence is captured.
+- Missing backend/provider data must be recorded separately and must not be used to rewrite product/UI behavior.
+
+Do not claim Checkpoint 3 PASS from source identity alone. Actual route/runtime/browser evidence is required.
 
 ## Phase E — Cloudflare compatibility
 
