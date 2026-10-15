@@ -16,7 +16,8 @@ export async function batchDigest(batch) {
 }
 const fail = message => { throw new Error(message); };
 const requireTrue = (condition,message) => { if(!condition) fail(message); };
-const SQL_THREAD='INSERT OR IGNORE INTO ptt_threads(day,aid) VALUES (?,?)';
+const SQL_THREAD='INSERT INTO ptt_threads(day,aid,source_url) VALUES (?,?,?) ON CONFLICT(day,aid) DO UPDATE SET source_url=COALESCE(ptt_threads.source_url,excluded.source_url)';
+const SQL_STATE="INSERT INTO ptt_provider_state(day,aid,last_success_at,has_gap) VALUES (?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),1) ON CONFLICT(day,aid) DO UPDATE SET last_success_at=excluded.last_success_at,has_gap=1";
 const SQL_PUSH='INSERT INTO ptt_pushes (push_id,aid,day,source_line,kind,author,content,occurred_at,floor,source_url,source_priority,source_record_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(push_id) DO UPDATE SET floor=COALESCE(excluded.floor,ptt_pushes.floor),kind=COALESCE(excluded.kind,ptt_pushes.kind),source_priority=MAX(ptt_pushes.source_priority,excluded.source_priority)';
 const SQL_EVIDENCE='INSERT INTO ptt_source_evidence(day,aid,source_record_key,push_id,source_line) VALUES(?,?,?,?,?) ON CONFLICT(day,aid,source_record_key) DO UPDATE SET push_id=excluded.push_id,source_line=excluded.source_line';
 const DAY=/^\d{4}-\d{2}-\d{2}$/;
@@ -71,17 +72,21 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
     requireTrue(!existing || existing.push_id===row.push_id,'existing source evidence conflict');
   }
   const aids=[...new Set(batch.rows.map(row=>row.aid))].sort();
-  const statements=aids.map(aid=>DB.prepare(SQL_THREAD).bind(batch.day,aid));
+  const statements=aids.map(aid=>DB.prepare(SQL_THREAD).bind(batch.day,aid,
+    batch.rows.find(row=>row.aid===aid).source_url));
   for(const row of batch.rows) {
     statements.push(DB.prepare(SQL_PUSH).bind(row.push_id,row.aid,row.day,row.source_line,row.kind??null,
       row.author,row.content,row.occurred_at,row.floor??null,row.source_url,10,row.source_record_key));
     statements.push(DB.prepare(SQL_EVIDENCE).bind(row.day,row.aid,row.source_record_key,row.push_id,row.source_line));
   }
+  // A bounded write acknowledges observation, never full historical coverage.
+  // Until a separately verified gap repair, Public completeness stays partial.
+  for(const aid of aids)statements.push(DB.prepare(SQL_STATE).bind(batch.day,aid));
   const queries=statements.length+batch.rows.length;
   // Conservative pre-dispatch upper bound for this single-writer transaction:
   // at most one thread insert per AID plus one push and evidence mutation per
   // logical row. Must not rely only on post-commit meta.changes.
-  const possibleWrites=aids.length+2*batch.rows.length;
+  const possibleWrites=2*aids.length+2*batch.rows.length;
   requireTrue(possibleWrites<=20,'potential D1 write budget exceeded before dispatch');
   requireTrue(queries<=30,'query budget exceeded');
   const results=await DB.batch(statements);
