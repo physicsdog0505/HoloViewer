@@ -6,7 +6,10 @@ No frontend Worker, no site files, no UI mutation.
 """
 from __future__ import annotations
 import argparse, json, subprocess, tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 from .activate_today_profiles import WORKER, DB_NAME, DB_ID
 
@@ -15,6 +18,7 @@ PTT_SECRET_NAMES={
  "PTT_PUBLISH_MAX_ROWS","PTT_PUBLISH_MAX_BYTES","PTT_PUBLISH_MAX_QUERIES","PTT_PUBLISH_MAX_WRITES"
 }
 REQUIRED_SECRET_NAMES={"YOUTUBE_API_KEY","PTT_PUBLISH_HMAC_SECRET","PTT_TIME_AUTHORITY_SECRET","PTT_PUBLISH_ENABLED"}
+API="https://holoviewer-public-api.singlebagel.workers.dev"
 
 def run(cmd, *, capture=False):
     print("+"," ".join(map(str,cmd)))
@@ -39,6 +43,35 @@ def secret_names(config):
         raise SystemExit("required production secrets missing: "+",".join(sorted(missing)))
     return sorted(found)
 
+def ptt_operational_day(now=None):
+    local=(now or datetime.now(ZoneInfo("Asia/Taipei"))).astimezone(ZoneInfo("Asia/Taipei"))
+    day=local.date()-timedelta(days=1) if local.hour<6 else local.date()
+    return day.isoformat()
+
+def verify_ptt_rollout(state_root):
+    metrics=Path(state_root)/"minute-metrics.jsonl"
+    if not metrics.is_file():
+        raise SystemExit("PTT metrics missing; refusing Today release")
+    ack=None
+    for line in metrics.read_text(encoding="utf-8").splitlines()[-200:]:
+        try: row=json.loads(line)
+        except Exception: continue
+        if row.get("status")=="ACK" and row.get("publisher_mode")=="OWNER_APPROVED_SEND":
+            ack=row
+    if ack is None:
+        raise SystemExit("no post-restart PTT ACK receipt yet; refusing Today release")
+    day=ptt_operational_day()
+    req=Request(API+"/v1/ptt/today?day="+day+"&limit=10",
+                headers={"Accept":"application/json","User-Agent":"Mozilla/5.0"})
+    with urlopen(req,timeout=30) as response:
+        body=json.load(response)
+        if response.status!=200:
+            raise SystemExit("PTT Public GET not healthy")
+    pushes=body.get("pushes")
+    if not isinstance(pushes,list) or not pushes:
+        raise SystemExit("PTT Public GET returned no pushes")
+    return {"ack":ack,"day":day,"public_http":200,"public_pushes":len(pushes)}
+
 def safe_deploy_config(config_path):
     cfg=load_config(config_path)
     cfg=json.loads(json.dumps(cfg))
@@ -59,6 +92,7 @@ def main():
     p.add_argument("--apply",action="store_true")
     p.add_argument("--config",required=True)
     p.add_argument("--profiles-json",default="/tmp/hv47-legacy-avatars.json")
+    p.add_argument("--ptt-state-root",default=str(Path.home()/"Downloads"/"Hololive-PTT-Viewer"/".ptt-publisher-state"))
     args=p.parse_args()
     if not args.apply:
         raise SystemExit("refusing backend release without --apply")
@@ -66,6 +100,7 @@ def main():
     config=str(Path(args.config).resolve())
     load_config(config)
     secrets=secret_names(config)
+    ptt=verify_ptt_rollout(args.ptt_state_root)
 
     # 1) Activate verified legacy profiles on D1 + existing read path.
     run([__import__("sys").executable,"-B","-m","ptt_offline.activate_today_profiles",
@@ -87,7 +122,8 @@ def main():
       "api_contract_changed":False,
       "profile_rows_expected":66,
       "today_cadence_enabled":True,
-      "preserved_secret_bindings":secrets
+      "preserved_secret_bindings":secrets,
+      "ptt_preflight":ptt
     },ensure_ascii=False,indent=2))
 
 if __name__=="__main__":
