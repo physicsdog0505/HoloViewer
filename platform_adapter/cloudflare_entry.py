@@ -8,6 +8,7 @@ To execute inside Cloudflare, the build must package the immutable accepted
 be replaced at the *approved provider boundary*. Until then, do not deploy.
 """
 from urllib.parse import urlsplit
+from functools import partial
 
 from workers import WorkerEntrypoint, Response
 from platform_adapter.worker_transport import dispatch_accepted_get
@@ -54,7 +55,11 @@ class Default(WorkerEntrypoint):
         try:
             # Cloudflare/Pyodide uses async fetch. Accepted 4174 data loaders
             # remain synchronous but consume request-local preloaded values.
-            preload = await preload_for_accepted_request(target, fetch_canonical_json)
+            # Cloudflare same-account workers.dev subrequests require a service binding.
+            # Keep the old injectable transport for disposable offline fixture tests.
+            api_service = getattr(self.env, "PUBLIC_API", None)
+            getter = partial(fetch_canonical_json, api_service=api_service)
+            preload = await preload_for_accepted_request(target, getter)
             with preloaded_public_reads(preload):
                 result = dispatch_accepted_get(
                     _accepted_handler(), target=target, method=str(request.method)
