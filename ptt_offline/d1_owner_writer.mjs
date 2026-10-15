@@ -1,6 +1,19 @@
 // #48 private owner-controlled D1 writer. Never mount as public route.
 // Caller supplies authenticated authority and existing holoviewer-public-api env.DB.
 const LIMIT = 5;
+const canonical=value=> {
+ if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
+ if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>
+   JSON.stringify(k)+':'+canonical(value[k])).join(',')+'}';
+ return JSON.stringify(value);
+};
+export async function batchDigest(batch) {
+ const payload={source_identity:batch.source_identity,day:batch.day,rows:batch.rows,
+  request_cap:batch.request_cap,write_cap:batch.write_cap,retry_cap:batch.retry_cap};
+ const encoded=new TextEncoder().encode(canonical(payload));
+ const bytes=await crypto.subtle.digest('SHA-256',encoded);
+ return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 const fail = message => { throw new Error(message); };
 const requireTrue = (condition,message) => { if(!condition) fail(message); };
 const SQL_THREAD='INSERT OR IGNORE INTO ptt_threads(day,aid) VALUES (?,?)';
@@ -29,7 +42,12 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority}) {
   requireTrue(typeof verifyAuthority==='function','trusted independent verifier required');
   requireTrue(batch && Array.isArray(batch.rows) && batch.rows.length>0 && batch.rows.length<=LIMIT,'push cap 5');
   requireTrue(batch.request_cap===1 && batch.retry_cap===0,'unsafe request budget');
-  requireTrue(typeof batch.batch_id==='string' && typeof batch.digest==='string','batch identity required');
+  requireTrue(typeof batch.source_identity==='string' && batch.source_identity.length>0 &&
+    batch.write_cap===batch.rows.length && typeof batch.digest==='string' &&
+    /^[0-9a-f]{64}$/.test(batch.digest), 'batch identity required');
+  const digest=await batchDigest(batch);
+  requireTrue(digest===batch.digest && batch.batch_id==='ptt48:'+digest.slice(0,24),
+    'batch checksum mismatch');
   requireTrue(typeof batch.day==='string' && DAY.test(batch.day) &&
     !Number.isNaN(Date.parse(batch.day+'T00:00:00Z')) &&
     new Date(batch.day+'T00:00:00Z').toISOString().slice(0,10)===batch.day,'invalid day');
