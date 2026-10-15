@@ -1,5 +1,8 @@
 import sqlite3
 import unittest
+from unittest.mock import patch
+from contextlib import nullcontext
+from ptt_offline.source_audit_cli import audit
 from datetime import datetime,timezone
 from ptt_offline.ptt_aid_identity import aid_from_article_url
 from ptt_offline.source_audit_stage import audit_source_day
@@ -36,6 +39,12 @@ class SourceAuditStageTests(unittest.TestCase):
         self.assertEqual(receipt["checkpoint_blocked_at"],2)
         self.assertEqual(receipt["publishable_rows"],[])
         self.assertEqual(receipt["pending"][0]["reason"],"invalid-source-calendar")
+        with patch("ptt_offline.source_audit_cli.open_source",return_value=nullcontext(db)):
+            redacted=audit(source="/synthetic/readonly.sqlite3",day="2026-01-01",aid=aid)
+        self.assertEqual(redacted["pending_count"],1)
+        self.assertEqual(redacted["publishable_count"],0)
+        self.assertNotIn("content",str(redacted))
+        self.assertNotIn("author",str(redacted))
 
 if __name__=="__main__":
     unittest.main()
