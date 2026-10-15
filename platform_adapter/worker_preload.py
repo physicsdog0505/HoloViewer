@@ -54,7 +54,7 @@ async def fetch_canonical_json(url: str, *, api_service=None) -> dict:
         if api_service is not None:
             # ServiceBinding.fetch returns a JS Response proxy; JSON text parsing
             # avoids passing JS object proxies into Python consumer contracts.
-            response = await api_service.fetch(url, {"method": "GET", "headers": {"Accept": "application/json"}})
+            response = await api_service.fetch(url)
             if response.status != 200:
                 raise PublicAPIUnavailable("Canonical Public API HTTP error")
             data = json.loads(str(await response.text()))
