@@ -22,3 +22,11 @@ test('valid signed Atom delivery persists before 204 ACK; bad signature does not
  const fail=await handleWebSub(await req(await signature(atom)),{roster,secret,saveEvent:async()=>{throw Error('D1 unavailable')}});
  assert.equal(fail.status,503);
 });
+
+test('classic PubSubHubbub SHA1 signature is accepted',async()=>{
+ const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-1'},false,['sign']);
+ const hex=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(atom))),b=>b.toString(16).padStart(2,'0')).join('');
+ const saved=[];
+ const result=await handleWebSub(new Request(base,{method:'POST',headers:{'x-hub-signature':'sha1='+hex},body:atom}),{roster,secret,saveEvent:async x=>saved.push(x)});
+ assert.equal(result.status,204);assert.equal(saved.length,1);
+});
