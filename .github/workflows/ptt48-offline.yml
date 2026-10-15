@@ -38,6 +38,7 @@ jobs:
             ptt_offline.test_migration_preflight \
             ptt_offline.test_collector_source_preview \
             ptt_offline.test_publisher_cli \
-            ptt_offline.test_timestamp_authority
+            ptt_offline.test_timestamp_authority \
+            ptt_offline.test_resumable_publisher
       - name: Cloudflare Worker pure offline regressions
         run: node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshness.mjs ptt_offline/test_api_shell_ptt_extension.mjs
