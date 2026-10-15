@@ -83,3 +83,58 @@ Rollback:
 - disable `WATCHALONG_EVENTS_ENABLED` and/or revert the API Worker;
 - leave additive derived tables intact for diagnosis;
 - do not alter Today canonical, History, PTT publisher data, or accepted frontend UI.
+
+
+## Production verification queries
+
+Before import, confirm the Watchalong tables are either absent or additive-only. Never rerun unrelated Today/PTT migrations.
+
+After schema + derived event import:
+
+```sql
+SELECT COUNT(*) AS events FROM public_watchalong_events;
+
+SELECT
+  COUNT(*) AS streams,
+  COUNT(DISTINCT event_id) AS event_ids
+FROM public_watchalong_streams;
+
+SELECT source, COUNT(*) AS events
+FROM public_watchalong_events
+GROUP BY source;
+
+SELECT COUNT(*) AS orphaned_streams
+FROM public_watchalong_streams s
+LEFT JOIN public_watchalong_events e ON e.event_id=s.event_id
+WHERE e.event_id IS NULL;
+
+SELECT
+  e.event_id,
+  e.day,
+  e.scheduled_time,
+  e.member_only,
+  e.aid,
+  COUNT(s.video_id) AS hosts
+FROM public_watchalong_events e
+JOIN public_watchalong_streams s ON s.event_id=e.event_id
+GROUP BY e.event_id
+ORDER BY e.article_datetime DESC, e.event_id DESC
+LIMIT 20;
+```
+
+Required invariants:
+- `events > 0` only if the source parser found genuine Watchalong events; zero is not fabricated into data;
+- `streams >= events`;
+- `event_ids = events`;
+- the only `source` is `ptt_watchalong_parser`;
+- `orphaned_streams = 0`;
+- every sampled event has at least one valid YouTube host ID.
+
+HTTP acceptance after `WATCHALONG_EVENTS_ENABLED=true`:
+- `GET /v1/collab/live` -> 200 and `kind=collab`;
+- `GET /v1/collab/history?day=<known-day>` -> 200; overnight POVs retain the 06:00 event-day rule;
+- `GET /v1/watchalong/recent?days=30&limit=60` -> 200 with bounded `events[]` and `has_more`;
+- `GET /v1/watchalong/history?day=<known-day>` -> 200;
+- detail routes return the exact selected event or 404, never a guessed replacement.
+
+The frontend/8788 API adapters may be activated only after these backend reads pass and the current frontend stability gate is clear.
