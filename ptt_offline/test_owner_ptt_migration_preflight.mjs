@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planMigration,assertInventory,decodeD1,run,verifyAppliedPttLedger,assertWranglerLedger,UUID,ACCOUNT} from './owner_ptt_migration_preflight.mjs';
+import {planMigration,assertInventory,decodeD1,run,verifyAppliedPttLedger,assertWranglerLedger,migrationSqlWithReceipt,verifyReceipt,UUID,ACCOUNT} from './owner_ptt_migration_preflight.mjs';
 test('freeze original migration and reject byte drift',()=>{
  const receipt=planMigration();
  assert.equal(receipt.uuid,UUID);
@@ -43,7 +43,7 @@ test('existing PTT objects are not treated as applied without version ledger',()
 test('owner pinned apply uses one transactional Wrangler migration and verifies',()=>{
  const plan=planMigration();
  const existing=['public_catalog','public_history','public_today_schema_migrations','d1_migrations'];
- const after=[...existing,'ptt_threads','ptt_pushes','ptt_source_evidence',
+ const after=[...existing,'public_ptt_migration_receipts','ptt_threads','ptt_pushes','ptt_source_evidence',
    'ptt_provider_state','ptt_gap_repairs','public_ptt_schema_migrations'];
  const commands=[];let wrote=false;
  const execute=(args)=>{
@@ -51,7 +51,8 @@ test('owner pinned apply uses one transactional Wrangler migration and verifies'
   if(args[0]==='whoami')return ACCOUNT;
   if(args[0]==='d1'&&args[1]==='migrations'&&args[2]==='apply'){wrote=true;return 'ok';}
   const sql=args[args.length-1];
-  const rows=sql.includes('FROM d1_migrations')?
+  const rows=sql.includes('FROM public_ptt_migration_receipts')?
+    [{version:1,source_sha256:plan.sha256}]:sql.includes('FROM d1_migrations')?
     (wrote?[{name:'0001_today_canonical.sql'},{name:'0002_canonical_ptt.sql'}]:[{name:'0001_today_canonical.sql'}]):
     sql.includes('SELECT version,description')?
     [{version:1,description:'canonical push, thread scope, replay and forward repair state'}]:
@@ -96,4 +97,13 @@ test('existing PTT migration aborts before any write',()=>{
  assert.throws(()=>run(['--apply','--approve='+plan.sha256],exec,()=>{}),
    /migration already applied/);
  assert.equal(writes,0);
+});
+
+test('checksum receipt belongs to same migration and rejects mismatches',()=>{
+ const expected=planMigration().sha256;
+ const sql=migrationSqlWithReceipt('CREATE TABLE example(id INTEGER);',expected);
+ assert.match(sql,/public_ptt_migration_receipts/);
+ assert.match(sql,new RegExp(expected));
+ assert.equal(verifyReceipt([{version:1,source_sha256:expected}],expected),true);
+ assert.throws(()=>verifyReceipt([{version:1,source_sha256:'0'.repeat(64)}],expected),/checksum receipt mismatch/);
 });
