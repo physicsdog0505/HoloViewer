@@ -71,3 +71,30 @@ python3 -B -m unittest -v ptt_offline.test_public_today_contract ptt_offline.tes
 
 GitHub Actions: NOT RUN if no exact-head run exists. Runtime verification must
 not reuse receipts from older commits.
+
+## #45 consumer-boundary follow-up (Issue #48 review 6187540814)
+
+The offline reader now projects public pushes through a fixed allowlist of
+`push_id,aid,source_line,kind,author,content,occurred_at,floor,source_url`.
+Backend `cursor`, `origin`, and arbitrary future fields cannot escape.
+`source_url` is emitted only if it matches a strict HTTPS PTT C_Chat article
+path; malformed or untrusted URLs become null. Unknown `kind` is kept null
+instead of inventing a vote; known values must be 推, 噓 or →. Real-provider
+mapping for source URL/kind is an integration gate, not assumed from fixtures.
+
+Both Today and History use the `public-consumer-v1` envelope with `as_of`,
+`freshness={status,last_success_at}`, `completeness={status,gap}`,
+opaque checkpoint, projected pushes and page metadata. Today ages freshness
+at every read via an injectable timezone-aware clock, including no-checkpoint
+reads. Regressive timestamps fail closed to unknown.
+
+A verified, successfully readable day with zero rows returns an honest empty
+feed with no fabricated COMPLETE/gap; unresolved AIDs or read failures raise
+typed `SourceUnavailable` (provider-neutral unavailable condition), never
+complete-empty. Existing last-good state is retained for poll failures.
+
+The added `test_public_consumer_envelope.py` contains seven regressions for
+projection/internal-field leakage, fresh/stale TTL without checkpoint, clock
+regression, valid/untrusted URL, kind, verified empty and typed unavailable.
+All new contracts remain offline-only and cannot authorize live PTT or D1
+integration. Exact-head execution evidence must still be collected.
