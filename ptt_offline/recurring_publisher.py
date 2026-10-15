@@ -35,7 +35,9 @@ def seconds_until_next_snapshot(now=None):
         target=local.replace(hour=next_minute//60,minute=next_minute%60,second=0,microsecond=0)
     return max(0,(target-local).total_seconds())
 
-def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5):
+def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=8):
+    if type(max_batches) is not int or not 1<=max_batches<=16:
+        raise ContractError('invalid bounded batches per snapshot')
     started=clock()
     with open_source(source) as db:
         discovered=inspect_latest_article(db)
@@ -43,11 +45,30 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             result={"status":discovered["status"],"sent":0,"eligible":0}
         else:
             state=state_for_source(state_dir,discovered["source_identity"])
-            result=run_live_once(db,state_path=state,secret=secret,executor=executor,send=send,batch_cap=batch_cap)
+            if not send:
+                result=run_live_once(db,state_path=state,secret=secret,executor=executor,
+                                     send=False,batch_cap=batch_cap)
+            else:
+                sent=0
+                posts=0
+                last=None
+                for _ in range(max_batches):
+                    last=run_live_once(db,state_path=state,secret=secret,executor=executor,
+                                       send=True,batch_cap=batch_cap)
+                    if last.get("status")!="ACK":
+                        break
+                    posts+=1
+                    count=last.get("sent",0)
+                    sent+=count
+                    if count<batch_cap:
+                        break
+                result={**(last or {}),"sent":sent,"http_posts":posts,
+                        "batch_count":posts,
+                        "backlog_may_remain":posts==max_batches and last.get("sent",0)==batch_cap}
     return {**result,"elapsed_ms":round((clock()-started)*1000),
         "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "publisher_mode":"OWNER_APPROVED_SEND" if send else "DRY_RUN",
-        "http_posts":1 if send and result.get("status")=="ACK" else 0}
+        "http_posts":result.get("http_posts",0)}
 
 def main(argv=None):
     p=argparse.ArgumentParser(description="Controlled 60-second incremental PTT snapshot trial")
@@ -59,6 +80,7 @@ def main(argv=None):
     p.add_argument("--iterations",type=int,default=1)
     p.add_argument("--send",action="store_true")
     p.add_argument("--batch-cap",type=int,default=5)
+    p.add_argument("--max-batches",type=int,default=8)
     p.add_argument("--approve-live-capture-policy",action="store_true")
     p.add_argument("--endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish")
     args=p.parse_args(argv)
@@ -66,6 +88,8 @@ def main(argv=None):
         p.error("maximum 1440 bounded iterations allowed")
     if not 1<=args.batch_cap<=25:
         p.error('batch cap must be 1-25 and match approved Worker configuration')
+    if not 1<=args.max_batches<=16:
+        p.error('max batches must be 1-16')
     import os
     if args.send and (not args.approve_live_capture_policy or
        os.environ.get("PTT_ALLOW_CAPTURE_TIME_POLICY")!="true"):
@@ -82,7 +106,7 @@ def main(argv=None):
             started=time.monotonic()
             try:
                 result=run_snapshot(source=args.source,state_dir=args.state_dir,send=args.send,
-                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap)
+                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches)
             except Exception as exc:
                 failure={"status":"STOP_RECONCILE","error_class":type(exc).__name__,
                          "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
