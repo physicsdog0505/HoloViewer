@@ -69,6 +69,22 @@ class ProviderBindingTest(unittest.TestCase):
         self.assertEqual(len(live),1)
         self.assertEqual(live[0].state,"live")
 
+    def test_issue47_canonical_today_envelope(self):
+        class Stub:
+            def read_today(self):
+                return {"schema_version":"public-consumer-v1",
+                        "freshness":{"status":"fresh"},
+                        "completeness":{"status":"partial","gap":True},
+                        "streams":[
+                            {"video_id":"dQw4w9WgXcQ","group":"hololive",
+                             "lifecycle_state":"live","start_at":"2026-10-15T07:00:00Z"},
+                            {"video_id":"9bZkp7q19f0","group":"holostars",
+                             "lifecycle_state":"waiting","start_at":"2026-10-15T10:00:00Z"}]}
+        live, upcoming, ended, unknown = bind_home_reader(Stub(), FakeHomeStream)()
+        self.assertEqual((len(live),len(upcoming),len(ended),len(unknown)),(1,1,0,0))
+        self.assertEqual((live[0].group,upcoming[0].group),("hololive","holostars"))
+        self.assertEqual(live[0].start_label,"15:00")
+
     def test_missing_consumer_list_fails_closed(self):
         class Stub:
             def read_today(self):
