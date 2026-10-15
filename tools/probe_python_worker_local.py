@@ -73,6 +73,11 @@ def probe(bundle: Path, *, port: int = 8787, timeout: int = 120) -> dict:
                                 "body_size": len(payload)})
                 print(("PASS" if okay else "FAIL") + " " + target + " " + str(status))
             if not all(result["pass"] for result in results):
+                log.flush()
+                details = log_path.read_text(encoding="utf-8", errors="replace")[-12000:]
+                print("=== LOCAL PYODIDE ERROR LOG ===", flush=True)
+                print(details, flush=True)
+                print("=== END PYODIDE ERROR LOG ===", flush=True)
                 raise RuntimeError("Local Python Worker HTTP proof failed")
         finally:
             process.terminate()
