@@ -16,6 +16,7 @@ from platform_adapter.public_api import DEFAULT_API, PublicAPIUnavailable, prelo
 from platform_adapter.worker_preload import preload_for_accepted_request, fetch_canonical_json
 from platform_adapter.runtime_binding import bind_public_today
 from platform_adapter.page_fallbacks import render_page_fallback
+from platform_adapter.home_lightweight import dispatch_lightweight_home
 
 PAGE_ROUTES = frozenset({
     "/", "/history", "/custom-view", "/custom-view/session",
@@ -96,9 +97,12 @@ class Default(WorkerEntrypoint):
             getter = partial(fetch_canonical_json, api_service=api_service)
             preload = await preload_for_accepted_request(target, getter)
             with preloaded_public_reads(preload):
-                result = dispatch_accepted_get(
-                    _accepted_handler(), target=target, method=str(request.method)
-                )
+                if parsed.path in {"/", "/api/home"}:
+                    result = dispatch_lightweight_home(target)
+                else:
+                    result = dispatch_accepted_get(
+                        _accepted_handler(), target=target, method=str(request.method)
+                    )
         except PublicAPIUnavailable:
             if parsed.path in PAGE_ROUTES:
                 fallback = render_page_fallback(target)
