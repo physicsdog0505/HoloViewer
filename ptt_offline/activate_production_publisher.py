@@ -41,20 +41,25 @@ def load_config(path):
         raise SystemExit("wrong D1 binding")
     return cfg
 
+def parse_table_names_output(stdout):
+    marker="PTT_TABLES="
+    for line in stdout.splitlines():
+        if marker not in line:
+            continue
+        value=line.split(marker,1)[1].strip()
+        # Wrangler human table output may append a column border.
+        value=value.split("│",1)[0].strip()
+        if not value:
+            return set()
+        return {part.strip() for part in value.split(",") if part.strip()}
+    raise SystemExit("could not parse D1 schema preflight")
+
 def d1_table_names(config):
-    sql="SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ptt_%' OR name='public_ptt_schema_migrations' ORDER BY name;"
-    r=run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,"--command",sql,"--json"],capture=True)
-    try:
-        payload=json.loads(r.stdout)
-        rows=[]
-        if isinstance(payload,list):
-            for entry in payload:
-                rows.extend((entry.get("results") or []))
-        elif isinstance(payload,dict):
-            rows=payload.get("results") or []
-        return {str(row.get("name")) for row in rows if row.get("name")}
-    except Exception as exc:
-        raise SystemExit("could not parse D1 schema preflight") from exc
+    sql=("SELECT 'PTT_TABLES=' || COALESCE(GROUP_CONCAT(name, ','),'') AS marker "
+         "FROM sqlite_master WHERE type='table' AND "
+         "(name LIKE 'ptt_%' OR name='public_ptt_schema_migrations');")
+    r=run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,"--command",sql],capture=True)
+    return parse_table_names_output(r.stdout)
 
 def ensure_schema(config, repo_root):
     present=d1_table_names(config)
