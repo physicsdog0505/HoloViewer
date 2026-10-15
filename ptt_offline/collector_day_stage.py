@@ -14,9 +14,12 @@ MAX_SOURCE_ROWS = 50000
 MAX_STAGE_ROWS = 5
 
 
-def stage_selected_day(db, *, day: str, aid: str, limit: int=5) -> dict:
+def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
+                       after_source_line: int=0) -> dict:
     if type(limit) is not int or not 1 <= limit <= MAX_STAGE_ROWS:
         raise ContractError("first-window staging cap exceeded")
+    if type(after_source_line) is not int or after_source_line < 0:
+        raise ContractError("invalid ACKed source checkpoint")
     canonical=normalize_public_aid(aid)
     verify_schema(db)
     article=db.execute(
@@ -43,7 +46,8 @@ def stage_selected_day(db, *, day: str, aid: str, limit: int=5) -> dict:
         pushes=[dict(zip(keys,r)) for r in raw],
     )
     selected=[{**r,"source_url":url,"origin":"collector"}
-              for r in chronological if r["day"] == day]
+              for r in chronological if r["day"] == day
+              and r["source_line"] > after_source_line]
     return {
         "day":day,"aid":canonical,
         "source_rows_examined":len(raw),
