@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import date
+from typing import Callable
 from datetime import datetime, timezone
 from hashlib import sha256
 from json import dumps
@@ -78,6 +80,7 @@ def history_completeness(
     *,
     expected_day: str | None,
     expected_aids: set[str] | None,
+    verify_authority: Callable[[dict[str, Any]], bool] | None = None,
 ) -> str:
     """Only independently accepted fixture evidence may grant COMPLETE offline.
 
@@ -88,7 +91,8 @@ def history_completeness(
         return "partial"
     aids = manifest.get("aids")
     if (
-        manifest.get("authority") != "synthetic-accepted-fixture"
+        not callable(verify_authority)
+        or not verify_authority(manifest)
         or manifest.get("status") != "final-complete"
         or not isinstance(manifest.get("day"), str)
         or not isinstance(aids, list)
@@ -249,9 +253,11 @@ class TodayAdapter:
 
     def __post_init__(self) -> None:
         try:
-            datetime.fromisoformat(self.day)
-        except ValueError as error:
-            raise ContractError("day must be ISO date") from error
+            parsed = date.fromisoformat(self.day)
+            if parsed.isoformat() != self.day:
+                raise ValueError("non-canonical date")
+        except (TypeError, ValueError) as error:
+            raise ContractError("day must be exact YYYY-MM-DD") from error
         normalized = {normalize_public_aid(aid) for aid in self.aids}
         if not normalized:
             raise ContractError("explicit verified AIDs required")
@@ -267,7 +273,9 @@ class TodayAdapter:
         adapter.merge_snapshot(provider.snapshot_for_day(day))
         return adapter
 
-    def merge_snapshot(self, pushes: Iterable[dict[str, Any]], *, collector_first: bool = True) -> None:
+    def _stage_rows(self, pushes: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        """Validate all rows and winner selection before mutating any adapter state."""
+        staged = dict(self.rows)
         for raw in pushes:
             row = dict(raw)
             aid = normalize_public_aid(row.get("aid"))
@@ -283,9 +291,30 @@ class TodayAdapter:
                 raise ContractError("canonical push_id mismatch")
             row["push_id"] = identity
             row.setdefault("origin", "web")
-            prior = self.rows.get(identity)
-            if prior is None or (collector_first and row["origin"] == "collector" and prior.get("origin") != "collector"):
-                self.rows[identity] = row
+            old = staged.get(identity)
+            if old is None or (row["origin"] == "collector" and old.get("origin") != "collector"):
+                staged[identity] = row
+        return staged
+
+    def merge_snapshot(self, pushes: Iterable[dict[str, Any]], *, collector_first: bool = True) -> None:
+        """All-or-nothing application of one snapshot batch."""
+        self.rows = self._stage_rows(pushes)
+
+    def consumer_checkpoint(self) -> str:
+        """Opaque, day-bound state token; provider cursors never exposed to UI.
+
+        Offline in-memory token only. Production persistence/authentication is gated.
+        """
+        import base64
+        material = dumps(
+            [self.day, sorted(self.cursors.items()), sorted(self.purged.items())],
+            separators=(",", ":"), ensure_ascii=False,
+        ).encode("utf-8")
+        return "ptt:checkpoint:v1:" + sha256(material).hexdigest()
+
+    def check_consumer_checkpoint(self, token: str, day: str) -> None:
+        if day != self.day or not isinstance(token, str) or token != self.consumer_checkpoint():
+            raise ContractError("expired, foreign-day or invalid checkpoint")
 
     def _ordered(self) -> list[dict[str, Any]]:
         return sorted(
@@ -356,7 +385,8 @@ class TodayAdapter:
         }
         if len(dumps(wire, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > MAX_READ_BYTES:
             raise ContractError("oversize response")
-        self.merge_snapshot(normalized_rows)
+        staged = self._stage_rows(normalized_rows)
+        self.rows = staged
         self.cursors[aid] = page.next_cursor
         self.purged[aid] = max(self.purged.get(aid, 0), page.purged_through_cursor)
         self.last_checked_by_aid[aid] = checked.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -422,6 +452,9 @@ class TodayAdapter:
         if not self.last_checked_by_aid:
             return "unknown"
         oldest = min(_parse_aware(value, "checked_at") for value in self.last_checked_by_aid.values())
+        if now < oldest:
+            self.freshness = "unknown"
+            raise ContractError("freshness clock regression")
         if (now - oldest).total_seconds() > stale_after_seconds:
             self.freshness = "stale"
         return self.freshness
