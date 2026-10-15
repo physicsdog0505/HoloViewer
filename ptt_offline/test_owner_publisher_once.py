@@ -32,11 +32,11 @@ class OwnerPublisherOnceTests(unittest.TestCase):
         receipt={"identity":{"aid":"1gepPtNy"},"aid":"1gepPtNy","source_rows_examined":6,
                  "inferred_day":[],"pending":[{"source_line":1}],"coverage":{"complete":False}}
         output=StringIO()
-        with patch("ptt_offline.owner_publisher_once.open_source",return_value=nullcontext(object())), \\
-             patch("ptt_offline.owner_publisher_once.audit_source_day",return_value=receipt), \\
+        with (patch("ptt_offline.owner_publisher_once.open_source",return_value=nullcontext(object())),
+             patch("ptt_offline.owner_publisher_once.audit_source_day",return_value=receipt),
              patch("ptt_offline.owner_publisher_once.stage_verified_day",
-                   side_effect=AssertionError("strict stage cannot run for inspect")), \\
-             redirect_stdout(output):
+                   side_effect=AssertionError("strict stage cannot run for inspect")),
+             redirect_stdout(output)):
             main(["--source","ignored","--day","2026-10-15","--aid","1gepPtNy",
                   "--checkpoint","/not/used","--inspect"])
         data=json.loads(output.getvalue())
