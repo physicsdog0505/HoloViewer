@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const pins={
  'backend/today/d1/0002_today_canonical.sql':'943e3d49f665060a2f0b71c7ffef44185d754244',
- 'backend/today/d1/api-shell.mjs':'55d17e204f94b61fa53b7ce59cbbba907a59ee38',
+ 'backend/today/d1/api-shell.mjs':'2eec482d6e5c43336b4569deff8658b88a34bd99',
  'backend/today/d1/migrate.mjs':'33a9dae21302ac05f63b7f9ad21ef920350a41b9',
  'backend/today/d1/store.mjs':'4c7cdc378331ff1bf7c8d4f4916fa45e26d5cff7'
 };
