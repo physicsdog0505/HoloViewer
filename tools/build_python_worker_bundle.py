@@ -50,6 +50,17 @@ def build(output: Path) -> dict:
         destination.write_bytes(data)
         copied.append(str(relative))
 
+    # Pywrangler refuses root requirements.txt when pyproject.toml exists.
+    # Retain the blob unchanged under build metadata (not executable product
+    # source) after checking the original Git blob above. Never mutate vendor.
+    excluded_build_metadata = []
+    legacy_requirements = output / "requirements.txt"
+    if legacy_requirements.is_file():
+        legacy_metadata = output / "bundle-metadata"
+        legacy_metadata.mkdir(exist_ok=True)
+        legacy_requirements.rename(legacy_metadata / "requirements.txt")
+        excluded_build_metadata.append("requirements.txt -> bundle-metadata/requirements.txt")
+
     adapter = output / "platform_adapter"
     shutil.copytree(ROOT / "platform_adapter", adapter, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (output / "entry.py").write_text(
@@ -77,6 +88,7 @@ def build(output: Path) -> dict:
         "pinned_source": PINNED,
         "verified_product_files": len(copied),
         "entrypoint": "entry.py",
+        "relocated_legacy_metadata": excluded_build_metadata,
         "deployed": False,
         "tested_on_pyodide": False,
     }
