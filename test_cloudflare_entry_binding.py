@@ -161,6 +161,29 @@ class EntryPointBindingTest(unittest.TestCase):
         fallback.assert_called_once()
         dispatch.assert_not_called()
 
+    def test_page_exception_falls_back_instead_of_raising_1101(self):
+        class HomeRequest:
+            url = "https://public.example.test/"
+            method = "GET"
+        with (patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}),
+              patch.object(self.entry, "dispatch_lightweight_home", side_effect=RuntimeError("boom")),
+              patch.object(self.entry, "render_page_fallback", return_value=(200, "<html>safe-home</html>")) as fallback):
+            response = asyncio.run(self.entry.Default().fetch(HomeRequest()))
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.body, "<html>safe-home</html>")
+        fallback.assert_called_once_with("/")
+
+    def test_page_and_fallback_exception_returns_owned_503_not_raise(self):
+        class HomeRequest:
+            url = "https://public.example.test/"
+            method = "GET"
+        with (patch.object(self.entry, "preload_for_accepted_request", new_callable=AsyncMock, return_value={}),
+              patch.object(self.entry, "dispatch_lightweight_home", side_effect=RuntimeError("boom")),
+              patch.object(self.entry, "render_page_fallback", side_effect=RuntimeError("fallback-boom"))):
+            response = asyncio.run(self.entry.Default().fetch(HomeRequest()))
+        self.assertEqual(response.status, 503)
+        self.assertEqual(response.body, "Public page temporarily unavailable")
+
     def test_handler_binding_never_selects_custom_provider(self):
         with patch.object(self.entry, "bind_public_today") as bind:
             self.entry._accepted_handler()
