@@ -78,3 +78,25 @@ def bind_home_reader(api: PublicAPI, home_stream_cls: Callable):
             groups[bucket].append(item)
         return tuple(groups[key] for key in ("live", "upcoming", "ended", "unknown"))
     return read_home
+
+def bind_history_reader(api: PublicAPI, home_stream_cls: Callable):
+    """Convert Public History's existing day/page read into 4174's card result."""
+    def read_history_day(selected, *, page=1, source=None):
+        # Explicit fixture/source overrides stay outside the production adapter.
+        if source is not None:
+            raise ValueError("Cannot combine local source override with Public API")
+        if not 1 <= page <= 20:
+            raise ValueError("history page outside accepted bounded range")
+        result = api.read_day(selected, limit=50, offset=(page - 1) * 50)
+        items = result.get("items")
+        if not isinstance(items, list):
+            raise PublicAPIUnavailable("History list missing")
+        cards = []
+        for raw in items:
+            item = _home_row(raw, home_stream_cls)
+            if item is not None:
+                # History is a dated archive listing, not authoritative evidence
+                # that the stream has transitioned to ENDED.
+                cards.append(item)
+        return cards, result.get("has_more") is True
+    return read_history_day
