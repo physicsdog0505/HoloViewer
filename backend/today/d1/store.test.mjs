@@ -205,3 +205,20 @@ test('overnight Home reads previous day until 05:59 Taipei but not after 06:00',
  }
  d.close();
 });
+
+test('new verified profile avatar is opt-in and legacy API remains readable before migration',async()=>{
+ const d=db();
+ await writeEvidence(d,fixture());
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const old=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z')});
+ assert.equal(old.streams[0].avatar_url,null);
+ d.raw.exec(readFileSync(new URL('./websub-event-queue.PROPOSED.sql',import.meta.url),'utf8'));
+ d.raw.exec(readFileSync(new URL('./websub-hardening.PROPOSED.sql',import.meta.url),'utf8'));
+ d.raw.prepare("INSERT INTO public_today_channel_profiles(channel_id,roster_version,channel_title,avatar_url,fetched_at,source) VALUES(?,?,?,?,?,'youtube_channels_list')")
+  .run(C,'fixture-v1','Verified','https://yt3.ggpht.com/approved','2026-10-15T12:00:00Z');
+ const fresh=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z'),profileTableEnabled:true});
+ assert.equal(fresh.streams[0].avatar_url,'https://yt3.ggpht.com/approved');
+ const unchanged=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z')});
+ assert.equal(unchanged.streams[0].avatar_url,null);
+ d.close();
+});
