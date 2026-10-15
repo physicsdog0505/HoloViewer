@@ -16,6 +16,14 @@ export function publicPttFreshness(lastSuccess, nowMs = Date.now()) {
   return ageMs <= 30000 ? 'fresh' : 'stale';
 }
 
+export function publicPttDayFreshness(threads, stateRows, nowMs = Date.now()) {
+  if (!Array.isArray(threads) || threads.length === 0) return 'unknown';
+  const states = new Map((stateRows || []).map(row => [row.aid, row.last_success_at]));
+  const grades = threads.map(row => publicPttFreshness(states.get(row.aid) ?? null, nowMs));
+  return grades.includes('unknown') ? 'unknown'
+    : grades.includes('stale') ? 'stale' : 'fresh';
+}
+
 export async function handlePttD1Read(request, db) {
   const u = new URL(request.url);
   const history = u.pathname === '/v1/ptt/history';
@@ -57,9 +65,7 @@ export async function handlePttD1Read(request, db) {
     const required = new Set(threads.results.map(row=>row.aid));
     const evidence = new Map((scope.results || []).map(row=>[row.aid,row]));
     const checks = [...required].map(aid=>evidence.get(aid)?.last_success_at ?? null);
-    const statuses = checks.map(value=>publicPttFreshness(value));
-    const freshness = statuses.includes('unknown') ? 'unknown'
-      : statuses.includes('stale') ? 'stale' : 'fresh';
+    const freshness = publicPttDayFreshness(threads.results, scope.results);
     const lastSuccess = checks.every(Boolean) ? checks.sort()[0] : null;
     const gap = (scope.results || []).some(x=>Boolean(x.has_gap));
     const projected = visible.map(row => Object.fromEntries(keys.map(k=>[k,row[k] ?? null])));
