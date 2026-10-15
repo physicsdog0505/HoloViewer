@@ -58,16 +58,21 @@ class EntryPointBindingTest(unittest.TestCase):
                 self.entry._accepted_handler()
         self.assertFalse(self.entry._bound)
 
-    def test_unbound_ptt_route_returns_503_without_vendor_or_provider(self):
+    def test_ptt_page_is_page_first_without_provider_or_dispatch(self):
         class PttRequest:
             url = "https://public.example.test/ptt-today"
             method = "GET"
         with (patch.object(self.entry, "bind_public_today") as bind,
-              patch.object(self.entry, "dispatch_accepted_get") as dispatch):
+              patch.object(self.entry, "render_page_fallback", return_value=(200, "<html>ptt-shell</html>")) as fallback,
+              patch.object(self.entry, "dispatch_accepted_get") as dispatch,
+              patch.object(self.entry, "preload_for_accepted_request") as preload):
             response = asyncio.run(self.entry.Default().fetch(PttRequest()))
-        self.assertEqual(response.status, 503)
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.body, "<html>ptt-shell</html>")
+        fallback.assert_called_once_with("/ptt-today")
         bind.assert_not_called()
         dispatch.assert_not_called()
+        preload.assert_not_called()
 
     def test_non_get_never_preloads_or_dispatches(self):
         class PostRequest:
