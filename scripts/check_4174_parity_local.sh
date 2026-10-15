@@ -48,6 +48,9 @@ python3 -m unittest -v test_runtime_isolation
 
 BASELINE_DATA="$(mktemp -d "${TMPDIR:-/tmp}/holoviewer-4174-parity.XXXXXX")"
 CANDIDATE_DATA="$(mktemp -d "${TMPDIR:-/tmp}/holoviewer-8788-parity.XXXXXX")"
+# macOS /var resolves to /private/var; pass canonical paths to both servers.
+BASELINE_DATA="$(cd "$BASELINE_DATA" && pwd -P)"
+CANDIDATE_DATA="$(cd "$CANDIDATE_DATA" && pwd -P)"
 BASELINE_LOG="$(mktemp "${TMPDIR:-/tmp}/holoviewer-4174-parity-log.XXXXXX")"
 CANDIDATE_LOG="$(mktemp "${TMPDIR:-/tmp}/holoviewer-8788-parity-log.XXXXXX")"
 
