@@ -2,6 +2,7 @@
  * Issue #47, single canonical D1 store. No Cloudflare bindings, network or Cron side effects.
  * Inject a D1-compatible db. A write is an atomic batch of evidence and projection.
  */
+import {supportColorFor} from './support-colors.mjs';
 const idPattern=/^[A-Za-z0-9_-]{11}$/;
 const channelPattern=/^UC[A-Za-z0-9_-]{22}$/;
 const groups=new Set(['hololive','holostars','mekpark','other']);
@@ -103,19 +104,27 @@ export async function setCoverage(db, c) {
     typeof c.checkpoint==='string'&&ckPattern.test(c.checkpoint)?c.checkpoint:null));
   await db.batch(statements);
 }
-export async function readToday(db,{day,limit=200,now=new Date()}={}) {
+export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false,supportColors=null}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
     throw Error('invalid canonical Today day');
   if (!Number.isInteger(limit)||limit<1||limit>200) throw Error('invalid limit');
+  if (!Number.isSafeInteger(offset)||offset<0||offset>10000) throw Error('invalid offset');
   const coverage=await db.prepare('SELECT * FROM public_today_catalog_meta WHERE singleton=1').first();
   // Taipei day boundaries are UTC+08:00. Scope includes this day's activity and
   // actively LIVE streams crossing midnight, but not unrelated historical rows.
-  const start=new Date(day+'T00:00:00+08:00').toISOString().replace(/\.\d{3}Z$/,'Z');
-  const end=new Date(new Date(day+'T00:00:00+08:00').getTime()+86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
+  const requestedStart=new Date(day+'T00:00:00+08:00');
+  const localHour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',hourCycle:'h23'}).format(now));
+  const localDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  const overnight=day===localDay&&localHour<6;
+  const start=new Date(requestedStart.getTime()-(overnight?86400000:0)).toISOString().replace(/\.\d{3}Z$/,'Z');
+  const end=new Date(requestedStart.getTime()+86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
+  // Profile table is a separate owner-approved migration; legacy SQL remains
+  // unchanged until that table is proven available and explicitly enabled.
+  const profileExpr=profileTableEnabled?`(SELECT p.avatar_url FROM public_today_channel_profiles p WHERE p.channel_id=public_today_canonical.publisher_channel_id AND p.roster_version=ac.roster_version)`:null;
   const rows=await db.prepare(`SELECT public_today_canonical.*,
-    (SELECT c.avatar_url FROM public_catalog c
+    ${profileExpr?`COALESCE(${profileExpr},`:''}(SELECT c.avatar_url FROM public_catalog c
        WHERE c.channel_id=public_today_canonical.publisher_channel_id AND c.avatar_url IS NOT NULL
-       ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC LIMIT 1) AS trusted_channel_avatar
+       ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC LIMIT 1)${profileExpr?')':''} AS trusted_channel_avatar
     FROM public_today_canonical
     JOIN public_today_approved_channels ac
       ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
@@ -124,23 +133,25 @@ export async function readToday(db,{day,limit=200,now=new Date()}={}) {
         OR (actual_start>=? AND actual_start<?)
         OR (actual_end>=? AND actual_end<?)
         OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL AND lifecycle_observed_at>=?))
-    ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ?`)
-    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\.\d{3}Z$/,'Z'),limit).all();
+    ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ? OFFSET ?`)
+    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\.\d{3}Z$/,'Z'),limit+1,offset).all();
+  const truncated=(rows.results??[]).length>limit;
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
   const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
   return {schema_version:'public-consumer-v1',as_of:nowStamp,
     freshness:{status:freshness,last_success_at:last},
     completeness:{status:coverage?(coverage.gap||coverage.scanned_channels>0?'partial':'unverified'):'unverified',
-                  gap:!coverage||Boolean(coverage.gap)},
+                  gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated,has_more:truncated,offset,overnight},
     checkpoint:coverage?.checkpoint??null,
-    streams:(rows.results??[]).map(r=>{
-      const evidenceAge=Date.parse(nowStamp)-Date.parse(r.lifecycle_observed_at),valid=evidenceAge>=0&&evidenceAge<=1800000;
+    streams:(rows.results??[]).slice(0,limit).map(r=>{
+      const evidenceAge=Date.parse(nowStamp)-Date.parse(r.lifecycle_observed_at),valid=evidenceAge>=0&&evidenceAge<=1200000;
       const state=r.lifecycle_state==='ended'&&r.actual_end?'ended':!valid?'stale':
         r.lifecycle_state==='upcoming'&&r.scheduled_start&&r.scheduled_start<=nowStamp?'waiting':r.lifecycle_state;
+      const color=supportColorFor(r.publisher_channel_id,supportColors);
       return {video_id:r.video_id,title:r.title,channel_id:r.publisher_channel_id,channel_name:r.channel_name,
         group:r.channel_group,lifecycle_state:state,observed_at:r.lifecycle_observed_at,
-        start_at:r.actual_start??r.scheduled_start,avatar_url:verifiedChannelAvatar(r.trusted_channel_avatar),member_accent:null,
+        start_at:r.actual_start??r.scheduled_start,avatar_url:verifiedChannelAvatar(r.trusted_channel_avatar),member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,support_mode:color.support_mode,support_color_source:color.support_color_source,
         source_label:r.source_label,stale:state==='stale'};
     })};
 }

@@ -58,3 +58,27 @@ test('legacy CORS recognizes exact configured origin only',async()=>{
  assert.equal(bad.status,403);
  assert.equal(bad.headers.get('access-control-allow-origin'),null);
 });
+
+test('combined host serves #47 Today consumer envelope directly to 4174 preload',async()=>{
+ const coverage={roster_version:'v85',last_success_at:'2026-10-15T20:20:00Z',expected_channels:85,scanned_channels:85,gap:0,checkpoint:'cp_fixture1234'};
+ const row={video_id:'abcdefghijk',publisher_channel_id:'UC'+'A'.repeat(22),roster_version:'v85',
+  channel_group:'hololive',title:'Fixture LIVE',channel_name:'Fixture Channel',lifecycle_state:'live',
+  lifecycle_observed_at:'2026-10-15T20:20:00Z',checked_at:'2026-10-15T20:20:00Z',
+  scheduled_start:'2026-10-15T20:00:00Z',actual_start:'2026-10-15T20:01:00Z',actual_end:null,
+  source_label:'YouTube',source_checksum:'deadbeef',trusted_channel_avatar:null};
+ const DB={prepare(sql){return {bind(){return this},first:async()=>sql.includes('public_today_catalog_meta')?coverage:null,
+   all:async()=>({results:sql.includes('FROM public_today_canonical')?[row]:[]})}}};
+ const r=await worker.fetch(new Request('https://api.example/v1/catalog/today?day=2026-10-16'),{DB});
+ assert.equal(r.status,200);
+ const body=await r.json();
+ assert.equal(body.schema_version,'public-consumer-v1');
+ assert.equal(body.streams.length,1);
+ assert.deepEqual(Object.keys(body.streams[0]).sort(),[
+  'avatar_url','channel_id','channel_name','group','lifecycle_state','member_accent','member_accent_dual',
+  'observed_at','source_label','stale','start_at','support_color_source','support_mode','title','video_id'
+ ].sort());
+ assert.equal(body.streams[0].video_id,'abcdefghijk');
+ assert.equal(body.streams[0].lifecycle_state,'live');
+ assert.equal(body.streams[0].group,'hololive');
+ assert.equal(body.streams[0].source_label,'YouTube');
+});
