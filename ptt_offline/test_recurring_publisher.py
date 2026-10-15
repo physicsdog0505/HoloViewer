@@ -46,6 +46,25 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(publisher.call_count,8)
         self.assertTrue(result["backlog_may_remain"])
 
+    def test_two_active_articles_separate_delivery_budgets(self):
+        def plan(_,article_id=None):
+            return {"status":"READY","source_identity":str(article_id)*64}
+        per_article=[]
+        def publish(*args,**kwargs):
+            per_article.append(kwargs["article_id"])
+            return {"status":"ACK","sent":25} if per_article.count(kwargs["article_id"])==1 else {"status":"NO_NEW_ROWS","sent":0}
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1,2]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",side_effect=plan), \
+             patch("ptt_offline.recurring_publisher.run_live_once",side_effect=publish):
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=25,max_batches=8)
+        self.assertEqual(result["articles_checked"],2)
+        self.assertEqual(result["sent"],50)
+        self.assertEqual(result["http_posts"],2)
+        self.assertEqual(per_article,[1,1,2,2])
+        self.assertFalse(result["backlog_may_remain"])
+
     def test_empty_collector_never_posts(self):
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
              patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[]), \
