@@ -30,3 +30,15 @@ test('reviewed exact event time HMAC passes and tampering fails',async()=>{
   {PTT_TIME_AUTHORITY_SECRET:secret}),false);
  assert.equal(await verifyPublisherTimeProof(signed,{}),false);
 });
+
+test('combined host serves both independent owner POST paths without enabling writes',async()=>{
+ const today=await worker.fetch(new Request('https://api.example/internal/today/one-shot',
+   {method:'POST',body:'{}'}),{DB:{}});
+ assert.equal(today.status,503);
+ assert.equal((await today.json()).error,'publisher_disabled');
+ const ptt=await worker.fetch(new Request('https://api.example/private/ptt/publish',
+   {method:'POST',body:'{}'}),{DB:{}});
+ assert.equal(ptt.status,503);
+ const legacy=await worker.fetch(new Request('https://api.example/health'),{DB:{}});
+ assert.equal(legacy.status,200);
+});
