@@ -40,11 +40,12 @@ export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrig
  if(request.method!=='POST')return json({error:'method_not_allowed'},405);
  const raw=await request.arrayBuffer();
  if(raw.byteLength>65536)return json({error:'oversize'},413);
- const signature=request.headers.get('x-hub-signature-256')??'';
- const match=signature.match(/^sha256=([a-fA-F0-9]{64})$/);
+ const signature=request.headers.get('x-hub-signature-256')??request.headers.get('x-hub-signature')??'';
+ const match=signature.match(/^(sha1|sha256)=([a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/);
+ if(match && match[2].length!==(match[1]==='sha1'?40:64))return json({error:'signature_missing'},401);
  if(!match)return json({error:'signature_missing'},401);
- const expected=await signed(raw,secret,'SHA-256');
- if(!equal(expected,match[1].toLowerCase()))return json({error:'signature_rejected'},401);
+ const expected=await signed(raw,secret,match[1]==='sha1'?'SHA-1':'SHA-256');
+ if(!equal(expected,match[2].toLowerCase()))return json({error:'signature_rejected'},401);
  let event;
  try{event=parseAtomEnvelope(dec.decode(raw))}catch{return json({error:'invalid_atom'},400)}
  if(!approved(roster,event.channel_id))return json({error:'channel_not_approved'},403);
