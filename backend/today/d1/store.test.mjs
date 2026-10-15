@@ -143,3 +143,17 @@ test('removed publisher excluded immediately at approved roster rollover',async(
   assert.equal(rows.streams.length,0);
   d.close();
 });
+
+test('channel avatar projects only approved existing catalog channel artwork, not thumbnails',async()=>{
+ const d=db();
+ d.raw.exec(`CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)`);
+ d.raw.prepare('INSERT INTO public_catalog VALUES(?,?,?,?,?)').run('catalog0001',C,'https://yt3.ggpht.com/verified-avatar',null,'2026-10-15T12:00:00Z');
+ await writeEvidence(d,fixture());
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T11:59:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const result=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:01:00Z')});
+ assert.equal(result.streams[0].avatar_url,'https://yt3.ggpht.com/verified-avatar');
+ d.raw.prepare('UPDATE public_catalog SET avatar_url=?').run('https://evil.example/video-thumbnail.png');
+ const denied=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:01:00Z')});
+ assert.equal(denied.streams[0].avatar_url,null);
+ d.close();
+});
