@@ -2,11 +2,21 @@
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 from tools.package_8788_production_candidate import package, TARGET, ASSETS
 
 class ProductionPackageTests(unittest.TestCase):
+    def test_direct_cli_invocation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "cli-worker"
+            repo_root = Path(__file__).resolve().parent
+            run = subprocess.run([sys.executable, str(repo_root / "tools" / "package_8788_production_candidate.py"), "--output", str(output)], cwd=repo_root, capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(json.loads((output / "wrangler.jsonc").read_text())["name"], TARGET)
+
     def test_existing_worker_identity_and_static_assets(self):
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / "worker"
