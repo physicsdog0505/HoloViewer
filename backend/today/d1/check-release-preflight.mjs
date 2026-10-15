@@ -23,7 +23,7 @@ export function inspectRelease(rootPath=new URL('../../../',import.meta.url)){
  const canary=runbook.split('## E. Unified hosted read-only canary')[1]?.split('## F. Later ingestion activation')[0];
  if(!canary)throw Error('runbook unified canary section missing');
  for(const needle of ['HTTP requests <= 5','D1 queries <= 12','Rows Read delta <= 1,000','Rows Written exactly 0','automatic retries 0','/v1/ptt/history?day=<same>&limit=1&after=']){
-  if(!canary.includes(needle))throw Error(`runbook canary constraint missing: ${needle}`);
+  if(!(needle==='D1 queries <= 12' ? /D1 queries <= 12(?![0-9])/.test(canary) : canary.includes(needle)))throw Error(`runbook canary constraint missing: ${needle}`);
  }
  return {result:'OFFLINE_PREFLIGHT_PASS',source_blobs:actual,migration_sha256:sha256,first_window:firstWindow,production_mutation:false};
 }
