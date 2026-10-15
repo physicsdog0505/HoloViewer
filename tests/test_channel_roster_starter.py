@@ -16,6 +16,17 @@ class RosterTest(unittest.TestCase):
         self.assertEqual([x["legacy_order"] for x in raw["channels"]], list(range(66)))
         self.assertTrue(all(x["verified_live"] is False for x in raw["channels"]))
 
+    def test_source_additions_have_no_legacy_overlap(self):
+        base = json.loads((ROOT / "docs" / "roster" / "legacy-66.json").read_text())
+        extra = json.loads((ROOT / "docs" / "roster" / "verified-source-additions.json").read_text())
+        b = mod.validate(base)
+        e = mod.validate(extra)
+        self.assertEqual(len(b), 66)
+        self.assertEqual(len(e), 19)
+        self.assertEqual(len(set(b) | set(e)), 85)
+        self.assertFalse(set(b) & set(e))
+        self.assertTrue(all(item["live_checked"] is False and item["live_enabled"] is False for item in extra["channels"]))
+
     def test_duplicate_denied(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             mod.validate({"channels": [{"channel_id": "UC" + "a" * 22}] * 2})
