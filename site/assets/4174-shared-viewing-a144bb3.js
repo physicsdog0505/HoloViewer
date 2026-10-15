@@ -304,20 +304,10 @@ immerse?.addEventListener('click',async()=>{
   statusBox.textContent=next?'已進入沉浸介面（瀏覽器未提供全螢幕）':'已退出沉浸介面';
  }
 });
-window.hvExit4174Immersive=async function hvExit4174Immersive(){
- if(immersiveEnabled)applyImmersiveState(false);
- if(document.fullscreenElement){
-  try{await document.exitFullscreen();}catch(_e){}
- }
-};
-document.addEventListener('keydown',event=>{
- if(event.key!=='Escape'||!immersiveEnabled)return;
- setTimeout(()=>{if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);},0);
-});
 document.addEventListener('fullscreenchange',()=>{
  // Escape exits immersive if fullscreen was actually active. CSS-only immersive
  // remains valid when the browser refuses requestFullscreen().
- if(!document.fullscreenElement&&immersiveEnabled){
+ if(!document.fullscreenElement&&immersiveEnabled&&document.visibilityState==='visible'){
   applyImmersiveState(false);
  }else if(document.fullscreenElement){
   applyImmersiveState(true);
@@ -786,10 +776,5 @@ function mountWatchPlayer(index){
   players[index]=mounted;
 }
 window.onYouTubeIframeAPIReady=function(){streams.forEach((stream,index)=>mountWatchPlayer(index));};
-if(window.YT?.Player){
- streams.forEach((stream,index)=>mountWatchPlayer(index));
-}else{
- const existingApi=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
- if(!existingApi){const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);}
-}
+const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);
 };
