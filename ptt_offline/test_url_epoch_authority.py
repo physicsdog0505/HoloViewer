@@ -19,6 +19,14 @@ class UrlEpochAuthorityTests(unittest.TestCase):
             article_epoch(board="C_Chat",aid="A1",url=url,
                           identity_verifier=lambda *args: False)
 
+    def test_verifier_exception_fails_closed(self):
+        url=url_at("2025-12-31T15:00:00Z")
+        def broken(*args):
+            raise RuntimeError("verification unavailable")
+        with self.assertRaises(ContractError):
+            article_epoch(board="C_Chat",aid="A1",url=url,
+                          identity_verifier=broken)
+
     def test_december_to_january_rollover_and_selected_day(self):
         url=url_at("2025-12-31T15:00:00Z")  # 23:00 Taipei
         rows=[{"source_line":5,"ptt_date":"12/31","ptt_time":"23:01"},
