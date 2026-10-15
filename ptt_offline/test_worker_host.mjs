@@ -78,7 +78,7 @@ test('combined host serves #47 Today consumer envelope directly to 4174 preload'
   'observed_at','source_label','stale','start_at','support_color_source','support_mode','title','video_id'
  ].sort());
  assert.equal(body.streams[0].video_id,'abcdefghijk');
- assert.equal(body.streams[0].lifecycle_state,'live');
+ assert.equal(body.streams[0].lifecycle_state,'stale'); // old fixture must fail closed under 20-minute freshness
  assert.equal(body.streams[0].group,'hololive');
  assert.equal(body.streams[0].source_label,'YouTube');
 });
