@@ -71,8 +71,8 @@ body.viewer-wide .client-main{max-width:none;padding-right:18px}
 body.viewer-wide .viewer-shell{width:100%}
 body.viewer-wide .viewer-frame iframe{height:calc(100vh - 126px);min-height:720px}
 @media (min-width:761px){
-  body:has(.client-rail:hover) .client-topbar,body:has(.client-rail:focus-within) .client-topbar{margin-left:var(--rail-expanded)}
-  body:has(.client-rail:hover) .client-main,body:has(.client-rail:focus-within) .client-main{padding-left:calc(24px + var(--rail-expanded));max-width:calc(var(--content) + var(--rail-expanded))}
+  /* The navigation may expand as an overlay, but must never shift Home cards
+     or the multi-select workspace during hover/focus interactions. */
 }
 @media(max-width:1040px){.client-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.feature-row{grid-template-columns:1fr}}
 @media(max-width:760px){
