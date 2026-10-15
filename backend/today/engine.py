@@ -17,7 +17,7 @@ def utc(value):
 def stamp(value):
     return utc(value).isoformat(timespec="seconds").replace("+00:00","Z")
 
-def normalize_video(raw, *, observed_at, approved_channels, reference_now=None, roster_version=""):
+def normalize_video(raw, *, observed_at, approved_channels, reference_now=None, roster_version="", approved_groups=None):
     if not isinstance(raw, dict) or not isinstance(raw.get("id"), str) or not VIDEO_ID.fullmatch(raw["id"]):
         raise ValueError("invalid video id")
     sn, details = raw.get("snippet") or {}, raw.get("liveStreamingDetails") or {}
@@ -42,7 +42,7 @@ def normalize_video(raw, *, observed_at, approved_channels, reference_now=None, 
     return {"video_id":raw["id"],"channel_id":channel,
             "channel_name":str(sn.get("channelTitle") or "")[:160],
             "title":str(sn.get("title") or raw["id"])[:200],
-            "group":"hololive", "lifecycle_state":state,
+            "group":(approved_groups or {}).get(channel,"other"), "lifecycle_state":state,
             "observed_at":stamp(observed),
             "scheduled_start":stamp(scheduled) if scheduled else None,
             "actual_start":stamp(started) if started else None,
@@ -57,7 +57,11 @@ def apply_observation(old, incoming):
         raise ValueError("video identity mismatch")
     if old.get("roster_version") and incoming.get("roster_version") and old["roster_version"] != incoming["roster_version"]:
         raise ValueError("roster version mismatch")
-    if utc(incoming["observed_at"]) <= utc(old["observed_at"]):
+    if utc(incoming["observed_at"]) == utc(old["observed_at"]):
+        if incoming != old:
+            raise ValueError("conflicting equal-timestamp observation")
+        return dict(old)
+    if utc(incoming["observed_at"]) < utc(old["observed_at"]):
         return dict(old)
     if old["lifecycle_state"] == "ended" and incoming["lifecycle_state"] != "ended":
         return dict(old)  # never refresh ended evidence with contradictory probes
@@ -75,10 +79,8 @@ def project(rows, *, now, last_success_at=None, expected_channels=66, scanned_ch
         fresh_status = "fresh"
     else:
         fresh_status = "stale"
-    accepted_complete = bool(completeness_evidence and completeness_evidence.get("accepted")
-                             and completeness_evidence.get("scope") == "today"
-                             and completeness_evidence.get("roster_version") == roster_version
-                             and not gap)
+    # No external provider mapping can self-certify completeness.
+    accepted_complete = False
     complete_status = ("complete" if accepted_complete else
                        "partial" if scanned_channels > 0 or gap else "unverified")
     selected = {}
@@ -96,7 +98,12 @@ def project(rows, *, now, last_success_at=None, expected_channels=66, scanned_ch
         item_fresh = 0 <= (current-observed).total_seconds() <= ttl_seconds
         item = {k:row.get(k) for k in ("video_id","title","channel_id","channel_name","group",
             "observed_at","source_label","avatar_url","member_accent")}
-        item["lifecycle_state"] = row["lifecycle_state"] if item_fresh else "unknown"
+        if not item_fresh:
+            item["lifecycle_state"] = "stale"
+        elif row["lifecycle_state"] == "upcoming" and row.get("scheduled_start") and utc(row["scheduled_start"]) <= current:
+            item["lifecycle_state"] = "waiting"
+        else:
+            item["lifecycle_state"] = row["lifecycle_state"]
         item["start_at"] = row.get("actual_start") or row.get("scheduled_start")
         item["stale"] = not item_fresh
         items.append(item)
@@ -104,4 +111,4 @@ def project(rows, *, now, last_success_at=None, expected_channels=66, scanned_ch
         "freshness":{"status":fresh_status,
                      "last_success_at":stamp(last_success) if last_success else None},
         "completeness":{"status":complete_status,"gap":bool(gap)},
-        "checkpoint":checkpoint, "streams":items}
+        "checkpoint":checkpoint if isinstance(checkpoint,str) and re.fullmatch(r"cp_[A-Za-z0-9_-]{8,128}",checkpoint) else None, "streams":items}

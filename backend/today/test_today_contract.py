@@ -14,7 +14,7 @@ def payload(state,*,ident=V,owner=C,ended=None,started=None):
     return {"id":ident,"snippet":{"title":"Fixture","channelId":owner,"liveBroadcastContent":state},"liveStreamingDetails":d}
 def norm(raw,at=NOW):
     return normalize_video(raw,observed_at=at,approved_channels={C},reference_now=NOW+timedelta(hours=1),roster_version="v1")
-def readers(rows,*,gap=False,last=NOW,scanned=1,checkpoint="opaque"):
+def readers(rows,*,gap=False,last=NOW,scanned=1,checkpoint="cp_abcdefgh"):
     cover={"last_success_at":last,"expected_channels":1,"scanned_channels":scanned,
            "gap":gap,"roster_version":"v1","checkpoint":checkpoint}
     a=LocalTodayProvider(tuple(rows),cover,NOW)
@@ -39,7 +39,7 @@ class TodayVectors(unittest.TestCase):
         a=norm(payload("live",started="2026-10-15T10:00:00Z"),NOW-timedelta(hours=2))
         x=readers([a],last=NOW-timedelta(hours=2))
         self.assertEqual(x["freshness"]["status"],"stale")
-        self.assertEqual(x["streams"][0]["lifecycle_state"],"unknown")
+        self.assertEqual(x["streams"][0]["lifecycle_state"],"stale")
     def test_T6_empty_gap(self):
         x=readers([],gap=True,scanned=0)
         self.assertEqual(x["streams"],[])
@@ -72,6 +72,33 @@ class TodayVectors(unittest.TestCase):
         b=Budget(max_retries=3)
         self.assertIsNone(b.retry_seconds(4))
         self.assertFalse(b.permits_retry(4))
+    def test_equal_timestamp_conflict_rejected(self):
+        a=norm(payload("upcoming"))
+        b=norm(payload("none"))
+        with self.assertRaises(ValueError):apply_observation(a,b)
+        with self.assertRaises(ValueError):apply_observation(b,a)
+    def test_checkpoint_raw_cursor_not_exposed(self):
+        self.assertIsNone(readers([],checkpoint=101)["checkpoint"])
+        self.assertIsNone(readers([],checkpoint="123")["checkpoint"])
+        self.assertEqual(readers([],checkpoint="cp_abcdefgh")["checkpoint"],"cp_abcdefgh")
+    def test_completeness_cannot_self_assert(self):
+        a=norm(payload("upcoming"))
+        x=project([a],now=NOW,last_success_at=NOW,roster_version="v1",
+            scanned_channels=1,gap=False,completeness_evidence={"accepted":True,
+                "scope":"today","roster_version":"v1"})
+        self.assertNotEqual(x["completeness"]["status"],"complete")
+    def test_noncanonical_day_rejected(self):
+        a=LocalTodayProvider((),{"gap":True},NOW)
+        for value in ("2026-1-5","2026-02-30","2026-10-5","2026/10/15"):
+            with self.subTest(value=value),self.assertRaises(ValueError):
+                a.read_today(value,200)
+    def test_waiting_after_scheduled_time(self):
+        a=norm(payload("upcoming"))
+        a={**a,"scheduled_start":"2026-10-15T12:00:00Z"}
+        self.assertEqual(readers([a])["streams"][0]["lifecycle_state"],"waiting")
+        self.assertEqual(readers([norm(payload("upcoming"))])["streams"][0]["lifecycle_state"],"upcoming")
+    def test_group_not_fabricated(self):
+        self.assertEqual(norm(payload("upcoming"))["group"],"other")
     def test_non_divisor_ceiling(self):
         self.assertEqual(Budget(scan_minutes=31).requests_per_day_estimate(channel_count=1,video_batches=0),47)
 if __name__=="__main__":

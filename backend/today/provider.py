@@ -8,7 +8,11 @@ class TodayProvider(Protocol):
     def read_today(self, day: str, limit: int) -> Mapping: ...
 
 def _resolve(rows, coverage, *, day, limit, now):
-    datetime.strptime(day, "%Y-%m-%d")
+    if not isinstance(day,str) or not __import__("re").fullmatch(r"\d{4}-\d{2}-\d{2}",day):
+        raise ValueError("noncanonical day")
+    parsed=datetime.strptime(day,"%Y-%m-%d")
+    if parsed.strftime("%Y-%m-%d")!=day:
+        raise ValueError("noncanonical day")
     return project(tuple(rows),now=now,limit=limit,
         last_success_at=coverage.get("last_success_at"),
         expected_channels=coverage.get("expected_channels",66),
