@@ -55,6 +55,16 @@ def build(output: Path) -> dict:
     (output / "entry.py").write_text(
         "from platform_adapter.cloudflare_entry import Default\n", encoding="utf-8"
     )
+    (output / "pyproject.toml").write_text(
+        '[project]\\n'
+        'name = "holoviewer-8788-feasibility"\\n'
+        'version = "0.0.0"\\n'
+        'requires-python = ">=3.13"\\n'
+        'dependencies = []\\n'
+        '[dependency-groups]\\n'
+        'dev = ["workers-py", "workers-runtime-sdk"]\\n',
+        encoding="utf-8",
+    )
     # Source-only local Worker setup, using the same Python Worker/runtime
     # interface as Cloudflare; does not create or deploy a second backend.
     (output / "wrangler.jsonc").write_text(json.dumps({
