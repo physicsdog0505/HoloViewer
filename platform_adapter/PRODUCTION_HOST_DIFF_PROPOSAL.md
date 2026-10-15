@@ -151,3 +151,6 @@ Read-only inspection of current `main` resolves the repository-configured host i
 Therefore the proposed 8788 host diff is now concrete at repository level: retain the existing **`holoviewer-public`** identity, replace the static-only host configuration with the reviewed Python Worker `entry.py` + `python_workers`, keep same-Worker static assets through `ASSETS`, and add **no D1/KV binding** to the Public host. The canonical API remains separate.
 
 This does **not** prove the currently deployed Cloudflare revision, account/zone route state, custom-domain mapping, or runtime headers. Those remain read-only production preflight evidence required by #45 immediately before any owner-authorized config/deploy mutation.
+
+
+The exact-head offline workflow now also checks out current `main` read-only and runs `tools/check_production_host_baseline.py`. That receipt fails if the repository baseline drifts from static-only `holoviewer-public`, if manual deployment gates disappear, if the canonical API origin changes, or if the #68 proposal adds a Public-host D1 binding. It does not contact Cloudflare runtime.
