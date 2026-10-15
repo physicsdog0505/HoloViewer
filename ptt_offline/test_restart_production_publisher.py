@@ -5,10 +5,12 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
 from ptt_offline.restart_production_publisher import (
     uncertain_states, read_running_pid, assert_expected_process, wait_stopped,
+    assert_recent_completed_cycle,
 )
 
 
@@ -20,6 +22,21 @@ class RestartProductionPublisherTests(unittest.TestCase):
             (d/"b.json").write_text(json.dumps({"status":"REMOTE_UNCERTAIN"}),encoding="utf-8")
             (d/"bad.json").write_text("{",encoding="utf-8")
             self.assertEqual(uncertain_states(d),[str(d/"b.json")])
+
+    def test_recent_completed_cycle_requires_fresh_ack_or_noop(self):
+        with tempfile.TemporaryDirectory() as t:
+            p=Path(t)/"metrics.jsonl"
+            now=datetime(2026,10,15,23,40,0,tzinfo=timezone.utc)
+            fresh=(now-timedelta(seconds=5)).isoformat()
+            p.write_text(json.dumps({"status":"NO_NEW_ROWS","observed_at":fresh})+"\n",encoding="utf-8")
+            self.assertEqual(assert_recent_completed_cycle(p,now=now)["status"],"NO_NEW_ROWS")
+            p.write_text(json.dumps({"status":"STOP_RECONCILE","observed_at":fresh})+"\n",encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                assert_recent_completed_cycle(p,now=now)
+            stale=(now-timedelta(seconds=30)).isoformat()
+            p.write_text(json.dumps({"status":"ACK","observed_at":stale})+"\n",encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                assert_recent_completed_cycle(p,now=now)
 
     def test_read_running_pid_rejects_missing_and_stale(self):
         with tempfile.TemporaryDirectory() as t:
