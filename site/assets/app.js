@@ -330,15 +330,23 @@ async function loadCollab(){
  }
  $('collab-empty').textContent='目前沒有偵測到可用的多人連動。';
 }
+let pttLastGoodCount=0;
 async function loadPtt(){
  const today=taipeiDay();
  const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty');
- meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
- list.replaceChildren();list.hidden=true;empty.hidden=false;empty.textContent='讀取今日 PTT 推文中…';
- if(!config.apiBase){meta.textContent=today.replaceAll('-','/')+' · API 未設定 · 純 PTT 閱讀';empty.textContent='PTT 正式 API 尚未接通。';return}
+ if(!pttLastGoodCount){
+  meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
+  empty.hidden=false;empty.textContent='讀取今日 PTT 推文中…';
+ }
+ if(!config.apiBase){
+  meta.textContent=today.replaceAll('-','/')+' · API 未設定 · 純 PTT 閱讀';
+  if(!pttLastGoodCount){empty.hidden=false;empty.textContent='PTT 正式 API 尚未接通。'}
+  return;
+ }
  try{
   const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
+  const next=document.createDocumentFragment();let count=0;
   for(const row of data.pushes){
    if(!row||typeof row.content!=='string')continue;
    const push=node('div',undefined,'push');
@@ -353,17 +361,20 @@ async function loadPtt(){
     head.append(node('time',label,'ptt-push-time'));
    }
    push.append(head,node('div',row.content,'ptt-push-content'));
-   list.append(push);
+   next.append(push);count++;
   }
+  list.replaceChildren(next);pttLastGoodCount=count;
   const freshness=String(data.freshness?.status||'unknown');
   const freshnessLabel=freshness==='fresh'?'即時':freshness==='stale'?'資料稍舊':'狀態未知';
-  meta.textContent=today.replaceAll('-','/')+' · '+freshnessLabel+' · '+list.childElementCount+' 則 · 純 PTT 閱讀';
-  list.hidden=!list.childElementCount;
-  empty.hidden=Boolean(list.childElementCount);
-  if(!list.childElementCount)empty.textContent='目前沒有今天的推文。';
+  meta.textContent=today.replaceAll('-','/')+' · '+freshnessLabel+' · '+count+' 則 · 純 PTT 閱讀';
+  list.hidden=!count;empty.hidden=Boolean(count);
+  if(!count)empty.textContent='目前沒有今天的推文。';
  }catch(e){
-  meta.textContent=today.replaceAll('-','/')+' · 讀取失敗 · 純 PTT 閱讀';
-  empty.hidden=false;empty.textContent='無法讀取今日 PTT：'+(e instanceof Error?e.message:'未知錯誤');
+  meta.textContent=today.replaceAll('-','/')+' · 後端暫未就緒 · 10 秒後重試 · 純 PTT 閱讀';
+  if(!pttLastGoodCount){
+   list.hidden=true;empty.hidden=false;
+   empty.textContent='今日 PTT 後端資料暫未就緒；頁面會每 10 秒自動重試。';
+  }
  }
 }
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
@@ -678,6 +689,21 @@ const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/watchalong'?'watchalong':
  location.pathname==='/'?'home':'';
 route(hashRoute||pathRoute||'home');
+
+const homePollTimer=setInterval(()=>{
+ if(!document.hidden&&$('home').classList.contains('active'))loadHome();
+},30000);
+const pttPollTimer=setInterval(()=>{
+ if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();
+},10000);
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden)return;
+ if($('home').classList.contains('active'))loadHome();
+ if($('ptt').classList.contains('active'))loadPtt();
+});
+window.addEventListener('pagehide',()=>{
+ clearInterval(homePollTimer);clearInterval(pttPollTimer);
+},{once:true});
 
 /* Accepted 4174 custom-view selection controller with public read-only catalog adapter. */
 (function(){
