@@ -18,7 +18,7 @@ test('history validates day bounds and returns legacy envelope',async()=>{
 test('video lookup legacy status envelope and input guard',async()=>{
  assert.equal((await legacyVideo(new Request('https://api.example/v1/catalog/videos/short'),{DB:db})).status,400);
  const ok=await legacyVideo(new Request('https://api.example/v1/catalog/videos/abcdefghijk'),{DB:db});
- assert.equal(ok.status,200);assert.equal((await ok.json()).video_id,'abcdefghijk');
+ assert.equal(ok.status,200);assert.equal(ok.headers.get('cache-control'),'public, max-age=15');assert.equal((await ok.json()).video_id,'abcdefghijk');
 });
 
 test('live SQL parity: Taipei day, explicit projection and stable sort',async()=>{
