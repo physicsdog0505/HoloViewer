@@ -6,7 +6,7 @@ const pins={
  'backend/today/d1/0002_today_canonical.sql':'943e3d49f665060a2f0b71c7ffef44185d754244',
  'backend/today/d1/api-shell.mjs':'70f61d0a0a454bc305d5cb666ce28485ea6d8ed7',
  'backend/today/d1/migrate.mjs':'33a9dae21302ac05f63b7f9ad21ef920350a41b9',
- 'backend/today/d1/store.mjs':'59b123ba8206bdeb54a378d6a4c729cb1966d4f1'
+ 'backend/today/d1/store.mjs':'070d85b34eb20f16f80e1b0888988e44a9ac63ea'
 };
 export const firstWindow={httpMax:5,d1QueriesMax:12,rowsReadMax:1000,rowsWritten:0,retries:0};
 export function inspectRelease(rootPath=new URL('../../../',import.meta.url)){
