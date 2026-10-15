@@ -17,6 +17,7 @@ from .public_today_contract import ContractError
 
 MAX_JSON_BYTES=131072
 OWNER_API_HOST="holoviewer-public-api.singlebagel.workers.dev"
+BROWSER_USER_AGENT="Mozilla/5.0"
 
 def owner_signed_http_executor(*, endpoint: str, secret: str, allow_write: bool=False,
                                opener=urlopen, clock_ms=None, max_rows=5, max_bytes=65536):
@@ -44,6 +45,7 @@ def owner_signed_http_executor(*, endpoint: str, secret: str, allow_write: bool=
             timestamp.encode("ascii")+b"\n"+raw,hashlib.sha256).hexdigest()
         request=Request(endpoint,data=raw,method="POST",headers={
             "Content-Type":"application/json",
+            "User-Agent":BROWSER_USER_AGENT,
             "X-Ptt-Timestamp":timestamp,
             "X-Ptt-Signature":signature,
         })
