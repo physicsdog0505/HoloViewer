@@ -29,6 +29,15 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertEqual(len(inspected["candidate_rows"]),2)
         self.assertEqual(inspected["pending_source_lines"],[1])
         self.assertTrue(all(x["day"]=="2026-10-15" for x in inspected["candidate_rows"]))
+    def test_truncated_first_scan_refuses_publish(self):
+        self.db.executemany("INSERT INTO pushes VALUES(?,?,?,?,?,?,?,?,?,?)",[
+          (n,1,n,1,'推','a',f'bulk-{n}','10/15','18:01','2026-10-15T10:02:07Z')
+          for n in range(4,102)])
+        with self.assertRaisesRegex(ContractError,"initial live source scan truncated"):
+            run_live_once(self.db,state_path=self.state,secret="k"*40,
+                executor=lambda _:self.fail("cannot publish unseen older lines"),send=True)
+        self.assertFalse(Path(self.state).exists())
+
     def test_exact_ack_replay_and_unknown_remote_stop_latch(self):
         def approve(batch):
             self.assertEqual(len(batch["rows"]),2)
