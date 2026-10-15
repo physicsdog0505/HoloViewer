@@ -33,7 +33,7 @@ class CollectorDayStageTests(unittest.TestCase):
 
     def test_selected_day_only_and_source_identity(self):
         earlier=stage_selected_day(self.db,identity_verifier=self.verifier,day="2025-12-31",aid="A1")
-        later=stage_selected_day(self.db,day="2026-01-01",aid="#A1")
+        later=stage_selected_day(self.db,identity_verifier=self.verifier,day="2026-01-01",aid="#A1")
         self.assertEqual(earlier["selected_rows_total"],1)
         self.assertEqual(later["selected_rows_total"],1)
         self.assertEqual(later["rows"][0]["content"],"after")
@@ -43,7 +43,7 @@ class CollectorDayStageTests(unittest.TestCase):
         self.assertTrue(later["coverage"]["complete"])
 
     def test_resume_after_ack_does_not_restage_old_source_line(self):
-        result=stage_selected_day(self.db,day="2026-01-01",aid="A1",
+        result=stage_selected_day(self.db,identity_verifier=self.verifier,day="2026-01-01",aid="A1",
                                   after_source_line=6)
         self.assertEqual(result["selected_rows_total"],0)
         self.assertEqual(result["rows"],[])
