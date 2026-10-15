@@ -35,7 +35,7 @@ class ProductionPackageTests(unittest.TestCase):
             self.assertFalse((dest / "entry_fixture.py").exists())
             shell = (dest / "client_ui_shell.py").read_text()
             self.assertIn("top:376px", shell)
-            self.assertIn("max-height:calc(100vh - 478px)", shell)
+            self.assertIn("max-height:calc(100vh - 388px)", shell)
             self.assertNotIn("top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px)", shell)
             self.assertEqual(
                 receipt["authorized_ui_overrides"]["live_channel_rail_clear_navigation"],
