@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from pathlib import Path
 
-from ptt_offline.d1_publisher import publish_batch, read_day
+from ptt_offline.d1_publisher import publish_batch, publish_provider_state, read_day
 from ptt_offline.public_today_contract import ContractError, canonical_id
 
 
@@ -48,7 +48,7 @@ class D1PublisherTests(unittest.TestCase):
         self.assertEqual([(r["aid"], r["source_line"]) for r in rows],
                          [("A1", 1), ("A2", 2)])
         self.assertEqual(self.db.execute(
-            "SELECT count(*) FROM schema_migrations").fetchone()[0], 1)
+            "SELECT count(*) FROM public_ptt_schema_migrations").fetchone()[0], 1)
         self.assertEqual(self.db.execute(
             "SELECT count(*) FROM ptt_source_evidence").fetchone()[0], 2)
 
@@ -76,6 +76,21 @@ class D1PublisherTests(unittest.TestCase):
                               [record(item["source_line"], origin=priority, floor=None)])
                 rows = read_day(self.db, "2026-10-15")[1]
                 self.assertEqual(next(r["floor"] for r in rows if r["source_line"] == item["source_line"]), 45)
+
+    def test_provider_state_replay_and_gap_are_monotonic(self):
+        publish_provider_state(self.db, day="2026-10-15", aid="A1",
+            last_success_at="2026-10-15T00:00:20Z", has_gap=True,
+            relay_cursor=10, purged_through_cursor=4)
+        publish_provider_state(self.db, day="2026-10-15", aid="A1",
+            last_success_at="2026-10-15T00:00:10Z", has_gap=False)
+        row = self.db.execute(
+            "SELECT relay_cursor,purged_through_cursor,last_success_at,has_gap FROM ptt_provider_state WHERE day=? AND aid=?",
+            ("2026-10-15","A1")).fetchone()
+        self.assertEqual(row, (10,4,"2026-10-15T00:00:20Z",1))
+        publish_provider_state(self.db, day="2026-10-15", aid="A1",
+            last_success_at="2026-10-15T00:00:30Z")
+        self.assertEqual(self.db.execute(
+            "SELECT count(*) FROM ptt_provider_state").fetchone()[0], 1)
 
     def test_nullable_floor_and_replay_survive(self):
         publish_batch(self.db, "2026-10-15", {"A1"}, [record(1)])
