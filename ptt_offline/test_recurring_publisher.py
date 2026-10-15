@@ -22,6 +22,7 @@ class RecurringPublisherTests(unittest.TestCase):
         source="b"*64
         responses=[{"status":"ACK","sent":25} for _ in range(4)]+[{"status":"NO_NEW_ROWS","sent":0}]
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
              patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
              patch("ptt_offline.recurring_publisher.run_live_once",side_effect=responses) as publisher:
             result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
@@ -45,6 +46,7 @@ class RecurringPublisherTests(unittest.TestCase):
 
     def test_empty_collector_never_posts(self):
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[]), \
              patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"NO_REAL_COLLECTOR_ROWS","candidate_rows":[]}), \
              patch("ptt_offline.recurring_publisher.run_live_once",side_effect=AssertionError("must not publish")):
             result=run_snapshot(source="unused",state_dir="/tmp/unused")
