@@ -26,7 +26,7 @@ export async function handleOwnerPttPublish(request,env,{authorize,verifyAuthori
   } catch {return json({error:'unauthorized'},401);}
   try {batch=JSON.parse(raw);} catch {return json({error:'invalid_json'},400);}
   try {
-    const receipt=await applyAuthorizedPttBatch({DB:env.DB,batch,verifyAuthority});
+    const receipt=await applyAuthorizedPttBatch({DB:env.DB,batch,verifyAuthority:row=>verifyAuthority(row,env)});
     return json(receipt);
   } catch {
     // No automatic retries. The caller must reconcile remote commit state.
