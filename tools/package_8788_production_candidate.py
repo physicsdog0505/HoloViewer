@@ -9,7 +9,10 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
-from tools.build_python_worker_bundle import build
+if __package__:
+    from .build_python_worker_bundle import build
+else:
+    from build_python_worker_bundle import build
 
 TARGET = "holoviewer-public"
 PINNED = "a144bb378a8bdd772faa867d608c1e7491253883"
