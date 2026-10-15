@@ -32,7 +32,7 @@ function videoId(input){
  }catch{return null;}
 }
 async function api(path){
- if(!/^https:\/\//.test(config.apiBase||''))throw Error('Cloudflare Public API 未設定');
+ if(!(String(config.apiBase||'').startsWith('/__api')||/^https:\/\//.test(config.apiBase||'')))throw Error('Cloudflare Public API 未設定');
  const response=await fetch(config.apiBase.replace(/\/$/,'')+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}});
  if(!response.ok)throw Error('API HTTP '+response.status);
  return response.json();
