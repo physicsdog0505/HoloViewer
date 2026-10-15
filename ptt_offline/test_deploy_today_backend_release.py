@@ -48,6 +48,12 @@ class TodayBackendReleaseTests(unittest.TestCase):
         self.assertIn("PTT_LAST_DAY=",source)
         self.assertIn("ORDER BY last_success_at DESC LIMIT 1",source)
 
+
+    def test_cleanup_marker_regex_matches_numeric_count(self):
+        source=Path(__file__).with_name("deploy_today_backend_release.py").read_text(encoding="utf-8")
+        self.assertIn('r"NONLIVE_DISCOVERY_ROWS=(\\d+)"', source)
+        self.assertNotIn('r"NONLIVE_DISCOVERY_ROWS=(\\\\d+)"', source)
+
     def test_wrong_worker_fails_closed(self):
         cfg=self.config(); cfg["name"]="wrong-worker"
         with tempfile.TemporaryDirectory() as td:
