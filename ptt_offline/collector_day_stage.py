@@ -52,13 +52,13 @@ def stage_selected_day(db, *, day: str, aid: str, limit: int=5,
     coverage=coverage_receipt(db,raw_aid)
     # Bound the full chronology before determining the selected Taipei day.
     raw=db.execute(
-        """SELECT source_line,source_page,kind,author,content,ptt_date,ptt_time
+        """SELECT source_line,source_page,kind,author,content,ptt_date,ptt_time,collected_at
            FROM pushes WHERE article_id=? ORDER BY source_line LIMIT ?""",
         (article_id,MAX_SOURCE_ROWS+1),
     ).fetchall()
     if len(raw)>MAX_SOURCE_ROWS:
         raise ContractError("source chronology exceeds bounded audit cap")
-    keys=("source_line","source_page","kind","author","content","ptt_date","ptt_time")
+    keys=("source_line","source_page","kind","author","content","ptt_date","ptt_time","collected_at")
     chronological=reconstruct_events(
         board=board,aid=raw_aid,url=url,
         identity_verifier=identity_verifier,
