@@ -43,7 +43,7 @@ def _home_row(row: dict, home_stream_cls: Callable):
         state = "unknown"
     group = str(row.get("group") or "").lower()
     if group not in VISIBLE_GROUPS:
-        group = "hololive"  # Display fallback only; not a provenance assertion.
+        group = "unknown"  # Never classify an unverified channel as Hololive.
     start = _timestamp(
         row.get("actual_start") or row.get("scheduled_start") or row.get("start_at")
     )
@@ -51,7 +51,7 @@ def _home_row(row: dict, home_stream_cls: Callable):
         video_id=video_id,
         title=str(row.get("title") or video_id),
         channel_title=str(row.get("channel_name") or row.get("channel_title") or ""),
-        start_label=start.strftime("%H:%M") if start else "",
+        start_label=start.astimezone(__import__("zoneinfo").ZoneInfo("Asia/Taipei")).strftime("%H:%M") if start else "",
         state=state,
         source_label="",
         channel_id=str(row.get("channel_id") or ""),
