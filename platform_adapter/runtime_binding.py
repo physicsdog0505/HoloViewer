@@ -24,6 +24,16 @@ def bind_public_today(client_app: Any, *, api_base: str) -> dict[str, str]:
     reader = bind_home_reader(provider, HomeStream)
     client_home.load_home_streams = reader
     client_app.load_home_streams = reader
+
+    # Accepted 4174 collab pages use the same Today stream evidence, but
+    # RuntimeCollabEventSource captured the old local loader as a default.
+    # Rebind only the provider seam so /collab and /collab/session render
+    # the original accepted UI without touching local SQLite in Cloudflare.
+    def collab_reader(*args, **kwargs):
+        live, upcoming, ended, _unknown = reader()
+        return live, upcoming, ended
+    client_home.load_collab_event_streams = collab_reader
+    client_app.load_collab_event_streams = collab_reader
     # History renderer/pagination remain the accepted 4174 implementation.
     history_reader = bind_history_reader(provider, HomeStream)
     client_app.load_history_day = history_reader
