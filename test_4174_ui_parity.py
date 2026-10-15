@@ -209,8 +209,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn('id="custom-session-ptt-panel"',html)
         self.assertIn('PTT 尚未對齊',html)
         self.assertIn('viewerPttPanel.remove()',js)
-        self.assertIn("classList.toggle('video-only',!showPtt)",js)
-        self.assertIn('目前沒有足夠的專串來源與影片時間證據。',js)
+        self.assertIn("classList.add('video-only')",js)
+        self.assertIn('PTT 資料尚未可用；先顯示完整影片畫面',js)
 
     def test_shared_shell_has_no_invented_footer_or_dead_id_bindings(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
