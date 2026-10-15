@@ -121,6 +121,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn("/v1/ptt/today?day=", js)
         self.assertIn("public-consumer-v1", js)
         self.assertIn("pttLastGoodCount", js)
+        self.assertIn("pttLastGoodDay", js)
+        self.assertIn("pttLoadInFlight", js)
+        self.assertIn("homeLoadInFlight", js)
+        self.assertIn("pttLastGoodDay&&pttLastGoodDay!==today", js)
         self.assertIn("10 秒後重試", js)
         self.assertNotIn("message('ptt-status'", js)
 
