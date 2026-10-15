@@ -35,7 +35,7 @@ function invoke(args,description,{capture=false}={}){
 export function validateAccountReceipt(output){
  if(!output.includes(ACCOUNT_ID))throw Error('authenticated Cloudflare account mismatch');return true;
 }
-export function executionArgs(configPath){return ['d1','migrations','apply',DB_ID,'--remote','--config',configPath];}
+export function executionArgs(configPath){return ['d1','migrations','apply',DB,'--remote','--config',configPath];}
 export const EXPECTED_OBJECTS=Object.freeze(['public_today_schema_migrations','public_today_canonical','public_today_canonical_state','public_today_evidence','public_today_evidence_by_video','public_today_catalog_meta','public_today_approved_channels','public_today_approved_version']);
 export function decodeD1(output){
  let data;
