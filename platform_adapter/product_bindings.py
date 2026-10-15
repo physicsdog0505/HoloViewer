@@ -82,6 +82,19 @@ def home_groups_from_payload(payload: dict, home_stream_cls: Callable):
                   "unknown" if item.state == "stale" else
                   item.state if item.state in groups else "unknown")
         groups[bucket].append(item)
+
+    far_future = datetime.max.replace(tzinfo=timezone.utc)
+    far_past = datetime.min.replace(tzinfo=timezone.utc)
+    groups["upcoming"].sort(
+        key=lambda item: (item.start_at is None, item.start_at or far_future, item.video_id)
+    )
+    groups["unknown"].sort(
+        key=lambda item: (item.start_at is None, item.start_at or far_future, item.video_id)
+    )
+    groups["ended"].sort(
+        key=lambda item: (item.start_at or far_past, item.video_id),
+        reverse=True,
+    )
     return tuple(groups[key] for key in ("live", "upcoming", "ended", "unknown"))
 
 
