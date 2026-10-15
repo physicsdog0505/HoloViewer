@@ -55,7 +55,7 @@ class DayBoundaryTests(unittest.TestCase):
         )
         reader = PttConsumerReader(provider)
         model = reader.read_today("2026-10-15")
-        self.assertEqual(model.schema_version, "ptt-public-v1")
+        self.assertEqual(model.schema_version, "public-consumer-v1")
         self.assertEqual(len(model.pushes), 2)
         self.assertNotIn("cursors", vars(model))
         self.assertNotIn("A1", model.checkpoint)
