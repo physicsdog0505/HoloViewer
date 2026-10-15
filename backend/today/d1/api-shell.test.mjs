@@ -74,3 +74,12 @@ test('accepted OPTIONS exposes preflight max age 600 and no response cache overr
  assert.equal(res.headers.get('access-control-allow-headers'),'Accept');
  assert.equal(res.headers.get('cache-control'),null);
 });
+
+test('live video prefix dispatch preserves invalid ID 400 and video cache age 15',async()=>{
+ const env={DB:{prepare(){return {bind(){return {first:async()=>({video_id:'abcdefghijk'})}}}}},ALLOWED_ORIGIN:ORIGIN};
+ const invalid=await router.fetch(req('/v1/catalog/videos/short'),env);
+ assert.equal(invalid.status,400);
+ assert.equal((await invalid.json()).error,'invalid_video_id');
+ const valid=await router.fetch(req('/v1/catalog/videos/abcdefghijk'),env);
+ assert.equal(valid.status,200);
+});
