@@ -67,8 +67,27 @@ def ensure_schema(config, repo_root):
     if required_present==REQUIRED_TABLES:
         print(json.dumps({"ptt_schema":"already_present","tables":sorted(required_present)}))
         return
+
+    legacy_without_gap=REQUIRED_TABLES-{"ptt_gap_repairs"}
+    if required_present==legacy_without_gap:
+        sql="""CREATE TABLE IF NOT EXISTS ptt_gap_repairs (
+            repair_id TEXT PRIMARY KEY,
+            day TEXT NOT NULL,
+            aid TEXT NOT NULL,
+            verified_at TEXT NOT NULL,
+            covered_through_cursor INTEGER NOT NULL,
+            evidence_digest TEXT NOT NULL
+        );"""
+        run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,"--command",sql])
+        after=d1_table_names(config)
+        if not REQUIRED_TABLES.issubset(after):
+            raise SystemExit("PTT additive gap-repair table readback incomplete")
+        print(json.dumps({"ptt_schema":"added_gap_repairs_only","tables":sorted(REQUIRED_TABLES)}))
+        return
+
     if required_present:
-        raise SystemExit("partial PTT schema detected; refusing migration: "+",".join(sorted(required_present)))
+        raise SystemExit("unexpected partial PTT schema detected; refusing migration: "+",".join(sorted(required_present)))
+
     migration=repo_root/"ptt_offline"/"d1_migrations"/"0001_canonical_ptt.sql"
     run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,"--file",str(migration)])
     after=d1_table_names(config)
