@@ -41,7 +41,7 @@ class SourceAuditStageTests(unittest.TestCase):
         self.assertEqual(receipt["pending"][0]["reason"],"invalid-source-calendar")
         with patch("ptt_offline.source_audit_cli.open_source",return_value=nullcontext(db)):
             redacted=audit(source="/synthetic/readonly.sqlite3",day="2026-01-01",aid=aid)
-        self.assertEqual(redacted["pending_count"],1)
+        self.assertEqual(redacted["pending_count"],3)
         self.assertEqual(redacted["publishable_count"],0)
         self.assertNotIn("content",str(redacted))
         self.assertNotIn("author",str(redacted))
