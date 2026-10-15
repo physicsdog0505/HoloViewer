@@ -69,7 +69,9 @@ def main(argv=None):
                      "coverage":audit["coverage"],"d1_requests":0}
         else:
             initial=stage_verified_day(db,day=args.day,aid=args.aid,limit=5)
-        if args.draft_evidence:
+        if args.inspect:
+            pass
+        elif args.draft_evidence:
             proposal={"source_identity":initial["source_identity"],"day":args.day,
                       "aid":initial["aid"],"authority":"PENDING_REVIEW",
                       "approved_rows":[{"source_line":row["source_line"],
