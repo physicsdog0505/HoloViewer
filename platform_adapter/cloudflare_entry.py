@@ -70,6 +70,6 @@ class Default(WorkerEntrypoint):
         headers = {
             key: value
             for key, value in result.headers
-            if key.lower() not in {"connection", "transfer-encoding", "server", "date"}
+            if key.lower() not in {"connection", "transfer-encoding", "server", "date", "content-length"}
         }
         return Response(result.body, status=result.status, headers=headers)
