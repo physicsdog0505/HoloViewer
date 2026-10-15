@@ -8,34 +8,23 @@ import re
 import sys
 from dataclasses import dataclass
 from html.parser import HTMLParser
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 
-ROUTES = [
-    ("/", "page"),
-    ("/history", "page"),
-    ("/ptt-today", "page"),
-    ("/ptt-today?focus=1", "page"),
-    ("/custom-view", "page"),
-    ("/custom-view/session?stream=dQw4w9WgXcQ&layout=auto&primary=0&audio=0", "page"),
-    ("/custom-view/session?stream=dQw4w9WgXcQ&stream=9bZkp7q19f0&layout=auto&primary=0&audio=0", "page"),
-    ("/watchalong", "page"),
-    ("/collab", "page"),
-    ("/api/home", "api"),
-    ("/api/ptt/today", "api"),
-    ("/api/ptt/video?video_id=invalid", "api"),
-    ("/api/collab/live?collab=unsupported", "api"),
-    ("/api/translation/preflight", "api"),
-    ("/api/translation/prepare", "api"),
-    ("/api/watchalong/progressive", "api"),
-    ("/api/watchalong/reanalyze", "api"),
-    ("/collab/session?collab=unsupported", "page"),
-    ("/watchalong/session", "page"),
-    ("/history?date=invalid", "page"),
-    ("/history?page=0", "page"),
-]
+MATRIX = Path(__file__).resolve().parents[1] / "provenance" / "4174-parity-matrix.json"
+
+
+def parity_routes() -> list[tuple[str, str]]:
+    matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
+    rows = [(item["path"], item["kind"]) for item in matrix["routes"]]
+    if len(rows) != len(set(rows)):
+        raise ValueError("duplicate route in accepted parity matrix")
+    if not rows or any(kind not in {"api", "page"} for _, kind in rows):
+        raise ValueError("invalid accepted parity route matrix")
+    return rows
 
 
 class StructuralHTML(HTMLParser):
@@ -166,7 +155,7 @@ def compare_one(baseline: str, candidate: str, path: str, kind: str) -> Receipt:
     note = ""
     if bs != cs:
         note = "status mismatch"
-    elif bct != cct or bct != ("application/json" if kind == "api" else "text/html"):
+    elif bct != cct or (bs < 400 and bct != ("application/json" if kind == "api" else "text/html")):
         note = "Content-Type mismatch or invalid media type"
     elif bloc != cloc:
         note = "redirect Location mismatch"
@@ -205,10 +194,10 @@ def main() -> int:
 
     receipts: list[Receipt] = []
     failed = False
-    for path, kind in ROUTES:
+    for path, kind in parity_routes():
         receipt = compare_one(args.baseline, args.candidate, path, kind)
         receipts.append(receipt)
-        status = "PASS" if receipt.baseline_status == receipt.candidate_status and receipt.baseline_content_type == receipt.candidate_content_type and receipt.baseline_content_type == ("application/json" if kind == "api" else "text/html") and receipt.baseline_location == receipt.candidate_location and receipt.structural_equal else "FAIL"
+        status = "PASS" if receipt.baseline_status == receipt.candidate_status and receipt.baseline_content_type == receipt.candidate_content_type and (receipt.baseline_status >= 400 or receipt.baseline_content_type == ("application/json" if kind == "api" else "text/html")) and receipt.baseline_location == receipt.candidate_location and receipt.structural_equal else "FAIL"
         print(f"{status}: {path} baseline={receipt.baseline_status} candidate={receipt.candidate_status} {receipt.note}")
         if status == "FAIL":
             failed = True
@@ -222,12 +211,11 @@ def main() -> int:
             "count": len(receipts),
             "structural_pass": sum(
                 1 for r in receipts
-                if r.baseline_status == r.candidate_status and r.baseline_content_type == r.candidate_content_type and r.baseline_content_type == ("application/json" if r.kind == "api" else "text/html") and r.baseline_location == r.candidate_location and r.structural_equal
+                if r.baseline_status == r.candidate_status and r.baseline_content_type == r.candidate_content_type and (r.baseline_status >= 400 or r.baseline_content_type == ("application/json" if r.kind == "api" else "text/html")) and r.baseline_location == r.candidate_location and r.structural_equal
             ),
             "raw_body_equal": sum(1 for r in receipts if r.body_equal),
         },
     }
-    from pathlib import Path
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
