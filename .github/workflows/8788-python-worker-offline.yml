@@ -11,6 +11,7 @@ on:
       - 'tools/prepare_worker_fixture_bundle.py'
       - 'tools/probe_pyodide_combined_router.py'
       - 'tools/serve_8788_owner_api_mock.mjs'
+      - 'tools/check_production_host_baseline.py'
       - 'test_*worker*.py'
       - 'test_public_api_binding.py'
       - 'test_canonical_consumer_integration.py'
@@ -35,6 +36,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Checkout current main for read-only production host baseline comparison
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .production-main
+          persist-credentials: false
       - name: Checkout exact #47-owned existing API shell for read-only consumer E2E
         uses: actions/checkout@v4
         with:
@@ -47,6 +54,11 @@ jobs:
           ref: b96d0902a504bc26019efd693a1b3586cfb3d3d2
           path: .owner-issue48
           persist-credentials: false
+      - name: Verify proposed 8788 host diff against current main repo config
+        run: |
+          python3 tools/check_production_host_baseline.py \
+            --main-root .production-main \
+            --output "$RUNNER_TEMP/production-host-baseline-receipt.json"
       - name: Exercise exact #47 + #48 combined router into accepted consumer
         run: node tools/check_8788_owner_api_e2e.mjs .owner-issue47 .owner-issue48
       - name: Exercise exact #47 router via local mock D1 into accepted 4174 consumer
@@ -109,6 +121,7 @@ jobs:
           name: 8788-python-worker-local-proof
           if-no-files-found: ignore
           path: |
+            ${{ runner.temp }}/production-host-baseline-receipt.json
             ${{ runner.temp }}/python-worker-runtime-receipt.json
             ${{ runner.temp }}/python-worker-fixture-receipt.json
             ${{ runner.temp }}/pyodide-combined-router-e2e.json
