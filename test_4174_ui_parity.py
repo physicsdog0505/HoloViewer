@@ -276,6 +276,17 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const recovered=urls.length?ids:",js)
         self.assertIn("route(location.hash.substring(1).split('?')[0]||'home')",js)
 
+    def test_single_player_ptt_keeps_positive_aspect_ratio_contract(self):
+        css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
+        anchor='/* Public-only correction: observed #customContentGrid'
+        self.assertIn(anchor,css)
+        fix=css[css.index(anchor):]
+        self.assertIn('flex:1 1 auto!important',fix)
+        self.assertIn('grid-auto-rows:max-content!important',fix)
+        self.assertIn('aspect-ratio:16/9!important',fix)
+        self.assertIn('.custom-content-grid:has(#stage > .player-card:only-child)',fix)
+        self.assertNotIn('viewerPttPanel.remove()',fix)
+
     def test_public_viewer_does_not_mount_uncertified_ptt_or_collapse_video(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')

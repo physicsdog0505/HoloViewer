@@ -1607,3 +1607,31 @@ body.custom-session-watching .custom-content-grid.video-only #stage .video-wrap 
 body.custom-session-watching.custom-immersive .custom-content-grid.video-only{
  overflow:auto!important;min-height:0!important
 }
+
+/* Public-only correction: observed #customContentGrid -> #stage -> iframe
+   all measuring 0px in Chrome (2026-10-15). The shared viewing renderer
+   remains untouched. A single video must retain a positive 16:9 area;
+   preserve the selected side-by-side PTT column. */
+body.custom-session-watching .custom-content-grid:has(#stage > .player-card:only-child){
+ flex:1 1 auto!important;height:auto!important;min-height:0!important;
+ align-items:start!important;overflow:auto!important
+}
+body.custom-session-watching .custom-content-grid:has(#stage > .player-card:only-child) .custom-player-column{
+ height:auto!important;min-height:0!important;max-height:none!important;
+ overflow:visible!important;display:block!important
+}
+body.custom-session-watching .custom-content-grid:has(#stage > .player-card:only-child) #stage{
+ height:auto!important;max-height:none!important;min-height:0!important;
+ grid-auto-rows:max-content!important;align-content:start!important;overflow:visible!important
+}
+body.custom-session-watching .custom-content-grid:has(#stage > .player-card:only-child) #stage > .player-card{
+ height:auto!important;max-height:none!important;min-height:0!important;align-self:start!important
+}
+body.custom-session-watching .custom-content-grid:has(#stage > .player-card:only-child) #stage .video-wrap{
+ flex:none!important;position:relative!important;width:100%!important;
+ height:auto!important;min-height:0!important;aspect-ratio:16/9!important;
+ max-height:none!important
+}
+body.custom-session-watching .custom-content-grid:has(#stage > .player-card:only-child) #stage .video-wrap iframe{
+ position:absolute!important;inset:0!important;width:100%!important;height:100%!important
+}
