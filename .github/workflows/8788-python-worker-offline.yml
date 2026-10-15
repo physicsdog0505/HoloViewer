@@ -31,6 +31,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Checkout exact #47-owned existing API shell for read-only consumer E2E
+        uses: actions/checkout@v4
+        with:
+          ref: ef068e19cfe94bb4bc21c7e47b099cfbbc1361de
+          path: .owner-issue47
+          persist-credentials: false
+      - name: Exercise exact #47 router via local mock D1 into accepted 4174 consumer
+        run: node tools/check_8788_owner_api_e2e.mjs .owner-issue47
       - name: Verify immutable accepted 4174 snapshot
         run: python3 tools/verify_4174_snapshot.py
       - name: Run worker/provider offline regression
