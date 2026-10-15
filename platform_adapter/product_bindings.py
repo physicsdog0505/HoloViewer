@@ -91,7 +91,7 @@ def bind_home_reader(api: PublicAPI, home_stream_cls: Callable):
     return read_home
 
 def bind_history_reader(api: PublicAPI, home_stream_cls: Callable):
-    """Convert Public History's existing day/page read into 4174's card result."""
+    """Map legacy-compatible History pages into accepted 4174 cards."""
     def read_history_day(selected, *, page=1, source=None):
         # Explicit fixture/source overrides stay outside the production adapter.
         if source is not None:
