@@ -6,8 +6,8 @@
     "commit": "a144bb378a8bdd772faa867d608c1e7491253883"
   },
   "public_host_worker": {
-    "name": null,
-    "owner_confirmation_required": true,
+    "name": "holoviewer-public",
+    "owner_confirmation_required": false,
     "main": "entry.py",
     "compatibility_date": "2026-10-15",
     "compatibility_flags": [
@@ -24,7 +24,16 @@
       "source": "platform_adapter.public_api.DEFAULT_API",
       "runtime_env_override": false
     },
-    "runtime_vars": {}
+    "runtime_vars": {},
+    "repository_identity_verified": true,
+    "runtime_deployed_revision_verified": false,
+    "proposed_diff_from_main": [
+      "add Python Worker main entry.py",
+      "add python_workers compatibility flag",
+      "retain same-worker static asset delivery through ASSETS binding",
+      "change asset directory from repository ../site baseline to bundled ./public",
+      "do not add D1/KV bindings to public host"
+    ]
   },
   "canonical_api": {
     "worker_name": "holoviewer-public-api",
@@ -89,5 +98,21 @@
     "ptt_product": {
       "state": "disabled-fail-closed"
     }
+  },
+  "current_repository_baseline": {
+    "ref": "main",
+    "worker_name": "holoviewer-public",
+    "wrangler_path": "cloudflare/wrangler.json",
+    "compatibility_date": "2026-10-14",
+    "static_assets": {
+      "directory": "../site"
+    },
+    "has_worker_script": false,
+    "has_d1_binding": false,
+    "has_kv_binding": false,
+    "has_routes_in_repo_config": false,
+    "deploy_workflow": ".github/workflows/deploy-cloudflare-production.yml",
+    "deploy_trigger": "workflow_dispatch-manual-only",
+    "runtime_deployed_revision_verified": false
   }
 }
