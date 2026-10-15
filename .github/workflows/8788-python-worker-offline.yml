@@ -8,6 +8,7 @@ on:
       - 'platform_adapter/**'
       - 'tools/build_python_worker_bundle.py'
       - 'tools/probe_python_worker_local.py'
+      - 'tools/prepare_worker_fixture_bundle.py'
       - 'test_*worker*.py'
       - 'test_public_api_binding.py'
       - '.github/workflows/8788-python-worker-offline.yml'
@@ -51,6 +52,14 @@ jobs:
           python3 tools/probe_python_worker_local.py \
             --bundle "$RUNNER_TEMP/hv-8788-worker-bundle" \
             --output "$RUNNER_TEMP/python-worker-runtime-receipt.json"
+      - name: Build disposable fixture-only accepted route proof
+        run: |
+          python3 tools/build_python_worker_bundle.py --output "$RUNNER_TEMP/hv-8788-worker-fixture"
+          python3 tools/prepare_worker_fixture_bundle.py --bundle "$RUNNER_TEMP/hv-8788-worker-fixture"
+          python3 tools/probe_python_worker_local.py \
+            --bundle "$RUNNER_TEMP/hv-8788-worker-fixture" \
+            --port 8788 \
+            --output "$RUNNER_TEMP/python-worker-fixture-receipt.json"
       - name: Preserve local Pyodide probe evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -59,4 +68,5 @@ jobs:
           if-no-files-found: ignore
           path: |
             ${{ runner.temp }}/python-worker-runtime-receipt.json
+            ${{ runner.temp }}/python-worker-fixture-receipt.json
             ${{ runner.temp }}/worker-local-proof.log
