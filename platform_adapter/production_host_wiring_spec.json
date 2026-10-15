@@ -10,13 +10,21 @@
     "owner_confirmation_required": true,
     "main": "entry.py",
     "compatibility_date": "2026-10-15",
-    "compatibility_flags": ["python_workers"],
+    "compatibility_flags": [
+      "python_workers"
+    ],
     "assets": {
       "directory": "./public",
       "binding": "ASSETS",
       "run_worker_first": false
     },
-    "d1_bindings": []
+    "d1_bindings": [],
+    "outbound_api": {
+      "origin": "https://holoviewer-public-api.singlebagel.workers.dev",
+      "source": "platform_adapter.public_api.DEFAULT_API",
+      "runtime_env_override": false
+    },
+    "runtime_vars": {}
   },
   "canonical_api": {
     "worker_name": "holoviewer-public-api",
@@ -27,6 +35,20 @@
       "owner": "canonical_api",
       "binding": "DB",
       "database_name": "holoviewer-public-v1"
+    },
+    "runtime_bindings": {
+      "DB": {
+        "type": "d1",
+        "database_name": "holoviewer-public-v1",
+        "owner_confirmation_required": true
+      }
+    },
+    "runtime_vars": {
+      "ALLOWED_ORIGIN": {
+        "required_for_browser_origin_cors": true,
+        "value": null,
+        "owner_confirmation_required": true
+      }
     }
   },
   "ptt_product": {
@@ -41,5 +63,31 @@
     "publisher_or_cron_activation",
     "secret_change",
     "merge_or_cutover"
-  ]
+  ],
+  "routing": {
+    "static_assets": {
+      "host": "public_host_worker",
+      "binding": "ASSETS",
+      "worker_first": false
+    },
+    "product_html": {
+      "host": "public_host_worker",
+      "entry": "entry.py"
+    },
+    "canonical_reads": {
+      "from": "public_host_worker",
+      "to": "holoviewer-public-api",
+      "methods": [
+        "GET"
+      ]
+    },
+    "d1": {
+      "from": "holoviewer-public-api",
+      "binding": "DB",
+      "to": "holoviewer-public-v1"
+    },
+    "ptt_product": {
+      "state": "disabled-fail-closed"
+    }
+  }
 }
