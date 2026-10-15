@@ -114,7 +114,7 @@ This validates the **shape and ownership boundary** of production wiring without
 - separately verifies that the same combined Router has the reviewed #48 PTT mount active while leaving normal product PTT disabled;
 - records `production_deployment=false`, `production_d1=false`, and `ptt_product_enabled=false`.
 
-The exact-head workflow now executes this proof in addition to the existing combined-router Consumer test, 42-test regression set, Pyodide runtime proof, same-Worker static asset hashes, and Playwright geometry checks. Until exact-head CI for this new proof is green, classify this paragraph as **IMPLEMENTED / CI-PENDING**, not PASS.
+The exact-head workflow now executes this proof in addition to the existing combined-router Consumer test, offline regression set, Pyodide runtime proof, same-Worker static asset hashes, and Playwright geometry checks. Exact-head source/runtime evidence at `6a65a5fd9ffd63f21b3a88d97384df473bbeb12a` / workflow `38740976552` is **PASS**: 49/49 regressions, `/api/home` 200 through the single Pyodide trace, exact #47/#48 SHAs, mock-D1 reads observed, and the later fixture/static/browser proof remains green after process-group teardown.
 
 ## Remaining production gates after offline host validation
 
@@ -154,3 +154,20 @@ This does **not** prove the currently deployed Cloudflare revision, account/zone
 
 
 The exact-head offline workflow now also checks out current `main` read-only and runs `tools/check_production_host_baseline.py`. That receipt fails if the repository baseline drifts from static-only `holoviewer-public`, if manual deployment gates disappear, if the canonical API origin changes, or if the #68 proposal adds a Public-host D1 binding. It does not contact Cloudflare runtime.
+
+
+## Exact-head offline acceptance receipt
+
+Workflow `38740976552` at source HEAD `6a65a5fd9ffd63f21b3a88d97384df473bbeb12a`: **SUCCESS**.
+
+- current-`main` repository host baseline comparison: PASS (`holoviewer-public`, static-only baseline, canonical API origin unchanged, no Public-host D1 binding);
+- #47 + #48 combined owner Router / Python consumer proof: PASS;
+- offline regression suite: **49/49 PASS**;
+- accepted product SHA: `a144bb378a8bdd772faa867d608c1e7491253883`;
+- single trace: `/api/home` -> Pyodide `pyfetch` -> exact #47 `149a80361654b06377dbae580e1d8da2e5010cf0` + #48 `b96d0902a504bc26019efd693a1b3586cfb3d3d2` combined Router -> mock D1: **200 PASS**;
+- same-loopback #48 PTT mount: `200 / public-consumer-v1`; normal accepted-product PTT remains disabled/fail-closed;
+- same-Worker static assets: PASS;
+- accepted-vs-Pyodide Home/History browser geometry at 1440/760/390: PASS;
+- production runtime contacted: **false**; production deployment/D1 mutation: **false**.
+
+An earlier run proved the new trace but failed a later fixture because the test harness terminated only the `uvx` parent while child `wrangler/workerd` retained port 8788. HEAD `6a65a5f...` fixes only test-process teardown by terminating the entire process group; the exact-head green run proves the fixture regression is closed.
