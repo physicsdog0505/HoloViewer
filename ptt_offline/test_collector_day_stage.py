@@ -7,6 +7,7 @@ from ptt_offline.public_today_contract import ContractError
 
 
 class CollectorDayStageTests(unittest.TestCase):
+    verifier=staticmethod(lambda board,aid,url: board == "C_Chat" and aid == "A1")
     def setUp(self):
         self.db=sqlite3.connect(":memory:")
         self.addCleanup(self.db.close)
@@ -31,11 +32,12 @@ class CollectorDayStageTests(unittest.TestCase):
         """)
 
     def test_selected_day_only_and_source_identity(self):
-        earlier=stage_selected_day(self.db,day="2025-12-31",aid="A1")
+        earlier=stage_selected_day(self.db,identity_verifier=self.verifier,day="2025-12-31",aid="A1")
         later=stage_selected_day(self.db,day="2026-01-01",aid="#A1")
         self.assertEqual(earlier["selected_rows_total"],1)
         self.assertEqual(later["selected_rows_total"],1)
         self.assertEqual(later["rows"][0]["content"],"after")
+        self.assertEqual(later["next_after_source_line"],6)
         self.assertEqual(later["rows"][0]["source_record_key"],"A1:6")
         self.assertEqual(later["rows"][0]["occurred_at"],"2025-12-31T16:01:00Z")
         self.assertTrue(later["coverage"]["complete"])
@@ -45,6 +47,13 @@ class CollectorDayStageTests(unittest.TestCase):
                                   after_source_line=6)
         self.assertEqual(result["selected_rows_total"],0)
         self.assertEqual(result["rows"],[])
+
+    def test_unverified_identity_and_invalid_day_rejected(self):
+        with self.assertRaises(ContractError):
+            stage_selected_day(self.db,day="2026-01-01",aid="A1")
+        with self.assertRaises(ContractError):
+            stage_selected_day(self.db,identity_verifier=self.verifier,
+                               day="2026-02-30",aid="A1")
 
     def test_unknown_aid_and_cap_fail_closed(self):
         with self.assertRaises(ContractError):
