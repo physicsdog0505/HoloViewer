@@ -87,9 +87,30 @@ class ConsumerIntegrationTest(unittest.TestCase):
                          (1, 1, 0, 0))
         self.assertIsInstance(live[0], HomeStream)
         self.assertEqual(live[0].state, "live")
-        self.assertEqual(live[0].start_label, "18:00")  # 10:00 UTC -> Taipei
+        self.assertEqual(live[0].start_label, "10/15 18:00")  # UTC -> Taipei, retain date
         self.assertEqual(upcoming[0].state, "waiting")
         self.assertEqual(router.urls[0], DEFAULT_API + "/v1/catalog/today")
+
+    def test_time_label_preserves_taipei_calendar_date_across_midnight(self):
+        from platform_adapter.product_bindings import _home_row
+
+        row = {
+            "video_id": "dQw4w9WgXcQ",
+            "title": "Tomorrow's scheduled stream",
+            "channel_name": "Fixture",
+            "lifecycle_state": "upcoming",
+            "group": "hololive",
+            "start_at": "2026-10-15T16:30:00Z",
+        }
+        item = _home_row(row, HomeStream, feed_freshness="fresh")
+        self.assertEqual(item.start_label, "10/16 00:30")
+        self.assertEqual(item.start_at.isoformat(), "2026-10-15T16:30:00+00:00")
+        row["start_at"] = "2026-10-16T15:00:00Z"
+        item = _home_row(row, HomeStream, feed_freshness="fresh")
+        self.assertEqual(item.start_label, "10/16 23:00")
+        row["start_at"] = None
+        item = _home_row(row, HomeStream, feed_freshness="fresh")
+        self.assertEqual(item.start_label, "")
 
     def test_partial_gap_does_not_create_false_completeness(self):
         self.assertEqual(TODAY["completeness"]["status"], "partial")
