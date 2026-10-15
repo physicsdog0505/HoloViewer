@@ -39,7 +39,7 @@ class ProductionPackageTests(unittest.TestCase):
             self.assertNotIn("top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px)", shell)
             self.assertEqual(
                 receipt["authorized_ui_overrides"]["live_channel_rail_clear_navigation"],
-                "position:fixed;left:2px;top:466px;z-index:65;width:64px;max-height:calc(100vh - 478px);",
+                "position:fixed;left:2px;top:376px;z-index:65;width:64px;max-height:calc(100vh - 388px);",
             )
             self.assertEqual(
                 receipt["authorized_ui_overrides"]["default_hololive_keeps_unclassified_cards_visible"],
