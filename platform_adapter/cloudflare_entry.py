@@ -119,11 +119,32 @@ class Default(WorkerEntrypoint):
                          "Cache-Control": "no-store"},
             )
         except Exception as exc:
-            # Source-only local Pyodide feasibility: log exception identity, not
-            # request URL, video IDs, API content or secrets. Never mask errors.
-            print("PYTHON_WORKER_FEASIBILITY_EXCEPTION:",
+            # Never surface an ordinary Python exception as a Cloudflare 1101
+            # for a user-facing page. Log only exception identity, then fall
+            # back to the accepted 4174 page-first shell. Data APIs remain
+            # explicit failures and are never fabricated.
+            print("PYTHON_WORKER_PAGE_EXCEPTION:",
                   type(exc).__module__, type(exc).__name__)
-            raise
+            if parsed.path in PAGE_ROUTES:
+                try:
+                    fallback = render_page_fallback(target)
+                except Exception as fallback_exc:
+                    print("PYTHON_WORKER_FALLBACK_EXCEPTION:",
+                          type(fallback_exc).__module__, type(fallback_exc).__name__)
+                    fallback = None
+                if fallback is not None:
+                    status, html = fallback
+                    return Response(
+                        html, status=status,
+                        headers={"Content-Type": "text/html; charset=utf-8",
+                                 "Cache-Control": "no-store"},
+                    )
+            return Response(
+                "Public page temporarily unavailable",
+                status=503,
+                headers={"Content-Type": "text/plain; charset=utf-8",
+                         "Cache-Control": "no-store"},
+            )
         # Header names/values come from the accepted handler. Do not return
         # hop-by-hop server transport headers to the Worker network stack.
         headers = {
