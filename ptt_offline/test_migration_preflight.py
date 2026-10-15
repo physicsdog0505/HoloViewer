@@ -16,7 +16,28 @@ class MigrationPreflightTests(unittest.TestCase):
         import json
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual(receipt["sha256"], manifest["immutable_migrations"][0]["sha256"])
+        self.assertEqual(receipt["git_blob_sha"], manifest["immutable_migrations"][0]["git_blob_sha"])
         self.assertEqual(set(receipt["required_tables"]), set(TABLES))
+
+    def test_reviewed_blob_pin_mismatch_rejected_even_if_sha256_is_updated(self):
+        import hashlib
+        import json
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            sql = Path(directory) / "changed.sql"
+            manifest = Path(directory) / "manifest.json"
+            payload = SCHEMA.read_bytes() + b"-- modified v1, forbidden\\n"
+            sql.write_bytes(payload)
+            baseline = json.loads(MANIFEST.read_text(encoding="utf-8"))
+            entry = baseline["immutable_migrations"][0]
+            entry["sha256"] = hashlib.sha256(payload).hexdigest()
+            entry["bytes"] = len(payload)
+            manifest.write_text(json.dumps(baseline), encoding="utf-8")
+            with patch("ptt_offline.migration_preflight.SCHEMA", sql), patch(
+                "ptt_offline.migration_preflight.MANIFEST", manifest
+            ):
+                with self.assertRaisesRegex(RuntimeError, "checksum/length mismatch"):
+                    schema_receipt()
 
     def test_synthetic_fixture_preflight_and_missing_schema(self):
         with tempfile.TemporaryDirectory() as directory:
