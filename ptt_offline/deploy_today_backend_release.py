@@ -93,7 +93,7 @@ def safe_deploy_config(config_path):
     for name in PTT_SECRET_NAMES:
         vars.pop(name,None)
     vars["TODAY_CADENCE_ENABLED"]="true"
-    vars["TODAY_DISCOVERY_ENABLED"]="true"
+    vars["TODAY_DISCOVERY_ENABLED"]="false"
     cfg["vars"]=vars
     td=tempfile.TemporaryDirectory(prefix="holoviewer-today-release-")
     path=Path(td.name)/"wrangler.json"
@@ -158,7 +158,7 @@ def main():
       "api_contract_changed":False,
       "profile_rows_expected":66,
       "today_cadence_enabled":True,
-      "today_discovery_enabled":True,
+      "today_discovery_enabled":False,
       "nonlive_discovery_rows_after_cleanup":0,
       "preserved_secret_bindings":secrets,
       "ptt_preflight":ptt
