@@ -37,3 +37,13 @@ export async function handleTodayPrivatePost(request,env,{now=Date.now()}={}){
   return reply({error:'one_shot_failed_stop_no_auto_retry',detail:String(error.message).slice(0,180)},409);
  }
 }
+
+/** Compose on TOP of the already combined #47+#48 host, without replacing it. */
+export function mountTodayPublisherOnCombinedApi(combinedApi){
+ if(!combinedApi||typeof combinedApi.fetch!=='function')throw Error('combined existing API Worker required');
+ return {async fetch(request,env,context){
+  const path=new URL(request.url).pathname;
+  if(path==='/internal/today/one-shot')return handleTodayPrivatePost(request,env);
+  return combinedApi.fetch(request,env,context);
+ }};
+}
