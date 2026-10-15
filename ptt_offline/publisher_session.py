@@ -39,18 +39,30 @@ def load_checkpoint(path: Path, *, source_identity: str, day: str, aids) -> dict
 
 
 def run_synthetic_one(*, checkpoint_path: str, source_identity: str,
-                      day: str, aids, rows: list[dict], executor) -> dict:
+                      day: str, aids, rows: list[dict], executor,
+                      source_prefix_digest: str | None = None,
+                      next_prefix_digest: str | None = None) -> dict:
     """One locked batch; only an exact ACK permits advancing local checkpoint."""
     path=Path(checkpoint_path).expanduser().resolve()
     path.parent.mkdir(parents=True,exist_ok=True)
     with exclusive_lock(path.with_suffix(path.suffix+".lock")):
         checkpoint=load_checkpoint(path,source_identity=source_identity,
                                    day=day,aids=aids)
+        if source_prefix_digest is not None:
+            if not isinstance(source_prefix_digest,str) or len(source_prefix_digest)!=64:
+                raise ContractError("invalid source prefix evidence")
+            if not isinstance(next_prefix_digest,str) or len(next_prefix_digest)!=64:
+                raise ContractError("missing next source prefix evidence")
+            previous=checkpoint.get("acked_prefix_digest")
+            if previous is not None and previous != source_prefix_digest:
+                raise ContractError("ACKed source prefix changed since checkpoint")
         batch=make_batch(checkpoint=checkpoint,rows=rows)
         if not batch["rows"]:
             return {"status":"NO_NEW_ROWS","checkpoint":checkpoint}
         ack=execute_once(batch=batch,executor=executor)  # one call, never retry
         updated=apply_ack(checkpoint=checkpoint,batch=batch,ack=ack)
+        if source_prefix_digest is not None:
+            updated["acked_prefix_digest"]=next_prefix_digest
         # No source content, secrets or per-push payload in persisted checkpoint.
         atomic_receipt(path,updated)
         return {"status":"ACK","checkpoint":updated,
