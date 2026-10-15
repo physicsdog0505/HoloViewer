@@ -16,13 +16,14 @@ from urllib.request import Request, urlopen
 from .public_today_contract import ContractError
 
 MAX_JSON_BYTES=65536
+OWNER_API_HOST="holoviewer-public-api.singlebagel.workers.dev"
 
 def owner_signed_http_executor(*, endpoint: str, secret: str, allow_write: bool=False,
                                opener=urlopen, clock_ms=None):
     if not allow_write:
         raise ContractError("owner one-shot write authorization required")
     u=urlparse(endpoint)
-    if (u.scheme!="https" or not u.netloc or u.username or u.password or
+    if (u.scheme!="https" or u.netloc!=OWNER_API_HOST or u.username or u.password or
         u.fragment or u.query or u.path!="/private/ptt/publish"):
         raise ContractError("invalid owner Publisher endpoint")
     if not isinstance(secret,str) or len(secret)<32:
