@@ -5,13 +5,31 @@ They never synthesize backend records and never touch local runtime databases.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime
 from urllib.parse import parse_qs, urlsplit
 
 from frontend_time import TAIPEI
 
 
+@contextmanager
+def _without_local_home_runtime():
+    """Fallback pages must never touch local Home DB/files/network."""
+    import client_home
+    original = client_home.load_home_streams
+    client_home.load_home_streams = lambda *args, **kwargs: ([], [], [], [])
+    try:
+        yield
+    finally:
+        client_home.load_home_streams = original
+
+
 def render_page_fallback(target: str) -> tuple[int, str] | None:
+    with _without_local_home_runtime():
+        return _render_page_fallback_inner(target)
+
+
+def _render_page_fallback_inner(target: str) -> tuple[int, str] | None:
     parsed = urlsplit(target)
     query = parse_qs(parsed.query)
     today = datetime.now(TAIPEI).date()
