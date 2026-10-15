@@ -80,8 +80,30 @@ def compare_accepted_fixture(worker_base: str, *, port: int = 58085) -> dict:
                     receipts.append({"pass": okay, **asdict(row)})
                 if not all(r["pass"] for r in receipts):
                     raise RuntimeError("Accepted 4174 vs Worker DOM/JSON parity failed")
+                from playwright.sync_api import sync_playwright
+                from tools.check_4174_browser_state_parity import general_page
+                browser_rows = []
+                with sync_playwright() as pw:
+                    browser = pw.chromium.launch(headless=True)
+                    try:
+                        for width in (1440, 760, 390):
+                            for route in ("/", "/history"):
+                                original = general_page(browser, baseline, width, route)
+                                worker = general_page(browser, worker_base, width, route)
+                                passed = original == worker
+                                browser_rows.append({
+                                    "path": route, "width": width, "pass": passed,
+                                    "baseline": original, "candidate": worker,
+                                })
+                                print(("PASS" if passed else "FAIL") +
+                                      ": accepted-vs-Pyodide browser " +
+                                      route + " " + str(width) + "px", flush=True)
+                    finally:
+                        browser.close()
+                if not all(row["pass"] for row in browser_rows):
+                    raise RuntimeError("Accepted 4174 vs Worker browser geometry parity failed")
                 return {"accepted_source": "a144bb378a8bdd772faa867d608c1e7491253883",
-                        "routes": receipts, "status": "PASS"}
+                        "routes": receipts, "browser": browser_rows, "status": "PASS"}
             finally:
                 process.terminate()
                 try:
