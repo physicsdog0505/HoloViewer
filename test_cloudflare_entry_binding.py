@@ -54,6 +54,12 @@ class EntryPointBindingTest(unittest.TestCase):
             asyncio.run(self.entry.Default().fetch(FakeRequest()))
         self.assertEqual(order,["provider","dispatch","dispatch"])
 
+    def test_binding_failure_keeps_runtime_unbound(self):
+        with patch.object(self.entry, "bind_public_today", side_effect=ValueError("unavailable")):
+            with self.assertRaises(ValueError):
+                self.entry._accepted_handler()
+        self.assertFalse(self.entry._bound)
+
     def test_unbound_ptt_route_returns_503_without_vendor_or_provider(self):
         class PttRequest:
             url = "https://public.example.test/ptt-today"
