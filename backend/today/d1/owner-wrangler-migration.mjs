@@ -26,10 +26,12 @@ export function buildPlan(sqlBytes=readFileSync(SQL_PATH)){
  const config=JSON.stringify({name:'holoviewer-public-api',compatibility_date:'2026-10-14',d1_databases:[{binding:'DB',database_name:DB,database_id:DB_ID,migrations_dir:'migrations',migrations_table:'d1_migrations'}]},null,2)+'\n';
  return {sha256,blob:actualBlob,sql,config,databaseId:DB_ID,accountId:ACCOUNT_ID};
 }
-function invoke(args,description){
- const result=spawnSync('npx',['wrangler',...args],{encoding:'utf8',stdio:'inherit',env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
- if(result.error||result.status!==0)throw Error(description+' failed: '+(result.error?.message??result.status));
+function invoke(args,description,{capture=false}={}){
+ const result=spawnSync('npx',['wrangler',...args],{encoding:'utf8',stdio:capture?'pipe':'inherit',env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
+ if(result.error||result.status!==0)throw Error(description+' failed: '+(result.error?.message??result.stderr?.slice(0,300)??result.status));
+ return capture?result.stdout:'';
 }
+export function validateAccountReceipt(output){if(!output.includes(ACCOUNT_ID))throw Error('authenticated Cloudflare account mismatch');return true;}
 export function executionArgs(configPath){
  return ['d1','migrations','apply',DB,'--remote','--config',configPath];
 }
@@ -45,7 +47,7 @@ export function run(argv=process.argv.slice(2)){
   writeFileSync(config,plan.config,{mode:0o600});
   writeFileSync(join(folder,'migrations','0001_today_canonical.sql'),plan.sql,{mode:0o600});
   // Verify existing account/session and schema BEFORE any write. UUID, never name.
-  invoke(['whoami'],'Cloudflare authenticated account verification');
+  validateAccountReceipt(invoke(['whoami'],'Cloudflare authenticated account verification',{capture:true}));
   invoke(['d1','execute',DB_ID,'--remote','--command',"SELECT name,type FROM sqlite_master WHERE type IN ('table','index') ORDER BY type,name;"],'pre-migration read-only inventory');
   console.log('OWNER-GATED production mutation: database '+DB_ID+'; source sha256 '+plan.sha256);
   invoke(executionArgs(config),'transactional Wrangler D1 migration');
