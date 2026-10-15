@@ -36,6 +36,17 @@ class Default(WorkerEntrypoint):
         if parsed.query:
             target += "?" + parsed.query
 
+        # Phase-E first proof slice only. Unbound routes must never fall back
+        # to the immutable product's local SQLite/file loaders in a Worker.
+        # This is a data-readiness gate, NOT another product route dispatcher.
+        if parsed.path not in {"/", "/api/home", "/history"}:
+            return Response(
+                "Public provider route not yet connected",
+                status=503,
+                headers={"Content-Type": "text/plain; charset=utf-8",
+                         "Cache-Control": "no-store"},
+            )
+
         # Import only the accepted product handler, never a cloned route table.
         # Packaging/import support must be proved on the actual Python Workers
         # runtime before this experimental entrypoint can be promoted.
