@@ -26,6 +26,9 @@ class OwnerPublisherOnceTests(unittest.TestCase):
             path.write_text(json.dumps(data),encoding="utf-8")
             check=load_manual_evidence(path,source_identity="source-sha",day="2026-10-15",aid="1gepPtNy")
             self.assertTrue(check(row))
+            signed=load_manual_evidence(path,source_identity="source-sha",day="2026-10-15",
+                aid="1gepPtNy",proof_secret="x"*40)(row)
+            self.assertEqual(len(signed),64)
             self.assertFalse(check({**row,"content":"changed"}))
             self.assertFalse(check({**row,"source_line":2}))
     def test_readonly_inspect_never_stages_send_or_requires_year(self):
