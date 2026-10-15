@@ -23,7 +23,7 @@ AUTHORIZED_UI_OVERRIDES = {
     "live_channel_rail_clear_navigation": {
         "path": "client_ui_shell.py",
         "old": "position:fixed;left:2px;top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px);",
-        "new": "position:fixed;left:2px;top:466px;z-index:65;width:64px;max-height:calc(100vh - 478px);",
+        "new": "position:fixed;left:2px;top:376px;z-index:65;width:64px;max-height:calc(100vh - 388px);",
     },
     "default_hololive_keeps_unclassified_cards_visible": {
         "path": "client_home.py",
