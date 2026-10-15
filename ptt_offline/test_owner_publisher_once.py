@@ -1,6 +1,10 @@
 import json
 import tempfile
 import unittest
+from contextlib import nullcontext,redirect_stdout
+from unittest.mock import patch
+from io import StringIO
+from ptt_offline.owner_publisher_once import main
 from pathlib import Path
 from ptt_offline.owner_publisher_once import load_manual_evidence,row_fingerprint
 from ptt_offline.public_today_contract import ContractError
@@ -24,4 +28,19 @@ class OwnerPublisherOnceTests(unittest.TestCase):
             self.assertTrue(check(row))
             self.assertFalse(check({**row,"content":"changed"}))
             self.assertFalse(check({**row,"source_line":2}))
+    def test_readonly_inspect_never_stages_send_or_requires_year(self):
+        receipt={"identity":{"aid":"1gepPtNy"},"aid":"1gepPtNy","source_rows_examined":6,
+                 "inferred_day":[],"pending":[{"source_line":1}],"coverage":{"complete":False}}
+        output=StringIO()
+        with patch("ptt_offline.owner_publisher_once.open_source",return_value=nullcontext(object())), \\
+             patch("ptt_offline.owner_publisher_once.audit_source_day",return_value=receipt), \\
+             patch("ptt_offline.owner_publisher_once.stage_verified_day",
+                   side_effect=AssertionError("strict stage cannot run for inspect")), \\
+             redirect_stdout(output):
+            main(["--source","ignored","--day","2026-10-15","--aid","1gepPtNy",
+                  "--checkpoint","/not/used","--inspect"])
+        data=json.loads(output.getvalue())
+        self.assertEqual(data["pending_rows"],1)
+        self.assertEqual(data["d1_requests"],0)
+
 if __name__=="__main__": unittest.main()
