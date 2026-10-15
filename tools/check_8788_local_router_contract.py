@@ -70,23 +70,15 @@ def consumer_receipt(origin: str, *, ptt_day: str | None = None) -> dict:
         raise PublicAPIUnavailable("Owner #47 Today schema absent")
     if not isinstance(today.get("freshness"), dict) or not isinstance(today.get("streams"), list):
         raise PublicAPIUnavailable("Owner #47 Today consumer envelope missing")
-    # Use the *actual* #68 consumer type mapping, not a parallel parser.
-    from dataclasses import dataclass
-    @dataclass
-    class Card:
-        video_id: str
-        title: str
-        channel_title: str
-        start_label: str
-        state: str
-        source_label: str = ""
-        channel_id: str = ""
-        avatar_url: str = ""
-        group: str = "unknown"
-        start_at: object = None
+    # Use the pinned accepted 4174 HomeStream class: no consumer product clone.
+    import sys
+    vendor = Path(__file__).resolve().parents[1] / "vendor" / "4174-a144bb3"
+    if str(vendor) not in sys.path:
+        sys.path.insert(0, str(vendor))
+    from client_home import HomeStream
 
     with preloaded_public_reads({("/v1/catalog/today", ()): today}):
-        groups = bind_home_reader(PublicAPI(), Card)()
+        groups = bind_home_reader(PublicAPI(), HomeStream)()
     result = {
         "api_shell": "owner-supplied existing holoviewer-public-api",
         "origin_kind": "loopback-only",
