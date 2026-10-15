@@ -15,6 +15,14 @@ from platform_adapter.worker_transport import dispatch_accepted_get
 from platform_adapter.public_api import DEFAULT_API, PublicAPIUnavailable, preloaded_public_reads
 from platform_adapter.worker_preload import preload_for_accepted_request, fetch_canonical_json
 from platform_adapter.runtime_binding import bind_public_today
+from platform_adapter.page_fallbacks import render_page_fallback
+
+PAGE_ROUTES = frozenset({
+    "/", "/history", "/custom-view", "/custom-view/session",
+    "/collab", "/collab/session", "/ptt-today",
+    "/watchalong", "/watchalong/session",
+})
+PAGE_ONLY_FALLBACK_ROUTES = frozenset({"/ptt-today", "/watchalong", "/watchalong/session"})
 
 _bound = False
 
@@ -56,13 +64,25 @@ class Default(WorkerEntrypoint):
         # Phase-E first proof slice only. Unbound routes must never fall back
         # to the immutable product's local SQLite/file loaders in a Worker.
         # This is a data-readiness gate, NOT another product route dispatcher.
-        if parsed.path not in {"/", "/api/home", "/history", "/custom-view", "/custom-view/session", "/collab", "/collab/session", "/api/collab/live"}:
+        if parsed.path not in PAGE_ROUTES | {"/api/home", "/api/collab/live"}:
             return Response(
                 "Public provider route not yet connected",
                 status=503,
                 headers={"Content-Type": "text/plain; charset=utf-8",
                          "Cache-Control": "no-store"},
             )
+
+        # Page-first contract: pages whose providers are not wired yet still
+        # render the accepted 4174 UI shell. Data APIs remain independently gated.
+        if parsed.path in PAGE_ONLY_FALLBACK_ROUTES:
+            fallback = render_page_fallback(target)
+            if fallback is not None:
+                status, html = fallback
+                return Response(
+                    html, status=status,
+                    headers={"Content-Type": "text/html; charset=utf-8",
+                             "Cache-Control": "no-store"},
+                )
 
         # Import only the accepted product handler, never a cloned route table.
         # Packaging/import support must be proved on the actual Python Workers
@@ -80,6 +100,15 @@ class Default(WorkerEntrypoint):
                     _accepted_handler(), target=target, method=str(request.method)
                 )
         except PublicAPIUnavailable:
+            if parsed.path in PAGE_ROUTES:
+                fallback = render_page_fallback(target)
+                if fallback is not None:
+                    status, html = fallback
+                    return Response(
+                        html, status=status,
+                        headers={"Content-Type": "text/html; charset=utf-8",
+                                 "Cache-Control": "no-store"},
+                    )
             return Response(
                 "Public data temporarily unavailable", status=503,
                 headers={"Content-Type": "text/plain; charset=utf-8",
