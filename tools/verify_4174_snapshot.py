@@ -232,6 +232,35 @@ def main() -> int:
         if not path.is_file():
             errors.append(f"required Phase C isolation artifact missing: {rel}")
 
+    phase_c_runner = ROOT / "tools" / "run_4174_snapshot.py"
+    if phase_c_runner.is_file():
+        runner_text = phase_c_runner.read_text(encoding="utf-8")
+        required_runner_tokens = [
+            "--runtime-data-root",
+            "PTT_CLIENT_DISABLE_TODAY_REFRESH",
+            '"code_root"',
+            '"runtime_data_root"',
+            "verify_snapshot_unchanged",
+        ]
+        for token in required_runner_tokens:
+            if token not in runner_text:
+                errors.append(f"Phase C runner missing isolation token: {token}")
+        forbidden_runner_tokens = [
+            '"runtime_root": str(VENDOR)',
+            '"--runtime-root", str(VENDOR)',
+        ]
+        for token in forbidden_runner_tokens:
+            if token in runner_text:
+                errors.append(f"Phase C runner still couples runtime data to vendor: {token}")
+
+    phase_c_launcher = ROOT / "scripts" / "start_8788_full_4174.sh"
+    if phase_c_launcher.is_file():
+        launcher_text = phase_c_launcher.read_text(encoding="utf-8")
+        if "PTT_4174_RUNTIME_DATA_ROOT" not in launcher_text:
+            errors.append("Phase C launcher lacks explicit runtime-data override")
+        if "mktemp -d" not in launcher_text:
+            errors.append("Phase C launcher lacks disposable external runtime-data root")
+
     for rel in sorted(BLOCKED_PHASE_E):
         try:
             tracked = subprocess.check_output(
