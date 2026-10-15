@@ -50,8 +50,6 @@ test('concurrent migration checksum loser rolls back all extra schema',async()=>
  // Force both appliers to observe absent ledger, then let the accepted
  // migration win before the second transactional batch begins.
  const startBatch=db.batch.bind(db);
- let firstBatch=null;
- const barrier=new Promise(resolve=>{firstBatch=resolve});
  const originalPrepare=db.prepare.bind(db);
  let emptyReads=0;
  db.prepare=(sql)=>{
@@ -71,10 +69,10 @@ test('concurrent migration checksum loser rolls back all extra schema',async()=>
  const firstCommitted=new Promise(resolve=>{releaseSecond=resolve});
  let batches=0;
  db.batch=async actions=>{
-   batches++;
-   if(batches===2)await firstCommitted;
+   const index=++batches;
+   if(index===2)await firstCommitted;
    try{return await startBatch(actions)}
-   finally {if(batches===1)releaseSecond()}
+   finally {if(index===1)releaseSecond()}
  };
  const outcomes=await Promise.allSettled([
    applyTodayMigration(db,{sql:accepted}),
