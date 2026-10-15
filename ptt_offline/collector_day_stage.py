@@ -1,0 +1,54 @@
+"""Explicit bounded, read-only Collector -> selected day/AID staging.
+
+Source rows are scanned only for one verified article. They are never selected
+by schema-preview first-N query. No publication or D1 mutation is performed.
+"""
+from __future__ import annotations
+
+from .collector_source_preview import verify_schema
+from .public_today_contract import ContractError, normalize_public_aid
+from .publisher_cli import coverage_receipt
+from .url_epoch_authority import reconstruct_events
+
+MAX_SOURCE_ROWS = 50000
+MAX_STAGE_ROWS = 5
+
+
+def stage_selected_day(db, *, day: str, aid: str, limit: int=5) -> dict:
+    if type(limit) is not int or not 1 <= limit <= MAX_STAGE_ROWS:
+        raise ContractError("first-window staging cap exceeded")
+    canonical=normalize_public_aid(aid)
+    verify_schema(db)
+    article=db.execute(
+        "SELECT id,board,aid,url FROM articles WHERE board=? AND aid IN (?,?)",
+        ("C_Chat",canonical,"#"+canonical),
+    ).fetchall()
+    if len(article) != 1:
+        raise ContractError("exactly one verified C_Chat article required")
+    article_id,board,raw_aid,url=article[0]
+    if normalize_public_aid(raw_aid) != canonical:
+        raise ContractError("selected AID mismatch")
+    coverage=coverage_receipt(db,raw_aid)
+    # Bound the full chronology before determining the selected Taipei day.
+    raw=db.execute(
+        """SELECT source_line,source_page,kind,author,content,ptt_date,ptt_time
+           FROM pushes WHERE article_id=? ORDER BY source_line LIMIT ?""",
+        (article_id,MAX_SOURCE_ROWS+1),
+    ).fetchall()
+    if len(raw)>MAX_SOURCE_ROWS:
+        raise ContractError("source chronology exceeds bounded audit cap")
+    keys=("source_line","source_page","kind","author","content","ptt_date","ptt_time")
+    chronological=reconstruct_events(
+        board=board,aid=raw_aid,url=url,
+        pushes=[dict(zip(keys,r)) for r in raw],
+    )
+    selected=[{**r,"source_url":url,"origin":"collector"}
+              for r in chronological if r["day"] == day]
+    return {
+        "day":day,"aid":canonical,
+        "source_rows_examined":len(raw),
+        "selected_rows_total":len(selected),
+        "rows":selected[:limit],
+        "has_more":len(selected)>limit,
+        "coverage":coverage,
+    }
