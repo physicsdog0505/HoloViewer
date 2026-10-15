@@ -33,7 +33,7 @@ def schema_receipt():
         raise RuntimeError("migration manifest missing or unexpected version set")
     entry = entries[0]
     digest = hashlib.sha256(payload).hexdigest()
-    blob_digest = hashlib.sha1(b"blob " + str(len(payload)).encode("ascii") + b"\\0" + payload).hexdigest()
+    blob_digest = hashlib.sha1(b"blob " + str(len(payload)).encode("ascii") + b"\\x00" + payload).hexdigest()
     if (entry.get("version") != 1
         or entry.get("path") != "ptt_offline/d1_migrations/0001_canonical_ptt.sql"
         or entry.get("git_blob_sha") != blob_digest
