@@ -50,7 +50,7 @@ def owner_signed_http_executor(*, endpoint: str, secret: str, allow_write: bool=
             "X-Ptt-Signature":signature,
         })
         # One call only; do not catch and retry uncertain remote commit.
-        with opener(request,timeout=30) as response:
+        with opener(request,timeout=60) as response:
             if response.status!=200:
                 raise ContractError("non-success publisher response; reconcile before replay")
             data=response.read(MAX_JSON_BYTES+1)
