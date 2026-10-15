@@ -46,7 +46,7 @@ class ResumablePublisherTests(unittest.TestCase):
             with self.subTest(row=row), self.assertRaises(ContractError):
                 make_batch(checkpoint=self.cp,rows=[row])
         with self.assertRaises(ContractError):
-            make_batch(checkpoint=self.cp,rows=[],batch_cap=6)
+            make_batch(checkpoint=self.cp,rows=[],batch_cap=26)
 
 if __name__=="__main__":
     unittest.main()
