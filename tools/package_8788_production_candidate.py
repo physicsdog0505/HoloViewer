@@ -19,10 +19,31 @@ PINNED = "a144bb378a8bdd772faa867d608c1e7491253883"
 ASSETS = ("ptt_timeline.js", "ptt_player_adapter.js", "ptt_worker_adapter.js",
           "hololive_channels.prototype.json")
 
+AUTHORIZED_UI_OVERRIDES = {
+    "live_channel_rail_clear_navigation": {
+        "path": "client_ui_shell.py",
+        "old": "position:fixed;left:2px;top:270px;z-index:65;width:64px;max-height:calc(100vh - 282px);",
+        "new": "position:fixed;left:2px;top:466px;z-index:65;width:64px;max-height:calc(100vh - 478px);",
+    },
+}
+
+def apply_authorized_ui_overrides(output: Path) -> dict[str, str]:
+    applied = {}
+    for name, spec in AUTHORIZED_UI_OVERRIDES.items():
+        target = output / spec["path"]
+        text = target.read_text(encoding="utf-8")
+        old = spec["old"]
+        if text.count(old) != 1:
+            raise RuntimeError("authorized UI override anchor mismatch: " + name)
+        target.write_text(text.replace(old, spec["new"]), encoding="utf-8")
+        applied[name] = spec["new"]
+    return applied
+
 def package(output: Path) -> dict:
     base = build(output)
     if base["pinned_source"] != PINNED:
         raise RuntimeError("accepted source pin changed")
+    ui_overrides = apply_authorized_ui_overrides(output)
     if (output / "entry_fixture.py").exists():
         raise RuntimeError("fixture entrypoint must never be deployed")
     public = output / "public"
@@ -53,6 +74,7 @@ def package(output: Path) -> dict:
     (output / "wrangler.jsonc").write_text(json.dumps(config, indent=2) + "\n")
     receipt = {
         **base, "target_worker": TARGET, "runtime": "python_workers",
+        "authorized_ui_overrides": ui_overrides,
         "assets": digests, "d1_bindings": [], "worker_deployed": False,
         "production_capability": "limited-route probe; NOT full product acceptance",
         "requires_explicit_owner_deploy_approval": True,
