@@ -63,31 +63,34 @@ def _home_row(row: dict, home_stream_cls: Callable, *, feed_freshness: str = "un
     )
 
 
+def home_groups_from_payload(payload: dict, home_stream_cls: Callable):
+    """Adapt one already-fetched Today envelope without any extra I/O."""
+    rows = payload.get("streams", payload.get("items"))
+    if not isinstance(rows, list):
+        raise PublicAPIUnavailable("Today rows missing")
+    groups = {"live": [], "upcoming": [], "ended": [], "unknown": []}
+    freshness_envelope = payload.get("freshness")
+    freshness = (
+        freshness_envelope.get("status")
+        if isinstance(freshness_envelope, dict) else None
+    )
+    if freshness not in {"fresh", "stale", "unknown"}:
+        freshness = "unknown"
+    for raw in rows:
+        item = _home_row(raw, home_stream_cls, feed_freshness=freshness)
+        if item is None:
+            continue
+        bucket = ("upcoming" if item.state == "waiting" else
+                  "unknown" if item.state == "stale" else
+                  item.state if item.state in groups else "unknown")
+        groups[bucket].append(item)
+    return tuple(groups[key] for key in ("live", "upcoming", "ended", "unknown"))
+
+
 def bind_home_reader(api: PublicAPI, home_stream_cls: Callable):
     """Return the accepted 4174 four-list shape using only Public API evidence."""
     def read_home(*, now=None, runtime_root=None):
-        payload = api.read_today()
-        rows = payload.get("streams", payload.get("items"))
-        # Missing list is an error, not a silently empty 'complete' result.
-        if not isinstance(rows, list):
-            raise PublicAPIUnavailable("Today rows missing")
-        groups = {"live": [], "upcoming": [], "ended": [], "unknown": []}
-        freshness_envelope = payload.get("freshness")
-        freshness = (
-            freshness_envelope.get("status")
-            if isinstance(freshness_envelope, dict) else None
-        )
-        if freshness not in {"fresh", "stale", "unknown"}:
-            freshness = "unknown"
-        for raw in rows:
-            item = _home_row(raw, home_stream_cls, feed_freshness=freshness)
-            if item is None:
-                continue
-            bucket = ("upcoming" if item.state == "waiting" else
-                      "unknown" if item.state == "stale" else
-                      item.state if item.state in groups else "unknown")
-            groups[bucket].append(item)
-        return tuple(groups[key] for key in ("live", "upcoming", "ended", "unknown"))
+        return home_groups_from_payload(api.read_today(), home_stream_cls)
     return read_home
 
 def bind_history_reader(api: PublicAPI, home_stream_cls: Callable):
