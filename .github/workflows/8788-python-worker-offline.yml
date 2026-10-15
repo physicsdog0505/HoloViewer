@@ -31,6 +31,29 @@ permissions:
   contents: read
 
 jobs:
+  playback-fast-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Immutable 4174 UI source verification
+        run: python3 tools/verify_4174_snapshot.py
+      - name: Player-only route, canonical Home, and deployment bundle regressions
+        run: |
+          python3 -B -m unittest -v \
+            test_playback_routes \
+            test_cloudflare_entry_binding \
+            test_worker_preload \
+            test_public_api_binding \
+            test_package_8788_production_candidate
+      - name: Build exact existing Worker candidate without deploying
+        run: |
+          python3 tools/package_8788_production_candidate.py --output "$RUNNER_TEMP/holoviewer-public-player-candidate"
+          python3 -m compileall -q "$RUNNER_TEMP/holoviewer-public-player-candidate"
+
   worker-source-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 15
