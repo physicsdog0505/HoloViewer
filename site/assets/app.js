@@ -34,31 +34,6 @@ function updateClientTopbar(routeName){
 }
 
 
-/* Accepted 4174 immersive state: keep player iframes mounted while changing
-   fullscreen and layout. Original stylesheet is loaded only for viewer routes. */
-function applyViewerImmersive(enabled){
- document.body.classList.toggle('custom-immersive',enabled);
- const button=$('customImmerse');button.setAttribute('aria-pressed',String(enabled));
- button.textContent=enabled?'退出沉浸模式':'沉浸模式';
-}
-$('immersiveExit').onclick=()=>$('customImmerse').click();
-document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('custom-immersive')&&!document.fullscreenElement)applyViewerImmersive(false)});
-document.addEventListener('fullscreenchange',()=>{
- if(!document.fullscreenElement)applyViewerImmersive(false);
-});
-$('customImmerse').addEventListener('click',async()=>{
- const next=!document.body.classList.contains('custom-immersive');
- applyViewerImmersive(next);
- try{
-  if(next&&!document.fullscreenElement)await document.documentElement.requestFullscreen();
-  else if(!next&&document.fullscreenElement)await document.exitFullscreen();
- }catch(error){
-  // Leave the accepted CSS-only immersive presentation active if fullscreen
-  // is denied; the same visible button remains available to exit.
-  $('session-status').textContent=next?'無法進入瀏覽器全螢幕，已切換沉浸版面':'';
- }
-});
-
 function route(r){
  // Hash query belongs to the session, not the route key.
  r=String(r||'').split('?')[0];
@@ -92,8 +67,7 @@ function route(r){
  if(transplantCss)transplantCss.media=viewerActive?'all':'not all';
  document.body.classList.toggle('custom-session-watching',viewerActive);
  if(!viewerActive&&document.body.classList.contains('custom-immersive')){
-  applyViewerImmersive(false);
-  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+  window.hvExit4174Immersive?.();
  }
  document.body.classList.toggle('home-wide',r==='home'||r==='history');
  document.body.classList.toggle('ptt-focus-mode',r==='ptt-focus');
