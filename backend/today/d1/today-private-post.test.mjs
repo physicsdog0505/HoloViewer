@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {signature,handleTodayPrivatePost} from './today-private-post.mjs';
+import {signature,handleTodayPrivatePost,mountTodayPublisherOnCombinedApi} from './today-private-post.mjs';
 const secret='test-secret';
 const when=1792080000000;
 function req(body,stamp=String(when),mac='0'.repeat(64)){return new Request('https://api.example/internal/today/one-shot',{method:'POST',headers:{'x-today-timestamp':stamp,'x-today-signature':mac},body});}
@@ -14,4 +14,15 @@ test('private signed path rejects disabled, stale, malformed and bad signatures 
  const valid=await signature(secret,String(when),payload);
  assert.equal((await handleTodayPrivatePost(req(payload,String(when),valid),env,{now:when})).status,409);
  assert.notEqual(valid,await signature(secret,String(when),payload+' '));
+});
+
+test('mounted Today handler preserves combined legacy and PTT routes and blocks unsigned writes',async()=>{
+ const existing={async fetch(request){return new Response(new URL(request.url).pathname,{status:200})}};
+ const mounted=mountTodayPublisherOnCombinedApi(existing);
+ const legacy=await mounted.fetch(new Request('https://api.example/v1/history'),{});
+ assert.equal(await legacy.text(),'/v1/history');
+ const ptt=await mounted.fetch(new Request('https://api.example/internal/ptt/publish',{method:'POST'}),{});
+ assert.equal(await ptt.text(),'/internal/ptt/publish');
+ const disabled=await mounted.fetch(req('{"receipt":{}}'),{});
+ assert.equal(disabled.status,503);
 });
