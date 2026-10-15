@@ -9,19 +9,23 @@ from __future__ import annotations
 from .public_today_contract import ContractError
 
 MAX_HTTP_REQUESTS = 1
-MAX_D1_QUERIES = 30
-MAX_LOGICAL_ROWS = 5
+MAX_D1_QUERIES = 150
+MAX_LOGICAL_ROWS = 25
 # First-window upper bound: 1 thread + 5 push upserts + 5 evidence upserts
 # + 1 optional provider-state update = 12 mutations; allow 20 actual D1
 # Rows Written under the frozen #48 canary cap. Treat as distinct accounting.
-MAX_ROWS_WRITTEN = 20
+MAX_ROWS_WRITTEN = 80
 
 
-def execute_once(*, batch: dict, executor) -> dict:
+def execute_once(*, batch: dict, executor, max_rows=5, max_queries=30, max_written=20) -> dict:
+    if (type(max_rows) is not int or not 1<=max_rows<=MAX_LOGICAL_ROWS or
+        type(max_queries) is not int or not 1<=max_queries<=MAX_D1_QUERIES or
+        type(max_written) is not int or not 1<=max_written<=MAX_ROWS_WRITTEN):
+        raise ContractError('invalid operator-approved transport caps')
     if not callable(executor):
         raise ContractError("explicit transport executor required")
     rows=batch.get("rows")
-    if not isinstance(rows,list) or len(rows) > MAX_LOGICAL_ROWS:
+    if not isinstance(rows,list) or len(rows) > max_rows:
         raise ContractError("transport row cap exceeded")
     if batch.get("request_cap") != 1 or batch.get("retry_cap") != 0:
         raise ContractError("unsafe transport budget")
@@ -40,8 +44,8 @@ def execute_once(*, batch: dict, executor) -> dict:
     logical=response.get("logical_rows_acked")
     requests=response.get("http_requests")
     if (type(requests) is not int or requests < 0 or requests > MAX_HTTP_REQUESTS or
-        type(queries) is not int or queries < 0 or queries > MAX_D1_QUERIES or
-        type(written) is not int or written < 0 or written > MAX_ROWS_WRITTEN):
+        type(queries) is not int or queries < 0 or queries > max_queries or
+        type(written) is not int or written < 0 or written > max_written):
         raise ContractError("transport accounting cap exceeded")
     if type(logical) is not int or logical != len(rows):
         raise ContractError("partial logical push ACK")
