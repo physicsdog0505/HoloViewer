@@ -47,6 +47,7 @@ def package(output: Path) -> dict:
         "main": "entry.py",
         "compatibility_date": "2026-10-15",
         "compatibility_flags": ["python_workers"],
+        "services": [{"binding": "PUBLIC_API", "service": "holoviewer-public-api"}],
         "assets": {"directory": "./public", "binding": "ASSETS", "run_worker_first": False},
     }
     (output / "wrangler.jsonc").write_text(json.dumps(config, indent=2) + "\n")
