@@ -17,10 +17,10 @@ export async function batchDigest(batch) {
 }
 const fail = message => { throw new Error(message); };
 const requireTrue = (condition,message) => { if(!condition) fail(message); };
-const SQL_THREAD='INSERT INTO ptt_threads(day,aid,source_url) VALUES (?,?,?) ON CONFLICT(day,aid) DO UPDATE SET source_url=COALESCE(ptt_threads.source_url,excluded.source_url)';
+const SQL_THREAD='INSERT INTO ptt_threads(day,aid,source_url) VALUES (?,?,?) ON CONFLICT(day,aid) DO UPDATE SET source_url=excluded.source_url WHERE ptt_threads.source_url IS NULL AND excluded.source_url IS NOT NULL';
 const SQL_STATE="INSERT INTO ptt_provider_state(day,aid,last_success_at,has_gap) VALUES (?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),1) ON CONFLICT(day,aid) DO UPDATE SET last_success_at=excluded.last_success_at,has_gap=1";
-const SQL_PUSH='INSERT INTO ptt_pushes (push_id,aid,day,source_line,kind,author,content,occurred_at,floor,source_url,source_priority,source_record_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(push_id) DO UPDATE SET floor=COALESCE(excluded.floor,ptt_pushes.floor),kind=COALESCE(excluded.kind,ptt_pushes.kind),source_priority=MAX(ptt_pushes.source_priority,excluded.source_priority)';
-const SQL_EVIDENCE='INSERT INTO ptt_source_evidence(day,aid,source_record_key,push_id,source_line) VALUES(?,?,?,?,?) ON CONFLICT(day,aid,source_record_key) DO UPDATE SET push_id=excluded.push_id,source_line=excluded.source_line';
+const SQL_PUSH='INSERT INTO ptt_pushes (push_id,aid,day,source_line,kind,author,content,occurred_at,floor,source_url,source_priority,source_record_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(push_id) DO UPDATE SET floor=COALESCE(excluded.floor,ptt_pushes.floor),kind=COALESCE(excluded.kind,ptt_pushes.kind),source_priority=MAX(ptt_pushes.source_priority,excluded.source_priority) WHERE (ptt_pushes.floor IS NULL AND excluded.floor IS NOT NULL) OR (ptt_pushes.kind IS NULL AND excluded.kind IS NOT NULL) OR ptt_pushes.source_priority<excluded.source_priority';
+const SQL_EVIDENCE='INSERT INTO ptt_source_evidence(day,aid,source_record_key,push_id,source_line) VALUES(?,?,?,?,?) ON CONFLICT(day,aid,source_record_key) DO UPDATE SET push_id=excluded.push_id,source_line=excluded.source_line WHERE ptt_source_evidence.push_id<>excluded.push_id OR ptt_source_evidence.source_line<>excluded.source_line';
 const DAY=/^\d{4}-\d{2}-\d{2}$/;
 const PUSH=/^ptt:v1:[0-9a-f]{64}$/;
 const AID=/^[A-Za-z0-9._-]{1,32}$/;
@@ -76,7 +76,10 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority,limits={
       .bind(row.day,row.aid,row.source_record_key).first();
     requireTrue(!existing || existing.push_id===row.push_id,'existing source evidence conflict');
   }
-  const aids=[...new Set(batch.rows.map(row=>row.aid))].sort();
+  // Idempotent re-observation must not create account-level D1 writes. The
+  // conflict preflight above still rejects source-identity disagreement before
+  // mutation; SQL conflict clauses below update only genuine enrichment.
+    const aids=[...new Set(batch.rows.map(row=>row.aid))].sort();
   const statements=aids.map(aid=>DB.prepare(SQL_THREAD).bind(batch.day,aid,
     batch.rows.find(row=>row.aid===aid).source_url));
   for(const row of batch.rows) {
