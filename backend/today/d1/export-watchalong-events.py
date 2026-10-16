@@ -78,6 +78,15 @@ def main():
                         "day":value.isoformat(),"aid":target.aid,"stage":"fetch",
                         "error":result.error or "unknown refresh failure",
                     })
+    if args.refresh_missing_recent and refresh_stats["errors"]:
+        print(json.dumps({
+            "status":"BLOCKED_REFRESH_ERRORS",
+            "refresh":refresh_stats,
+            "sql":None,
+            "json":None,
+        }, ensure_ascii=False))
+        raise SystemExit(2)
+
     try:
         for offset in range(args.days):
             day=(current.date()-timedelta(days=offset)).isoformat()
