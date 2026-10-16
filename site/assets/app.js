@@ -939,11 +939,41 @@ function sessionAudio(){
  const sel=$('session-audio');sel.value=String(viewing.audio);
  $('stage').querySelectorAll('.player-card iframe').forEach((el,i)=>sessionMute(el,i!==viewing.audio));
 }
+async function resolveProductionPtt(videoIdValue){
+ const id=videoId(String(videoIdValue||''));if(!id)return {mode:'unavailable'};
+ let row;try{row=await api('/v1/catalog/videos/'+encodeURIComponent(id));}catch(_error){return {mode:'unavailable'}}
+ const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
+ if(['live','upcoming','waiting'].includes(lifecycle))return {mode:'live'};
+ if(lifecycle!=='ended')return {mode:'unavailable'};
+ const start=String(row?.actual_start||row?.scheduled_start||'');
+ const startMs=Date.parse(start);if(!Number.isFinite(startMs))return {mode:'unavailable'};
+ const endMs=Date.parse(String(row?.actual_end||''));
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(startMs));
+ const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ const day=out.year+'-'+out.month+'-'+out.day;
+ const messages=[];let after='',pages=0;
+ while(pages++<50){
+  const path='/v1/ptt/history?day='+encodeURIComponent(day)+'&limit=200'+(after?'&after='+encodeURIComponent(after):'');
+  let data;try{data=await api(path)}catch(_error){return messages.length?{mode:'archive',start,messages}:{mode:'unavailable'}}
+  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))return {mode:'unavailable'};
+  let beyond=false;
+  for(const push of data.pushes){
+   const when=Date.parse(String(push?.occurred_at||''));
+   if(!Number.isFinite(when))continue;
+   if(when>=startMs&&(!Number.isFinite(endMs)||when<=endMs))messages.push(push);
+   if(Number.isFinite(endMs)&&when>endMs)beyond=true;
+  }
+  const next=String(data.page?.next_checkpoint||'');
+  if(beyond||data.page?.has_more!==true||!next||next===after)break;
+  after=next;
+ }
+ return {mode:'archive',start,messages};
+}
 window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
  viewing.ids=clean;
- viewing.ptt=opts.ptt==='live'?'live':'video';
+ viewing.ptt=['live','archive','unavailable'].includes(opts.ptt)?opts.ptt:'unavailable';
  viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
  viewing.primary=Math.max(0,Math.min(clean.length-1,Number(opts.primary)||0));
  viewing.audio=Math.max(0,Math.min(clean.length-1,Number(opts.audio)||0));
@@ -955,7 +985,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
   section.replaceChildren(Object.assign(document.createElement('p'),{className:'form-error',textContent:'4174 viewer transplant assets failed to load.'}));
   return;
  }
- section.replaceChildren(window.render4174SharedViewerDOM(viewing.ptt==='live'));
+ const hasPttResolver=typeof opts.pttResolve==='function'||Boolean(opts.pttResolverUrl);\n section.replaceChildren(window.render4174SharedViewerDOM(viewing.ptt==='live',hasPttResolver));
  route('custom-session');
 
  const streamMetadata=new Map([...document.querySelectorAll('.live-channel-rail-item[data-live-video-id]')].map(item=>[
@@ -973,7 +1003,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
   layout:viewing.layout,
   primaryIndex:viewing.primary,
   audioMasterIndex:viewing.audio,
-  singlePttKind:viewing.ptt==='live'?'live':'',
+  singlePttKind:viewing.ptt==='live'?'live':(viewing.ptt==='archive'?'vod':''),\n  pttResolverUrl:typeof opts.pttResolverUrl==='string'?opts.pttResolverUrl:'',\n  pttResolve:typeof opts.pttResolve==='function'?opts.pttResolve:null,
   translationA:[],
   translationB:[],
   verifiedTimelineStarts:opts.verifiedTimelineStarts&&typeof opts.verifiedTimelineStarts==='object'?opts.verifiedTimelineStarts:{},
@@ -1345,10 +1375,10 @@ renderWatchalongSession();
   }
   if(['live','upcoming','waiting'].includes(lifecycle)&&streamDay===taipeiDay()){
    opts.ptt='live';
-   opts.pttResolverUrl=config.apiBase.replace(/\/$/,'')+'/v1/ptt/today?day='+encodeURIComponent(taipeiDay());
+   opts.pttResolve=resolveProductionPtt;
   }else if(lifecycle==='ended'&&streamDay){
    opts.ptt='archive';
-   opts.pttResolverUrl=config.apiBase.replace(/\/$/,'')+'/v1/ptt/history?day='+encodeURIComponent(streamDay);
+   opts.pttResolve=resolveProductionPtt;
   }else{
    opts.ptt='unavailable';
   }
