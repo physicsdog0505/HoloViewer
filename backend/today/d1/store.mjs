@@ -136,6 +136,8 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
   const coverage=await db.prepare('SELECT * FROM public_today_catalog_meta WHERE singleton=1').first();
   // Taipei day boundaries are UTC+08:00. Scope includes this day's activity and
   // actively LIVE streams crossing midnight, but not unrelated historical rows.
+  // Membership uses actual start first, then scheduled start: observation and end timestamps
+  // never pull an old ended stream back into Home. Cross-midnight LIVE needs fresh evidence.
   const requestedStart=new Date(day+'T00:00:00+08:00');
   const localHour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',hourCycle:'h23'}).format(now));
   const localDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
@@ -152,13 +154,13 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
     FROM public_today_canonical
     JOIN public_today_approved_channels ac
       ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
-    WHERE ((lifecycle_observed_at>=? AND lifecycle_observed_at<?)
-        OR (scheduled_start>=? AND scheduled_start<?)
-        OR (actual_start>=? AND actual_start<?)
-        OR (actual_end>=? AND actual_end<?)
-        OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL AND lifecycle_observed_at>=?))
+    WHERE ((COALESCE(actual_start,scheduled_start)>=? AND COALESCE(actual_start,scheduled_start)<?)
+        OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL
+            AND lifecycle_observed_at>=? AND lifecycle_observed_at<=?))
     ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ? OFFSET ?`)
-    .bind(coverage?.roster_version??'',start,end,start,end,start,end,start,end,end,new Date(Date.parse(start)-86400000).toISOString().replace(/\.\d{3}Z$/,'Z'),limit+1,offset).all();
+    .bind(coverage?.roster_version??'',start,end,end,
+      new Date(Date.parse(now.toISOString())-1200000).toISOString().replace(/\.\d{3}Z$/,'Z'),
+      now.toISOString().replace(/\.\d{3}Z$/,'Z'),limit+1,offset).all();
   const truncated=(rows.results??[]).length>limit;
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
