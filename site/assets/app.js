@@ -997,8 +997,11 @@ function schedulePttPoll(){
  if(pttPollStopped)return;
  if(pttPollTimer)clearTimeout(pttPollTimer);
  pttPollTimer=setTimeout(async()=>{
-  if(!document.hidden&&$('ptt').classList.contains('active'))await loadPtt();
-  schedulePttPoll();
+  try{
+   if(!document.hidden&&$('ptt').classList.contains('active'))await loadPtt();
+  }finally{
+   schedulePttPoll();
+  }
  },pttPollDelayMs());
 }
 schedulePttPoll();
