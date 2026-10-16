@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+// #45 integration gate: run Today membership + route-mount regressions in the existing PTT workflow.
+import './store.test.mjs';
+import './api-shell.test.mjs';
 import {detectCollabCandidates} from './experience-read.mjs';
 
 const C1='UC'+'A'.repeat(22);
