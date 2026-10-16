@@ -5,14 +5,16 @@ Never publishes, writes source SQLite, displays push content or accesses secrets
 import argparse
 import json
 from .collector_source_preview import open_source
+from .public_today_contract import normalize_public_aid
 from .live_capture_publisher import inspect_latest_article
 
 def audit(source, aid, source_line):
     if not isinstance(aid,str) or not aid or type(source_line) is not int or source_line < 1:
         raise ValueError("explicit AID and positive source_line required")
+    canonical=normalize_public_aid(aid)
     db=open_source(source)
     try:
-        match=db.execute("SELECT id FROM articles WHERE board='C_Chat' AND aid=? ORDER BY id DESC LIMIT 1",(aid.lstrip('#'),)).fetchone()
+        match=db.execute("SELECT id FROM articles WHERE board='C_Chat' AND aid IN (?,?) ORDER BY id DESC LIMIT 1",(canonical,"#"+canonical)).fetchone()
         if not match:
             return {"status":"ARTICLE_NOT_FOUND","aid":aid,"source_line":source_line}
         plan=inspect_latest_article(db,article_id=match[0])
