@@ -76,6 +76,10 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertNotIn('href="assets/', html)
         self.assertNotIn('src="assets/', html)
 
+    def test_static_html_has_no_inline_style_under_strict_csp(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        self.assertNotIn(' style="', html)
+
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
