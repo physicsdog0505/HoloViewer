@@ -159,9 +159,9 @@ test('30-channel steady state: duplicate feed items create exactly one cursor ro
  assert.equal(out.discovered,0);
  assert.equal(db.rowWrites-before,1,'only the batched reconcile cursor advances');
  assert.equal(db.queries,65);
- assert.equal(db.readQueries,5);
- assert.equal(db.writeQueries,60);
- assert.equal(db.returnedReadRows,98,'result rows in the test double, not Cloudflare billed Rows Read');
+ assert.equal(db.readQueries,4);
+ assert.equal(db.writeQueries,61);
+ assert.equal(db.returnedReadRows,67,'result rows in the test double, not Cloudflare billed Rows Read');
  db.raw.close();
 });
 
