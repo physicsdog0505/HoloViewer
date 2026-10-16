@@ -41,6 +41,14 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
     started=clock()
     with open_source(source) as db:
         article_ids=active_article_ids(db,limit=max_articles)
+        if send and len(article_ids)>1:
+            # Fairly rotate the first AID at the active wall-clock cadence.
+            # This lets a strict global max_batches=1 remain safe without a
+            # permanently busy newest thread starving the other active AIDs.
+            now=datetime.fromtimestamp(started,timezone.utc)
+            slot=int(started//snapshot_interval(now))
+            offset=slot%len(article_ids)
+            article_ids=article_ids[offset:]+article_ids[:offset]
         if not article_ids:
             result={"status":"NO_REAL_COLLECTOR_ROWS","sent":0,"eligible":0,"http_posts":0}
         else:
