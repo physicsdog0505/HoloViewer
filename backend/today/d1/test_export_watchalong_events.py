@@ -38,6 +38,24 @@ class ProjectionGateTests(unittest.TestCase):
     def test_duplicate_diagnostic(self):
         issues=module.projection_issues([event(),event()])
         self.assertEqual(issues[0]["reasons"],["duplicate_event_id"])
+    def test_ptt_mirror_and_official_url_share_canonical_source(self):
+        official="https://www.ptt.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        mirror="https://www.pttweb.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        self.assertEqual(module.canonical_article_url(official),official)
+        self.assertEqual(module.canonical_article_url(mirror),official)
+        self.assertIsNone(module.canonical_article_url("https://bad.example/bbs/C_Chat/M.1790506113.A.7E3.html"))
+        self.assertIsNone(module.canonical_article_url(mirror+"?unexpected=1"))
+    def test_two_source_representations_dedupe_without_collapsing_other_day(self):
+        from types import SimpleNamespace
+        official="https://www.ptt.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        mirror="https://www.pttweb.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        def source(url,day):
+            return SimpleNamespace(aid="#legacy" if url==official else "M.1790506113.A.7E3",
+                 source_url=url,day=day,streams=[SimpleNamespace(video_id="U2o13h1Oib4")])
+        self.assertEqual(module.event_signature(source(official,"2026-09-27")),
+                         module.event_signature(source(mirror,"2026-09-27")))
+        self.assertNotEqual(module.event_signature(source(official,"2026-09-27")),
+                            module.event_signature(source(mirror,"2026-09-28")))
     def test_valid(self):
         self.assertTrue(module.validate_projection([event(),event("watch:456","8pF4qHcshDc")]))
     def test_duplicate_events_fail(self):
