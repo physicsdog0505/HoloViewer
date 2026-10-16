@@ -1220,13 +1220,17 @@ function ensureWatchalongYoutubeApi(callback){
  if(!existing){
   const script=document.createElement('script');script.src='https://www.youtube.com/iframe_api';document.head.appendChild(script);
  }else{
-  const retry=()=>{
+  let attempts=0;
+  const retryTimer=setInterval(()=>{
+   attempts++;
    if(window.YT?.Player){
+    clearInterval(retryTimer);
     const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
     callbacks.forEach(fn=>{try{fn();}catch(_error){}});
-   }else setTimeout(retry,50);
-  };
-  setTimeout(retry,50);
+   }else if(attempts>=200){
+    clearInterval(retryTimer);
+   }
+  },50);
  }
 }
 async function renderWatchalongSession(){
