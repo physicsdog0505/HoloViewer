@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from ptt_offline.live_capture_publisher import active_article_ids,inspect_latest_article,run_live_once,state_for_source
+from ptt_offline.audit_live_line import audit
 from ptt_offline.ptt_aid_identity import aid_from_article_url
 from ptt_offline.public_today_contract import ContractError
 
@@ -72,6 +73,23 @@ class LiveCapturePublisherTests(unittest.TestCase):
         plan=inspect_latest_article(self.db)
         self.assertIn(4,plan["pending_source_lines"])
         self.assertFalse(any(x["source_line"]==4 for x in plan["candidate_rows"]))
+
+    def test_exact_source_line_audit_is_read_only_and_redacted(self):
+        self.db.execute(
+            "INSERT INTO pushes VALUES(4,1,4,1,'→','late','do not disclose','10/16','06:36','2026-10-15T23:01:23Z')"
+        )
+        filename=str(Path(self.tmp.name)/"collector.sqlite3")
+        on_disk=sqlite3.connect(filename)
+        try:
+            self.db.backup(on_disk)
+        finally:
+            on_disk.close()
+        receipt=audit(filename,self.aid,4)
+        self.assertEqual(receipt["status"],"ELIGIBLE")
+        self.assertEqual(receipt["occurred_at"],"2026-10-15T22:36:00Z")
+        self.assertEqual(receipt["day"],"2026-10-16")
+        self.assertEqual(receipt["remote_writes"],0)
+        self.assertNotIn("do not disclose",str(receipt))
 
     def test_bounded_scan_tracks_all_normal_100_plus_lines(self):
         self.db.executemany("INSERT INTO pushes VALUES(?,?,?,?,?,?,?,?,?,?)",[
