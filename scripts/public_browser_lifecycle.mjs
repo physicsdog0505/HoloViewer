@@ -99,16 +99,16 @@ try{
  await page.waitForSelector('#stage .player-card:nth-child(2)');
  assert(await page.locator('#stage .player-card').count()===2,'multi-view did not mount two cards');
  assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'two-stream auto layout did not resolve to Equal');
- await page.locator('[data-layout="primary"]').click();
- assert(await page.evaluate(()=>document.body.classList.contains('layout-primary')),'Focus/primary layout did not activate');
- await page.locator('#stage .player-card[data-index="1"] .focus').click();
- assert(await page.locator('#stage .player-card[data-index="1"]').evaluate(el=>el.classList.contains('primary')),'Focus target did not become primary');
- await page.locator('#stage .player-card[data-index="1"] .master').click();
- assert(await page.locator('#stage .player-card[data-index="1"] .master').getAttribute('aria-pressed')==='true','audio master did not move to second POV');
- await page.locator('[data-layout="equal"]').click();
- assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'Equal layout did not restore');
  await page.locator('#watchSettings').click();
  assert(await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not open');
+ await page.locator('[data-layout="primary"]').click();
+ assert(await page.evaluate(()=>document.body.classList.contains('layout-primary')),'Focus/primary layout did not activate');
+ await page.locator('#focusChoices [data-focus-index="1"]').click();
+ assert(await page.locator('#stage .player-card[data-index="1"]').evaluate(el=>el.classList.contains('primary')),'Focus target did not become primary');
+ await page.locator('#audioFollowFocus').check();
+ assert(await page.locator('#audioFollowFocus').isChecked(),'audio-follow-focus control did not enable');
+ await page.locator('[data-layout="equal"]').click();
+ assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'Equal layout did not restore');
  await page.locator('#watchSettings').click();
  assert(!await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not close');
 
