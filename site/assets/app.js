@@ -960,7 +960,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
   section.replaceChildren(Object.assign(document.createElement('p'),{className:'form-error',textContent:'4174 viewer transplant assets failed to load.'}));
   return;
  }
- section.replaceChildren(window.render4174SharedViewerDOM(viewing.ptt==='live'));
+ section.innerHTML=window.render4174SharedViewerDOM(viewing.ptt==='live');
  route('custom-session');
 
  const streamMetadata=new Map([...document.querySelectorAll('.live-channel-rail-item[data-live-video-id]')].map(item=>[
