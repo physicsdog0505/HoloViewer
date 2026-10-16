@@ -97,6 +97,7 @@ recomputeVerifiedTimeline();
 const immerse=document.getElementById('customImmerse');
 const watchSettings=document.getElementById('watchSettings');
 const watchImmersive=document.getElementById('watchImmersive');
+const immersiveExit=document.getElementById('immersiveExit');
 watchSettings?.addEventListener('click',()=>{
  const open=document.body.classList.toggle('settings-open');
  watchSettings.setAttribute('aria-expanded',String(open));
@@ -310,6 +311,7 @@ window.hvExit4174Immersive=async function hvExit4174Immersive(){
   try{await document.exitFullscreen();}catch(_e){}
  }
 };
+immersiveExit?.addEventListener('click',()=>window.hvExit4174Immersive?.());
 document.addEventListener('keydown',event=>{
  if(event.key!=='Escape'||!immersiveEnabled)return;
  setTimeout(()=>{if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);},0);
