@@ -788,6 +788,7 @@ function mountWatchPlayer(index){
   });
   players[index]=mounted;
 }
+let youtubeReadyRetryTimer=null;
 function onYoutubeApiReadyForViewer(){streams.forEach((stream,index)=>mountWatchPlayer(index));}
 if(window.YT?.Player){
  onYoutubeApiReadyForViewer();
@@ -805,13 +806,17 @@ if(window.YT?.Player){
   const existingApi=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
   if(!existingApi){const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);}
   else{
-   const retry=()=>{
+   let attempts=0;
+   youtubeReadyRetryTimer=setInterval(()=>{
+    attempts++;
     if(window.YT?.Player){
+     clearInterval(youtubeReadyRetryTimer);youtubeReadyRetryTimer=null;
      const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
      callbacks.forEach(callback=>{try{callback();}catch(_error){}});
-    }else setTimeout(retry,50);
-   };
-   setTimeout(retry,50);
+    }else if(attempts>=200){
+     clearInterval(youtubeReadyRetryTimer);youtubeReadyRetryTimer=null;
+    }
+   },50);
   }
  }
 }
@@ -820,6 +825,7 @@ window.hvDestroy4174SharedViewer=function hvDestroy4174SharedViewer(){
  clearInterval(translationRefreshTimer);
  clearInterval(verifiedSyncTimer);
  if(collabPollTimer)clearInterval(collabPollTimer);
+ if(youtubeReadyRetryTimer)clearInterval(youtubeReadyRetryTimer);
  players.forEach(player=>{try{if(player&&typeof player.destroy==='function')player.destroy();}catch(_e){}});
  for(const name of ['watch-multi','watch-grid','layout-auto','layout-equal','layout-primary','single-ptt','single-live','single-vod','collab-live-session','settings-open','custom-immersive']){
   document.body.classList.remove(name);
