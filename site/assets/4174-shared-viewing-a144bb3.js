@@ -532,7 +532,7 @@ function showUnavailablePtt(){
  pttSetStatus('');
 }
 async function refreshPrimaryPtt(index=primaryIndex){
- if(!pttResolverUrl)return;
+ if(!pttResolverUrl&&typeof config.pttResolve!=='function')return;
  const stream=streams[index],player=players[index];
  if(!stream||!player)return;
  const token=++pttResolveToken;
