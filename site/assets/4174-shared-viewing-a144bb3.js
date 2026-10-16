@@ -156,14 +156,14 @@ function forceSingleImmersiveGeometry(active){
  pttPanel.style.setProperty('grid-row','1','important');
 }
 function forceMultiImmersiveGeometry(active){
- if(!contentGrid||!pttPanel||streams.length<2)return;
+ if(!contentGrid||streams.length<2)return;
  const playerColumn=document.querySelector('.custom-player-column');
  const stageNode=document.getElementById('stage');
  const cards=Array.from(stageNode?.querySelectorAll('.player-card')||[]);
  const wraps=cards.map(card=>card.querySelector('.video-wrap')).filter(Boolean);
  const playersNodes=wraps.flatMap(wrap=>Array.from(wrap.querySelectorAll('.player,iframe')));
  const controls=cards.map(card=>card.querySelector('.player-controls')).filter(Boolean);
- const nodes=[contentGrid,playerColumn,stageNode,pttPanel,...cards,...wraps,...playersNodes,...controls].filter(Boolean);
+ const nodes=[contentGrid,playerColumn,stageNode,...(pttPanel?[pttPanel]:[]),...cards,...wraps,...playersNodes,...controls].filter(Boolean);
  if(!active){
   nodes.forEach(node=>{
    const saved=node.dataset.multiImmersiveStyle;
@@ -255,18 +255,30 @@ function forceMultiImmersiveGeometry(active){
   node.style.setProperty('max-height','none','important');
  });
  controls.forEach(node=>node.style.setProperty('display','none','important'));
- pttPanel.style.setProperty('position','relative','important');
- pttPanel.style.setProperty('display','flex','important');
- pttPanel.style.setProperty('flex-direction','column','important');
- pttPanel.style.setProperty('width','100%','important');
- pttPanel.style.setProperty('height','100%','important');
- pttPanel.style.setProperty('min-width','0','important');
- pttPanel.style.setProperty('min-height','0','important');
- pttPanel.style.setProperty('max-width','none','important');
- pttPanel.style.setProperty('max-height','none','important');
- pttPanel.style.setProperty('overflow','hidden','important');
- if(layout==='primary'){pttPanel.style.setProperty('grid-column','2','important');pttPanel.style.setProperty('grid-row',streams.length===2?'2 / 4':'3','important');}
- else{pttPanel.style.setProperty('grid-column','auto','important');pttPanel.style.setProperty('grid-row','auto','important');}
+ if(pttPanel){
+  pttPanel.style.setProperty('position','relative','important');
+  pttPanel.style.setProperty('display','flex','important');
+  pttPanel.style.setProperty('flex-direction','column','important');
+  pttPanel.style.setProperty('width','100%','important');
+  pttPanel.style.setProperty('height','100%','important');
+  pttPanel.style.setProperty('min-width','0','important');
+  pttPanel.style.setProperty('min-height','0','important');
+  pttPanel.style.setProperty('max-width','none','important');
+  pttPanel.style.setProperty('max-height','none','important');
+  pttPanel.style.setProperty('overflow','hidden','important');
+  if(layout==='primary'){pttPanel.style.setProperty('grid-column','2','important');pttPanel.style.setProperty('grid-row',streams.length===2?'2 / 4':'3','important');}
+  else{pttPanel.style.setProperty('grid-column','auto','important');pttPanel.style.setProperty('grid-row','auto','important');}
+  const pttContent=pttPanel.querySelector('iframe:not([hidden]),#ptt-worker-feed:not([hidden])');
+  if(pttContent){
+   pttContent.style.setProperty('display','block','important');
+   pttContent.style.setProperty('flex','1 1 0','important');
+   pttContent.style.setProperty('width','100%','important');
+   pttContent.style.setProperty('height','100%','important');
+   pttContent.style.setProperty('min-height','0','important');
+   pttContent.style.setProperty('max-height','none','important');
+  }
+ }
+}tPanel.style.setProperty('grid-column','auto','important');pttPanel.style.setProperty('grid-row','auto','important');}
  const pttContent=pttPanel.querySelector('iframe:not([hidden]),#ptt-worker-feed:not([hidden])');
  if(pttContent){
   pttContent.style.setProperty('display','block','important');
@@ -306,7 +318,10 @@ immerse?.addEventListener('click',async()=>{
  }
 });
 window.hvExit4174Immersive=async function hvExit4174Immersive(){
- if(immersiveEnabled)applyImmersiveState(false);
+ applyImmersiveState(false);
+ document.body.classList.remove('custom-immersive');
+ forceSingleImmersiveGeometry(false);
+ forceMultiImmersiveGeometry(false);
  if(document.fullscreenElement){
   try{await document.exitFullscreen();}catch(_e){}
  }
@@ -788,14 +803,38 @@ function mountWatchPlayer(index){
   });
   players[index]=mounted;
 }
-window.onYouTubeIframeAPIReady=function(){streams.forEach((stream,index)=>mountWatchPlayer(index));};
+function mountAllWatchPlayers(){streams.forEach((stream,index)=>mountWatchPlayer(index));}
 if(window.YT?.Player){
- streams.forEach((stream,index)=>mountWatchPlayer(index));
+ mountAllWatchPlayers();
 }else{
- const existingApi=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
- if(!existingApi){const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);}
+ window.__hvYoutubeReadyCallbacks=window.__hvYoutubeReadyCallbacks||[];
+ window.__hvYoutubeReadyCallbacks.push(mountAllWatchPlayers);
+ if(!window.__hvYoutubeApiRequested){
+  window.__hvYoutubeApiRequested=true;
+  const previous=window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady=function(){
+   try{if(typeof previous==='function')previous();}catch(_e){}
+   const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
+   callbacks.forEach(callback=>{try{callback();}catch(_e){}});
+  };
+  const existingApi=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+  if(!existingApi){const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);}
+  else{
+   let attempts=0;
+   const retry=setInterval(()=>{
+    attempts++;
+    if(window.YT?.Player){
+     clearInterval(retry);
+     const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
+     callbacks.forEach(callback=>{try{callback();}catch(_e){}});
+    }else if(attempts>=200)clearInterval(retry);
+   },50);
+  }
+ }
 }
 window.hvDestroy4174SharedViewer=function hvDestroy4174SharedViewer(){
+ try{applyImmersiveState(false);}catch(_e){}
+ document.body.classList.remove('custom-immersive');
  stopFocusCarousel();
  clearInterval(translationRefreshTimer);
  clearInterval(verifiedSyncTimer);
