@@ -2,8 +2,7 @@
 const config=window.HOLOVIEWER_CONFIG||{};
 const $=id=>document.getElementById(id);
 const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'歷史直播',ptt:'PTT 今日專串',watchalong:'同時視聽','custom-session':'自訂觀看','ptt-focus':'PTT 今日專串'};
-const stored=(()=>{try{return JSON.parse(sessionStorage.getItem('hvMulti')||'[]')}catch{return []}})();
-const state={multi:Array.isArray(stored)?stored.filter(x=>typeof x==='string'&&/^[\w-]{11}$/.test(x)):[],offset:0};
+const state={offset:0};
 function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el}
 function message(target,text){const box=$(target);box.replaceChildren(node('div',text,'notice'))}
 function videoId(input){let t=input.trim();if(/^[\w-]{11}$/.test(t))return t;try{const u=new URL(t);if(!['youtube.com','www.youtube.com','m.youtube.com','youtu.be','www.youtu.be'].includes(u.hostname))return null;t=u.hostname.includes('youtu.be')?u.pathname.split('/')[1]:u.pathname==='/watch'?u.searchParams.get('v'):['live','embed','shorts'].includes(u.pathname.split('/')[1])?u.pathname.split('/')[2]:null;return /^[\w-]{11}$/.test(t||'')?t:null}catch{return null}}
@@ -16,7 +15,6 @@ function youtubeEmbedUrl(id){
 }
 function frame(id){const f=document.createElement('iframe');f.className='frame';f.title='YouTube player '+id;f.src=youtubeEmbedUrl(id);f.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';f.referrerPolicy='strict-origin-when-cross-origin';f.allowFullscreen=true;return f}
 function single(id,target='single-player'){if(!id){if($(target))message(target,'請輸入有效的 YouTube 網址或影片 ID。');return}if(!$(target)){openViewingDocument([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}$(target).replaceChildren(frame(id))}
-function renderMulti(){sessionStorage.setItem('hvMulti',JSON.stringify(state.multi))}
 function viewingSessionUrl(ids,opts={}){
  const clean=[...new Set((ids||[]).map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return '/custom-view';
@@ -64,9 +62,8 @@ function route(r){
  currentRoute=r;
  // A viewing route without mounted players must never display an empty workspace.
  if(r==='custom-session'&&!viewing.ids.length){
-  const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
-  let recoverable=params.getAll('stream').some(id=>/^[A-Za-z0-9_-]{11}$/.test(id));
-  try{const saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null');recoverable=recoverable||(Array.isArray(saved?.ids)&&saved.ids.some(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id)));}catch{}
+  const params=location.pathname==='/custom-view/session'?new URLSearchParams(location.search):new URLSearchParams();
+  const recoverable=params.getAll('stream').some(id=>/^[A-Za-z0-9_-]{11}$/.test(id));
   if(!recoverable)r='single';
  }
  const pageId=r==='ptt-focus'?'ptt':r;
@@ -97,7 +94,7 @@ function route(r){
  if(r==='multi')loadCollab();
 }
 async function api(path){if(!config.apiBase||!/^https:\/\//.test(config.apiBase))throw Error('尚未設定正式 Worker API');const base=config.apiBase.replace(/\/$/,'');const response=await fetch(base+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}});if(!response.ok)throw Error('API HTTP '+response.status);return response.json()}
-function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>{window.hvOpenCustomSession?.([item.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};card.append(btn);card.append(' ');const multi=node('button','加入多人','secondary');multi.onclick=()=>{if(!state.multi.includes(item.video_id))state.multi.push(item.video_id);renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})};card.append(multi);container.append(card)}
+function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>openViewingDocument([item.video_id],{layout:'auto',ptt:'video',primary:0,audio:0});card.append(btn);container.append(card)}
 const HOME_FILTER_KEY='holoviewer-live-filter';
 const HOME_FILTERS=new Set(['hololive','holostars','mekpark','all']);
 const selectedHomeVideos=new Set();
@@ -865,8 +862,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
-$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
-const hashRoute=location.hash.substring(1).split('?')[0];
+$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;
 const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):
  location.pathname==='/custom-view/session'?'custom-session':
@@ -874,7 +870,7 @@ const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/collab'?'multi':
  location.pathname==='/watchalong'?'watchalong':
  location.pathname==='/'?'home':'';
-route(hashRoute||pathRoute||'home');
+route(pathRoute||'home');
 
 const homePollTimer=setInterval(()=>{
  if(!document.hidden&&($('home').classList.contains('active')||$('custom-session').classList.contains('active')))loadHome();
