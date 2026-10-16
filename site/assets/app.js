@@ -1308,5 +1308,17 @@ renderWatchalongSession();
    }
   }catch(_error){}
  }
+ const knownMetadata=new Map((Array.isArray(opts.streamMetadata)?opts.streamMetadata:[]).map(x=>[x.videoId,x]));
+ const missing=ids.filter(id=>!knownMetadata.has(id));
+ if(missing.length){
+  const resolved=await Promise.all(missing.map(async id=>{
+   try{
+    const item=await api('/v1/catalog/videos/'+encodeURIComponent(id));
+    return item&&item.video_id===id?{videoId:id,label:String(item.title||item.channel_name||id),channelId:String(item.channel_id||'')}:null;
+   }catch(_error){return null}
+  }));
+  for(const item of resolved){if(item)knownMetadata.set(item.videoId,item)}
+ }
+ opts.streamMetadata=ids.map(id=>knownMetadata.get(id)).filter(Boolean);
  window.hvOpenCustomSession(ids,opts);
 })();
