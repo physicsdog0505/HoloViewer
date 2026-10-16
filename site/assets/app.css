@@ -18,7 +18,8 @@ button,input,select{font:inherit}
 .rail-nav{display:grid;gap:6px}
 .rail-nav a{color:var(--muted)}
 .rail-nav a:hover,.rail-nav a.active{background:var(--surface-2);color:var(--text)}
-.rail-icon{width:54px;min-width:54px;height:44px;display:grid;place-items:center;text-align:center;font-size:16px;font-weight:800}\n.rail-nav a[href="/collab"] .rail-icon{font-size:27px;font-weight:900;line-height:1;color:#20252a}
+.rail-icon{width:54px;min-width:54px;height:44px;display:grid;place-items:center;text-align:center;font-size:16px;font-weight:800}
+.rail-nav a[href="/collab"] .rail-icon{font-size:27px;font-weight:900;line-height:1;color:#20252a}
 .rail-label{font-size:16px;font-weight:700;opacity:0;transform:translateX(-6px);transition:.16s ease}
 .client-rail:hover .rail-label,.client-rail:focus-within .rail-label{opacity:1;transform:none}
 .client-topbar{position:sticky;top:0;z-index:30;height:58px;margin-left:var(--rail-collapsed);display:flex;justify-content:flex-end;align-items:center;padding:0 24px;background:rgba(247,245,242,.9);backdrop-filter:blur(16px);border-bottom:1px solid rgba(230,225,218,.8);transition:margin-left .18s ease}
@@ -119,7 +120,10 @@ body.home-wide .section-head{margin-bottom:9px}
 .client-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:28px 18px}
 .stream-card{position:relative;border:1px solid transparent;background:transparent;border-radius:18px;overflow:visible;box-shadow:none;padding:8px;transition:border-color .14s ease,box-shadow .14s ease,background .14s ease}
 .stream-card[data-support-accent="1"]{background:color-mix(in srgb,var(--member-accent) 4%,transparent);border-color:color-mix(in srgb,var(--member-accent) 14%,transparent)}
-.stream-collab-entry{position:absolute;right:8px;bottom:8px;z-index:4;min-width:54px;height:42px;padding:0 9px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:4px;background:#fff;border:1px solid var(--line);box-shadow:0 4px 12px rgba(52,44,36,.18);font-weight:900;color:#356f89;cursor:pointer}\n.stream-collab-entry .collab-glyph{font-size:25px;line-height:1}.stream-collab-entry .collab-entry-label{font-size:10px;line-height:1;letter-spacing:.02em}\n.stream-collab-entry:hover,.stream-collab-entry:focus-visible{background:var(--accent-soft);outline:2px solid #4f7f93;outline-offset:1px}\n.stream-card:hover,.stream-card:focus-visible{
+.stream-collab-entry{position:absolute;right:8px;bottom:8px;z-index:4;min-width:54px;height:42px;padding:0 9px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:4px;background:#fff;border:1px solid var(--line);box-shadow:0 4px 12px rgba(52,44,36,.18);font-weight:900;color:#356f89;cursor:pointer}
+.stream-collab-entry .collab-glyph{font-size:25px;line-height:1}.stream-collab-entry .collab-entry-label{font-size:10px;line-height:1;letter-spacing:.02em}
+.stream-collab-entry:hover,.stream-collab-entry:focus-visible{background:var(--accent-soft);outline:2px solid #4f7f93;outline-offset:1px}
+.stream-card:hover,.stream-card:focus-visible{
   transform:none;
   border-color:color-mix(in srgb,var(--member-accent,#7aa8bb) 72%,white);
   background:#fff;
