@@ -2,7 +2,7 @@ import json, tempfile, unittest
 from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from ptt_offline.deploy_today_backend_release import load_config, safe_deploy_config, ptt_operational_day
+from ptt_offline.deploy_today_backend_release import load_config, safe_deploy_config, ptt_operational_day, load_support_color_chunks
 
 class TodayBackendReleaseTests(unittest.TestCase):
     def config(self):
@@ -21,11 +21,23 @@ class TodayBackendReleaseTests(unittest.TestCase):
           }]
         }
 
-    def test_safe_config_never_reintroduces_plaintext_ptt_gate(self):
+    def support_colors(self):
+        return {
+          "schema_version":1,
+          "fallback":"neutral",
+          "channels":[
+            {"channel_id":"UC"+f"{i:022d}","display_mode":"neutral","verification_status":"verified"}
+            for i in range(66)
+          ]
+        }
+
+    def test_safe_config_never_reintroduces_plaintext_ptt_gate_and_rehydrates_colors(self):
         with tempfile.TemporaryDirectory() as td:
             src=Path(td)/"wrangler.json"
+            colors=Path(td)/"colors.json"
             src.write_text(json.dumps(self.config()),encoding="utf-8")
-            holder,out=safe_deploy_config(str(src))
+            colors.write_text(json.dumps(self.support_colors()),encoding="utf-8")
+            holder,out=safe_deploy_config(str(src),support_colors_path=str(colors))
             try:
                 cfg=json.loads(out.read_text())
                 self.assertNotIn("PTT_PUBLISH_ENABLED",cfg["vars"])
@@ -33,8 +45,21 @@ class TodayBackendReleaseTests(unittest.TestCase):
                 self.assertEqual(cfg["vars"]["TODAY_CADENCE_ENABLED"],"true")
                 self.assertEqual(cfg["vars"]["TODAY_DISCOVERY_ENABLED"],"false")
                 self.assertEqual(cfg["vars"]["ALLOWED_ORIGIN"],"https://example.test")
+                keys=sorted(k for k in cfg["vars"] if k.startswith("TODAY_SUPPORT_COLORS_JSON_"))
+                self.assertTrue(keys)
+                joined="".join(cfg["vars"][k] for k in keys)
+                self.assertEqual(json.loads(joined),self.support_colors())
             finally:
                 holder.cleanup()
+
+    def test_support_color_payload_requires_exact_66_unique_ids(self):
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/"colors.json"
+            path.write_text(json.dumps(self.support_colors()),encoding="utf-8")
+            self.assertTrue(load_support_color_chunks(path))
+            broken=self.support_colors();broken["channels"]=broken["channels"][:-1]
+            path.write_text(json.dumps(broken),encoding="utf-8")
+            with self.assertRaises(SystemExit): load_support_color_chunks(path)
 
     def test_ptt_operational_day_rolls_at_0600_taipei(self):
         tz=ZoneInfo("Asia/Taipei")
