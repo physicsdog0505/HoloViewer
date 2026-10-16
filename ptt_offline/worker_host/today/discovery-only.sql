@@ -32,5 +32,6 @@ CREATE TABLE IF NOT EXISTS public_today_lifecycle_cursor (
  singleton INTEGER PRIMARY KEY CHECK(singleton=1),
  roster_version TEXT NOT NULL,
  last_video_id TEXT NOT NULL DEFAULT '',
+ checked_at_json TEXT NOT NULL DEFAULT '{}',
  updated_at TEXT NOT NULL
 );
