@@ -20,16 +20,20 @@ def main():
     ap.add_argument("--output",required=True,type=Path)
     ap.add_argument("--json-output",type=Path)
     ap.add_argument("--days",type=int,default=90)
+    ap.add_argument("--refresh-missing-recent",type=int,default=0,metavar="DAYS",help="Owner-Mac only: discover PTT Hololive threads for the most recent DAYS and fetch only cache-missing article bodies before export")
     ap.add_argument("--source-root",type=Path,default=Path.home()/"Downloads"/"Hololive-PTT-Viewer")
     args=ap.parse_args()
     if not 1<=args.days<=3660:
         raise SystemExit("days outside safe range")
+    if not 0<=args.refresh_missing_recent<=min(args.days,60):
+        raise SystemExit("refresh-missing-recent must be 0..min(days,60)")
     source_root=args.source_root.expanduser().resolve()
     sys.path.insert(0,str(source_root))
     from client_runtime import client_runtime_root
     from frontend_config import database_paths
     from frontend_time import TAIPEI
-    from live_stream_discovery import LiveDiscoveryCache
+    from live_stream_discovery import LiveDiscoveryCache, fetch_body_via_pttweb, refresh_target
+    from thread_discovery import discover_for_date
     from watchalong_ptt_catalog import load_recent_events, parse_watchalong_events
 
     runtime_root=client_runtime_root()
@@ -47,6 +51,33 @@ def main():
     current=datetime.now(TAIPEI)
     events=[]
     cache=LiveDiscoveryCache(runtime_root/".ptt_stream_discovery_cache.json")
+    refresh_stats={"days":args.refresh_missing_recent,"targets":0,"already_cached":0,"fetched":0,"errors":[]}
+    if args.refresh_missing_recent:
+        # Explicit owner-side coverage repair. This mutates only the rebuildable
+        # local discovery cache; it does not write the Web History DB or any cloud service.
+        for offset in range(args.refresh_missing_recent):
+            value=current.date()-timedelta(days=offset)
+            try:
+                targets=discover_for_date(value,max_pages=10)
+            except Exception as exc:
+                refresh_stats["errors"].append({"day":value.isoformat(),"stage":"discover","error":str(exc)})
+                continue
+            refresh_stats["targets"]+=len(targets)
+            for target in targets:
+                try:
+                    if cache.get(target.aid) is not None:
+                        refresh_stats["already_cached"]+=1
+                        continue
+                except ValueError:
+                    pass
+                result=refresh_target(target,fetch_body=fetch_body_via_pttweb,cache=cache)
+                if result.fresh:
+                    refresh_stats["fetched"]+=1
+                else:
+                    refresh_stats["errors"].append({
+                        "day":value.isoformat(),"aid":target.aid,"stage":"fetch",
+                        "error":result.error or "unknown refresh failure",
+                    })
     try:
         for offset in range(args.days):
             day=(current.date()-timedelta(days=offset)).isoformat()
@@ -103,6 +134,6 @@ def main():
     args.output.write_text("\n".join(lines)+"\n")
     payload={"schema_version":"public-watchalong-export-v1","imported_at":imported,"event_count":len(out),"events":out}
     if args.json_output: args.json_output.write_text(json.dumps(payload,ensure_ascii=False,indent=2)+"\n")
-    print(json.dumps({"status":"PASS","events":len(out),"streams":sum(len(x["streams"]) for x in out),"sql":str(args.output),"json":str(args.json_output) if args.json_output else None}))
+    print(json.dumps({"status":"PASS","events":len(out),"streams":sum(len(x["streams"]) for x in out),"refresh":refresh_stats,"sql":str(args.output),"json":str(args.json_output) if args.json_output else None}))
 
 if __name__=="__main__": main()
