@@ -49,9 +49,14 @@ function updateClientTopbar(routeName){
 
 let currentRoute='home';
 function route(r){
- // Hash query belongs to the session, not the route key.
  r=String(r||'').split('?')[0];
  if(!names[r])r='home';
+ // A viewing route without valid stream IDs must never display an empty workspace.
+ if(r==='custom-session'&&!viewing.ids.length){
+  const params=location.pathname==='/custom-view/session'?new URLSearchParams(location.search):new URLSearchParams();
+  const recoverable=params.getAll('stream').some(id=>/^[A-Za-z0-9_-]{11}$/.test(id));
+  if(!recoverable)r='single';
+ }
  if(r!==currentRoute&&['home','history'].includes(currentRoute)){
   selectedHomeVideos.clear();
   homeSelection();
@@ -60,12 +65,6 @@ function route(r){
   window.hvDestroy4174SharedViewer?.();
  }
  currentRoute=r;
- // A viewing route without mounted players must never display an empty workspace.
- if(r==='custom-session'&&!viewing.ids.length){
-  const params=location.pathname==='/custom-view/session'?new URLSearchParams(location.search):new URLSearchParams();
-  const recoverable=params.getAll('stream').some(id=>/^[A-Za-z0-9_-]{11}$/.test(id));
-  if(!recoverable)r='single';
- }
  const pageId=r==='ptt-focus'?'ptt':r;
  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id===pageId));
  const activeNav=r==='custom-session'?'single':r==='watchalong-session'?'watchalong':pageId;
@@ -87,7 +86,7 @@ function route(r){
  $('ptt-focus').textContent=r==='ptt-focus'?'退出專注':'⛶ 專注模式';
  $('ptt-floor-toggle').hidden=r!=='ptt-focus';
  $('live-channel-rail').hidden=!['home','custom-session'].includes(r)||!$('live-channel-list').childElementCount;
- if(r==='home')loadHome();
+ if(r==='home'||r==='custom-session')loadHome();
  if(r==='history')loadHistory();
  if(r==='ptt'||r==='ptt-focus')loadPtt();
  if(r==='single')loadCustomLibrary();
