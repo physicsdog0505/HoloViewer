@@ -64,13 +64,25 @@ function discoveryDb({seedAll=true,omitVideoIndex=null}={}){
         VALUES(?,?,?,?,?,'processed',0)`).run(entryHash(channel.id,videoId(index)),channel.id,videoId(index),'fixture-v1',stamp(fixedNow));
     }
   }
-  let rowWrites=0,writeStatements=0;
+  let rowWrites=0,writeStatements=0,queries=0,readQueries=0,writeQueries=0,returnedRows=0,returnedReadRows=0;
+  function isRead(sql){return /^\\s*(SELECT|PRAGMA|EXPLAIN)\\b/i.test(sql);}
   function statement(sql,params=[]){
     return {
       bind(...args){return statement(sql,args)},
-      async first(){return sqlite.prepare(sql).get(...params)??null},
-      async all(){return {results:sqlite.prepare(sql).all(...params)}},
+      async first(){
+        queries++;if(isRead(sql))readQueries++;else writeQueries++;
+        const value=sqlite.prepare(sql).get(...params)??null;
+        if(value){returnedRows++;if(isRead(sql))returnedReadRows++;}
+        return value;
+      },
+      async all(){
+        queries++;if(isRead(sql))readQueries++;else writeQueries++;
+        const results=sqlite.prepare(sql).all(...params);
+        returnedRows+=results.length;if(isRead(sql))returnedReadRows+=results.length;
+        return {results};
+      },
       async run(){
+        queries++;if(isRead(sql))readQueries++;else writeQueries++;
         const result=sqlite.prepare(sql).run(...params);
         const changed=Number(result.changes??0);
         if(changed>0){rowWrites+=changed;writeStatements++;}
@@ -90,6 +102,11 @@ function discoveryDb({seedAll=true,omitVideoIndex=null}={}){
     },
     get rowWrites(){return rowWrites},
     get writeStatements(){return writeStatements},
+    get queries(){return queries},
+    get readQueries(){return readQueries},
+    get writeQueries(){return writeQueries},
+    get returnedRows(){return returnedRows},
+    get returnedReadRows(){return returnedReadRows},
     raw:sqlite
   };
   return DB;
@@ -141,6 +158,10 @@ test('30-channel steady state: duplicate feed items create exactly one cursor ro
  assert.equal(out.feed_entries,60);
  assert.equal(out.discovered,0);
  assert.equal(db.rowWrites-before,1,'only the batched reconcile cursor advances');
+ assert.equal(db.queries,65);
+ assert.equal(db.readQueries,5);
+ assert.equal(db.writeQueries,60);
+ assert.equal(db.returnedReadRows,98,'result rows in the test double, not Cloudflare billed Rows Read');
  db.raw.close();
 });
 
@@ -155,6 +176,9 @@ test('one new livestream candidate: bounded end-to-end budget is six changed row
  assert.equal(out.discovered,1);
  assert.equal(out.updated,1);
  assert.equal(db.rowWrites-before,6,'queue insert + cursor + claim + evidence + canonical + finish claim');
+ assert.equal(db.queries,71);
+ assert.equal(db.readQueries,6);
+ assert.equal(db.writeQueries,65);
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical").get().n,1);
  db.raw.close();
 });
@@ -172,6 +196,9 @@ test('full 30-channel / 60-entry minute remains bounded while discovery stays mi
  assert.equal(net.videoCalls,1,'pending IDs are batched into one videos.list request of at most 50');
  assert.equal(out.updated,50);
  assert.equal(db.rowWrites-before,261,'60 queue inserts + 1 cursor + 50 claims + 100 evidence/canonical + 50 finishes');
+ assert.equal(db.queries,365);
+ assert.equal(db.readQueries,104);
+ assert.equal(db.writeQueries,261);
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_websub_events WHERE status='pending'").get().n,10);
  db.raw.close();
 });
