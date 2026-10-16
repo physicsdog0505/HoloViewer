@@ -1,8 +1,8 @@
 import json, tempfile, unittest
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from ptt_offline.deploy_today_backend_release import load_config, safe_deploy_config, ptt_operational_day
+from ptt_offline.deploy_today_backend_release import load_config, safe_deploy_config, ptt_operational_day, recent_clean_publisher_cycle
 
 class TodayBackendReleaseTests(unittest.TestCase):
     def config(self):
@@ -51,6 +51,37 @@ class TodayBackendReleaseTests(unittest.TestCase):
                 self.assertEqual(len(decoded["channels"]),66)
             finally:
                 holder.cleanup()
+
+
+    def test_release_gate_accepts_fresh_owner_noop(self):
+        now=datetime(2026,10,16,5,40,0,tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            metrics=Path(td)/"minute-metrics.jsonl"
+            metrics.write_text(json.dumps({
+              "status":"NO_NEW_ROWS",
+              "publisher_mode":"OWNER_APPROVED_SEND",
+              "observed_at":"2026-10-16T05:39:30+00:00",
+              "http_posts":0
+            })+"\n",encoding="utf-8")
+            row=recent_clean_publisher_cycle(metrics,now=now)
+            self.assertEqual(row["status"],"NO_NEW_ROWS")
+
+    def test_release_gate_rejects_stale_or_failed_latest_cycle(self):
+        now=datetime(2026,10,16,5,40,0,tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            metrics=Path(td)/"minute-metrics.jsonl"
+            metrics.write_text(
+              json.dumps({"status":"ACK","publisher_mode":"OWNER_APPROVED_SEND","observed_at":"2026-10-16T05:39:00+00:00"})+"\n"+
+              json.dumps({"status":"STOP_RECONCILE","observed_at":"2026-10-16T05:39:30+00:00"})+"\n",
+              encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                recent_clean_publisher_cycle(metrics,now=now)
+            metrics.write_text(json.dumps({
+              "status":"NO_NEW_ROWS","publisher_mode":"OWNER_APPROVED_SEND",
+              "observed_at":"2026-10-16T05:00:00+00:00"
+            })+"\n",encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                recent_clean_publisher_cycle(metrics,now=now)
 
     def test_ptt_operational_day_rolls_at_0600_taipei(self):
         tz=ZoneInfo("Asia/Taipei")

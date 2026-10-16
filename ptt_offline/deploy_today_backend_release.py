@@ -6,7 +6,7 @@ No frontend Worker, no site files, no UI mutation.
 """
 from __future__ import annotations
 import argparse, json, subprocess, tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
@@ -48,18 +48,36 @@ def ptt_operational_day(now=None):
     day=local.date()-timedelta(days=1) if local.hour<6 else local.date()
     return day.isoformat()
 
+def recent_clean_publisher_cycle(metrics, *, now=None, max_age_seconds=900):
+    if not Path(metrics).is_file():
+        raise SystemExit("PTT metrics missing; refusing Today release")
+    last=None
+    for line in Path(metrics).read_text(encoding="utf-8").splitlines()[-200:]:
+        if not line.strip():
+            continue
+        try:
+            row=json.loads(line)
+        except Exception:
+            continue
+        if isinstance(row,dict):
+            last=row
+    if not isinstance(last,dict):
+        raise SystemExit("PTT metrics contain no valid completed cycle")
+    if last.get("publisher_mode")!="OWNER_APPROVED_SEND" or last.get("status") not in {"ACK","NO_NEW_ROWS"}:
+        raise SystemExit("latest PTT Publisher cycle is not a clean owner-approved ACK/no-op")
+    try:
+        observed=datetime.fromisoformat(str(last.get("observed_at")).replace("Z","+00:00")).astimezone(timezone.utc)
+    except (TypeError,ValueError):
+        raise SystemExit("latest PTT Publisher metric has invalid timestamp")
+    current=(now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    age=(current-observed).total_seconds()
+    if age<0 or age>max_age_seconds:
+        raise SystemExit("latest clean PTT Publisher cycle is stale; wait for the next scheduled metric and retry")
+    return last
+
 def verify_ptt_rollout(state_root, config):
     metrics=Path(state_root)/"minute-metrics.jsonl"
-    if not metrics.is_file():
-        raise SystemExit("PTT metrics missing; refusing Today release")
-    ack=None
-    for line in metrics.read_text(encoding="utf-8").splitlines()[-200:]:
-        try: row=json.loads(line)
-        except Exception: continue
-        if row.get("status")=="ACK" and row.get("publisher_mode")=="OWNER_APPROVED_SEND":
-            ack=row
-    if ack is None:
-        raise SystemExit("no post-restart PTT ACK receipt yet; refusing Today release")
+    cycle=recent_clean_publisher_cycle(metrics)
 
     # Do not infer the validation day from wall clock near the 06:00 Taipei
     # operational rollover. Read the most recent successfully published day
@@ -82,7 +100,7 @@ def verify_ptt_rollout(state_root, config):
     pushes=body.get("pushes")
     if not isinstance(pushes,list) or not pushes:
         raise SystemExit("PTT Public GET returned no pushes")
-    return {"ack":ack,"day":day,"public_http":200,"public_pushes":len(pushes)}
+    return {"publisher_cycle":cycle,"day":day,"public_http":200,"public_pushes":len(pushes)}
 
 def validated_support_colors(path):
     body=json.loads(Path(path).read_text(encoding="utf-8"))
