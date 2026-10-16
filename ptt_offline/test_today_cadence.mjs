@@ -24,8 +24,17 @@ function fakeDb(rows,{rosterVersion='v85',cursor=null}={}){
               return null;
             },
             run:async()=>{
+              if(sql.includes('INSERT INTO public_today_lifecycle_cursor')){
+                const same=self.cursor&&self.cursor.roster_version===args[0]&&
+                  self.cursor.last_video_id===args[1]&&self.cursor.checked_at_json===args[2];
+                if(!same){
+                  self.writes.push({sql,args});
+                  self.cursor={roster_version:args[0],last_video_id:args[1],checked_at_json:args[2]};
+                  return {success:true,changes:1,meta:{changes:1}};
+                }
+                return {success:true,changes:0,meta:{changes:0}};
+              }
               self.writes.push({sql,args});
-              if(sql.includes('INSERT INTO public_today_lifecycle_cursor'))self.cursor={roster_version:args[0],last_video_id:args[1]};
               return {success:true,changes:1,meta:{changes:1}};
             }
           };
@@ -103,7 +112,7 @@ test('unchanged lifecycle snapshots create zero D1 writes after cursor is settle
     lifecycle_state:'live',lifecycle_observed_at:'2026-10-17T00:00:00Z',
     scheduled_start:null,actual_start:'2026-10-17T00:00:00Z',actual_end:null,from_discovery:0
   };
-  const db=fakeDb([row],{cursor:{roster_version:'v85',last_video_id:'abcdefghijk'}});
+  const db=fakeDb([row],{cursor:{roster_version:'v85',last_video_id:'abcdefghijk',checked_at_json:'{"abcdefghijk":"2026-10-17T00:05:00Z"}'}});
   const out=await refreshKnownTodayLifecycle(
     {TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:db},
     {now:new Date('2026-10-17T00:05:00Z'),fetchImpl:async()=>new Response(JSON.stringify({items:[{
