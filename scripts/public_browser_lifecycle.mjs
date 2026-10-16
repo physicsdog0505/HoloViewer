@@ -164,7 +164,9 @@ try{
  await freshDocument(page,()=>page.locator('a[data-route="watchalong"]').click(),url=>url.pathname==='/watchalong');
  await page.waitForSelector('#recentWatchGrid .recent-watch-card');
  assert(await page.locator('#recentWatchGrid .recent-watch-card').count()===1,'Watchalong recent API card did not render');
- await page.locator('#watchalongBuilder [name="master"]').fill('AAAAAAAAAAA');
+ await freshDocument(page,()=>page.locator('#recentWatchGrid .recent-watch-card').click(),url=>url.pathname==='/watchalong'&&url.searchParams.get('master')==='AAAAAAAAAAA');
+ await page.waitForSelector('#watchalongBuilder .selected-master');
+ assert(await page.locator('#watchalongBuilder input[type="hidden"][name="master"][value="AAAAAAAAAAA"]').count()===1,'Watchalong selected master was not preserved');
  await page.locator('#watchalongBuilder [name="source"]').fill('CCCCCCCCCCC');
  await freshDocument(page,()=>page.locator('#watchalongBuilder button[type="submit"]').click(),url=>
   url.pathname==='/watchalong/session'&&
