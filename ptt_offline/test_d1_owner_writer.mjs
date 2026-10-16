@@ -38,6 +38,10 @@ test('one atomic transactional D1 batch after authority and provenance checks',a
   assert.deepEqual(calls.map(x=>x[0]),['read','batch','read','read']);
   assert.equal(calls[1][1],4);
   assert.ok(calls[1][2].some(x=>x.sql.includes('ptt_provider_state') && x.sql.includes('has_gap=1')));
+  const mutationSql=calls[1][2].map(x=>x.sql);
+  assert.ok(mutationSql.find(x=>x.includes('INSERT INTO ptt_threads')).includes('WHERE ptt_threads.source_url IS NULL'));
+  assert.ok(mutationSql.find(x=>x.includes('INSERT INTO ptt_pushes')).includes('WHERE (ptt_pushes.floor IS NULL'));
+  assert.ok(mutationSql.find(x=>x.includes('INSERT INTO ptt_source_evidence')).includes('WHERE ptt_source_evidence.push_id<>excluded.push_id'));
   assert.equal(ack.d1_rows_written,4);
 });
 test('refuse spoofed source identity',async()=>{
