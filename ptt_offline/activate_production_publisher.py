@@ -19,12 +19,20 @@ REQUIRED_TABLES={
     "public_ptt_schema_migrations","ptt_threads","ptt_pushes",
     "ptt_provider_state","ptt_source_evidence","ptt_gap_repairs"
 }
+PRODUCTION_PROFILE={
+    "rows":10,
+    "bytes":131072,
+    "queries":60,
+    "writes":24,
+    "max_batches":1,
+    "max_articles":4,
+}
 BINDINGS={
     "PTT_PUBLISH_ENABLED":"true",
-    "PTT_PUBLISH_MAX_ROWS":"10",
-    "PTT_PUBLISH_MAX_BYTES":"131072",
-    "PTT_PUBLISH_MAX_QUERIES":"60",
-    "PTT_PUBLISH_MAX_WRITES":"24",
+    "PTT_PUBLISH_MAX_ROWS":str(PRODUCTION_PROFILE["rows"]),
+    "PTT_PUBLISH_MAX_BYTES":str(PRODUCTION_PROFILE["bytes"]),
+    "PTT_PUBLISH_MAX_QUERIES":str(PRODUCTION_PROFILE["queries"]),
+    "PTT_PUBLISH_MAX_WRITES":str(PRODUCTION_PROFILE["writes"]),
 }
 
 def run(cmd, *, capture=False, input_text=None):
@@ -166,7 +174,9 @@ def start_publisher(repo_root, source, state_root, secrets_path):
     cmd=[sys.executable,"-B","-m","ptt_offline.recurring_publisher",
          "--source",source,"--state-dir",str(state_root/"state"),
          "--metrics",str(metrics),"--iterations","1440",
-         "--batch-cap","10","--max-batches","1","--max-articles","4",
+         "--batch-cap",str(PRODUCTION_PROFILE["rows"]),
+         "--max-batches",str(PRODUCTION_PROFILE["max_batches"]),
+         "--max-articles",str(PRODUCTION_PROFILE["max_articles"]),
          "--send","--approve-live-capture-policy"]
     with log.open("ab",buffering=0) as handle:
         p=subprocess.Popen(cmd,cwd=repo_root,env=env,stdout=handle,stderr=subprocess.STDOUT,
@@ -214,7 +224,7 @@ def main():
         "database":DB_NAME,
         "source":source,
         "cadence":"07:00-01:59 60s; 02:00-06:59 600s Asia/Taipei",
-        "limits":{"rows":10,"bytes":131072,"queries":60,"writes":24,"max_batches":1,"max_articles":4},
+        "limits":dict(PRODUCTION_PROFILE),
         "process":process,
         "public_readback_after_start":public_readback(),
         "frontend_changed":False,
