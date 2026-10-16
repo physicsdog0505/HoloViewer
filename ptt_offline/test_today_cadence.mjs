@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {refreshKnownTodayLifecycle,mountTodayCadence} from './worker_host/today/cadence-refresh.mjs';
+import {refreshKnownTodayLifecycle,mountTodayCadence,shouldRunLifecycleRefresh} from './worker_host/today/cadence-refresh.mjs';
 
 function fakeDb(rows){
   return {
@@ -65,4 +65,12 @@ test('combined cadence wrapper preserves fetch contract',async()=>{
   const r=await worker.fetch(new Request('https://api.example/v1/catalog/today'),{});
   assert.equal(r.status,207);
   assert.equal(await r.text(),'same');
+});
+
+
+test('lifecycle refresh cadence is every five minutes while discovery cron remains independent',()=>{
+  assert.equal(shouldRunLifecycleRefresh(new Date('2026-10-16T06:40:00Z')),true);
+  assert.equal(shouldRunLifecycleRefresh(new Date('2026-10-16T06:41:00Z')),false);
+  assert.equal(shouldRunLifecycleRefresh(new Date('2026-10-16T06:44:59Z')),false);
+  assert.equal(shouldRunLifecycleRefresh(new Date('2026-10-16T06:45:00Z')),true);
 });
