@@ -51,18 +51,21 @@ let currentRoute='home';
 function route(r){
  r=String(r||'').split('?')[0];
  if(!names[r])r='home';
+ const leavingViewer=currentRoute==='custom-session'&&r!=='custom-session';
  // A viewing route without valid stream IDs must never display an empty workspace.
  if(r==='custom-session'&&!viewing.ids.length){
   const params=location.pathname==='/custom-view/session'?new URLSearchParams(location.search):new URLSearchParams();
   const recoverable=params.getAll('stream').some(id=>/^[A-Za-z0-9_-]{11}$/.test(id));
   if(!recoverable)r='single';
  }
- if(r!==currentRoute&&['home','history'].includes(currentRoute)){
+ if(r!==currentRoute&&(['home','history'].includes(currentRoute)||leavingViewer)){
   selectedHomeVideos.clear();
   homeSelection();
  }
- if(currentRoute==='custom-session'&&r!=='custom-session'){
+ if(leavingViewer){
   window.hvDestroy4174SharedViewer?.();
+  viewing.ids=[];
+  viewing.ptt='live';
  }
  currentRoute=r;
  const pageId=r==='ptt-focus'?'ptt':r;
