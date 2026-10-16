@@ -475,6 +475,11 @@ async function loadWatchalongRecent(){
  if(watchalongRecentInFlight)return;
  const grid=$('recentWatchGrid'),empty=$('recentWatchEmpty'),noMatches=$('recentWatchNoMatches');
  if(!grid||!empty)return;
+ const requestedMaster=videoId(String(new URLSearchParams(location.search).get('master')||''));
+ if(requestedMaster){
+  const masterInput=document.querySelector('#watchalongBuilder [name="master"]');
+  if(masterInput)masterInput.value=requestedMaster;
+ }
  watchalongRecentInFlight=true;empty.hidden=false;empty.textContent='讀取近期同時視聽中…';
  try{
   const data=await api('/v1/watchalong/recent?days=30&limit=60');
@@ -505,7 +510,7 @@ async function loadWatchalongRecent(){
   }
   empty.hidden=grid.childElementCount>0;
   if(!grid.childElementCount)empty.textContent='目前沒有近期同時視聽資料。';
-  const params=new URLSearchParams(location.search),master=videoId(String(params.get('master')||''));
+  const master=requestedMaster;
   if(master){
    const chosen=data.events.find(event=>Array.isArray(event?.hosts)&&event.hosts.some(host=>host.video_id===master));
    const host=chosen?.hosts?.find(item=>item.video_id===master);
@@ -961,7 +966,13 @@ window.hvOpenCustomSession=function(ids,opts={}){
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
 $('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};
-$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;
+$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};
+{
+ const params=new URLSearchParams(location.search),bounds=historyBounds(),requested=String(params.get('date')||'');
+ $('historyDate').value=historyDateValid(requested)?requested:bounds.latest;
+ const page=Math.max(1,Number.parseInt(String(params.get('page')||'1'),10)||1);
+ state.offset=(page-1)*50;
+}
 const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):
  location.pathname==='/custom-view/session'?'custom-session':
