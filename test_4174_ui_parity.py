@@ -446,6 +446,15 @@ class ParityContract(unittest.TestCase):
         self.assertIn('window.hvExit4174Immersive?.()',app)
         self.assertNotIn('function applyViewerImmersive(enabled)',app)
 
+    def test_viewer_teardown_tracks_every_recurring_timer(self):
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn('const translationRefreshTimer=setInterval(',js)
+        self.assertIn('const verifiedSyncTimer=setInterval(',js)
+        self.assertIn('let collabPollTimer=null',js)
+        self.assertIn('clearInterval(translationRefreshTimer)',js)
+        self.assertIn('clearInterval(verifiedSyncTimer)',js)
+        self.assertIn('if(collabPollTimer)clearInterval(collabPollTimer)',js)
+
     def test_transplanted_youtube_players_mount_when_api_is_already_loaded(self):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
         self.assertIn('if(window.YT?.Player)',js)
