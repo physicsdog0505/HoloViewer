@@ -431,6 +431,14 @@ class ParityContract(unittest.TestCase):
         end=js.index("window.addEventListener('message'",start)
         self.assertNotIn("setInterval(",js[start:end])
 
+    def test_home_history_and_collab_default_to_live_ptt_layout(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("if(opts.ptt==='video')q.set('ptt','video');",js)
+        self.assertIn("ptt:params.get('ptt')==='video'?'video':'live'",js)
+        self.assertNotIn("q.set('ptt',opts.ptt==='live'?'live':'video')",js)
+        self.assertIn("$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};",js)
+        self.assertIn("$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};",js)
+
     def test_session_url_encodes_and_restores_explicit_stream_ids(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn("clean.forEach(id=>q.append('stream',id))",js)
