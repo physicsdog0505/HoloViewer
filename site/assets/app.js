@@ -413,20 +413,40 @@ function collabEventState(event){
 }
 function collabEventCard(event){
  const streams=collabEventStreams(event);if(streams.length<2)return null;
- const first=streams[0],card=node('a',undefined,'collab-event-card '+collabEventState(event));card.href='#custom-session';
- card.onclick=e=>{e.preventDefault();openCollabEvent(event)};
- const thumb=node('div',undefined,'collab-event-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+first.video_id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
- const state=collabEventState(event);thumb.append(node('span',state==='live'?'LIVE':state==='upcoming'?'即將開始':'已結束','status-pill '+(state==='live'?'live':state==='upcoming'?'upcoming':'ended')));card.append(thumb);
- const copy=node('div',undefined,'collab-event-copy');const kicker=node('div',undefined,'collab-event-kicker');
- kicker.append(node('span',String(event.label||'多人連動')),node('span',String(event.confidence||'candidate')));copy.append(kicker);
- copy.append(node('h3',String(first.title||event.label||'多人連動')));
- const avatars=node('div',undefined,'collab-avatars');
- for(const stream of streams){
-  const avatar=node('span',undefined,'collab-avatar');avatar.title=String(stream.channel_name||'');
-  const url=homeAvatarUrl(stream);if(url){const av=node('img');av.src=url;av.alt='';av.loading='lazy';avatar.append(av)}else avatar.append(node('span',(String(stream.channel_name||'H')[0]||'H').toUpperCase()));
+ const members=streams.slice().sort((a,b)=>{
+  const at=Date.parse(a.actual_start||a.scheduled_start||a.start_at||'1970-01-01T00:00:00Z');
+  const bt=Date.parse(b.actual_start||b.scheduled_start||b.start_at||'1970-01-01T00:00:00Z');
+  return at-bt||String(a.video_id).localeCompare(String(b.video_id));
+ });
+ const representative=members[0],live=members.filter(x=>x.lifecycle_state==='live').length;
+ const upcoming=members.filter(x=>['upcoming','waiting'].includes(x.lifecycle_state)).length;
+ const ended=members.filter(x=>x.lifecycle_state==='ended').length;
+ const state=live?'live':upcoming?'upcoming':'ended',stateLabel=state==='live'?'LIVE':state==='upcoming'?'稍後':'已結束';
+ const eventTimes=members.map(x=>Date.parse(x.actual_start||x.scheduled_start||x.start_at||'')).filter(Number.isFinite);
+ const eventAt=eventTimes.length?Math.max(...eventTimes):NaN;
+ const dateLabel=Number.isFinite(eventAt)?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(eventAt)):'日期未明';
+ const card=node('a',undefined,'collab-event-card '+state);card.href=viewingSessionUrl(members.map(x=>x.video_id),{layout:'auto',ptt:'video',primary:0,audio:0,eventId:String(event.event_id||'')});
+ card.dataset.eventDate=dateLabel;
+ card.onclick=e=>{if(e.target.closest('[data-youtube-href]'))return;e.preventDefault();openCollabEvent(event)};
+ const thumb=node('div',undefined,'collab-event-thumb'),img=node('img');img.src='https://i.ytimg.com/vi/'+representative.video_id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
+ const source=node('span','YouTube ↗','youtube-source-link');source.role='link';source.tabIndex=0;source.dataset.youtubeHref='https://www.youtube.com/watch?v='+representative.video_id;
+ source.onclick=e=>{e.preventDefault();e.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')};
+ source.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')}};
+ thumb.append(source,node('span',stateLabel,'status-pill '+state));card.append(thumb);
+ const copy=node('div',undefined,'collab-event-copy'),kicker=node('div',undefined,'collab-event-kicker');
+ kicker.append(node('span',dateLabel),node('span',String(event.confidence||'candidate')));copy.append(kicker);
+ copy.append(node('h3',String(event.label||'多人連動').replace(/候選/g,'').replace(/^[ ·]+|[ ·]+$/g,'')||'多人連動'));
+ const avatars=node('div',undefined,'collab-avatars'),seen=new Set();
+ for(const item of members){
+  const channel=String(item.channel_id||item.channel_name||item.channel_title||item.video_id);if(seen.has(channel))continue;seen.add(channel);
+  const name=String(item.channel_title||item.channel_name||'Hololive'),avatar=node('span',undefined,'collab-avatar');avatar.title=name;
+  const url=homeAvatarUrl(item);if(url){const av=node('img');av.src=url;av.alt=name;av.loading='lazy';avatar.append(av)}else{const fallback=[...name].find(ch=>/[A-Za-z0-9]/.test(ch))||'H';avatar.append(node('span',fallback.toUpperCase()))}
   avatars.append(avatar);
  }
- copy.append(avatars);copy.append(node('p',streams.length+' POV · 進入多人連動畫面'));card.append(copy);return card;
+ copy.append(avatars);
+ const bits=[];if(live)bits.push(live+' 個直播中');if(upcoming)bits.push(upcoming+' 個稍後開始');if(ended)bits.push(ended+' 個已結束');
+ copy.append(node('p',members.length+' 個 POV'+(bits.length?' · '+bits.join(' · '):'')+' · 進入多人連動畫面'));
+ card.append(copy);return card;
 }
 async function loadCollab(){
  for(const id of ['collab-live','collab-upcoming','collab-ended']){
