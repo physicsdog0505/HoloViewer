@@ -1218,8 +1218,8 @@ async function renderWatchalongSession(){
  shell.replaceChildren();
  const status=node('div','等待播放器…','watchalong-session-status');
  const actions=node('div',undefined,'watchalong-session-actions');
- const compare=node('button','對照');compare.type='button';compare.className='active';
- const focus=node('button','Focus 動畫');focus.type='button';
+ const compare=node('button','雙畫面');compare.type='button';compare.className='active';
+ const focus=node('button','動畫優先');focus.type='button';
  const play=node('button','播放左側直播');play.type='button';play.className='primary-action';
  const pause=node('button','暫停左側直播');pause.type='button';
  actions.append(compare,focus,play,pause);
@@ -1233,7 +1233,7 @@ async function renderWatchalongSession(){
  compare.onclick=()=>setFocus(false);focus.onclick=()=>setFocus(true);
  function tick(){
   const mt=Number(masterPlayer?.getCurrentTime?.()||0),st=Number(sourcePlayer?.getCurrentTime?.()||0);
-  if(kind==='youtube')status.textContent=(resolvedMode==='live'?'即時模式 · 右側片源獨立控制':'手動對齊模式')+' · 主時間 '+watchalongClock(mt)+' · 來源 '+watchalongClock(st);
+  if(kind==='youtube')status.textContent=(resolvedMode==='live'?'即時模式 · 右側片源獨立控制':'手動模式 · 右側片源獨立控制')+' · 主時間 '+watchalongClock(mt)+' · 來源 '+watchalongClock(st);
   else status.textContent='外部平台 companion · 主時間 '+watchalongClock(mt);
   raf=requestAnimationFrame(tick);
  }
@@ -1296,7 +1296,8 @@ renderWatchalongSession();
    const event=payload?.event||payload;
    const streams=collabEventStreams(event);
    opts.collabLabel=String(event?.label||'多人連動');
-   opts.collabPollUrl=config.apiBase.replace(/\/$/,'')+'/v1/collab/events/'+encodeURIComponent(eventId);
+   const pollable=streams.some(x=>['live','upcoming','waiting'].includes(String(x.lifecycle_state||'').toLowerCase()));
+   if(pollable)opts.collabPollUrl=config.apiBase.replace(/\/$/,'')+'/v1/collab/events/'+encodeURIComponent(eventId);
    opts.streamMetadata=streams.map(x=>({videoId:x.video_id,label:String(x.title||x.channel_name||x.video_id),channelId:String(x.channel_id||'')}));
    if(event?.sync?.available===true){
     opts.verifiedTimelineStarts={};
