@@ -1583,3 +1583,58 @@ body.custom-session-watching .custom-content-grid.video-only #stage .video-wrap{
  flex:1 1 0!important;height:auto!important;min-height:0!important;max-height:none!important;
  aspect-ratio:auto!important
 }
+
+
+/* Public video-only sessions have no PTT side rail. Preserve the accepted
+   4174 16:9 player geometry instead of applying the PTT viewport-fit flex
+   collapse rules. This must remain the last arbitration block. */
+body.custom-session-watching .custom-content-grid.video-only{
+ display:block!important;
+ height:auto!important;
+ min-height:0!important;
+ overflow:auto!important
+}
+body.custom-session-watching .custom-content-grid.video-only .custom-player-column{
+ display:block!important;
+ height:auto!important;
+ max-height:none!important;
+ overflow:visible!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage{
+ display:grid!important;
+ width:100%!important;
+ height:auto!important;
+ min-height:0!important;
+ max-height:none!important;
+ grid-template-columns:repeat(var(--columns,1),minmax(0,1fr))!important;
+ grid-auto-rows:auto!important;
+ align-content:start!important;
+ overflow:visible!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage > .player-card{
+ height:auto!important;
+ min-height:0!important;
+ max-height:none!important;
+ align-self:start!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage > .player-card .video-wrap{
+ position:relative!important;
+ display:block!important;
+ flex:0 0 auto!important;
+ width:100%!important;
+ height:auto!important;
+ min-height:0!important;
+ max-height:none!important;
+ aspect-ratio:16 / 9!important;
+ overflow:hidden!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage > .player-card .video-wrap .player,
+body.custom-session-watching .custom-content-grid.video-only #stage > .player-card .video-wrap iframe{
+ position:absolute!important;
+ inset:0!important;
+ display:block!important;
+ width:100%!important;
+ height:100%!important;
+ max-width:none!important;
+ max-height:none!important
+}

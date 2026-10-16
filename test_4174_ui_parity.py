@@ -72,6 +72,14 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("sessionStorage.setItem('selectedHomeVideos'",app)
         self.assertNotIn("localStorage.setItem('selectedHomeVideos'",app)
 
+    def test_video_only_viewer_keeps_visible_16_9_player_geometry(self):
+        css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
+        self.assertIn("body.custom-session-watching .custom-content-grid.video-only #stage > .player-card .video-wrap",css)
+        self.assertIn("aspect-ratio:16 / 9!important",css)
+        self.assertIn("grid-auto-rows:auto!important",css)
+        self.assertIn("height:auto!important",css)
+        self.assertIn("overflow:visible!important",css)
+
     def test_4174_sidebar_exact_order_and_labels(self):
         parser = SidebarParser()
         parser.feed((ROOT / "site/index.html").read_text(encoding="utf-8"))
