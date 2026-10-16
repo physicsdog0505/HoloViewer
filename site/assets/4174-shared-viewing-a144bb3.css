@@ -1644,3 +1644,65 @@ body.custom-session-watching .custom-content-grid.video-only #stage > .player-ca
  max-width:none!important;
  max-height:none!important
 }
+
+
+/* Final desktop 3+ POV authority.
+   4174 treats 3+ streams as a viewport-fitted tile grid. Public must keep every
+   player plus the live PTT tile visible in the same browser viewport instead of
+   allowing later video-only/auto-height rules to push the last row below it. */
+@media(min-width:761px){
+ body.custom-session-watching.watch-grid:not(.custom-immersive){
+  overflow:hidden!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) .client-main{
+  height:100dvh!important;max-height:100dvh!important;overflow:hidden!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) .viewer-workspace{
+  display:flex!important;flex-direction:column!important;
+  width:100%!important;height:100%!important;min-height:0!important;max-height:100%!important;
+  overflow:hidden!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) .watch-actions{
+  flex:0 0 auto!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) .custom-content-grid{
+  display:block!important;flex:1 1 0!important;height:0!important;min-height:0!important;
+  max-height:none!important;overflow:hidden!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) .custom-player-column{
+  display:block!important;width:100%!important;height:100%!important;min-height:0!important;
+  max-height:100%!important;overflow:hidden!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage{
+  display:grid!important;width:100%!important;height:100%!important;min-height:0!important;
+  max-height:100%!important;overflow:hidden!important;align-items:stretch!important;align-content:stretch!important;
+  grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important;
+  grid-template-rows:repeat(var(--tile-rows,2),minmax(0,1fr))!important;
+  grid-auto-rows:minmax(0,1fr)!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .player-card,
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .ptt-live-panel{
+  position:relative!important;display:flex!important;flex-direction:column!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:100%!important;overflow:hidden!important;
+  grid-column:auto!important;grid-row:auto!important;align-self:stretch!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .player-card .video-wrap{
+  position:relative!important;display:block!important;flex:1 1 0!important;
+  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+  aspect-ratio:auto!important;overflow:hidden!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .player-card .video-wrap .player,
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .player-card .video-wrap iframe{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .player-card .player-controls{
+  flex:0 0 auto!important
+ }
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .ptt-live-panel iframe:not([hidden]),
+ body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .ptt-live-panel #ptt-worker-feed:not([hidden]){
+  display:block!important;flex:1 1 0!important;width:100%!important;height:auto!important;
+  min-height:0!important;max-height:none!important;overflow:auto!important
+ }
+}
