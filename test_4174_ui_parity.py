@@ -327,6 +327,18 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("$('page-title').textContent=names[r]",js)
         self.assertIn("/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/",js)
 
+    def test_immersive_exit_lives_inside_transplanted_fullscreen_surface(self):
+        dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        self.assertIn('id="immersiveExit" class="immersive-exit"',dom)
+        self.assertIn("const immersiveExit=document.getElementById('immersiveExit')",js)
+        self.assertIn("immersiveExit?.addEventListener('click'",js)
+        self.assertIn("#immersiveExit.immersive-exit{display:none}",css)
+        self.assertIn("body.custom-session-watching.custom-immersive #immersiveExit.immersive-exit",css)
+        self.assertNotIn('id="immersiveExit"',html)
+
     def test_accepted_full_viewer_css_and_immersive_lifecycle(self):
         css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
