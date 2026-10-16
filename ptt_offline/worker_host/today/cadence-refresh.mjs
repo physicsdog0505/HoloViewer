@@ -77,6 +77,11 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
   return {status:'refreshed',requests:1,selected:ids.length,updated,missing,removed_non_live};
 }
 
+export function shouldRunLifecycleRefresh(now){
+  if(!(now instanceof Date)||Number.isNaN(now.getTime()))throw Error('invalid lifecycle cadence time');
+  return now.getUTCMinutes()%5===0;
+}
+
 export function mountTodayCadence(base,{fetchImpl=fetch}={}){
   if(!base||typeof base.fetch!=='function')throw Error('existing combined worker required');
   return {
@@ -84,7 +89,9 @@ export function mountTodayCadence(base,{fetchImpl=fetch}={}){
     async scheduled(event,env,ctx){
       if(typeof base.scheduled==='function')await base.scheduled(event,env,ctx);
       const now=Number.isFinite(event?.scheduledTime)?new Date(event.scheduledTime):new Date();
-      const lifecycle=await refreshKnownTodayLifecycle(env,{fetchImpl,now});
+      const lifecycle=shouldRunLifecycleRefresh(now)
+        ? await refreshKnownTodayLifecycle(env,{fetchImpl,now})
+        : {status:'cadence_skip',requests:0,updated:0};
       const discovery=await refreshTodayDiscovery(env,{fetchImpl,now});
       return {lifecycle,discovery};
     }
