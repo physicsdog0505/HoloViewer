@@ -78,9 +78,9 @@ try{
 
  // Viewer -> PTT must be a fresh document and must not inherit viewer body state.
  await freshDocument(page,()=>page.locator('a[data-route="ptt"]').click(),url=>url.pathname==='/ptt-today');
- await page.waitForSelector('#ptt-list .ptt-push');
+ await page.waitForSelector('#ptt-list .push');
  assert(!await page.evaluate(()=>document.body.classList.contains('custom-session-watching')),'PTT inherited Viewer body state');
- assert(await page.locator('#ptt-list .ptt-push').count()===1,'PTT reader did not render fixture push');
+ assert(await page.locator('#ptt-list .push').count()===1,'PTT reader did not render fixture push');
 
  // PTT -> Home is also a new document; prior Home selection cannot survive.
  await freshDocument(page,()=>page.locator('a[data-route="home"]').click(),url=>url.pathname==='/');
