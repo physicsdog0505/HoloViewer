@@ -80,6 +80,47 @@ class ParityContract(unittest.TestCase):
         self.assertIn("height:auto!important",css)
         self.assertIn("overflow:visible!important",css)
 
+    def test_document_navigation_matches_4174_page_lifecycle(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        # Main navigation stays native: no SPA preventDefault/route interception.
+        self.assertNotIn("querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click'",js)
+        self.assertNotIn("querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click'",js)
+        self.assertNotIn("querySelectorAll('[data-page-link]').forEach(link=>link.addEventListener('click'",js)
+        # The URL is the viewer session source of truth, as in 4174's separate page.
+        self.assertIn("return '/custom-view/session?'+q.toString()",js)
+        self.assertIn("location.href=viewingSessionUrl(ids,opts)",js)
+        self.assertIn("location.pathname==='/custom-view/session'?'custom-session'",js)
+        self.assertIn("if(location.pathname!=='/custom-view/session')return;",js)
+        self.assertIn("const params=new URLSearchParams(location.search)",js)
+        self.assertNotIn("sessionStorage.setItem('hvCustomViewing'",js)
+        self.assertNotIn("sessionStorage.getItem('hvCustomViewing'",js)
+        self.assertNotIn("sessionStorage.setItem('hvMulti'",js)
+        self.assertNotIn("location.hash.substring",js)
+        # Home and History selections navigate to a new document.
+        self.assertIn("$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids",js)
+        self.assertIn("$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids",js)
+        # Custom builder and PTT focus/refresh also use real URLs.
+        self.assertIn("location.href='/custom-view/session?'+q.toString()",js)
+        self.assertIn("location.href='/ptt-today'",js)
+        self.assertIn("'/ptt-today?focus=1'",js)
+        # Static SPA fallback still exposes canonical routes for full reloads.
+        for href in ('href="/"','href="/history"','href="/watchalong"','href="/custom-view"','href="/collab"','href="/ptt-today"'):
+            self.assertIn(href,html)
+
+    def test_collab_document_session_rehydrates_context_from_event_url(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn("eventId:String(event.event_id||'')",js)
+        self.assertIn("const eventId=String(params.get('event')||'')",js)
+        self.assertIn("api('/v1/collab/events/'+encodeURIComponent(eventId))",js)
+        self.assertIn("opts.collabPollUrl=config.apiBase.replace",js)
+        self.assertIn("opts.streamMetadata=streams.map",js)
+        self.assertIn("opts.verifiedTimelineStarts={}",js)
+        self.assertIn("collabPollUrl:typeof opts.collabPollUrl==='string'?opts.collabPollUrl:''",js)
+        self.assertIn("Array.isArray(payload.event?.streams)?payload.event.streams:[]",viewer)
+        self.assertIn("appendWatchStream(id,String(item.label||item.title||item.channel_name||id)",viewer)
+
     def test_4174_sidebar_exact_order_and_labels(self):
         parser = SidebarParser()
         parser.feed((ROOT / "site/index.html").read_text(encoding="utf-8"))
