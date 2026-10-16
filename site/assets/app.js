@@ -680,7 +680,7 @@ pttInitControls();
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};
+$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',ptt:'video',primary:0,audio:0})};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};
 $('ptt-refresh').onclick=event=>{event.preventDefault();location.href='/ptt-today'};
