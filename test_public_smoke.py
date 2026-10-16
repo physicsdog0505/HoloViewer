@@ -79,8 +79,12 @@ class PublicSmokeTests(unittest.TestCase):
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
-        for directive in ("default-src 'none'", "script-src 'self'", "connect-src https://holoviewer-public-api.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
+        for directive in ("default-src 'none'", "script-src 'self'", "connect-src https://holoviewer-public-api.singlebagel.workers.dev", "frame-src 'self' https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
             self.assertIn(directive, headers)
+        self.assertIn("/ptt-today", headers)
+        self.assertIn("frame-ancestors 'self'", headers)
+        self.assertIn("X-Frame-Options: SAMEORIGIN", headers)
+        self.assertIn("X-Frame-Options: DENY", headers)
         self.assertNotIn("'unsafe-inline'", headers)
         self.assertNotIn("'unsafe-eval'", headers)
 
