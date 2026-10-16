@@ -111,6 +111,10 @@ try{
  assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'Equal layout did not restore');
  await page.locator('#watchSettings').click();
  assert(!await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not close');
+ await page.locator('#customImmerse').click();
+ assert(await page.evaluate(()=>document.body.classList.contains('custom-immersive')),'Viewer immersive state did not activate');
+ await page.locator('#immersiveExit').click();
+ assert(!await page.evaluate(()=>document.body.classList.contains('custom-immersive')),'Viewer immersive exit button did not clear state');
 
  // Canonical Custom View builder uses full-document session navigation.
  await freshDocument(page,()=>page.locator('a[data-route="single"]').click(),url=>url.pathname==='/custom-view');
