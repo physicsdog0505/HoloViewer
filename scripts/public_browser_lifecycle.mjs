@@ -81,6 +81,11 @@ try{
  await page.waitForSelector('#ptt-list .push');
  assert(!await page.evaluate(()=>document.body.classList.contains('custom-session-watching')),'PTT inherited Viewer body state');
  assert(await page.locator('#ptt-list .push').count()===1,'PTT reader did not render fixture push');
+ await freshDocument(page,()=>page.locator('#ptt-focus').click(),url=>url.pathname==='/ptt-today'&&url.searchParams.get('focus')==='1');
+ assert(await page.evaluate(()=>document.body.classList.contains('ptt-focus-mode')),'PTT focus document did not activate focus mode');
+ assert(await page.evaluate(()=>getComputedStyle(document.querySelector('.client-rail')).display==='none'),'PTT focus document did not hide sidebar');
+ await freshDocument(page,()=>page.locator('#ptt-focus').click(),url=>url.pathname==='/ptt-today'&&!url.searchParams.has('focus'));
+ assert(!await page.evaluate(()=>document.body.classList.contains('ptt-focus-mode')),'PTT focus mode survived exit');
 
  // PTT -> Home is also a new document; prior Home selection cannot survive.
  await freshDocument(page,()=>page.locator('a[data-route="home"]').click(),url=>url.pathname==='/');
