@@ -973,6 +973,7 @@ async function resolveProductionPtt(videoIdValue){
 window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
+ if(typeof opts.pttResolve!=='function'&&!opts.pttResolverUrl)opts.pttResolve=resolveProductionPtt;
  viewing.ids=clean;
  viewing.ptt=['live','archive','unavailable'].includes(opts.ptt)?opts.ptt:'unavailable';
  viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
