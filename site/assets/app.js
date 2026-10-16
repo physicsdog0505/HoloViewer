@@ -1355,15 +1355,29 @@ renderWatchalongSession();
   }catch(_error){}
  }
  const knownMetadata=new Map((Array.isArray(opts.streamMetadata)?opts.streamMetadata:[]).map(x=>[x.videoId,x]));
+ const catalogRows=new Map();
  const missing=ids.filter(id=>!knownMetadata.has(id));
  if(missing.length){
   const resolved=await Promise.all(missing.map(async id=>{
    try{
     const item=await api('/v1/catalog/videos/'+encodeURIComponent(id));
-    return item&&item.video_id===id?{videoId:id,label:String(item.title||item.channel_name||id),channelId:String(item.channel_id||'')}:null;
+    if(item&&item.video_id===id){
+     catalogRows.set(id,item);
+     return {videoId:id,label:String(item.title||item.channel_name||id),channelId:String(item.channel_id||'')};
+    }
+    return null;
    }catch(_error){return null}
   }));
   for(const item of resolved){if(item)knownMetadata.set(item.videoId,item)}
+ }
+ // Match accepted 4174 behavior: an ended VOD must never inherit today's live PTT.
+ // Public currently has no verified per-video historical PTT resolver, so fail closed.
+ if(ids.length===1&&opts.ptt==='live'){
+  let row=catalogRows.get(ids[0])||null;
+  if(!row){
+   try{row=await api('/v1/catalog/videos/'+encodeURIComponent(ids[0]));}catch(_error){}
+  }
+  if(String(row?.lifecycle_state||'').toLowerCase()==='ended')opts.ptt='video';
  }
  opts.streamMetadata=ids.map(id=>knownMetadata.get(id)).filter(Boolean);
  window.hvOpenCustomSession(ids,opts);
