@@ -1,6 +1,6 @@
 # Public Experience API contract — Collab + Watchalong
 
-This backend-only contract preserves accepted 4174 product semantics while removing local/private runtime dependencies.
+This backend-only contract preserves accepted 4174 product semantics where applicable while removing local/private runtime dependencies. Release scope: **basic Collab + Watchalong discovery, history and detail only**. The C7 Playlist/alignment/translated-caption Playback Package is deferred to the next release and is NOT a gate for this release.
 
 ## Collab
 
@@ -63,7 +63,7 @@ Initial/backfill export:
 
 The exporter reads the existing complete PTT Web DB through the accepted
 `watchalong_ptt_catalog.load_recent_events()` parser. It emits only the derived minimal event rows.
-Same host-video sets dedupe to one stable `watch:<sha256[:20]>` event id; stale imports cannot replace newer article provenance.
+Canonical article URL + event day + host-video set yields a stable `watch:<sha256[:20]>` event id; equivalent PTT/pttweb URL representations dedupe, while distinct dates or article sources remain independent. Stale imports cannot replace newer article provenance.
 
 ## Rollout boundary
 
@@ -138,3 +138,18 @@ HTTP acceptance after `WATCHALONG_EVENTS_ENABLED=true`:
 - detail routes return the exact selected event or 404, never a guessed replacement.
 
 The frontend/8788 API adapters may be activated only after these backend reads pass and the current frontend stability gate is clear.
+
+## #47 final owner-side artifact gate (basic release)
+
+After local exporter reports `status=PASS`, run the read-only verifier before sending anything to #45:
+
+```sh
+cd "$HOME/Downloads/HoloViewer"
+git fetch origin issue47-public-collab-watchalong-api
+git show origin/issue47-public-collab-watchalong-api:backend/today/d1/audit-watchalong-release.py > /tmp/hv47-audit-watchalong-release.py
+python3 /tmp/hv47-audit-watchalong-release.py --sql /tmp/hv47-watchalong-repaired.sql --json /tmp/hv47-watchalong-repaired.json
+```
+
+Require `status=PASS`, no issues, valid SQL table allowlist, SHA-256 values, three independent Pekora Mushoku Tensei sample days, 177 events / 190 streams matching the Owner's existing candidate receipt. If the verification fails, STOP; do not import. This tool does not read or alter the Web DB and does not access Cloudflare.
+
+**Nonblocking, subsequent release only:** `WATCHALONG_PLAYBACK_API_HANDOFF.md` describes a *proposed*, not implemented Playlist/alignment/caption API. No basic-release backend schema, UI, tests, or import should depend on that package.
