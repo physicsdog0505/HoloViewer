@@ -51,6 +51,15 @@ class SidebarParser(HTMLParser):
             self.route = None
 
 class ParityContract(unittest.TestCase):
+    def test_sidebar_pointer_navigation_releases_focus_without_harming_keyboard(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        self.assertIn("function navigateSidebarLink(event,destination)",js)
+        self.assertIn("if(event.detail>0)event.currentTarget.blur();",js)
+        self.assertIn("navigateSidebarLink(event,link.dataset.route)",js)
+        self.assertIn("navigateSidebarLink(event,'home')",js)
+        self.assertIn(".client-rail:hover,.client-rail:focus-within",css)
+
     def test_4174_sidebar_exact_order_and_labels(self):
         parser = SidebarParser()
         parser.feed((ROOT / "site/index.html").read_text(encoding="utf-8"))
