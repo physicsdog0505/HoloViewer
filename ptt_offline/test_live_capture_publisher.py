@@ -79,6 +79,7 @@ class LiveCapturePublisherTests(unittest.TestCase):
             "INSERT INTO pushes VALUES(4,1,4,1,'→','late','do not disclose','10/16','06:36','2026-10-15T23:01:23Z')"
         )
         filename=str(Path(self.tmp.name)/"collector.sqlite3")
+        self.db.commit()
         on_disk=sqlite3.connect(filename)
         try:
             self.db.backup(on_disk)
