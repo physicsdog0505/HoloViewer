@@ -15,8 +15,23 @@ function youtubeEmbedUrl(id){
  return url.toString();
 }
 function frame(id){const f=document.createElement('iframe');f.className='frame';f.title='YouTube player '+id;f.src=youtubeEmbedUrl(id);f.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';f.referrerPolicy='strict-origin-when-cross-origin';f.allowFullscreen=true;return f}
-function single(id,target='single-player'){if(!id){if($(target))message(target,'請輸入有效的 YouTube 網址或影片 ID。');return}if(!$(target)){window.hvOpenCustomSession?.([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}$(target).replaceChildren(frame(id))}
+function single(id,target='single-player'){if(!id){if($(target))message(target,'請輸入有效的 YouTube 網址或影片 ID。');return}if(!$(target)){openViewingDocument([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}$(target).replaceChildren(frame(id))}
 function renderMulti(){sessionStorage.setItem('hvMulti',JSON.stringify(state.multi))}
+function viewingSessionUrl(ids,opts={}){
+ const clean=[...new Set((ids||[]).map(id=>videoId(String(id||''))).filter(Boolean))];
+ if(!clean.length)return '/custom-view';
+ const q=new URLSearchParams();
+ clean.forEach(id=>q.append('stream',id));
+ q.set('layout',['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto');
+ q.set('primary',String(Math.max(0,Number(opts.primary)||0)));
+ q.set('audio',String(Math.max(0,Number(opts.audio)||0)));
+ q.set('ptt',opts.ptt==='live'?'live':'video');
+ if(opts.eventId)q.set('event',String(opts.eventId));
+ return '/custom-view/session?'+q.toString();
+}
+function openViewingDocument(ids,opts={}){
+ location.href=viewingSessionUrl(ids,opts);
+}
 
 /* 4174 client_home._english_home_date: %a · %b %d, %Y, uppercase. */
 function clientTopbarDate(day){
@@ -60,15 +75,6 @@ function route(r){
  document.querySelectorAll('[data-route]').forEach(el=>el.classList.toggle('active',el.dataset.route===activeNav));
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
  updateClientTopbar(r);$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
- // Preserve session stream parameters while entering the player.
- const sessionHash=r==='custom-session'&&viewing.ids.length
-  ?'#custom-session?'+new URLSearchParams([
-    ...viewing.ids.map(id=>['stream',id]),
-    ['layout',viewing.layout],['primary',String(viewing.primary)],
-    ['audio',String(viewing.audio)],['ptt',viewing.ptt||'video']
-   ]).toString()
-  :r==='custom-session'&&location.hash.startsWith('#custom-session?')?location.hash:'#'+r;
- history.replaceState(null,'',sessionHash);
  const viewerActive=r==='custom-session';
  if(!viewerActive)window.hvStopFocusCarousel?.();
  $('viewer-4174-css').media='not all';
@@ -199,10 +205,7 @@ function openCollabEvent(event){
  const streams=collabEventStreams(event);
  const ids=streams.map(x=>x.video_id);
  if(ids.length<2)return;
- state.multi=ids.slice();renderMulti();
- window.hvOpenCustomSession?.(ids,{layout:'auto',ptt:'video',primary:0,audio:0,
-  collabLabel:String(event.label||'多人連動'),
-  streamMetadata:streams.map(x=>({videoId:x.video_id,label:String(x.title||x.channel_name||x.video_id),channelId:String(x.channel_id||'')}))});
+ location.href=viewingSessionUrl(ids,{layout:'auto',ptt:'video',primary:0,audio:0,eventId:String(event.event_id||'')});
 }
 function collabEntry(event){
  const streams=collabEventStreams(event);
@@ -238,7 +241,7 @@ function homeCard(item,container){
   if(event.target.closest('.stream-collab-entry'))return;
   const source=event.target.closest('[data-youtube-href]');
   if(source){event.preventDefault();event.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer');return}
-  event.preventDefault();if(!card.dataset.multiviewId){window.hvOpenCustomSession?.([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}
+  event.preventDefault();if(!card.dataset.multiviewId){openViewingDocument([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}
   if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);homeSelection()
  });
  card.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open(event.target.dataset.youtubeHref,'_blank','noopener,noreferrer')}});
@@ -310,7 +313,7 @@ function renderHomeHighlights(rows){
    const message=node('span',undefined,'announcement-entry');message.dataset.announcementIndex=String(i);message.hidden=i!==0;
    const link=node('a');link.href='/custom-view/session?stream='+encodeURIComponent(pick.row.video_id);
    link.append(node('strong',pick.label),document.createTextNode(' · '+String(pick.row.channel_title||pick.row.channel_name||'Hololive')+'：'+String(pick.row.title||'')));
-   link.onclick=e=>{e.preventDefault();window.hvOpenCustomSession?.([pick.row.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};
+   link.onclick=e=>{e.preventDefault();openViewingDocument([pick.row.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};
    message.append(link);track.append(message);
   });
   messages.append(track);aside.append(messages);announcement.append(aside);
@@ -323,7 +326,7 @@ function renderHomeHighlights(rows){
   const row=pick.row,id=row.video_id;const state=String(row.lifecycle_state||row.state||'').toLowerCase();
   const slide=node('div',undefined,'highlight-slide');slide.dataset.slide=String(i);slide.hidden=i!==0;
   const card=node('a',undefined,'home-highlight');card.href='/custom-view/session?stream='+encodeURIComponent(id);
-  card.onclick=e=>{if(e.target.closest('[data-youtube-href]'))return;e.preventDefault();window.hvOpenCustomSession?.([id],{layout:'auto',ptt:'video',primary:0,audio:0})};
+  card.onclick=e=>{if(e.target.closest('[data-youtube-href]'))return;e.preventDefault();openViewingDocument([id],{layout:'auto',ptt:'video',primary:0,audio:0})};
   const thumb=node('div',undefined,'highlight-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
   const source=node('span','YouTube ↗','youtube-source-link');source.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;source.setAttribute('role','link');source.tabIndex=0;
   source.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')});
@@ -561,12 +564,11 @@ pttInitControls();
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
+$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',ptt:'video',primary:0,audio:0})};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
-$('ptt-refresh').onclick=event=>{event.preventDefault();loadPtt()};
-$('ptt-focus').onclick=event=>{event.preventDefault();route($('ptt').classList.contains('active')&&document.body.classList.contains('ptt-focus-mode')?'ptt':'ptt-focus')};
-document.querySelectorAll('[data-page-link]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.pageLink)}));
+$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',ptt:'video',primary:0,audio:0})};
+$('ptt-refresh').onclick=event=>{event.preventDefault();location.href='/ptt-today'};
+$('ptt-focus').onclick=event=>{event.preventDefault();location.href=document.body.classList.contains('ptt-focus-mode')?'/ptt-today':'/ptt-today?focus=1'};
 let customCatalogCache=null;
 async function loadCustomLibrary(){
  try{
@@ -820,7 +822,6 @@ window.hvOpenCustomSession=function(ids,opts={}){
  window.hvDestroy4174SharedViewer?.();
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
- try{sessionStorage.setItem('hvCustomViewing',JSON.stringify({ids:clean,layout:opts.layout||'auto',ptt:opts.ptt||'video',primary:opts.primary||0,audio:opts.audio||0}));}catch{}
  viewing.ids=clean;
  viewing.ptt=opts.ptt==='live'?'live':'video';
  viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
@@ -858,16 +859,17 @@ window.hvOpenCustomSession=function(ids,opts={}){
   translationB:[],
   verifiedTimelineStarts:opts.verifiedTimelineStarts&&typeof opts.verifiedTimelineStarts==='object'?opts.verifiedTimelineStarts:{},
   manualTimelineStarts:{},
-  collabPollUrl:'',
+  collabPollUrl:typeof opts.collabPollUrl==='string'?opts.collabPollUrl:'',
   collabLabel:typeof opts.collabLabel==='string'?opts.collabLabel:''
  });
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
+$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
 const hashRoute=location.hash.substring(1).split('?')[0];
 const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):
+ location.pathname==='/custom-view/session'?'custom-session':
  location.pathname==='/custom-view'?'single':
  location.pathname==='/collab'?'multi':
  location.pathname==='/watchalong'?'watchalong':
@@ -987,18 +989,7 @@ document.getElementById('start').onclick=()=>{
   q.set('ptt',document.getElementById('pttMode').value);
   q.set('primary',String(Math.max(0,items.indexOf(primaryId))));
   q.set('audio',String(Math.max(0,items.indexOf(audioId))));
-  const error=document.getElementById('custom-error');
-  try{
-   if(typeof window.hvOpenCustomSession!=='function')throw Error('播放器初始化尚未完成');
-   window.hvOpenCustomSession(items.slice(),{layout:q.get('layout'),ptt:q.get('ptt'),primary:Number(q.get('primary')),audio:Number(q.get('audio'))});
-   if(!document.getElementById('custom-session').classList.contains('active')||
-      document.querySelectorAll('#stage .player-card iframe').length!==items.length)throw Error('播放器畫面未正確建立');
-   error.hidden=true;
-  }catch(err){
-   error.textContent='開啟觀看失敗：'+(err instanceof Error?err.message:'未知錯誤')+'。請重新整理頁面再試。';
-   error.hidden=false;
-   document.getElementById('custom-selection-status').textContent='觀看尚未開始，已保留所選影片。';
-  }
+  location.href='/custom-view/session?'+q.toString();
 };
 render();
 
@@ -1078,23 +1069,35 @@ watchForm.addEventListener('submit',event=>{
 });
 })();
 
-// Recover the last explicitly opened session after a tab reload/deep link.
-// Without saved valid IDs, route to selection rather than an empty player shell.
-(function restoreCustomSession(){
- if(location.hash.split('?')[0]!=='#custom-session')return;
- const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
- const urls=params.getAll('stream');
- // An explicit URL is authoritative: never substitute an unrelated saved session.
- const ids=urls.length
-  ?[...new Set(urls.filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))]
-  :[];
- let saved=null;try{saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null')}catch{}
- const recovered=urls.length?ids:(Array.isArray(saved?.ids)?saved.ids.filter(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id)):[]);
- if(!recovered.length){route('single');return;}
- window.hvOpenCustomSession(recovered,{
-  layout:urls.length?params.get('layout'):saved.layout,
-  ptt:urls.length?params.get('ptt'):saved.ptt,
-  primary:urls.length?Number(params.get('primary')||0):saved.primary,
-  audio:urls.length?Number(params.get('audio')||0):saved.audio
- });
+// 4174-style session lifecycle: the URL is the complete source of truth.
+(async function restoreCustomSession(){
+ if(location.pathname!=='/custom-view/session')return;
+ const params=new URLSearchParams(location.search);
+ const ids=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))];
+ if(!ids.length){location.replace('/custom-view');return;}
+ const opts={
+  layout:params.get('layout'),
+  ptt:params.get('ptt'),
+  primary:Number(params.get('primary')||0),
+  audio:Number(params.get('audio')||0)
+ };
+ const eventId=String(params.get('event')||'');
+ if(eventId){
+  try{
+   const payload=await api('/v1/collab/events/'+encodeURIComponent(eventId));
+   const event=payload?.event||payload;
+   const streams=collabEventStreams(event);
+   opts.collabLabel=String(event?.label||'多人連動');
+   opts.collabPollUrl=config.apiBase.replace(/\/$/,'')+'/v1/collab/events/'+encodeURIComponent(eventId);
+   opts.streamMetadata=streams.map(x=>({videoId:x.video_id,label:String(x.title||x.channel_name||x.video_id),channelId:String(x.channel_id||'')}));
+   if(event?.sync?.available===true){
+    opts.verifiedTimelineStarts={};
+    for(const stream of streams){
+     const seconds=Date.parse(String(stream.actual_start||''))/1000;
+     if(Number.isFinite(seconds))opts.verifiedTimelineStarts[stream.video_id]=seconds;
+    }
+   }
+  }catch(_error){}
+ }
+ window.hvOpenCustomSession(ids,opts);
 })();
