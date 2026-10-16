@@ -184,6 +184,23 @@ class ParityContract(unittest.TestCase):
         self.assertIn("collabLabel:typeof opts.collabLabel==='string'?opts.collabLabel:''", js)
         self.assertIn("if(event.target.closest('.stream-collab-entry'))return", js)
 
+    def test_public_collab_context_reaches_existing_4174_viewer(self):
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn("function collabDetailUrl(event)",app)
+        self.assertIn("'/v1/collab/events/'+encodeURIComponent(eventId)",app)
+        self.assertIn("function verifiedTimelineStartsForEvent(event)",app)
+        self.assertIn("event?.sync?.available!==true",app)
+        self.assertIn("Date.parse(String(stream.actual_start||''))/1000",app)
+        self.assertIn("collabPollUrl:pollable?collabDetailUrl(event):''",app)
+        self.assertIn("verifiedTimelineStarts:verifiedTimelineStartsForEvent(event)",app)
+        self.assertIn("collabPollUrl:typeof opts.collabPollUrl==='string'?opts.collabPollUrl:''",app)
+        self.assertIn("savedSession.collabPollUrl=opts.collabPollUrl",app)
+        self.assertIn("collabPollUrl:urls.length?'':saved?.collabPollUrl",app)
+        self.assertIn("Array.isArray(payload.event?.streams)?payload.event.streams:[]",viewer)
+        self.assertIn("setInterval(refreshLiveCollab,15000)",viewer)
+        self.assertIn("appendWatchStream(id,String(item.label||item.title||item.channel_name||id)",viewer)
+
     def test_collab_hub_card_follows_4174_event_presentation(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn("const ordered=streams.slice().sort(",js)
