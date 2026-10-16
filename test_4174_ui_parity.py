@@ -211,18 +211,24 @@ class ParityContract(unittest.TestCase):
         self.assertIn(".ptt-push-content{color:#a9a900", css)
         self.assertNotIn("message('ptt-status'", js)
 
-    def test_watchalong_builder_matches_4174_source_and_mode_controls(self):
+    def test_watchalong_builder_and_session_match_4174_public_boundary(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         for part in ('id="watchalongBuilder"', 'class="manual-grid"', 'id="youtubePanel"',
                      'id="externalPanel"', 'id="singleFields"', 'id="playlistFields"',
-                     'name="view_mode"', 'name="source_kind"', 'id="youtubeMode"'):
+                     'name="view_mode"', 'name="source_kind"', 'id="youtubeMode"',
+                     'id="recentWatchGrid"', 'id="watchalong-session"'):
             self.assertIn(part, html)
         self.assertIn('.source-choice{display:grid', css)
         self.assertIn('.manual-shell{padding:20px}', css)
+        self.assertIn('.watchalong-player-grid{display:grid', css)
         self.assertIn("const youtubePanel=document.getElementById('youtubePanel')", js)
-        self.assertIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
+        self.assertIn("api('/v1/watchalong/recent?days=30&limit=60')", js)
+        self.assertIn("if(location.pathname!=='/watchalong/session')return;", js)
+        self.assertIn("ensureWatchalongYoutubeApi", js)
+        self.assertIn("watchalong-companion-card", js)
+        self.assertNotIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
         self.assertNotIn("watch-add').onclick", js)
 
     def test_original_4174_collab_hub_structure(self):
