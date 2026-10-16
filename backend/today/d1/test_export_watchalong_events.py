@@ -14,6 +14,19 @@ def event(event_id="watch:123",video_id="U2o13h1Oib4"):
             "streams":[{"video_id":video_id,"label":"host"}]}
 
 class ProjectionGateTests(unittest.TestCase):
+    def test_refresh_fail_closed_on_fetch_errors(self):
+        stats={"targets":58,"already_cached":13,"fetched":0,
+               "errors":[{"stage":"fetch","error":"missing playwright"}]}
+        self.assertFalse(module.refresh_coverage_ok(stats))
+    def test_refresh_fail_closed_on_unaccounted_targets(self):
+        self.assertFalse(module.refresh_coverage_ok({"targets":58,"already_cached":13,
+                     "fetched":42,"errors":[]}))
+    def test_refresh_complete_if_all_cached(self):
+        self.assertTrue(module.refresh_coverage_ok({"targets":13,"already_cached":13,
+                     "fetched":0,"errors":[]}))
+    def test_refresh_complete_if_all_fetched(self):
+        self.assertTrue(module.refresh_coverage_ok({"targets":3,"already_cached":0,
+                     "fetched":3,"errors":[]}))
     def test_valid(self):
         self.assertTrue(module.validate_projection([event(),event("watch:456","8pF4qHcshDc")]))
     def test_duplicate_events_fail(self):
