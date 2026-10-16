@@ -1021,42 +1021,24 @@ function addStream(value){
  status.textContent='已加入 '+items.length+' 支影片；按下方「開始觀看」開啟播放器。';
  return true;
 }
-function bindCustomPicker(box){
- box.addEventListener('click',event=>{
-  const button=event.target.closest('[data-live-pick]');if(!button)return;
-  if(event.target.closest('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open('https://www.youtube.com/watch?v='+button.dataset.livePick,'_blank','noopener,noreferrer');return}
-  const value=button.dataset.livePick;if(items.includes(value))items.splice(items.indexOf(value),1);else addStream(value);render();
- });
- box.addEventListener('keydown',event=>{
-  if(event.key!=='Enter'&&event.key!==' ')return;
-  const button=event.target.closest('[data-live-pick]');if(!button)return;
-  event.preventDefault();event.stopPropagation();
-  if(event.target.closest('[data-youtube-href]')){window.open('https://www.youtube.com/watch?v='+button.dataset.livePick,'_blank','noopener,noreferrer');return}
-  button.click();
- });
-}
-bindCustomPicker(document.getElementById('custom-live-picker'));
-bindCustomPicker(document.getElementById('custom-history-picker'));
-async function loadCustomHistoryLibrary(){
- const date=document.getElementById('customHistoryDate'),box=document.getElementById('custom-history-picker'),empty=document.getElementById('custom-history-empty');
- if(!date||!box||!empty)return;
- const bounds=historyBounds();date.min=bounds.earliest;date.max=bounds.latest;if(!historyDateValid(date.value))date.value=bounds.latest;
- empty.hidden=false;empty.textContent='讀取 '+date.value+' 歷史影片中…';box.replaceChildren();
- try{
-  const data=await api('/v1/history?day='+encodeURIComponent(date.value)+'&limit=50&offset=0');
-  if(!Array.isArray(data.items))throw Error('資料格式錯誤');
-  fillCustomPicker(box,data.items,empty);
-  if(!box.childElementCount){empty.hidden=false;empty.textContent='這一天沒有可加入的歷史影片。'}
- }catch(error){empty.hidden=false;empty.textContent='歷史影片暫時無法讀取。'}
-}
+document.getElementById('custom-live-picker').addEventListener('click',event=>{
+ const button=event.target.closest('[data-live-pick]');if(!button)return;
+ if(event.target.closest('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open('https://www.youtube.com/watch?v='+button.dataset.livePick,'_blank','noopener,noreferrer');return}
+ const value=button.dataset.livePick;if(items.includes(value))items.splice(items.indexOf(value),1);else addStream(value);render();
+});
+document.getElementById('custom-live-picker').addEventListener('keydown',event=>{
+ if(event.key!=='Enter'&&event.key!==' ')return;
+ const button=event.target.closest('[data-live-pick]');if(!button)return;
+ event.preventDefault();event.stopPropagation();
+ if(event.target.closest('[data-youtube-href]')){window.open('https://www.youtube.com/watch?v='+button.dataset.livePick,'_blank','noopener,noreferrer');return}
+ button.click();
+});
 document.querySelectorAll('[data-library-tab]').forEach(tab=>tab.addEventListener('click',()=>{
   const history=tab.dataset.libraryTab==='history';
   document.querySelectorAll('[data-library-tab]').forEach(b=>b.setAttribute('aria-selected',String(b===tab)));
   document.getElementById('liveLibrary').hidden=history;
   document.getElementById('historyLibrary').hidden=!history;
-  if(history&&!document.getElementById('custom-history-picker').childElementCount)loadCustomHistoryLibrary();
 }));
-document.getElementById('customHistoryLoad').onclick=loadCustomHistoryLibrary;
 document.getElementById('displayMode').onclick=()=>{
   const gallery=document.querySelector('.live-picker-list');if(!gallery)return;
   gallery.classList.toggle('compact');document.getElementById('displayMode').textContent=gallery.classList.contains('compact')?'詳細卡片':'精簡列表';
@@ -1075,22 +1057,19 @@ document.getElementById('start').onclick=()=>{
 };
 render();
 
-function fillCustomPicker(box,rows,empty){
- box.replaceChildren();
+window.hvCustomCatalog=function(rows){
+ const box=document.getElementById('custom-live-picker');box.replaceChildren();streamMetadata.clear();
  for(const row of rows){
   const id=String(row?.video_id||'');if(!/^[A-Za-z0-9_-]{11}$/.test(id))continue;
-  const channel=String(row.channel_title||row.channel_name||'Hololive'),title=String(row.title||id),avatar=String(row.avatar_url||'');
-  streamMetadata.set(id,{channel,title,avatar:/^https:\/\/(yt3\.ggpht\.com|i\.ytimg\.com)\//.test(avatar)?avatar:''});
+  const channel=String(row.channel_title||row.channel_name||'Hololive');const title=String(row.title||id);
+  const avatar=String(row.avatar_url||'');streamMetadata.set(id,{channel,title,avatar:/^https:\/\/(yt3\.ggpht\.com|i\.ytimg\.com)\//.test(avatar)?avatar:''});
   const card=node('div',undefined,'live-picker-item');card.setAttribute('role','button');card.tabIndex=0;card.dataset.livePick=id;card.setAttribute('aria-pressed',String(items.includes(id)));
   const cover=node('div');cover.style.position='relative';const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';img.alt='';img.loading='lazy';cover.append(img);
   const source=node('span','YouTube ↗','youtube-source-link');source.setAttribute('role','link');source.tabIndex=0;source.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;cover.append(source);card.append(cover);
   const label=node('span');const strong=node('strong',channel);label.append(strong,document.createTextNode(' · '+title));card.append(label);box.append(card);
  }
- if(empty)empty.hidden=box.childElementCount>0;
+ document.getElementById('custom-live-empty').hidden=box.childElementCount>0;
  render();
-}
-window.hvCustomCatalog=function(rows){
- const box=document.getElementById('custom-live-picker');streamMetadata.clear();fillCustomPicker(box,rows,document.getElementById('custom-live-empty'));
 };
 window.hvCustomAdd=addStream;
 
