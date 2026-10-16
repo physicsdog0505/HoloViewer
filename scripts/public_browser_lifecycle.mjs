@@ -100,6 +100,12 @@ try{
  await page.locator('#custom-live-picker [data-live-pick]').nth(0).click();
  await freshDocument(page,()=>page.locator('#start').click(),url=>url.pathname==='/custom-view/session'&&url.searchParams.getAll('stream').length===1);
  await page.waitForSelector('#stage .player-card');
+ const pttFrameHandle=await page.waitForSelector('.ptt-live-panel iframe');
+ const pttFrame=await pttFrameHandle.contentFrame();
+ assert(pttFrame,'Viewer PTT iframe did not create a document');
+ await pttFrame.waitForSelector('#ptt-list .push');
+ assert(await pttFrame.evaluate(()=>document.body.classList.contains('ptt-focus-mode')),'Viewer PTT iframe is not in focus mode');
+ assert(await pttFrame.evaluate(()=>getComputedStyle(document.querySelector('.client-rail')).display==='none'),'Viewer PTT iframe leaked the main sidebar');
 
  // History selection is independent and uses its own fresh viewer document.
  await freshDocument(page,()=>page.locator('a[data-route="history"]').click(),url=>url.pathname==='/history');
