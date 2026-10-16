@@ -124,13 +124,16 @@ try{
  await page.waitForSelector('#stage .player-card:nth-child(3)');
  assert(await page.locator('#stage .player-card').count()===3,'multi-view did not mount three cards');
  assert(await page.locator('#stage > .ptt-live-panel').count()===1,'3-POV viewer did not mount live PTT tile');
- const tileGeometry=await page.evaluate(()=>{
+ const tileSnapshot=await page.evaluate(()=>{
   const nodes=[...document.querySelectorAll('#stage > .player-card, #stage > .ptt-live-panel')];
-  return nodes.map(el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height}});
+  return {
+   viewport:{width:window.innerWidth,height:window.innerHeight},
+   tiles:nodes.map(el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height}})
+  };
  });
- assert(tileGeometry.length===4,'3-POV viewer should have 4 visible tiles including PTT');
- assert(tileGeometry.every(r=>r.width>80&&r.height>80),'3-POV viewer contains collapsed tiles');
- assert(tileGeometry.every(r=>r.top>=-1&&r.bottom<=innerHeight+1&&r.left>=-1&&r.right<=innerWidth+1),'3-POV viewer tiles overflow browser viewport');
+ assert(tileSnapshot.tiles.length===4,'3-POV viewer should have 4 visible tiles including PTT');
+ assert(tileSnapshot.tiles.every(r=>r.width>80&&r.height>80),'3-POV viewer contains collapsed tiles');
+ assert(tileSnapshot.tiles.every(r=>r.top>=-1&&r.bottom<=tileSnapshot.viewport.height+1&&r.left>=-1&&r.right<=tileSnapshot.viewport.width+1),'3-POV viewer tiles overflow browser viewport');
  assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'two-stream auto layout did not resolve to Equal');
  await page.locator('#watchSettings').click();
  assert(await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not open');
