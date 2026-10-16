@@ -58,12 +58,32 @@ class RecurringPublisherTests(unittest.TestCase):
              patch("ptt_offline.recurring_publisher.inspect_latest_article",side_effect=plan), \
              patch("ptt_offline.recurring_publisher.run_live_once",side_effect=publish):
             result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
-                                send=True,batch_cap=25,max_batches=8)
+                                send=True,batch_cap=25,max_batches=8,clock=lambda:0)
         self.assertEqual(result["articles_checked"],2)
         self.assertEqual(result["sent"],50)
         self.assertEqual(result["http_posts"],2)
         self.assertEqual(per_article,[1,1,2,2])
         self.assertFalse(result["backlog_may_remain"])
+
+    def test_global_one_batch_budget_rotates_across_active_articles(self):
+        def plan(_,article_id=None):
+            return {"status":"READY","source_identity":str(article_id)*64}
+        for clock_value,expected_article in [(0,1),(60,2)]:
+            delivered=[]
+            def publish(*args,**kwargs):
+                delivered.append(kwargs["article_id"])
+                return {"status":"ACK","sent":10}
+            with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+                 patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1,2,3,4]), \
+                 patch("ptt_offline.recurring_publisher.inspect_latest_article",side_effect=plan), \
+                 patch("ptt_offline.recurring_publisher.run_live_once",side_effect=publish):
+                result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                    send=True,batch_cap=10,max_batches=1,
+                                    max_articles=4,clock=lambda v=clock_value:v)
+            self.assertEqual(result["http_posts"],1)
+            self.assertEqual(result["sent"],10)
+            self.assertEqual(delivered,[expected_article])
+            self.assertTrue(result["backlog_may_remain"])
 
     def test_empty_collector_never_posts(self):
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
