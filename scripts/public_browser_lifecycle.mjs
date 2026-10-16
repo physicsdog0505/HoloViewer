@@ -93,6 +93,19 @@ try{
  await freshDocument(page,()=>page.locator('#multiWatch').click(),url=>url.pathname==='/custom-view/session'&&url.searchParams.getAll('stream').length===2);
  await page.waitForSelector('#stage .player-card:nth-child(2)');
  assert(await page.locator('#stage .player-card').count()===2,'multi-view did not mount two cards');
+ assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'two-stream auto layout did not resolve to Equal');
+ await page.locator('[data-layout="primary"]').click();
+ assert(await page.evaluate(()=>document.body.classList.contains('layout-primary')),'Focus/primary layout did not activate');
+ await page.locator('#stage .player-card[data-index="1"] .focus').click();
+ assert(await page.locator('#stage .player-card[data-index="1"]').evaluate(el=>el.classList.contains('primary')),'Focus target did not become primary');
+ await page.locator('#stage .player-card[data-index="1"] .master').click();
+ assert(await page.locator('#stage .player-card[data-index="1"] .master').getAttribute('aria-pressed')==='true','audio master did not move to second POV');
+ await page.locator('[data-layout="equal"]').click();
+ assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'Equal layout did not restore');
+ await page.locator('#watchSettings').click();
+ assert(await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not open');
+ await page.locator('#watchSettings').click();
+ assert(!await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not close');
 
  // Canonical Custom View builder uses full-document session navigation.
  await freshDocument(page,()=>page.locator('a[data-route="single"]').click(),url=>url.pathname==='/custom-view');
