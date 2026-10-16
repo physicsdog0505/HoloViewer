@@ -187,10 +187,13 @@ function setHomeCollabEvents(data){
  for(const event of homeCollabEvents)for(const stream of collabEventStreams(event))homeCollabByVideo.set(stream.video_id,event);
 }
 function openCollabEvent(event){
- const ids=collabEventStreams(event).map(x=>x.video_id);
+ const streams=collabEventStreams(event);
+ const ids=streams.map(x=>x.video_id);
  if(ids.length<2)return;
  state.multi=ids.slice();renderMulti();
- window.hvOpenCustomSession?.(ids,{layout:'auto',ptt:'video',primary:0,audio:0});
+ window.hvOpenCustomSession?.(ids,{layout:'auto',ptt:'video',primary:0,audio:0,
+  collabLabel:String(event.label||'多人連動'),
+  streamMetadata:streams.map(x=>({videoId:x.video_id,label:String(x.title||x.channel_name||x.video_id),channelId:String(x.channel_id||'')}))});
 }
 function collabEntry(event){
  const streams=collabEventStreams(event);
@@ -829,8 +832,10 @@ window.hvOpenCustomSession=function(ids,opts={}){
   item.dataset.liveVideoId,
   {label:item.dataset.title||item.dataset.channel||item.dataset.liveVideoId,channelId:item.dataset.channelId||item.dataset.channel||''}
  ]));
+ const collabMetadata=new Map((Array.isArray(opts.streamMetadata)?opts.streamMetadata:[])
+  .filter(x=>x&&clean.includes(x.videoId)).map(x=>[x.videoId,x]));
  const streams=clean.map((id,index)=>{
-  const meta=streamMetadata.get(id)||{};
+  const meta=collabMetadata.get(id)||streamMetadata.get(id)||{};
   return {videoId:id,label:meta.label||('Stream '+(index+1)),channelId:meta.channelId||''};
  });
  window.mount4174SharedViewer({
@@ -844,7 +849,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
   verifiedTimelineStarts:opts.verifiedTimelineStarts&&typeof opts.verifiedTimelineStarts==='object'?opts.verifiedTimelineStarts:{},
   manualTimelineStarts:{},
   collabPollUrl:'',
-  collabLabel:''
+  collabLabel:typeof opts.collabLabel==='string'?opts.collabLabel:''
  });
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
