@@ -14,6 +14,11 @@ def q(value):
         return "NULL"
     return "'" + str(value).replace("'", "''") + "'"
 
+def refresh_coverage_ok(stats):
+    """A requested refresh never passes with any discovery/fetch error."""
+    return (not stats["errors"] and
+            stats["targets"] == stats["already_cached"] + stats["fetched"])
+
 def validate_projection(events):
     """Validate public-only output before any SQL/JSON artifact is written."""
     video_id=re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -103,8 +108,8 @@ def main():
                         "day":value.isoformat(),"aid":target.aid,"stage":"fetch",
                         "error":result.error or "unknown refresh failure",
                     })
-    if args.refresh_missing_recent and refresh_stats["errors"]:
-        print(json.dumps({"status":"BLOCKED_REFRESH_ERRORS","refresh":refresh_stats,
+    if args.refresh_missing_recent and not refresh_coverage_ok(refresh_stats):
+        print(json.dumps({"status":"BLOCKED_REFRESH_ERRORS","refresh":{**refresh_stats,"coverage_incomplete":True},
             "events":None,"streams":None,"sql":None,"json":None},ensure_ascii=False))
         raise SystemExit(2)
 
