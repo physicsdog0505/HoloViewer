@@ -943,7 +943,8 @@ async function resolveProductionPtt(videoIdValue){
  const id=videoId(String(videoIdValue||''));if(!id)return {mode:'unavailable'};
  let row;try{row=await api('/v1/catalog/videos/'+encodeURIComponent(id));}catch(_error){return {mode:'unavailable'}}
  const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
- if(lifecycle==='live')return {mode:'live'};\n if(['upcoming','waiting'].includes(lifecycle))return {mode:'unavailable'};
+ if(lifecycle==='live')return {mode:'live'};
+ if(['upcoming','waiting'].includes(lifecycle))return {mode:'unavailable'};
  if(lifecycle!=='ended')return {mode:'unavailable'};
  const start=String(row?.actual_start||row?.scheduled_start||'');
  const startMs=Date.parse(start);if(!Number.isFinite(startMs))return {mode:'unavailable'};
