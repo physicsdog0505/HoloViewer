@@ -22,7 +22,7 @@ def refresh_coverage_ok(stats):
 def projection_issues(events):
     """Return bounded, non-private diagnostics for the rejected export."""
     video_id=re.compile(r"^[A-Za-z0-9_-]{11}$")
-    source=re.compile(r"^https://(?:www\\.)?ptt\\.cc/bbs/C_Chat/M\\.[0-9]+\\.A\\.[A-Za-z0-9]+\\.html$")
+    source=re.compile(r"^https://(?:www\.)?ptt\.cc/bbs/C_Chat/M\.[0-9]+\.A\.[A-Za-z0-9]+\.html$")
     seen=set()
     issues=[]
     for index,e in enumerate(events):
