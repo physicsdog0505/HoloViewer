@@ -1222,7 +1222,8 @@ async function renderWatchalongSession(){
  const focus=node('button','動畫優先');focus.type='button';
  const play=node('button','播放左側直播');play.type='button';play.className='primary-action';
  const pause=node('button','暫停左側直播');pause.type='button';
- actions.append(compare,focus,play,pause);
+ const immersive=node('button','沉浸全螢幕');immersive.type='button';
+ actions.append(compare,focus,play,pause,immersive);
  const layout=node('div',undefined,'watchalong-player-grid');
  const masterCard=node('section',undefined,'watchalong-player-card');
  masterCard.append(node('div','Hololive 直播（主時間軸）','watchalong-player-head'));
@@ -1230,7 +1231,18 @@ async function renderWatchalongSession(){
  layout.append(masterCard);
  let masterPlayer=null,sourcePlayer=null,raf=0;
  const setFocus=enabled=>{layout.classList.toggle('focus-source',enabled);compare.classList.toggle('active',!enabled);focus.classList.toggle('active',enabled)};
+ const setImmersive=enabled=>{
+  document.body.classList.toggle('watchalong-immersive',Boolean(enabled));
+  immersive.textContent=enabled?'退出沉浸模式':'沉浸全螢幕';
+ };
  compare.onclick=()=>setFocus(false);focus.onclick=()=>setFocus(true);
+ immersive.onclick=async()=>{
+  const next=!document.body.classList.contains('watchalong-immersive');setImmersive(next);
+  if(next&&!document.fullscreenElement&&shell.requestFullscreen){try{await shell.requestFullscreen()}catch(_error){}}
+  else if(!next&&document.fullscreenElement&&document.exitFullscreen){try{await document.exitFullscreen()}catch(_error){}}
+ };
+ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('watchalong-immersive'))setImmersive(false)});
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('watchalong-immersive')&&!document.fullscreenElement)setImmersive(false)});
  function tick(){
   const mt=Number(masterPlayer?.getCurrentTime?.()||0),st=Number(sourcePlayer?.getCurrentTime?.()||0);
   if(kind==='youtube')status.textContent=(resolvedMode==='live'?'即時模式 · 右側片源獨立控制':'手動模式 · 右側片源獨立控制')+' · 主時間 '+watchalongClock(mt)+' · 來源 '+watchalongClock(st);
