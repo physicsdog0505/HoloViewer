@@ -51,6 +51,21 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
         self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
 
+    def test_static_public_document_lifecycle_boundary(self):
+        config = json.loads((ROOT / "cloudflare/wrangler.json").read_text())
+        self.assertEqual(set(config), {"name", "compatibility_date", "assets"})
+        self.assertNotIn("main", config)
+        self.assertNotIn("d1_databases", config)
+        self.assertNotIn("kv_namespaces", config)
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        self.assertNotIn("preventDefault();route(link.dataset.route)", js)
+        self.assertNotIn("preventDefault();route(link.dataset.mobileRoute)", js)
+        self.assertNotIn("sessionStorage.setItem('hvMulti'", js)
+        self.assertNotIn("sessionStorage.setItem('hvCustomViewing'", js)
+        self.assertIn("location.href=viewingSessionUrl(ids,opts)", js)
+        self.assertIn("location.pathname==='/custom-view/session'?'custom-session'", js)
+        self.assertIn("location.href='/custom-view/session?'+q.toString()", js)
+
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
