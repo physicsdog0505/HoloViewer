@@ -52,17 +52,28 @@ export async function commitReconcileWindow(db,window){
  .bind(window.rosterVersion,window.next,window.updatedAt).run();
 }
 export async function readLifecycleCursor(db,rosterVersion){
- const row=await db.prepare('SELECT roster_version,last_video_id FROM public_today_lifecycle_cursor WHERE singleton=1').first();
- return row?.roster_version===rosterVersion?String(row.last_video_id??''):'';
+ const row=await db.prepare('SELECT roster_version,last_video_id,checked_at_json FROM public_today_lifecycle_cursor WHERE singleton=1').first();
+ if(row?.roster_version!==rosterVersion)return {lastVideoId:'',checkedAtByVideo:{}};
+ let checkedAtByVideo={};
+ try{
+  const parsed=JSON.parse(String(row.checked_at_json??'{}'));
+  if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))checkedAtByVideo=parsed;
+ }catch{}
+ return {lastVideoId:String(row.last_video_id??''),checkedAtByVideo};
 }
-export async function commitLifecycleCursor(db,{rosterVersion,lastVideoId,now=new Date()}){
- if(typeof rosterVersion!=='string'||!rosterVersion||typeof lastVideoId!=='string')throw Error('invalid lifecycle cursor');
- await db.prepare(`INSERT INTO public_today_lifecycle_cursor(singleton,roster_version,last_video_id,updated_at)
- VALUES(1,?,?,?) ON CONFLICT(singleton) DO UPDATE SET
- roster_version=excluded.roster_version,last_video_id=excluded.last_video_id,updated_at=excluded.updated_at
+export async function commitLifecycleCursor(db,{rosterVersion,lastVideoId,checkedAtByVideo={},now=new Date()}){
+ if(typeof rosterVersion!=='string'||!rosterVersion||typeof lastVideoId!=='string'||
+   !checkedAtByVideo||typeof checkedAtByVideo!=='object'||Array.isArray(checkedAtByVideo))throw Error('invalid lifecycle cursor');
+ const checkedJson=JSON.stringify(checkedAtByVideo);
+ if(checkedJson.length>131072)throw Error('lifecycle freshness watermark too large');
+ await db.prepare(`INSERT INTO public_today_lifecycle_cursor(singleton,roster_version,last_video_id,checked_at_json,updated_at)
+ VALUES(1,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET
+ roster_version=excluded.roster_version,last_video_id=excluded.last_video_id,
+ checked_at_json=excluded.checked_at_json,updated_at=excluded.updated_at
  WHERE public_today_lifecycle_cursor.roster_version!=excluded.roster_version
-    OR public_today_lifecycle_cursor.last_video_id!=excluded.last_video_id`)
- .bind(rosterVersion,lastVideoId,stamp(now)).run();
+    OR public_today_lifecycle_cursor.last_video_id!=excluded.last_video_id
+    OR public_today_lifecycle_cursor.checked_at_json!=excluded.checked_at_json`)
+ .bind(rosterVersion,lastVideoId,checkedJson,stamp(now)).run();
 }
 export async function saveChannelProfiles(db,roster,items,{now=new Date()}={}){
  if(!Array.isArray(items)||items.length>50||!roster?.version||!Array.isArray(roster.channels))throw Error('profile batch invalid');
