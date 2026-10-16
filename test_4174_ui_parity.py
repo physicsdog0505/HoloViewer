@@ -108,6 +108,16 @@ class ParityContract(unittest.TestCase):
         for href in ('href="/"','href="/history"','href="/watchalong"','href="/custom-view"','href="/collab"','href="/ptt-today"'):
             self.assertIn(href,html)
 
+    def test_history_document_navigation_is_url_authoritative(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('<form id="history-picker" class="history-picker" method="get" action="/history">',html)
+        self.assertIn("const params=new URLSearchParams(location.search),bounds=historyBounds(),requested=String(params.get('date')||'');",js)
+        self.assertIn("state.offset=(page-1)*50;",js)
+        self.assertIn("link.href='/history?date='+encodeURIComponent(day)+(page>1?'&page='+page:'');return link",js)
+        self.assertNotIn("link.onclick=e=>{e.preventDefault();$('historyDate').value=day",js)
+        self.assertNotIn("$('history-picker').onsubmit=event=>{event.preventDefault()",js)
+
     def test_collab_document_session_rehydrates_context_from_event_url(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
