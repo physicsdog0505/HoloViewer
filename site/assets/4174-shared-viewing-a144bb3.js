@@ -41,7 +41,7 @@ function refreshTranslationText(){
  const cue=translationTracks[activeTranslationTrack].find(row=>now>=Number(row.start)&&now<Number(row.end));
  translationText.textContent=cue?.translated||'';
 }
-setInterval(refreshTranslationText,250);
+const translationRefreshTimer=setInterval(refreshTranslationText,250);
 let watchMode=streams.length>1?"multi":"single";
 // No product-imposed stream cap: stop adding only for duplicates or browser/API failures.
 const liveRailItems=Array.from(document.querySelectorAll('.live-channel-rail-item[data-live-video-id]'));
@@ -792,4 +792,18 @@ if(window.YT?.Player){
  const existingApi=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
  if(!existingApi){const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);}
 }
+window.hvDestroy4174SharedViewer=function hvDestroy4174SharedViewer(){
+ stopFocusCarousel();
+ clearInterval(translationRefreshTimer);
+ clearInterval(verifiedSyncTimer);
+ if(collabPollTimer)clearInterval(collabPollTimer);
+ players.forEach(player=>{try{if(player&&typeof player.destroy==='function')player.destroy();}catch(_e){}});
+ for(const name of ['watch-multi','watch-grid','layout-auto','layout-equal','layout-primary','single-ptt','single-live','single-vod','collab-live-session','settings-open','custom-immersive']){
+  document.body.classList.remove(name);
+ }
+ for(const name of ['--tile-count','--tile-columns','--tile-rows','--columns','--side-count','--ptt-font-size']){
+  document.documentElement.style.removeProperty(name);
+ }
+ window.hvDestroy4174SharedViewer=null;
+};
 };
