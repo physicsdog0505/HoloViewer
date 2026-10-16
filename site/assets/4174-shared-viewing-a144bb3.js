@@ -297,42 +297,44 @@ function applyImmersiveState(active){
 }
 immerse?.addEventListener('click',async()=>{
  const next=!immersiveEnabled;
- applyImmersiveState(next);
+ if(!next){await window.hvExit4174Immersive?.();return}
+ applyImmersiveState(true);
  try{
-  if(next&&!document.fullscreenElement){
-   // Fullscreen the viewing surface itself, not the document: it enters the
-   // browser top layer and cannot inherit the Client shell's max-width/rails.
+  if(!document.fullscreenElement){
    const surface=pttPanel&&contentGrid?contentGrid:document.documentElement;
    await surface.requestFullscreen();
   }
-  else if(!next&&document.fullscreenElement)await document.exitFullscreen();
  }catch(_e){
-  // Keep the CSS immersive state even when browser fullscreen is unavailable.
-  statusBox.textContent=next?'已進入沉浸介面（瀏覽器未提供全螢幕）':'已退出沉浸介面';
+  statusBox.textContent='已進入沉浸介面（瀏覽器未提供全螢幕）';
  }
 });
 window.hvExit4174Immersive=async function hvExit4174Immersive(){
- applyImmersiveState(false);
+ if(immersiveExiting)return;
+ immersiveExiting=true;
+ // State must be cleared before leaving the browser fullscreen top layer.
+ immersiveEnabled=false;
  document.body.classList.remove('custom-immersive');
+ mountImmersiveSurface(false);
  forceSingleImmersiveGeometry(false);
  forceMultiImmersiveGeometry(false);
- if(document.fullscreenElement){
-  try{await document.exitFullscreen();}catch(_e){}
- }
+ repinWorkerPttAfterLayout();
+ immerse?.setAttribute('aria-pressed','false');
+ if(watchImmersive)watchImmersive.textContent='沉浸模式';
+ if(immerse)immerse.textContent='沉浸模式';
+ try{
+  if(document.fullscreenElement)await document.exitFullscreen();
+ }catch(_e){}
+ immersiveExiting=false;
 };
 immersiveExit?.addEventListener('click',()=>window.hvExit4174Immersive?.());
 document.addEventListener('keydown',event=>{
- if(event.key!=='Escape'||!immersiveEnabled)return;
- setTimeout(()=>{if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);},0);
+ if(event.key!=='Escape'||!immersiveEnabled||immersiveExiting)return;
+ window.hvExit4174Immersive?.();
 });
 document.addEventListener('fullscreenchange',()=>{
- // Escape exits immersive if fullscreen was actually active. CSS-only immersive
- // remains valid when the browser refuses requestFullscreen().
- if(!document.fullscreenElement&&immersiveEnabled){
-  applyImmersiveState(false);
- }else if(document.fullscreenElement){
-  applyImmersiveState(true);
- }
+ if(immersiveExiting)return;
+ if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);
+ else if(document.fullscreenElement&&!immersiveEnabled)applyImmersiveState(true);
 });
 
 function refreshMultiControls(){const active=streams.length>1;document.querySelectorAll('[data-layout]').forEach(button=>button.hidden=!active);for(const id of ['playerSyncLabel','focusChoices','focusCarousel','focusCarouselIntervalLabel','audioFollowLabel','playAll','pauseAll']){const el=document.getElementById(id);if(el)el.hidden=!active;}}
