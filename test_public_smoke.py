@@ -66,6 +66,16 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("location.pathname==='/custom-view/session'?'custom-session'", js)
         self.assertIn("location.href='/custom-view/session?'+q.toString()", js)
 
+    def test_nested_routes_use_root_absolute_static_assets(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        self.assertIn('href="/assets/app.css"', html)
+        self.assertIn('src="/assets/config.js"', html)
+        self.assertIn('src="/assets/4174-shared-viewing-a144bb3-dom.js"', html)
+        self.assertIn('src="/assets/4174-shared-viewing-a144bb3.js"', html)
+        self.assertIn('src="/assets/app.js"', html)
+        self.assertNotIn('href="assets/', html)
+        self.assertNotIn('src="assets/', html)
+
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
