@@ -374,7 +374,7 @@ function pttToLatest(force=false){
  const list=$('ptt-list');
  if(!force&&!pttFollowing)return;
  pttProgrammatic=true;list.scrollTop=list.scrollHeight;
- window.setTimeout(()=>{pttProgrammatic=false},180);
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{pttProgrammatic=false}));
  $('ptt-newest').hidden=true;
 }
 function pttRow(row){
