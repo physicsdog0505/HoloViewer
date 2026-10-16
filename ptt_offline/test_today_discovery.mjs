@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {refreshTodayDiscovery} from './worker_host/today/discovery-refresh.mjs';
+import {refreshPendingVideos} from './worker_host/today/websub-status.mjs';
 import {mountTodayCadence} from './worker_host/today/cadence-refresh.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
@@ -202,5 +203,46 @@ test('full 30-channel / 60-entry minute remains bounded while discovery stays mi
  assert.equal(db.writeQueries,261);
  assert.equal(db.returnedReadRows,117,'result rows in the test double, not Cloudflare billed Rows Read');
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_websub_events WHERE status='pending'").get().n,10);
+ db.raw.close();
+});
+
+
+test('ordinary uploads and Shorts without livestream evidence never enter canonical/evidence',async()=>{
+ const db=discoveryDb({seedAll:false});
+ const targets=[
+  {index:0,title:'ordinary recent upload'},
+  {index:2,title:'vertical Shorts video'}
+ ];
+ for(const target of targets){
+  const channel=CHANNELS[Math.floor(target.index/2)];
+  const id=videoId(target.index);
+  db.raw.prepare(`INSERT INTO public_today_websub_events
+   (event_hash,channel_id,video_id,roster_version,received_at,status,attempts)
+   VALUES(?,?,?,?,?,'pending',0)`)
+   .run(entryHash(channel.id,id),channel.id,id,'fixture-v1',stamp(fixedNow));
+ }
+ let apiCalls=0;
+ const result=await refreshPendingVideos({
+  db,
+  roster:{version:'fixture-v1',channels:CHANNELS.slice(0,2)},
+  now:fixedNow,
+  limit:2,
+  fetchVideos:async ids=>{
+   apiCalls++;
+   return ids.map(id=>{
+    const target=targets.find(t=>videoId(t.index)===id);
+    const channel=CHANNELS[Math.floor(target.index/2)];
+    return {id,snippet:{channelId:channel.id,title:target.title,channelTitle:'Test',liveBroadcastContent:'none'}};
+   });
+  }
+ });
+ assert.equal(apiCalls,1);
+ assert.equal(result.updated,0);
+ assert.equal(result.failed,0);
+ assert.equal(result.ignored_non_live,2);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_canonical').get().n,0);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,0);
+ assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_websub_events WHERE status='processed'").get().n,2);
+ assert.equal(db.rowWrites,4,'two queue claims and two final acknowledgements only');
  db.raw.close();
 });
