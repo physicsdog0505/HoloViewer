@@ -502,6 +502,18 @@ class ParityContract(unittest.TestCase):
         self.assertIn('clearInterval(verifiedSyncTimer)',js)
         self.assertIn('if(collabPollTimer)clearInterval(collabPollTimer)',js)
 
+    def test_youtube_api_loader_is_shared_and_does_not_drop_ready_callbacks(self):
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn("window.__hvYoutubeReadyCallbacks=window.__hvYoutubeReadyCallbacks||[]",app)
+        self.assertIn("window.__hvYoutubeReadyCallbacks=window.__hvYoutubeReadyCallbacks||[]",viewer)
+        self.assertIn("if(window.__hvYoutubeApiRequested)return;",app)
+        self.assertIn("if(!window.__hvYoutubeApiRequested)",viewer)
+        self.assertIn("const previous=window.onYouTubeIframeAPIReady",app)
+        self.assertIn("const previous=window.onYouTubeIframeAPIReady",viewer)
+        self.assertNotIn("window.onYouTubeIframeAPIReady=function(){streams.forEach",viewer)
+        self.assertNotIn("setTimeout(retry",app)
+
     def test_transplanted_youtube_players_mount_when_api_is_already_loaded(self):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
         self.assertIn('if(window.YT?.Player)',js)
