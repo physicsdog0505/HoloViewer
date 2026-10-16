@@ -105,6 +105,11 @@ function applyHomeFilter(value=homeFilter()){
  document.querySelectorAll('#live-channel-list .live-channel-rail-item').forEach(card=>{card.hidden=(value!=='all'&&card.dataset.group!==value)||(watchMode==='multi'&&viewing.ids.includes(card.dataset.liveVideoId))});
  document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.classList.toggle('active',button.dataset.filter===value));
 }
+function selectedHomePttMode(){
+ const cards=[...selectedHomeVideos].map(id=>document.querySelector('#homeDynamic .stream-card[data-multiview-id="'+id+'"],#historyDynamic .stream-card[data-multiview-id="'+id+'"]')).filter(Boolean);
+ if(!cards.length)return 'video';
+ return cards.every(card=>card.closest('#historyDynamic')===null) ? 'live' : 'video';
+}
 function homeSelection(){
  document.querySelectorAll('#homeDynamic .stream-card[data-multiview-id],#historyDynamic .stream-card[data-multiview-id]').forEach(card=>{const on=selectedHomeVideos.has(card.dataset.multiviewId);card.classList.toggle('multi-selected',on);card.setAttribute('aria-selected',String(on))});
  const count=selectedHomeVideos.size;for(const [bar,countEl,watch] of [['multiSelectBar','multiSelectCount','multiWatch'],['historyMultiSelectBar','historyMultiSelectCount','historyMultiWatch']]){
@@ -202,7 +207,7 @@ function openCollabEvent(event){
  const streams=collabEventStreams(event);
  const ids=streams.map(x=>x.video_id);
  if(ids.length<2)return;
- location.href=viewingSessionUrl(ids,{layout:'auto',primary:0,audio:0,eventId:String(event.event_id||'')});
+ location.href=viewingSessionUrl(ids,{layout:'auto',ptt:'live',primary:0,audio:0,eventId:String(event.event_id||'')});
 }
 function collabEntry(event){
  const streams=collabEventStreams(event);
@@ -238,7 +243,7 @@ function homeCard(item,container){
   if(event.target.closest('.stream-collab-entry'))return;
   const source=event.target.closest('[data-youtube-href]');
   if(source){event.preventDefault();event.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer');return}
-  event.preventDefault();if(!card.dataset.multiviewId){openViewingDocument([id],{layout:'auto',primary:0,audio:0});return}
+  event.preventDefault();if(!card.dataset.multiviewId){openViewingDocument([id],{layout:'auto',primary:0,audio:0,ptt:lifecycle==='ended'?'video':'live'});return}
   if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);homeSelection()
  });
  card.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open(event.target.dataset.youtubeHref,'_blank','noopener,noreferrer')}});
@@ -310,7 +315,7 @@ function renderHomeHighlights(rows){
    const message=node('span',undefined,'announcement-entry');message.dataset.announcementIndex=String(i);message.hidden=i!==0;
    const link=node('a');link.href='/custom-view/session?stream='+encodeURIComponent(pick.row.video_id);
    link.append(node('strong',pick.label),document.createTextNode(' · '+String(pick.row.channel_title||pick.row.channel_name||'Hololive')+'：'+String(pick.row.title||'')));
-   link.onclick=e=>{e.preventDefault();openViewingDocument([pick.row.video_id],{layout:'auto',primary:0,audio:0})};
+   link.onclick=e=>{e.preventDefault();openViewingDocument([pick.row.video_id],{layout:'auto',ptt:'live',primary:0,audio:0})};
    message.append(link);track.append(message);
   });
   messages.append(track);aside.append(messages);announcement.append(aside);
@@ -682,7 +687,7 @@ window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHo
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',ptt:'video',primary:0,audio:0})};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};
+$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0,ptt:selectedHomePttMode()})};
 $('ptt-refresh').onclick=event=>{event.preventDefault();location.href='/ptt-today'};
 $('ptt-focus').onclick=event=>{event.preventDefault();location.href=document.body.classList.contains('ptt-focus-mode')?'/ptt-today':'/ptt-today?focus=1'};
 let customCatalogCache=null;
