@@ -34,10 +34,19 @@ function updateClientTopbar(routeName){
 }
 
 
+let currentRoute='home';
 function route(r){
  // Hash query belongs to the session, not the route key.
  r=String(r||'').split('?')[0];
  if(!names[r])r='home';
+ if(r!==currentRoute&&['home','history'].includes(currentRoute)){
+  selectedHomeVideos.clear();
+  homeSelection();
+ }
+ if(currentRoute==='custom-session'&&r!=='custom-session'){
+  window.hvDestroy4174SharedViewer?.();
+ }
+ currentRoute=r;
  // A viewing route without mounted players must never display an empty workspace.
  if(r==='custom-session'&&!viewing.ids.length){
   const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
@@ -808,6 +817,7 @@ function sessionAudio(){
  $('stage').querySelectorAll('.player-card iframe').forEach((el,i)=>sessionMute(el,i!==viewing.audio));
 }
 window.hvOpenCustomSession=function(ids,opts={}){
+ window.hvDestroy4174SharedViewer?.();
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
  try{sessionStorage.setItem('hvCustomViewing',JSON.stringify({ids:clean,layout:opts.layout||'auto',ptt:opts.ptt||'video',primary:opts.primary||0,audio:opts.audio||0}));}catch{}
