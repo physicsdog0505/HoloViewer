@@ -162,6 +162,14 @@ class ParityContract(unittest.TestCase):
             self.assertIn('id="'+name+'"', html)
         self.assertNotIn('id="multi-url"', html)
         self.assertIn('function loadCollab()', js)
+        self.assertIn("api('/v1/collab/live')", js)
+        self.assertIn("function collabEntry(event)", js)
+        self.assertIn("'stream-collab-entry'", js)
+        self.assertIn("'👥'", js)
+        self.assertIn("'多人'", js)
+        self.assertIn("function openCollabEvent(event)", js)
+        self.assertIn("window.hvOpenCustomSession?.(ids", js)
+        self.assertIn("if(event.target.closest('.stream-collab-entry'))return", js)
 
     def test_original_4174_home_highlights_have_verified_rules(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')

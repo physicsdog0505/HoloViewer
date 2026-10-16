@@ -176,6 +176,34 @@ function homeAvatarChild(item,name){
  return node('span',first.toUpperCase(),'channel-avatar-fallback');
 }
 
+let homeCollabEvents=[],homeCollabByVideo=new Map();
+function collabEventStreams(event){
+ return Array.isArray(event?.streams)?event.streams.filter(x=>x&&/^[A-Za-z0-9_-]{11}$/.test(String(x.video_id||''))):[];
+}
+function setHomeCollabEvents(data){
+ const events=data?.schema_version==='public-experience-v1'&&data?.kind==='collab'&&Array.isArray(data.events)?data.events:[];
+ homeCollabEvents=events.filter(event=>collabEventStreams(event).length>1);
+ homeCollabByVideo=new Map();
+ for(const event of homeCollabEvents)for(const stream of collabEventStreams(event))homeCollabByVideo.set(stream.video_id,event);
+}
+function openCollabEvent(event){
+ const ids=collabEventStreams(event).map(x=>x.video_id);
+ if(ids.length<2)return;
+ state.multi=ids.slice();renderMulti();
+ window.hvOpenCustomSession?.(ids,{layout:'auto',ptt:'video',primary:0,audio:0});
+}
+function collabEntry(event){
+ const streams=collabEventStreams(event);
+ if(streams.length<2)return null;
+ const entry=node('span',undefined,'stream-collab-entry');
+ entry.role='link';entry.tabIndex=0;entry.dataset.collabEventId=String(event.event_id||'');
+ entry.setAttribute('aria-label','進入多人連動');entry.title='進入多人連動';
+ entry.append(node('span','👥','collab-glyph'),node('span','多人','collab-entry-label'));
+ entry.querySelector('.collab-glyph').setAttribute('aria-hidden','true');
+ entry.onclick=e=>{e.preventDefault();e.stopPropagation();openCollabEvent(event)};
+ entry.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();openCollabEvent(event)}};
+ return entry;
+}
 function homeCard(item,container){
  if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
  const id=item.video_id;const lifecycle=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
@@ -193,7 +221,9 @@ function homeCard(item,container){
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
+ const collab=homeCollabByVideo.get(id);const collabButton=collabEntry(collab);if(collabButton)card.append(collabButton);
  card.addEventListener('click',event=>{
+  if(event.target.closest('.stream-collab-entry'))return;
   const source=event.target.closest('[data-youtube-href]');
   if(source){event.preventDefault();event.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer');return}
   event.preventDefault();if(!card.dataset.multiviewId){window.hvOpenCustomSession?.([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}
@@ -318,8 +348,13 @@ async function loadHome(){
  if(!config.apiBase){$('home-empty').textContent='正式直播資料 API 尚未接通。';return}
  homeLoadInFlight=true;
  try{
- const data=await api('/v1/catalog/today');const rows=data.streams||data.items;
+ const [data,collabData]=await Promise.all([
+  api('/v1/catalog/today'),
+  api('/v1/collab/live').catch(()=>null)
+ ]);
+ const rows=data.streams||data.items;
  if(!Array.isArray(rows))throw Error('資料格式錯誤');
+ setHomeCollabEvents(collabData);
  customCatalogCache=rows;
  window.hvCustomCatalog?.(rows);
  const buckets={live:[],upcoming:[],unknown:[],ended:[]};
@@ -357,13 +392,49 @@ async function loadHistory(){
   if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
  }catch(e){error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false}
 }
+function collabEventState(event){
+ const streams=collabEventStreams(event);
+ if(streams.some(x=>x.lifecycle_state==='live'))return 'live';
+ if(streams.some(x=>x.lifecycle_state==='upcoming'))return 'upcoming';
+ return 'ended';
+}
+function collabEventCard(event){
+ const streams=collabEventStreams(event);if(streams.length<2)return null;
+ const first=streams[0],card=node('a',undefined,'collab-event-card '+collabEventState(event));card.href='#custom-session';
+ card.onclick=e=>{e.preventDefault();openCollabEvent(event)};
+ const thumb=node('div',undefined,'collab-event-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+first.video_id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
+ const state=collabEventState(event);thumb.append(node('span',state==='live'?'LIVE':state==='upcoming'?'即將開始':'已結束','status-pill '+(state==='live'?'live':state==='upcoming'?'upcoming':'ended')));card.append(thumb);
+ const copy=node('div',undefined,'collab-event-copy');const kicker=node('div',undefined,'collab-event-kicker');
+ kicker.append(node('span',String(event.label||'多人連動')),node('span',String(event.confidence||'candidate')));copy.append(kicker);
+ copy.append(node('h3',String(first.title||event.label||'多人連動')));
+ const avatars=node('div',undefined,'collab-avatars');
+ for(const stream of streams){
+  const avatar=node('span',undefined,'collab-avatar');avatar.title=String(stream.channel_name||'');
+  const url=homeAvatarUrl(stream);if(url){const av=node('img');av.src=url;av.alt='';av.loading='lazy';avatar.append(av)}else avatar.append(node('span',(String(stream.channel_name||'H')[0]||'H').toUpperCase()));
+  avatars.append(avatar);
+ }
+ copy.append(avatars);copy.append(node('p',streams.length+' POV · 進入多人連動畫面'));card.append(copy);return card;
+}
 async function loadCollab(){
- // A verified multi-POV candidate API is not yet exposed by Public.
- // Never manufacture events from partial titles, timestamps or owner guesses.
  for(const id of ['collab-live','collab-upcoming','collab-ended']){
   const section=$(id);section.hidden=true;section.querySelector('.collab-event-grid').replaceChildren();
  }
- $('collab-empty').textContent='目前沒有偵測到可用的多人連動。';
+ $('collab-empty').hidden=false;$('collab-empty').textContent='讀取多人連動中…';
+ try{
+  const data=await api('/v1/collab/live');
+  setHomeCollabEvents(data);
+  const buckets={live:[],upcoming:[],ended:[]};
+  for(const event of homeCollabEvents)buckets[collabEventState(event)].push(event);
+  for(const [state,events] of Object.entries(buckets)){
+   const section=$('collab-'+state),grid=section.querySelector('.collab-event-grid');
+   for(const event of events){const card=collabEventCard(event);if(card)grid.append(card)}
+   section.hidden=!grid.children.length;
+  }
+  $('collab-empty').hidden=homeCollabEvents.length>0;
+  if(!homeCollabEvents.length)$('collab-empty').textContent='目前沒有偵測到可用的多人連動。';
+ }catch(e){
+  $('collab-empty').hidden=false;$('collab-empty').textContent='多人連動資料暫時無法讀取。';
+ }
 }
 let pttLastGoodCount=0,pttLastGoodDay='',pttLoadInFlight=false,pttFollowing=true,pttProgrammatic=false;
 function pttAtBottom(){
