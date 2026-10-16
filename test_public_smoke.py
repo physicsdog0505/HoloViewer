@@ -40,11 +40,14 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertEqual(config["assets"], {"directory": "../site", "not_found_handling": "single-page-application"})
         self.assertNotIn("main", config)
         js = (ROOT / "site/assets/app.js").read_text()
-        for token in ("setTimeout(", "location.reload(", "eval(", "innerHTML", "document.write("):
+        for token in ("location.reload(", "eval(", "innerHTML", "document.write("):
             self.assertNotIn(token, js)
+        self.assertEqual(js.count("setTimeout("), 1)
+        self.assertIn("pttPollTimer=setTimeout(async()=>{", js)
+        self.assertIn("if(pttPollTimer)clearTimeout(pttPollTimer)", js)
         self.assertEqual(js.count("setInterval("), 2)
         self.assertIn("},30000);", js)
-        self.assertIn("},10000);", js)
+        self.assertIn("return fast?10000:120000;", js)
         self.assertIn("credentials:'omit'", js)
         self.assertIn("textContent=", js)
         frontend_config = (ROOT / "site/assets/config.js").read_text()
