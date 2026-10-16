@@ -29,6 +29,12 @@ async function freshDocument(page,action,expected){
 
 const browser=await chromium.launch({headless:true});
 const page=await browser.newPage();
+const browserErrors=[];
+page.on('pageerror',error=>browserErrors.push('pageerror: '+String(error?.stack||error)));
+page.on('console',message=>{if(message.type()==='error')browserErrors.push('console.error: '+message.text())});
+function assertNoBrowserErrors(label){
+ if(browserErrors.length)throw new Error(label+' browser errors:\n'+browserErrors.join('\n'));
+}
 
 await page.route(api+'/**',async route=>{
  const url=new URL(route.request().url());
@@ -161,7 +167,8 @@ try{
  await page.locator('#watchalongBuilder [name="master"]').fill('AAAAAAAAAAA');
  await page.locator('#watchalongBuilder [name="source"]').fill('CCCCCCCCCCC');
  await freshDocument(page,()=>page.locator('#watchalongBuilder button[type="submit"]').click(),url=>url.pathname==='/watchalong/session'&&url.searchParams.get('master')==='AAAAAAAAAAA');
- await page.waitForSelector('.watchalong-player-grid');
+ await page.waitForSelector('.watchalong-player-grid',{timeout:8000}).catch(()=>{assertNoBrowserErrors('Watchalong session');throw new Error('Watchalong session grid did not render at '+page.url())});
+ assertNoBrowserErrors('Watchalong session');
  assert(await page.locator('.watchalong-player-card').count()===2,'Watchalong YouTube session did not render two player cards');
  await page.waitForSelector('#watchalong-master-player [data-test-youtube="1"]');
  await page.waitForSelector('#watchalong-source-player [data-test-youtube="1"]');
