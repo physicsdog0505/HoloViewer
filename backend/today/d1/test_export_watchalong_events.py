@@ -27,6 +27,17 @@ class ProjectionGateTests(unittest.TestCase):
     def test_refresh_complete_if_all_fetched(self):
         self.assertTrue(module.refresh_coverage_ok({"targets":3,"already_cached":0,
                      "fetched":3,"errors":[]}))
+    def test_integrity_reports_reasons_without_body(self):
+        wrong=event(video_id="bad")
+        wrong["aid"]="sample"
+        wrong["day"]="2026-10-15"
+        wrong["body_text"]="PRIVATE"
+        issues=module.projection_issues([wrong])
+        self.assertEqual(issues[0]["reasons"],["invalid_host_video_id"])
+        self.assertNotIn("PRIVATE",str(issues))
+    def test_duplicate_diagnostic(self):
+        issues=module.projection_issues([event(),event()])
+        self.assertEqual(issues[0]["reasons"],["duplicate_event_id"])
     def test_valid(self):
         self.assertTrue(module.validate_projection([event(),event("watch:456","8pF4qHcshDc")]))
     def test_duplicate_events_fail(self):
