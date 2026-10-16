@@ -458,3 +458,26 @@ body.watchalong-immersive .watchalong-player-wrap{flex:1 1 auto;min-height:0;asp
 .watch-source-kind-label{margin:0 0 8px;font-size:12px;font-weight:800;color:#5e5a54}
 .selected-master{position:relative}
 .live-picker-cover{position:relative}
+
+/* Accepted 4174 watching rail parity: keep the stream picker beside global navigation. */
+body.custom-session-watching{--watch-rail:64px}
+body.custom-session-watching .client-topbar{display:none!important}
+body.custom-session-watching .client-rail{display:block!important;z-index:90}
+body.custom-session-watching .live-channel-rail{
+ left:var(--rail-collapsed,72px);top:0;bottom:0;max-height:100dvh;width:64px;
+ border-radius:0;z-index:70;padding-top:8px
+}
+body.custom-session-watching .live-channel-rail:hover,
+body.custom-session-watching .live-channel-rail:focus-within{width:222px}
+body.custom-session-watching:has(.live-channel-rail:hover):not(.custom-immersive),
+body.custom-session-watching:has(.live-channel-rail:focus-within):not(.custom-immersive){--watch-rail:222px}
+body.custom-session-watching .client-main{
+ margin-left:calc(var(--rail-collapsed,72px) + var(--watch-rail))!important;
+ width:calc(100vw - var(--rail-collapsed,72px) - var(--watch-rail))!important
+}
+body.custom-session-watching:has(.live-channel-rail:hover) .client-main,
+body.custom-session-watching:has(.live-channel-rail:focus-within) .client-main{
+ margin-left:calc(var(--rail-collapsed,72px) + 222px)!important;
+ width:calc(100vw - var(--rail-collapsed,72px) - 222px)!important;
+ padding-left:8px!important;max-width:none!important
+}
