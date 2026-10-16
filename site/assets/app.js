@@ -992,26 +992,23 @@ function pttPollDelayMs(now=new Date()){
  const fast=weekend?(hour>=16&&hour<22):(hour>=18&&hour<22);
  return fast?10000:120000;
 }
-let pttPollTimer=null,pttPollStopped=false;
-function schedulePttPoll(){
- if(pttPollStopped)return;
- if(pttPollTimer)clearTimeout(pttPollTimer);
- pttPollTimer=setTimeout(async()=>{
-  try{
-   if(!document.hidden&&$('ptt').classList.contains('active'))await loadPtt();
-  }finally{
-   schedulePttPoll();
-  }
- },pttPollDelayMs());
-}
-schedulePttPoll();
+let pttNextPollAt=Date.now()+pttPollDelayMs();
+const pttPollTimer=setInterval(async()=>{
+ if(document.hidden||!$('ptt').classList.contains('active'))return;
+ const now=Date.now();if(now<pttNextPollAt)return;
+ pttNextPollAt=now+pttPollDelayMs();
+ await loadPtt();
+},10000);
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden)return;
  if($('home').classList.contains('active')||$('custom-session').classList.contains('active'))loadHome();
- if($('ptt').classList.contains('active'))loadPtt();
+ if($('ptt').classList.contains('active')){
+  loadPtt();
+  pttNextPollAt=Date.now()+pttPollDelayMs();
+ }
 });
 window.addEventListener('pagehide',()=>{
- pttPollStopped=true;clearInterval(homePollTimer);if(pttPollTimer)clearTimeout(pttPollTimer);
+ clearInterval(homePollTimer);clearInterval(pttPollTimer);
 },{once:true});
 
 /* Accepted 4174 custom-view selection controller with public read-only catalog adapter. */
