@@ -196,6 +196,14 @@ try{
  assert(await page.locator('.watchalong-player-card').count()===2,'Watchalong YouTube session did not render two player cards');
  await page.waitForSelector('#watchalong-master-player [data-test-youtube="1"]');
  await page.waitForSelector('#watchalong-source-player [data-test-youtube="1"]');
+ await page.getByRole('button',{name:'動畫優先'}).click();
+ assert(await page.locator('.watchalong-player-grid').evaluate(el=>el.classList.contains('focus-source')),'Watchalong animation-priority layout did not activate');
+ await page.getByRole('button',{name:'雙畫面'}).click();
+ assert(!await page.locator('.watchalong-player-grid').evaluate(el=>el.classList.contains('focus-source')),'Watchalong dual layout did not restore');
+ await page.getByRole('button',{name:'沉浸全螢幕'}).click();
+ assert(await page.evaluate(()=>document.body.classList.contains('watchalong-immersive')),'Watchalong immersive layout did not activate');
+ await page.getByRole('button',{name:'退出沉浸模式'}).click();
+ assert(!await page.evaluate(()=>document.body.classList.contains('watchalong-immersive')),'Watchalong immersive layout did not exit');
 
  // External-provider companion remains in a separate normal browser tab and the Public page only tracks time.
  await freshDocument(page,()=>page.locator('a[data-route="watchalong"]').click(),url=>url.pathname==='/watchalong');
