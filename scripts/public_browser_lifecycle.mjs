@@ -37,6 +37,8 @@ await page.route(api+'/**',async route=>{
  else if(url.pathname==='/v1/collab/live')body={schema_version:'public-experience-v1',kind:'collab',events:[collabEvent]};
  else if(url.pathname==='/v1/collab/events/evt-1')body={schema_version:'public-experience-v1',event:collabEvent};
  else if(url.pathname==='/v1/history')body={items:streams.map(x=>({...x,lifecycle_state:'ended'})),total:2,has_more:false};
+ else if(url.pathname==='/v1/watchalong/recent')body={schema_version:'public-experience-v1',kind:'watchalong',scope:'recent',events:[{event_id:'watch-1',title:'Test Watchalong',day:'2026-10-16',scheduled_time:'20:00',member_only:false,hosts:[{label:'Host A',video_id:'AAAAAAAAAAA'}],source_mapping:null,capabilities:{source_mapping:false,translation:false,telemetry:false}}]};
+ else if(url.pathname==='/v1/watchalong/events/watch-1')body={schema_version:'public-experience-v1',event:{event_id:'watch-1',title:'Test Watchalong',day:'2026-10-16',scheduled_time:'20:00',member_only:false,hosts:[{label:'Host A',video_id:'AAAAAAAAAAA'}],source_mapping:null,capabilities:{source_mapping:false,translation:false,telemetry:false}}};
  else if(url.pathname==='/v1/ptt/today')body=ptt;
  else body={};
  await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
@@ -120,6 +122,28 @@ try{
  await page.goForward({waitUntil:'domcontentloaded'});
  await page.waitForSelector('#stage .player-card:nth-child(2)');
  assert(new URL(page.url()).pathname==='/custom-view/session','browser Forward did not restore viewer URL');
+
+
+ // Watchalong recent API + manual YouTube session use real document navigation.
+ await freshDocument(page,()=>page.locator('a[data-route="watchalong"]').click(),url=>url.pathname==='/watchalong');
+ await page.waitForSelector('#recentWatchGrid .recent-watch-card');
+ assert(await page.locator('#recentWatchGrid .recent-watch-card').count()===1,'Watchalong recent API card did not render');
+ await page.locator('#watchalongBuilder [name="master"]').fill('AAAAAAAAAAA');
+ await page.locator('#watchalongBuilder [name="source"]').fill('CCCCCCCCCCC');
+ await freshDocument(page,()=>page.locator('#watchalongBuilder button[type="submit"]').click(),url=>url.pathname==='/watchalong/session'&&url.searchParams.get('master')==='AAAAAAAAAAA');
+ await page.waitForSelector('.watchalong-player-grid');
+ assert(await page.locator('.watchalong-player-card').count()===2,'Watchalong YouTube session did not render two player cards');
+ await page.waitForSelector('#watchalong-master-player [data-test-youtube="1"]');
+ await page.waitForSelector('#watchalong-source-player [data-test-youtube="1"]');
+
+ // External-provider companion remains in a separate normal browser tab and the Public page only tracks time.
+ await freshDocument(page,()=>page.locator('a[data-route="watchalong"]').click(),url=>url.pathname==='/watchalong');
+ await page.locator('#watchalongBuilder [name="master"]').fill('AAAAAAAAAAA');
+ await page.locator('#watchalongBuilder input[name="source_kind"][value="external"]').check();
+ await page.locator('#watchalongBuilder [name="external_source"]').fill('https://example.com/watch');
+ await freshDocument(page,()=>page.locator('#watchalongBuilder button[type="submit"]').click(),url=>url.pathname==='/watchalong/session'&&url.searchParams.get('source_kind')==='external');
+ await page.waitForSelector('.watchalong-companion-card');
+ assert((await page.locator('.watchalong-companion-card a[href="https://example.com/watch"]').count())===1,'Watchalong external companion link missing');
 
  console.log('PUBLIC_BROWSER_LIFECYCLE_PASS');
 } finally {
