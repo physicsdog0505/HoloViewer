@@ -111,6 +111,8 @@ try{
  assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'Equal layout did not restore');
  await page.locator('#watchSettings').click();
  assert(!await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not close');
+ await page.locator('#watchSettings').click();
+ assert(await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not reopen for immersive control');
  await page.locator('#customImmerse').click();
  assert(await page.evaluate(()=>document.body.classList.contains('custom-immersive')),'Viewer immersive state did not activate');
  await page.locator('#immersiveExit').click();
