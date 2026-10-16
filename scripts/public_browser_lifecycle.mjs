@@ -68,7 +68,8 @@ await page.route('https://www.youtube.com/iframe_api',async route=>{
  `;
  await route.fulfill({status:200,contentType:'application/javascript',body});
 });
-await page.route(/https:\/\/(i\.ytimg\.com|yt3\.ggpht\.com)\/.*/,route=>route.abort());
+const transparentGif=Buffer.from('R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=','base64');
+await page.route(/https:\/\/(i\.ytimg\.com|yt3\.ggpht\.com)\/.*/,route=>route.fulfill({status:200,contentType:'image/gif',body:transparentGif}));
 
 try{
  // Home: selecting is page-local; Watch action must create a new document.
