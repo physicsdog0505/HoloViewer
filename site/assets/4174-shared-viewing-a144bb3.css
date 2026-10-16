@@ -1,3 +1,9 @@
+#immersiveExit.immersive-exit{display:none}
+body.custom-session-watching.custom-immersive #immersiveExit.immersive-exit{
+ display:block!important;position:fixed;top:10px;right:12px;z-index:2147483647;
+ border:1px solid rgba(255,255,255,.35);border-radius:9px;padding:8px 12px;
+ background:rgba(0,0,0,.72);color:#fff;cursor:pointer;font-weight:800
+}
 /* Direct transplant from shared_viewing_core.py @ a144bb378a8bdd772faa867d608c1e7491253883 */
 .viewer-workspace{display:grid;gap:12px}
 .player-toolbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow-x:auto}

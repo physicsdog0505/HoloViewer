@@ -10,7 +10,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
@@ -40,22 +40,58 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertEqual(config["assets"], {"directory": "../site", "not_found_handling": "single-page-application"})
         self.assertNotIn("main", config)
         js = (ROOT / "site/assets/app.js").read_text()
-        for token in ("setTimeout(", "location.reload(", "eval(", "innerHTML", "document.write("):
+        for token in ("location.reload(", "eval(", "innerHTML", "document.write("):
             self.assertNotIn(token, js)
+        self.assertEqual(js.count("setTimeout("), 1)
+        self.assertIn("pttPollTimer=setTimeout(async()=>{", js)
+        self.assertIn("if(pttPollTimer)clearTimeout(pttPollTimer)", js)
         self.assertEqual(js.count("setInterval("), 2)
         self.assertIn("},30000);", js)
-        self.assertIn("},10000);", js)
+        self.assertIn("return fast?10000:120000;", js)
         self.assertIn("credentials:'omit'", js)
         self.assertIn("textContent=", js)
         frontend_config = (ROOT / "site/assets/config.js").read_text()
         self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
         self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
 
+    def test_static_public_document_lifecycle_boundary(self):
+        config = json.loads((ROOT / "cloudflare/wrangler.json").read_text())
+        self.assertEqual(set(config), {"name", "compatibility_date", "assets"})
+        self.assertNotIn("main", config)
+        self.assertNotIn("d1_databases", config)
+        self.assertNotIn("kv_namespaces", config)
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        self.assertNotIn("preventDefault();route(link.dataset.route)", js)
+        self.assertNotIn("preventDefault();route(link.dataset.mobileRoute)", js)
+        self.assertNotIn("sessionStorage.setItem('hvMulti'", js)
+        self.assertNotIn("sessionStorage.setItem('hvCustomViewing'", js)
+        self.assertIn("location.href=viewingSessionUrl(ids,opts)", js)
+        self.assertIn("location.pathname==='/custom-view/session'?'custom-session'", js)
+        self.assertIn("location.href='/custom-view/session?'+q.toString()", js)
+
+    def test_nested_routes_use_root_absolute_static_assets(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        self.assertIn('href="/assets/app.css"', html)
+        self.assertIn('src="/assets/config.js"', html)
+        self.assertIn('src="/assets/4174-shared-viewing-a144bb3-dom.js"', html)
+        self.assertIn('src="/assets/4174-shared-viewing-a144bb3.js"', html)
+        self.assertIn('src="/assets/app.js"', html)
+        self.assertNotIn('href="assets/', html)
+        self.assertNotIn('src="assets/', html)
+
+    def test_static_html_has_no_inline_style_under_strict_csp(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        self.assertNotIn(' style="', html)
+
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
-        for directive in ("default-src 'none'", "script-src 'self'", "connect-src https://holoviewer-public-api.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
+        for directive in ("default-src 'none'", "script-src 'self'", "connect-src https://holoviewer-public-api.singlebagel.workers.dev", "frame-src 'self' https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
             self.assertIn(directive, headers)
+        self.assertIn("/ptt-today", headers)
+        self.assertIn("frame-ancestors 'self'", headers)
+        self.assertIn("X-Frame-Options: SAMEORIGIN", headers)
+        self.assertIn("X-Frame-Options: DENY", headers)
         self.assertNotIn("'unsafe-inline'", headers)
         self.assertNotIn("'unsafe-eval'", headers)
 

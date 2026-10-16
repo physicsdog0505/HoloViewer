@@ -80,6 +80,57 @@ class ParityContract(unittest.TestCase):
         self.assertIn("height:auto!important",css)
         self.assertIn("overflow:visible!important",css)
 
+    def test_document_navigation_matches_4174_page_lifecycle(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        # Main navigation stays native: no SPA preventDefault/route interception.
+        self.assertNotIn("querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click'",js)
+        self.assertNotIn("querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click'",js)
+        self.assertNotIn("querySelectorAll('[data-page-link]').forEach(link=>link.addEventListener('click'",js)
+        # The URL is the viewer session source of truth, as in 4174's separate page.
+        self.assertIn("return '/custom-view/session?'+q.toString()",js)
+        self.assertIn("location.href=viewingSessionUrl(ids,opts)",js)
+        self.assertIn("location.pathname==='/custom-view/session'?'custom-session'",js)
+        self.assertIn("if(location.pathname!=='/custom-view/session')return;",js)
+        self.assertIn("const params=new URLSearchParams(location.search)",js)
+        self.assertNotIn("sessionStorage.setItem('hvCustomViewing'",js)
+        self.assertNotIn("sessionStorage.getItem('hvCustomViewing'",js)
+        self.assertNotIn("sessionStorage.setItem('hvMulti'",js)
+        self.assertNotIn("location.hash.substring",js)
+        # Home and History selections navigate to a new document.
+        self.assertIn("$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids",js)
+        self.assertIn("$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids",js)
+        # Custom builder and PTT focus/refresh also use real URLs.
+        self.assertIn("location.href='/custom-view/session?'+q.toString()",js)
+        self.assertIn("location.href='/ptt-today'",js)
+        self.assertIn("'/ptt-today?focus=1'",js)
+        # Static SPA fallback still exposes canonical routes for full reloads.
+        for href in ('href="/"','href="/history"','href="/watchalong"','href="/custom-view"','href="/collab"','href="/ptt-today"'):
+            self.assertIn(href,html)
+
+    def test_history_document_navigation_is_url_authoritative(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('<form id="history-picker" class="history-picker" method="get" action="/history">',html)
+        self.assertIn("const params=new URLSearchParams(location.search),bounds=historyBounds(),requested=String(params.get('date')||'');",js)
+        self.assertIn("state.offset=(page-1)*50;",js)
+        self.assertIn("link.href='/history?date='+encodeURIComponent(day)+(page>1?'&page='+page:'');return link",js)
+        self.assertNotIn("link.onclick=e=>{e.preventDefault();$('historyDate').value=day",js)
+        self.assertNotIn("$('history-picker').onsubmit=event=>{event.preventDefault()",js)
+
+    def test_collab_document_session_rehydrates_context_from_event_url(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn("eventId:String(event.event_id||'')",js)
+        self.assertIn("const eventId=String(params.get('event')||'')",js)
+        self.assertIn("api('/v1/collab/events/'+encodeURIComponent(eventId))",js)
+        self.assertIn("opts.collabPollUrl=config.apiBase.replace",js)
+        self.assertIn("opts.streamMetadata=streams.map",js)
+        self.assertIn("opts.verifiedTimelineStarts={}",js)
+        self.assertIn("collabPollUrl:typeof opts.collabPollUrl==='string'?opts.collabPollUrl:''",js)
+        self.assertIn("Array.isArray(payload.event?.streams)?payload.event.streams:[]",viewer)
+        self.assertIn("appendWatchStream(id,String(item.label||item.title||item.channel_name||id)",viewer)
+
     def test_4174_sidebar_exact_order_and_labels(self):
         parser = SidebarParser()
         parser.feed((ROOT / "site/index.html").read_text(encoding="utf-8"))
@@ -137,6 +188,18 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('addEventListener', route_body)
         self.assertNotIn("multiWatch').onclick", route_body)
 
+    def test_viewer_ptt_iframe_controls_have_same_origin_receiver(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        self.assertIn("event.origin!==location.origin",js)
+        self.assertIn("event.source!==window.parent",js)
+        self.assertIn("data.type==='holoviewer:ptt-show-floor'",js)
+        self.assertIn("data.type==='holoviewer:ptt-font-size'",js)
+        self.assertIn("postMessage({type:'holoviewer:ptt-show-floor'",viewer)
+        self.assertIn("postMessage({type:'holoviewer:ptt-font-size'",viewer)
+        self.assertIn("font-size:var(--ptt-font-size,16px)",css)
+
     def test_ptt_reader_preserves_4174_shell_without_fake_data(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
@@ -170,18 +233,24 @@ class ParityContract(unittest.TestCase):
         self.assertIn(".ptt-push-content{color:#a9a900", css)
         self.assertNotIn("message('ptt-status'", js)
 
-    def test_watchalong_builder_matches_4174_source_and_mode_controls(self):
+    def test_watchalong_builder_and_session_match_4174_public_boundary(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         for part in ('id="watchalongBuilder"', 'class="manual-grid"', 'id="youtubePanel"',
                      'id="externalPanel"', 'id="singleFields"', 'id="playlistFields"',
-                     'name="view_mode"', 'name="source_kind"', 'id="youtubeMode"'):
+                     'name="view_mode"', 'name="source_kind"', 'id="youtubeMode"',
+                     'id="recentWatchGrid"', 'id="watchalong-session"'):
             self.assertIn(part, html)
         self.assertIn('.source-choice{display:grid', css)
         self.assertIn('.manual-shell{padding:20px}', css)
+        self.assertIn('.watchalong-player-grid{display:grid', css)
         self.assertIn("const youtubePanel=document.getElementById('youtubePanel')", js)
-        self.assertIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
+        self.assertIn("api('/v1/watchalong/recent?days=30&limit=60')", js)
+        self.assertIn("if(location.pathname!=='/watchalong/session')return;", js)
+        self.assertIn("ensureWatchalongYoutubeApi", js)
+        self.assertIn("watchalong-companion-card", js)
+        self.assertNotIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
         self.assertNotIn("watch-add').onclick", js)
 
     def test_original_4174_collab_hub_structure(self):
@@ -197,8 +266,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn("'👥'", js)
         self.assertIn("'多人'", js)
         self.assertIn("function openCollabEvent(event)", js)
-        self.assertIn("window.hvOpenCustomSession?.(ids", js)
-        self.assertIn("streamMetadata:streams.map(x=>", js)
+        self.assertIn("location.href=viewingSessionUrl(ids", js)
+        self.assertIn("eventId:String(event.event_id||'')", js)
+        self.assertIn("api('/v1/collab/events/'+encodeURIComponent(eventId))", js)
+        self.assertIn("opts.streamMetadata=streams.map(x=>", js)
         self.assertIn("const collabMetadata=new Map(", js)
         self.assertIn("collabMetadata.get(id)||streamMetadata.get(id)", js)
         self.assertIn("collabLabel:typeof opts.collabLabel==='string'?opts.collabLabel:''", js)
@@ -266,6 +337,18 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("$('page-title').textContent=names[r]",js)
         self.assertIn("/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/",js)
 
+    def test_immersive_exit_lives_inside_transplanted_fullscreen_surface(self):
+        dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        self.assertIn('id="immersiveExit" class="immersive-exit"',dom)
+        self.assertIn("const immersiveExit=document.getElementById('immersiveExit')",js)
+        self.assertIn("immersiveExit?.addEventListener('click'",js)
+        self.assertIn("#immersiveExit.immersive-exit{display:none}",css)
+        self.assertIn("body.custom-session-watching.custom-immersive #immersiveExit.immersive-exit",css)
+        self.assertNotIn('id="immersiveExit"',html)
+
     def test_accepted_full_viewer_css_and_immersive_lifecycle(self):
         css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
@@ -290,11 +373,15 @@ class ParityContract(unittest.TestCase):
 
     def test_shared_shell_has_no_invented_footer_or_dead_id_bindings(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
         self.assertNotIn('<footer',html)
-        element_ids=set(re.findall(r'\bid="([^"]+)"',html))
+        element_ids=set(re.findall(r'\bid="([^"]+)"',html+"\n"+dom))
         required_ids=set(re.findall(r"\$\('([^']+)'\)",js))
-        self.assertEqual(required_ids-element_ids,set(),"JS required ID missing in Public HTML")
+        required_ids.update(re.findall(r"getElementById\('([^']+)'\)",viewer))
+        optional_ids={'ptt-worker-feed','ptt-worker-follow'}
+        self.assertEqual((required_ids-element_ids)-optional_ids,set(),"JS required ID missing from Public shell + transplanted Viewer DOM")
 
     def test_4174_watching_controls_and_no_iframe_remount_on_mode_toggle(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
@@ -346,13 +433,15 @@ class ParityContract(unittest.TestCase):
 
     def test_session_url_encodes_and_restores_explicit_stream_ids(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("'#custom-session?'+new URLSearchParams([",js)
-        self.assertIn("...viewing.ids.map(id=>['stream',id])",js)
+        self.assertIn("clean.forEach(id=>q.append('stream',id))",js)
+        self.assertIn("return '/custom-view/session?'+q.toString()",js)
+        self.assertIn("location.href=viewingSessionUrl(ids,opts)",js)
+        self.assertIn("const params=new URLSearchParams(location.search)",js)
         self.assertIn("params.getAll('stream')",js)
-        self.assertIn("const recovered=urls.length?ids:",js)
-        self.assertIn("const hashRoute=location.hash.substring(1).split('?')[0];",js)
-        self.assertIn("const pathRoute=location.pathname==='/history'?'history':",js)
-        self.assertIn("route(hashRoute||pathRoute||'home')",js)
+        self.assertIn("if(location.pathname!=='/custom-view/session')return;",js)
+        self.assertIn("window.hvOpenCustomSession(ids,opts)",js)
+        self.assertNotIn("location.hash.substring",js)
+        self.assertNotIn("history.replaceState",js)
 
     def test_single_player_ptt_keeps_positive_aspect_ratio_contract(self):
         css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
@@ -376,10 +465,13 @@ class ParityContract(unittest.TestCase):
 
     def test_custom_session_restores_on_reload_without_blank_shell(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("sessionStorage.setItem('hvCustomViewing'",js)
-        self.assertIn('function restoreCustomSession()',js)
-        self.assertIn("if(!recovered.length){route('single');return;}",js)
-        self.assertIn('window.hvOpenCustomSession(recovered,',js)
+        self.assertIn('async function restoreCustomSession()',js)
+        self.assertIn("if(location.pathname!=='/custom-view/session')return;",js)
+        self.assertIn("const params=new URLSearchParams(location.search)",js)
+        self.assertIn("if(!ids.length){location.replace('/custom-view');return;}",js)
+        self.assertIn('window.hvOpenCustomSession(ids,opts)',js)
+        self.assertNotIn("sessionStorage.setItem('hvCustomViewing'",js)
+        self.assertNotIn("sessionStorage.getItem('hvCustomViewing'",js)
 
     def test_immersive_overrides_watch_shell_and_has_exit(self):
         css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
@@ -392,21 +484,39 @@ class ParityContract(unittest.TestCase):
         self.assertIn('window.hvExit4174Immersive?.()',app)
         self.assertNotIn('function applyViewerImmersive(enabled)',app)
 
+    def test_public_ptt_polling_uses_peak_and_offpeak_cadence(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('function pttPollDelayMs(now=new Date())',js)
+        self.assertIn("const fast=weekend?(hour>=16&&hour<22):(hour>=18&&hour<22);",js)
+        self.assertIn('return fast?10000:120000;',js)
+        self.assertIn('pttPollTimer=setTimeout(async()=>{',js)
+        self.assertIn('pttPollStopped=true;',js)
+        self.assertNotIn("if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();\n},10000);",js)
+
+    def test_viewer_teardown_tracks_every_recurring_timer(self):
+        js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        self.assertIn('const translationRefreshTimer=setInterval(',js)
+        self.assertIn('const verifiedSyncTimer=setInterval(',js)
+        self.assertIn('let collabPollTimer=null',js)
+        self.assertIn('clearInterval(translationRefreshTimer)',js)
+        self.assertIn('clearInterval(verifiedSyncTimer)',js)
+        self.assertIn('if(collabPollTimer)clearInterval(collabPollTimer)',js)
+
     def test_transplanted_youtube_players_mount_when_api_is_already_loaded(self):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
         self.assertIn('if(window.YT?.Player)',js)
         self.assertIn('streams.forEach((stream,index)=>mountWatchPlayer(index))',js)
         self.assertIn('script[src="https://www.youtube.com/iframe_api"]',js)
 
-    def test_custom_url_entry_reports_add_and_start_failures(self):
+    def test_custom_url_entry_reports_add_failures_and_starts_new_document(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
         self.assertIn('id="custom-selection-status"',html)
         self.assertIn('aria-live="polite"',html)
         self.assertIn('已加入 ',js)
-        self.assertIn("typeof window.hvOpenCustomSession!=='function'",js)
-        self.assertIn("document.querySelectorAll('#stage .player-card iframe').length!==items.length",js)
-        self.assertIn('觀看尚未開始，已保留所選影片。',js)
+        self.assertIn("if(!items.length){alert('請先加入至少一個影片。');return;}",js)
+        self.assertIn("location.href='/custom-view/session?'+q.toString()",js)
+        self.assertNotIn("document.querySelectorAll('#stage .player-card iframe').length!==items.length",js)
 
     def test_verified_timeline_engine_is_fail_closed_and_uses_4174_offset_formula(self):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')

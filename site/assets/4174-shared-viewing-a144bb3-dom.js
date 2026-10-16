@@ -26,7 +26,7 @@ window.render4174SharedViewerDOM=function render4174SharedViewerDOM(showLivePtt)
     <button type="button" id="pauseAll" disabled>全部暫停</button>
     <span id="status" class="player-status">載入播放器…</span>
   </div>
-  <div class="custom-content-grid${showLivePtt?'':' video-only'}"><div class="custom-player-column"><main id="stage"></main><div class="translation-slot" id="translationSlot" aria-label="VOD 翻譯字幕" hidden><div class="translation-track-controls"><button type="button" id="translationA">A方案</button><button type="button" id="translationB">B方案</button></div><div id="translationStatus" class="note"></div><div id="translationText" class="translation-text"></div></div></div>${pttPanel}</div>
+  <div class="custom-content-grid${showLivePtt?'':' video-only'}"><button type="button" id="immersiveExit" class="immersive-exit" aria-label="退出沉浸模式">退出沉浸模式</button><div class="custom-player-column"><main id="stage"></main><div class="translation-slot" id="translationSlot" aria-label="VOD 翻譯字幕" hidden><div class="translation-track-controls"><button type="button" id="translationA">A方案</button><button type="button" id="translationB">B方案</button></div><div id="translationStatus" class="note"></div><div id="translationText" class="translation-text"></div></div></div>${pttPanel}</div>
 </div>`;
  return template.content.cloneNode(true);
 };
