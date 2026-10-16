@@ -5,7 +5,7 @@ Read-only source. Does not publish PTT article bodies, translations, transcripts
 telemetry, or private Watchalong source mappings.
 """
 from __future__ import annotations
-import argparse, hashlib, json, sys
+import argparse, hashlib, json, re, sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -53,6 +53,19 @@ def main():
     cache=LiveDiscoveryCache(runtime_root/".ptt_stream_discovery_cache.json")
     refresh_stats={"days":args.refresh_missing_recent,"targets":0,"already_cached":0,"fetched":0,"errors":[]}
     if args.refresh_missing_recent:
+        # Fail before discovery or writes if the Python environment lacks
+        # the official Web import dependency or its required local Chrome.
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as pw:
+                browser=pw.chromium.launch(channel="chrome",headless=True)
+                browser.close()
+        except Exception as exc:
+            print(json.dumps({"status":"BLOCKED_WEB_DEPENDENCY","refresh":refresh_stats,
+                "error_type":type(exc).__name__,"error":str(exc),
+                "events":None,"streams":None,"sql":None,"json":None},
+                ensure_ascii=False))
+            raise SystemExit(2)
         # Explicit owner-side coverage repair. This mutates only the rebuildable
         # local discovery cache; it does not write the Web History DB or any cloud service.
         for offset in range(args.refresh_missing_recent):
@@ -78,6 +91,11 @@ def main():
                         "day":value.isoformat(),"aid":target.aid,"stage":"fetch",
                         "error":result.error or "unknown refresh failure",
                     })
+    if args.refresh_missing_recent and refresh_stats["errors"]:
+        print(json.dumps({"status":"BLOCKED_REFRESH_ERRORS","refresh":refresh_stats,
+            "events":None,"streams":None,"sql":None,"json":None},ensure_ascii=False))
+        raise SystemExit(2)
+
     try:
         for offset in range(args.days):
             day=(current.date()-timedelta(days=offset)).isoformat()
@@ -88,8 +106,10 @@ def main():
                     source_url=snapshot.source_url,
                     body_text=snapshot.body_text,
                 ))
-    except (OSError, ValueError, TypeError):
-        pass
+    except (OSError, ValueError, TypeError) as exc:
+        print(json.dumps({"status":"BLOCKED_CACHE_PARSE","refresh":refresh_stats,
+            "error":str(exc),"events":None,"streams":None,"sql":None,"json":None},ensure_ascii=False))
+        raise SystemExit(2)
 
     events.extend(load_recent_events(database,days=args.days,now=current))
     events.sort(
@@ -119,6 +139,19 @@ def main():
             "description":event.description,"member_only":bool(event.member_only),
             "streams":[{"label":s.label,"video_id":s.video_id} for s in event.streams],
         })
+    ids=[item["event_id"] for item in out]
+    valid_video=re.compile(r"^[A-Za-z0-9_-]{11}$")
+    valid=(
+        len(ids)==len(set(ids)) and
+        all(item["source_url"].startswith("https://www.ptt.cc/bbs/C_Chat/")
+            and item["streams"] and all(valid_video.fullmatch(v["video_id"]) for v in item["streams"])
+            for item in out)
+    )
+    if not valid:
+        print(json.dumps({"status":"BLOCKED_PROJECTION_INTEGRITY",
+            "refresh":refresh_stats,"events":len(out),"streams":None,
+            "sql":None,"json":None},ensure_ascii=False))
+        raise SystemExit(2)
     lines=["-- Generated minimal Watchalong event projection; no PTT article body is included.","BEGIN TRANSACTION;"]
     for event in out:
         vals=[event["event_id"],event["aid"],event["article_title"],event["source_url"],
@@ -134,6 +167,6 @@ def main():
     args.output.write_text("\n".join(lines)+"\n")
     payload={"schema_version":"public-watchalong-export-v1","imported_at":imported,"event_count":len(out),"events":out}
     if args.json_output: args.json_output.write_text(json.dumps(payload,ensure_ascii=False,indent=2)+"\n")
-    print(json.dumps({"status":"PASS","events":len(out),"streams":sum(len(x["streams"]) for x in out),"refresh":refresh_stats,"sql":str(args.output),"json":str(args.json_output) if args.json_output else None}))
+    print(json.dumps({"status":"PASS","events":len(out),"streams":sum(len(x["streams"]) for x in out),"refresh":{**refresh_stats,"discovery_ok":True,"fetch_errors":sum(1 for e in refresh_stats["errors"] if e.get("stage")=="fetch"),"coverage_incomplete":False},"sql":str(args.output),"json":str(args.json_output) if args.json_output else None}))
 
 if __name__=="__main__": main()
