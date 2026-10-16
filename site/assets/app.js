@@ -223,7 +223,7 @@ function homeCard(item,container){
  if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
  const id=item.video_id;const lifecycle=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
  const group=String(item.group||item.channel_group||'other').toLowerCase();
- const href='/custom-view/session?stream='+encodeURIComponent(id)+'&layout=auto&primary=0&audio=0';
+ const href='/custom-view/session?stream='+encodeURIComponent(id)+'&layout=auto&primary=0&audio=0'+(lifecycle==='ended'?'&ptt=video':'');
  const card=node('a',undefined,'client-card stream-card');card.href=href;card.dataset.group=group;card.id='stream-'+id;
  applyHomeSupportStyle(card,item);
  const states={live:['LIVE','live'],waiting:['等待中','upcoming'],upcoming:['即將開始','upcoming'],ended:['已結束','ended'],unknown:['狀態待更新',''],stale:['狀態待更新','']};
