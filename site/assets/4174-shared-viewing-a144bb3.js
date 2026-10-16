@@ -7,9 +7,13 @@ const streams=config.streams;
 const singlePttKind=(config.singlePttKind||"");
 function syncSessionCardinalityClasses(){
  const single=streams.length===1;
+ const hasPttPanel=Boolean(document.querySelector('.ptt-live-panel'));
  document.body.classList.toggle('single-ptt',single&&Boolean(singlePttKind));
  document.body.classList.toggle('single-live',single&&singlePttKind==='live');
  document.body.classList.toggle('single-vod',single&&singlePttKind==='vod');
+ document.body.classList.toggle('multi-stream',streams.length>1);
+ document.body.classList.toggle('viewer-has-ptt',hasPttPanel);
+ document.body.classList.toggle('viewer-video-only',!hasPttPanel);
 }
 syncSessionCardinalityClasses();
 const translationTracks={A:(config.translationA||[]),B:(config.translationB||[])};
@@ -829,7 +833,7 @@ window.hvDestroy4174SharedViewer=function hvDestroy4174SharedViewer(){
  clearInterval(verifiedSyncTimer);
  if(collabPollTimer)clearInterval(collabPollTimer);
  players.forEach(player=>{try{if(player&&typeof player.destroy==='function')player.destroy();}catch(_e){}});
- for(const name of ['watch-multi','watch-grid','layout-auto','layout-equal','layout-primary','single-ptt','single-live','single-vod','collab-live-session','settings-open','custom-immersive']){
+ for(const name of ['watch-multi','watch-grid','layout-auto','layout-equal','layout-primary','single-ptt','single-live','single-vod','multi-stream','viewer-has-ptt','viewer-video-only','collab-live-session','settings-open','custom-immersive']){
   document.body.classList.remove(name);
  }
  for(const name of ['--tile-count','--tile-columns','--tile-rows','--columns','--side-count','--ptt-font-size']){
