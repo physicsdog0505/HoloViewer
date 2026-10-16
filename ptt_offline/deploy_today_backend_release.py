@@ -149,8 +149,22 @@ def safe_deploy_config(config_path, support_colors_path):
         if name=="TODAY_SUPPORT_COLORS_JSON" or name.startswith("TODAY_SUPPORT_COLORS_JSON_"):
             vars.pop(name,None)
     color_payload=validated_support_colors(support_colors_path)
-    chunk_size=7000
-    chunks=[color_payload[i:i+chunk_size] for i in range(0,len(color_payload),chunk_size)]
+    # Cloudflare rejects text bindings above ~5 KiB. Bound each chunk by
+    # UTF-8 bytes, not Python characters, with margin for platform limits.
+    chunk_size=4000
+    chunks=[]
+    current=[]
+    current_bytes=0
+    for character in color_payload:
+        encoded_bytes=len(character.encode("utf-8"))
+        if current and current_bytes+encoded_bytes>chunk_size:
+            chunks.append("".join(current))
+            current=[]
+            current_bytes=0
+        current.append(character)
+        current_bytes+=encoded_bytes
+    if current:
+        chunks.append("".join(current))
     for i,chunk in enumerate(chunks):
         vars[f"TODAY_SUPPORT_COLORS_JSON_{i}"]=chunk
     cfg["vars"]=vars
