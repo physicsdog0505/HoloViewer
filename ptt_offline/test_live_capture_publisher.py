@@ -65,6 +65,14 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertIn(4,plan["pending_source_lines"])
         self.assertFalse(any(x["source_line"]==4 for x in plan["candidate_rows"]))
 
+    def test_naive_collector_timestamp_cannot_recover_delayed_row(self):
+        self.db.execute(
+            "INSERT INTO pushes VALUES(4,1,4,1,'→','late','naive time','10/16','06:36','2026-10-15T23:01:23')"
+        )
+        plan=inspect_latest_article(self.db)
+        self.assertIn(4,plan["pending_source_lines"])
+        self.assertFalse(any(x["source_line"]==4 for x in plan["candidate_rows"]))
+
     def test_bounded_scan_tracks_all_normal_100_plus_lines(self):
         self.db.executemany("INSERT INTO pushes VALUES(?,?,?,?,?,?,?,?,?,?)",[
           (n,1,n,1,'推','a',f'bulk-{n}','10/15','18:01','2026-10-15T10:02:07Z')
