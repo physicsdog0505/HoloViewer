@@ -65,7 +65,7 @@ function discoveryDb({seedAll=true,omitVideoIndex=null}={}){
     }
   }
   let rowWrites=0,writeStatements=0,queries=0,readQueries=0,writeQueries=0,returnedRows=0,returnedReadRows=0;
-  function isRead(sql){return /^\\s*(SELECT|PRAGMA|EXPLAIN)\\b/i.test(sql);}
+  function isRead(sql){return /^\s*(SELECT|PRAGMA|EXPLAIN)\b/i.test(sql);}
   function statement(sql,params=[]){
     return {
       bind(...args){return statement(sql,args)},
