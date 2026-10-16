@@ -169,6 +169,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn("'多人'", js)
         self.assertIn("function openCollabEvent(event)", js)
         self.assertIn("window.hvOpenCustomSession?.(ids", js)
+        self.assertIn("streamMetadata:streams.map(x=>", js)
+        self.assertIn("const collabMetadata=new Map(", js)
+        self.assertIn("collabMetadata.get(id)||streamMetadata.get(id)", js)
+        self.assertIn("collabLabel:typeof opts.collabLabel==='string'?opts.collabLabel:''", js)
         self.assertIn("if(event.target.closest('.stream-collab-entry'))return", js)
 
     def test_original_4174_home_highlights_have_verified_rules(self):
