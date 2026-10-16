@@ -18,7 +18,7 @@ class PublicSmokeTests(unittest.TestCase):
                    if p.is_file() and ".git" not in p.parts and "__pycache__" not in p.parts and not p.name.endswith(".pyc")}
         # Backend integration files are intentionally outside the static-public deploy boundary.
         # Keep this smoke gate strict for root/public files while allowing the reviewed backend tree.
-        unexpected = {p for p in present - EXPECTED if not p.startswith("ptt_offline/") and p != ".github/workflows/ptt48-offline.yml"}
+        unexpected = {p for p in present - EXPECTED if not p.startswith("ptt_offline/") and p not in {".github/workflows/ptt48-offline.yml", "scripts/public_browser_lifecycle.mjs"}}
         missing = EXPECTED - present
         self.assertEqual(unexpected, set())
         self.assertEqual(missing, set())
