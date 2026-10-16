@@ -238,8 +238,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn("'👥'", js)
         self.assertIn("'多人'", js)
         self.assertIn("function openCollabEvent(event)", js)
-        self.assertIn("window.hvOpenCustomSession?.(ids", js)
-        self.assertIn("streamMetadata:streams.map(x=>", js)
+        self.assertIn("location.href=viewingSessionUrl(ids", js)
+        self.assertIn("eventId:String(event.event_id||'')", js)
+        self.assertIn("api('/v1/collab/events/'+encodeURIComponent(eventId))", js)
+        self.assertIn("opts.streamMetadata=streams.map(x=>", js)
         self.assertIn("const collabMetadata=new Map(", js)
         self.assertIn("collabMetadata.get(id)||streamMetadata.get(id)", js)
         self.assertIn("collabLabel:typeof opts.collabLabel==='string'?opts.collabLabel:''", js)
@@ -387,13 +389,15 @@ class ParityContract(unittest.TestCase):
 
     def test_session_url_encodes_and_restores_explicit_stream_ids(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("'#custom-session?'+new URLSearchParams([",js)
-        self.assertIn("...viewing.ids.map(id=>['stream',id])",js)
+        self.assertIn("clean.forEach(id=>q.append('stream',id))",js)
+        self.assertIn("return '/custom-view/session?'+q.toString()",js)
+        self.assertIn("location.href=viewingSessionUrl(ids,opts)",js)
+        self.assertIn("const params=new URLSearchParams(location.search)",js)
         self.assertIn("params.getAll('stream')",js)
-        self.assertIn("const recovered=urls.length?ids:",js)
-        self.assertIn("const hashRoute=location.hash.substring(1).split('?')[0];",js)
-        self.assertIn("const pathRoute=location.pathname==='/history'?'history':",js)
-        self.assertIn("route(hashRoute||pathRoute||'home')",js)
+        self.assertIn("if(location.pathname!=='/custom-view/session')return;",js)
+        self.assertIn("window.hvOpenCustomSession(ids,opts)",js)
+        self.assertNotIn("location.hash.substring",js)
+        self.assertNotIn("history.replaceState",js)
 
     def test_single_player_ptt_keeps_positive_aspect_ratio_contract(self):
         css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
@@ -417,10 +421,13 @@ class ParityContract(unittest.TestCase):
 
     def test_custom_session_restores_on_reload_without_blank_shell(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("sessionStorage.setItem('hvCustomViewing'",js)
-        self.assertIn('function restoreCustomSession()',js)
-        self.assertIn("if(!recovered.length){route('single');return;}",js)
-        self.assertIn('window.hvOpenCustomSession(recovered,',js)
+        self.assertIn('async function restoreCustomSession()',js)
+        self.assertIn("if(location.pathname!=='/custom-view/session')return;",js)
+        self.assertIn("const params=new URLSearchParams(location.search)",js)
+        self.assertIn("if(!ids.length){location.replace('/custom-view');return;}",js)
+        self.assertIn('window.hvOpenCustomSession(ids,opts)',js)
+        self.assertNotIn("sessionStorage.setItem('hvCustomViewing'",js)
+        self.assertNotIn("sessionStorage.getItem('hvCustomViewing'",js)
 
     def test_immersive_overrides_watch_shell_and_has_exit(self):
         css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
@@ -439,15 +446,15 @@ class ParityContract(unittest.TestCase):
         self.assertIn('streams.forEach((stream,index)=>mountWatchPlayer(index))',js)
         self.assertIn('script[src="https://www.youtube.com/iframe_api"]',js)
 
-    def test_custom_url_entry_reports_add_and_start_failures(self):
+    def test_custom_url_entry_reports_add_failures_and_starts_new_document(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
         self.assertIn('id="custom-selection-status"',html)
         self.assertIn('aria-live="polite"',html)
         self.assertIn('已加入 ',js)
-        self.assertIn("typeof window.hvOpenCustomSession!=='function'",js)
-        self.assertIn("document.querySelectorAll('#stage .player-card iframe').length!==items.length",js)
-        self.assertIn('觀看尚未開始，已保留所選影片。',js)
+        self.assertIn("if(!items.length){alert('請先加入至少一個影片。');return;}",js)
+        self.assertIn("location.href='/custom-view/session?'+q.toString()",js)
+        self.assertNotIn("document.querySelectorAll('#stage .player-card iframe').length!==items.length",js)
 
     def test_verified_timeline_engine_is_fail_closed_and_uses_4174_offset_formula(self):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
