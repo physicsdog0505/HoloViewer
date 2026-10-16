@@ -212,7 +212,8 @@ try{
  await externalMaster.waitFor({state:'attached'});
  if((await externalMaster.getAttribute('type'))!=='hidden')await externalMaster.fill('AAAAAAAAAAA');
  else assert((await externalMaster.inputValue())==='AAAAAAAAAAA','Watchalong external flow lost selected master');
- await page.locator('#watchalongBuilder input[name="source_kind"][value="external"]').check();
+ await page.locator('#watchalongBuilder .choice-card').filter({hasText:'外部平台'}).click();
+ assert(await page.locator('#watchalongBuilder input[name="source_kind"][value="external"]').isChecked(),'Watchalong external source card did not select its radio');
  await page.locator('#watchalongBuilder [name="external_source"]').fill('https://example.com/watch');
  await freshDocument(page,()=>page.locator('#watchalongBuilder button[type="submit"]').click(),url=>url.pathname==='/watchalong/session'&&url.searchParams.get('source_kind')==='external');
  await page.waitForSelector('.watchalong-companion-card');
