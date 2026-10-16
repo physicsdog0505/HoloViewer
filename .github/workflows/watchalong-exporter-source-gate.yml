@@ -4,11 +4,15 @@ on:
     paths:
       - 'backend/today/d1/export-watchalong-events.py'
       - 'backend/today/d1/test_export_watchalong_events.py'
+      - 'backend/today/d1/audit-watchalong-release.py'
+      - 'backend/today/d1/test_audit_watchalong_release.py'
       - '.github/workflows/watchalong-exporter-source-gate.yml'
   pull_request:
     paths:
       - 'backend/today/d1/export-watchalong-events.py'
       - 'backend/today/d1/test_export_watchalong_events.py'
+      - 'backend/today/d1/audit-watchalong-release.py'
+      - 'backend/today/d1/test_audit_watchalong_release.py'
       - '.github/workflows/watchalong-exporter-source-gate.yml'
 jobs:
   source-gate:
@@ -19,3 +23,4 @@ jobs:
         with:
           python-version: '3.11'
       - run: python3 -m unittest discover -s backend/today/d1 -p 'test_export_watchalong_events.py' -v
+      - run: python3 -m unittest discover -s backend/today/d1 -p 'test_audit_watchalong_release.py' -v
