@@ -574,13 +574,13 @@ function syncFollowers(master,playing){
     if(playing&&!canPlay){
       pendingArchiveFollowers.add(index);
       if(typeof player.pauseVideo==='function'){
-        syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
+        syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
         player.pauseVideo();
       }
       return;
     }
     pendingArchiveFollowers.delete(index);
-    const expected=playing?YT.PlayerState.PLAYING:YT.PlayerState.PAUSED;
+    const expected=playing?window.YT.PlayerState.PLAYING:window.YT.PlayerState.PAUSED;
     if(typeof player.getPlayerState==='function'&&player.getPlayerState()===expected)return;
     syncEchoes.set(index,{expected,expires:Date.now()+2000});
     if(playing&&typeof player.playVideo==='function')player.playVideo();
@@ -601,8 +601,8 @@ function handlePlayerState(index,event){
   // Keep the expected echo until it matches; a real PAUSED/PLAYING
   // user action with a different state still propagates.
  }
- if(event.data===YT.PlayerState.PLAYING)syncFollowers(index,true);
- else if(event.data===YT.PlayerState.PAUSED)syncFollowers(index,false);
+ if(event.data===window.YT.PlayerState.PLAYING)syncFollowers(index,true);
+ else if(event.data===window.YT.PlayerState.PAUSED)syncFollowers(index,false);
 }
 syncPlayback?.addEventListener('change',()=>{
  syncEchoes.clear();
@@ -612,8 +612,8 @@ syncPlayback?.addEventListener('change',()=>{
  const master=players[syncMaster];
  if(!master||typeof master.getPlayerState!=='function')return;
  const state=master.getPlayerState();
- if(state===YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
- else if(state===YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
+ if(state===window.YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
+ else if(state===window.YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
 });
 manualTimelineAlign?.addEventListener('change',()=>{
  syncEchoes.clear();pendingArchiveFollowers.clear();
@@ -630,8 +630,8 @@ manualTimelineAlign?.addEventListener('change',()=>{
   syncMaster=primaryIndex;
   const master=players[syncMaster];
   const state=master&&typeof master.getPlayerState==='function'?master.getPlayerState():null;
-  if(state===YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
-  else if(state===YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
+  if(state===window.YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
+  else if(state===window.YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
   else players.forEach((_,index)=>{if(index!==syncMaster)alignFollower(index,syncMaster);});
   statusBox.textContent='已啟用依實際開播時間自動對齊';
  }else{
@@ -650,12 +650,12 @@ function controlAllPlayback(playing){
   if(playing&&hasVerifiedTimeline&&index!==syncMaster&&!alignFollower(index,syncMaster)){
    pendingArchiveFollowers.add(index);
    if(typeof player.pauseVideo==='function'){
-    syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
+    syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
     player.pauseVideo();
    }
    return;
   }
-  const expected=playing?YT.PlayerState.PLAYING:YT.PlayerState.PAUSED;
+  const expected=playing?window.YT.PlayerState.PLAYING:window.YT.PlayerState.PAUSED;
   if(typeof player.getPlayerState==='function'&&player.getPlayerState()===expected)return;
   syncEchoes.set(index,{expected,expires:Date.now()+2000});
   if(playing&&typeof player.playVideo==='function')player.playVideo();
@@ -671,7 +671,7 @@ const verifiedSyncTimer=setInterval(()=>{
  const master=players[syncMaster];
  if(!master||typeof master.getPlayerState!=='function')return;
  const state=master.getPlayerState();
- if(state!==YT.PlayerState.PLAYING&&state!==YT.PlayerState.PAUSED)return;
+ if(state!==window.YT.PlayerState.PLAYING&&state!==window.YT.PlayerState.PAUSED)return;
  players.forEach((_,index)=>{
   if(index===syncMaster)return;
   const ready=alignFollower(index,syncMaster);
@@ -680,8 +680,8 @@ const verifiedSyncTimer=setInterval(()=>{
    const follower=players[index];
    if(follower&&typeof follower.pauseVideo==='function'&&
       typeof follower.getPlayerState==='function'&&
-      follower.getPlayerState()!==YT.PlayerState.PAUSED){
-    syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
+      follower.getPlayerState()!==window.YT.PlayerState.PAUSED){
+    syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
     follower.pauseVideo();
    }
    return;
@@ -689,8 +689,8 @@ const verifiedSyncTimer=setInterval(()=>{
   if(ready&&pendingArchiveFollowers.has(index)){
    pendingArchiveFollowers.delete(index);
    const follower=players[index];
-   if(state===YT.PlayerState.PLAYING&&follower&&typeof follower.playVideo==='function'){
-    syncEchoes.set(index,{expected:YT.PlayerState.PLAYING,expires:Date.now()+2000});
+   if(state===window.YT.PlayerState.PLAYING&&follower&&typeof follower.playVideo==='function'){
+    syncEchoes.set(index,{expected:window.YT.PlayerState.PLAYING,expires:Date.now()+2000});
     follower.playVideo();
    }
   }
@@ -792,12 +792,16 @@ function mountWatchPlayer(index){
   const stream=streams[index];
   if(!stream||players[index])return;
   const card=stage.querySelector('.player-card[data-index="'+index+'"]');
-  if(!card)return;
-  const mounted=new YT.Player('player-'+card.dataset.slotId,{
-      videoId:stream.videoId,width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
-      events:{onReady:()=>{const current=players.indexOf(mounted);if(current<0)return;applyAudio();if(playAll)playAll.disabled=false;if(pauseAll)pauseAll.disabled=false;if(typeof startPttBridge==='function')startPttBridge(current);},onStateChange:event=>{const current=players.indexOf(mounted);if(current>=0)handlePlayerState(current,event);},onError:event=>{const current=players.indexOf(mounted);if(current<0)return;const code=Number(event?.data);statusBox.textContent='YouTube 內嵌播放失敗'+(Number.isFinite(code)?'（錯誤 '+code+'）':'')+'；可用 YouTube ↗ 開啟原影片確認。';}}
-  });
-  players[index]=mounted;
+  if(!card||!window.YT?.Player)return;
+  try{
+   const mounted=new window.YT.Player('player-'+card.dataset.slotId,{
+    videoId:stream.videoId,width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
+    events:{onReady:()=>{const current=players.indexOf(mounted);if(current<0)return;applyAudio();if(playAll)playAll.disabled=false;if(pauseAll)pauseAll.disabled=false;if(typeof startPttBridge==='function')startPttBridge(current);},onStateChange:event=>{const current=players.indexOf(mounted);if(current>=0)handlePlayerState(current,event);},onError:event=>{const current=players.indexOf(mounted);if(current<0)return;const code=Number(event?.data);statusBox.textContent='YouTube 內嵌播放失敗'+(Number.isFinite(code)?'（錯誤 '+code+'）':'')+'；可用 YouTube ↗ 開啟原影片確認。';}}
+   });
+   players[index]=mounted;
+  }catch(error){
+   statusBox.textContent='YouTube 播放器初始化失敗：'+String(error?.message||error);
+  }
 }
 let youtubeReadyRetryTimer=null;
 function mountAllWatchPlayers(){streams.forEach((stream,index)=>mountWatchPlayer(index));}
