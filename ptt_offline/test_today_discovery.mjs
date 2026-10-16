@@ -102,7 +102,7 @@ function feedResponse(channelIndex){
   status:200,headers:{'content-type':'application/atom+xml'}
  });
 }
-function discoveryFetch({onlyOneVideoIndex=null}={}){
+function discoveryFetch(){
  let feedCalls=0,videoCalls=0;
  const fetchImpl=async input=>{
   const url=String(input);
@@ -110,13 +110,7 @@ function discoveryFetch({onlyOneVideoIndex=null}={}){
     const id=new URL(url).searchParams.get('channel_id');
     const ordinal=CHANNELS.findIndex(c=>c.id===id);
     feedCalls++;
-    const normal=feedResponse(ordinal);
-    if(onlyOneVideoIndex===null)return normal;
-    const body=await normal.text();
-    const filtered=body.replace(/<entry>[\\s\\S]*?<\\/entry>/g,block=>{
-      return block.includes(videoId(onlyOneVideoIndex))?block:'';
-    });
-    return new Response(filtered,{status:200,headers:{'content-type':'application/atom+xml'}});
+    return feedResponse(ordinal);
   }
   if(url.includes('youtube.googleapis.com/youtube/v3/videos')){
     videoCalls++;
