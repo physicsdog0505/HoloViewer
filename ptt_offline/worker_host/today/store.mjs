@@ -108,14 +108,15 @@ export async function setCoverage(db, c) {
 function consumerText(value){return typeof value==='string'?value:'';}
 function consumerTime(value){return validTime(value)?value:null;}
 function consumerLifecycle(value){return lifecycles.has(value)?value:'unknown';}
-function consumerRow(row,nowStamp,supportColors){
+function consumerRow(row,nowStamp,supportColors,checkedAt=null){
  const video_id=idPattern.test(row?.video_id??'')?row.video_id:null;
  const channel_id=channelPattern.test(row?.publisher_channel_id??'')?row.publisher_channel_id:null;
  // Broken primary identity is a corrupt candidate, not a fabricated Home card.
  if(!video_id||!channel_id)return null;
  const color=supportColorFor(channel_id,supportColors);
  const observed=consumerTime(row.lifecycle_observed_at);
- const age=observed?Date.parse(nowStamp)-Date.parse(observed):NaN;
+ const lastChecked=consumerTime(checkedAt)??observed;
+ const age=lastChecked?Date.parse(nowStamp)-Date.parse(lastChecked):NaN;
  const fresh=Number.isFinite(age)&&age>=0&&age<=1200000;
  const state=consumerLifecycle(row.lifecycle_state);
  const lifecycle_state=state==='ended'&&consumerTime(row.actual_end)?'ended':!fresh?'stale':
@@ -163,6 +164,17 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
       now.toISOString().replace(/\.\d{3}Z$/,'Z'),limit+1,offset).all();
   const truncated=(rows.results??[]).length>limit;
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
+  let checkedAtByVideo={};
+  // The proposed additive cursor keeps check freshness without mutating every
+  // canonical row when YouTube confirms an unchanged snapshot. Legacy schemas degrade
+  // safely to lifecycle_observed_at until #45 completes the controlled additive migration.
+  try{
+    const cursor=await db.prepare('SELECT roster_version,checked_at_json FROM public_today_lifecycle_cursor WHERE singleton=1').first();
+    if(cursor?.roster_version===coverage?.roster_version&&typeof cursor.checked_at_json==='string'&&cursor.checked_at_json.length<=131072){
+      const parsed=JSON.parse(cursor.checked_at_json);
+      if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))checkedAtByVideo=parsed;
+    }
+  }catch{}
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
   const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
   return {schema_version:'public-consumer-v1',as_of:nowStamp,
@@ -170,5 +182,5 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
     completeness:{status:coverage?(coverage.gap||coverage.scanned_channels>0?'partial':'unverified'):'unverified',
                   gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated,has_more:truncated,offset,overnight},
     checkpoint:coverage?.checkpoint??null,
-    streams:(rows.results??[]).slice(0,limit).map(r=>consumerRow(r,nowStamp,supportColors)).filter(Boolean)};
+    streams:(rows.results??[]).slice(0,limit).map(r=>consumerRow(r,nowStamp,supportColors,checkedAtByVideo[r.video_id])).filter(Boolean)};
 }

@@ -30,18 +30,50 @@ export async function failClaim(db,hash,token,error){
  .bind(String(error).slice(0,200),hash,token).run();
  if((r.meta?.changes??r.changes)!==1)throw Error('claim lost; cannot mark failure');
 }
-export async function nextReconcileWindow(db,roster,{now=new Date(),limit=3}={}){
+export async function nextReconcileWindow(db,roster,{now=new Date(),limit=3,startIndex=null}={}){
  if(!roster?.version||!Array.isArray(roster.channels)||!roster.channels.length||limit<1||limit>10)throw Error('invalid roster window');
- const old=await db.prepare('SELECT roster_version,next_index FROM public_today_reconcile_cursor WHERE singleton=1').first();
- const start=old?.roster_version===roster.version?old.next_index%roster.channels.length:0;
+ let start;
+ if(startIndex!==null){
+  if(!Number.isSafeInteger(startIndex)||startIndex<0)throw Error('invalid explicit roster cursor');
+  start=startIndex%roster.channels.length;
+ }else{
+  const old=await db.prepare('SELECT roster_version,next_index FROM public_today_reconcile_cursor WHERE singleton=1').first();
+  start=old?.roster_version===roster.version?old.next_index%roster.channels.length:0;
+ }
  const selected=Array.from({length:Math.min(limit,roster.channels.length)},(_,i)=>roster.channels[(start+i)%roster.channels.length]);
  return {start,selected,next:(start+selected.length)%roster.channels.length,rosterVersion:roster.version,updatedAt:stamp(now)};
 }
 export async function commitReconcileWindow(db,window){
  await db.prepare(`INSERT INTO public_today_reconcile_cursor(singleton,roster_version,next_index,updated_at)
  VALUES(1,?,?,?) ON CONFLICT(singleton) DO UPDATE SET
- roster_version=excluded.roster_version,next_index=excluded.next_index,updated_at=excluded.updated_at`)
+ roster_version=excluded.roster_version,next_index=excluded.next_index,updated_at=excluded.updated_at
+ WHERE public_today_reconcile_cursor.roster_version!=excluded.roster_version
+    OR public_today_reconcile_cursor.next_index!=excluded.next_index`)
  .bind(window.rosterVersion,window.next,window.updatedAt).run();
+}
+export async function readLifecycleCursor(db,rosterVersion){
+ const row=await db.prepare('SELECT roster_version,last_video_id,checked_at_json FROM public_today_lifecycle_cursor WHERE singleton=1').first();
+ if(row?.roster_version!==rosterVersion)return {lastVideoId:'',checkedAtByVideo:{}};
+ let checkedAtByVideo={};
+ try{
+  const parsed=JSON.parse(String(row.checked_at_json??'{}'));
+  if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))checkedAtByVideo=parsed;
+ }catch{}
+ return {lastVideoId:String(row.last_video_id??''),checkedAtByVideo};
+}
+export async function commitLifecycleCursor(db,{rosterVersion,lastVideoId,checkedAtByVideo={},now=new Date()}){
+ if(typeof rosterVersion!=='string'||!rosterVersion||typeof lastVideoId!=='string'||
+   !checkedAtByVideo||typeof checkedAtByVideo!=='object'||Array.isArray(checkedAtByVideo))throw Error('invalid lifecycle cursor');
+ const checkedJson=JSON.stringify(checkedAtByVideo);
+ if(checkedJson.length>131072)throw Error('lifecycle freshness watermark too large');
+ await db.prepare(`INSERT INTO public_today_lifecycle_cursor(singleton,roster_version,last_video_id,checked_at_json,updated_at)
+ VALUES(1,?,?,?,?) ON CONFLICT(singleton) DO UPDATE SET
+ roster_version=excluded.roster_version,last_video_id=excluded.last_video_id,
+ checked_at_json=excluded.checked_at_json,updated_at=excluded.updated_at
+ WHERE public_today_lifecycle_cursor.roster_version!=excluded.roster_version
+    OR public_today_lifecycle_cursor.last_video_id!=excluded.last_video_id
+    OR public_today_lifecycle_cursor.checked_at_json!=excluded.checked_at_json`)
+ .bind(rosterVersion,lastVideoId,checkedJson,stamp(now)).run();
 }
 export async function saveChannelProfiles(db,roster,items,{now=new Date()}={}){
  if(!Array.isArray(items)||items.length>50||!roster?.version||!Array.isArray(roster.channels))throw Error('profile batch invalid');
