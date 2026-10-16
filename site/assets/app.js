@@ -985,16 +985,30 @@ route(pathRoute||'home');
 const homePollTimer=setInterval(()=>{
  if(!document.hidden&&($('home').classList.contains('active')||$('custom-session').classList.contains('active')))loadHome();
 },30000);
-const pttPollTimer=setInterval(()=>{
- if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();
-},10000);
+function pttPollDelayMs(now=new Date()){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',hour12:false}).formatToParts(now);
+ const values=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ const hour=Number(values.hour),weekend=['Sat','Sun'].includes(values.weekday);
+ const fast=weekend?(hour>=16&&hour<22):(hour>=18&&hour<22);
+ return fast?10000:120000;
+}
+let pttPollTimer=null,pttPollStopped=false;
+function schedulePttPoll(){
+ if(pttPollStopped)return;
+ if(pttPollTimer)clearTimeout(pttPollTimer);
+ pttPollTimer=setTimeout(async()=>{
+  if(!document.hidden&&$('ptt').classList.contains('active'))await loadPtt();
+  schedulePttPoll();
+ },pttPollDelayMs());
+}
+schedulePttPoll();
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden)return;
  if($('home').classList.contains('active')||$('custom-session').classList.contains('active'))loadHome();
  if($('ptt').classList.contains('active'))loadPtt();
 });
 window.addEventListener('pagehide',()=>{
- clearInterval(homePollTimer);clearInterval(pttPollTimer);
+ pttPollStopped=true;clearInterval(homePollTimer);if(pttPollTimer)clearTimeout(pttPollTimer);
 },{once:true});
 
 /* Accepted 4174 custom-view selection controller with public read-only catalog adapter. */
