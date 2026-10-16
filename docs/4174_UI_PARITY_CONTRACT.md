@@ -47,7 +47,22 @@ The required migration sequence is:
 5. 👥 — 多人連動 (`/collab`)
 6. PTT — PTT 今日專串 (`/ptt-today`)
 
-The Public static SPA may use internal hash routing, but this must not change labels, screen transitions, appearance or behavior observed by users. Do **not** introduce decorative English eyebrows; no new UI or design reinterpretation. 4174 source CSS tokens (light appearance, 72px collapsed/250px expanded rail, typography, spacing) are a reference, **not** proof of pixel parity.
+Public production remains **static Cloudflare assets + Public API**, but page-to-page navigation must preserve the accepted 4174 document lifecycle. Main routes (`/`, `/history`, `/watchalong`, `/custom-view`, `/collab`, `/ptt-today`, `/custom-view/session`) use real browser document navigation rather than an in-document SPA router. This does **not** reintroduce Python or Streamlit runtime: Cloudflare serves the same static asset bundle for each canonical path.
+
+Page-local interactions (filtering, selecting cards, reordering a Custom View list, viewer controls) may use JavaScript, but transient page state must die when the browser leaves the document unless the 4174 source explicitly persists it. Do not use sessionStorage/hash routing as a substitute for 4174 page lifecycle.
+
+Do **not** introduce decorative English eyebrows; no new UI or design reinterpretation. 4174 source CSS tokens (light appearance, 72px collapsed/250px expanded rail, typography, spacing) are a reference, **not** proof of pixel parity.
+
+## Browser lifecycle contract (hard rule, 2026-10-16)
+
+- Sidebar and mobile navigation follow their canonical `href` and load a fresh document.
+- Home and History card selection is page-local only. Clicking a selectable stream toggles selection; the bottom action navigates to `/custom-view/session?...`.
+- Custom View builder state is page-local. `開始觀看` navigates to `/custom-view/session?...`.
+- Viewer session query parameters are the source of truth for stream IDs, layout, primary, audio and PTT mode. A collab session may add an `event` query parameter, which is rehydrated from the Public Collab detail API in the new document.
+- PTT refresh/focus actions use canonical `/ptt-today` URLs and do not depend on Viewer teardown.
+- Browser Back/Forward and reload must work from URLs alone.
+- Main-route navigation must not depend on `history.replaceState`, hash routing, or persisted `hvCustomViewing` / `hvMulti` routing state.
+- Public production deployment remains the static `holoviewer-public` Worker. No Python/Streamlit process, D1 binding, backend worker, or long-lived application session is introduced by this lifecycle rule.
 
 ## Migration state / outstanding differences
 
