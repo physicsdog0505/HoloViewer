@@ -63,7 +63,9 @@ function normalizeStream(row,{state=null}={}){
  };
 }
 function titleTokens(stream){
- const text=(stream.title+' '+stream.source_label).toLowerCase();
+ // Provenance labels (e.g. "YouTube videos.list verified bootstrap") identify
+ // ingestion, not a shared collab topic. Match only viewer-facing titles.
+ const text=stream.title.toLowerCase();
  const tokens=new Set();
  for(const re of [/[a-z0-9]{4,}/g,/[ァ-ヶー]{4,}/g,/[一-龠]{3,}/g]){
   for(const match of text.matchAll(re)){
