@@ -25,7 +25,18 @@ class TodayBackendReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             src=Path(td)/"wrangler.json"
             src.write_text(json.dumps(self.config()),encoding="utf-8")
-            holder,out=safe_deploy_config(str(src))
+            colors=Path(td)/"colors.json"
+            channels=[]
+            for i in range(66):
+                row={"channel_id":"UC"+("A"*21)+str(i%10),"display_mode":"neutral"}
+                channels.append(row)
+            # replace generated ids with exact-length unique values
+            channels=[{"channel_id":"UC"+format(i,"022d"),"display_mode":"neutral"} for i in range(66)]
+            for i in range(56):
+                channels[i].update({"display_mode":"solid","color_hex":"#112233","verification_status":"verified"})
+            channels[56].update({"display_mode":"dual_color","color_hexes":["#112233","#445566"],"verification_status":"community","color_semantics":"2025_6th_fes_penlight"})
+            colors.write_text(json.dumps({"schema_version":1,"fallback":"neutral","channels":channels}),encoding="utf-8")
+            holder,out=safe_deploy_config(str(src),str(colors))
             try:
                 cfg=json.loads(out.read_text())
                 self.assertNotIn("PTT_PUBLISH_ENABLED",cfg["vars"])
@@ -33,6 +44,11 @@ class TodayBackendReleaseTests(unittest.TestCase):
                 self.assertEqual(cfg["vars"]["TODAY_CADENCE_ENABLED"],"true")
                 self.assertEqual(cfg["vars"]["TODAY_DISCOVERY_ENABLED"],"false")
                 self.assertEqual(cfg["vars"]["ALLOWED_ORIGIN"],"https://example.test")
+                payload="".join(cfg["vars"][k] for k in sorted(
+                    (k for k in cfg["vars"] if k.startswith("TODAY_SUPPORT_COLORS_JSON_")),
+                    key=lambda x:int(x.rsplit("_",1)[1])))
+                decoded=json.loads(payload)
+                self.assertEqual(len(decoded["channels"]),66)
             finally:
                 holder.cleanup()
 
