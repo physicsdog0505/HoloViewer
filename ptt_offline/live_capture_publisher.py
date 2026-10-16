@@ -142,6 +142,21 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             if current.get("source_identity")!=plan["source_identity"]:
                 raise ContractError("live source identity changed; separate state needed")
         accepted=dict(current.get("accepted",{}))
+        # First activation for an already-populated AID establishes a LOCAL
+        # live baseline instead of promoting all pre-existing eligible rows
+        # into an implicit historical catch-up. This receipt performs no
+        # remote write. Subsequent rows are compared against this baseline.
+        if not current and plan["candidate_rows"]:
+            baseline={row["source_record_key"]:content_digest(row)
+                      for row in plan["candidate_rows"]}
+            atomic_receipt(path,{"status":"BASELINED",
+                "source_identity":plan["source_identity"],
+                "accepted":baseline,
+                "baseline_source_line":max(row["source_line"] for row in plan["candidate_rows"]),
+                "pending_count":len(plan["pending_source_lines"])})
+            return {"status":"BASELINED","aid":plan["aid"],"eligible":0,
+                    "baselined":len(baseline),"pending":len(plan["pending_source_lines"]),
+                    "source_identity":plan["source_identity"],"sent":0}
         # Last-N scanning cannot establish that older source rows were ever
         # inspected. Refuse first-time live publication from a truncated scan;
         # otherwise an old backlog could disappear without gap evidence.
