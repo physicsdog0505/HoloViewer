@@ -1206,17 +1206,28 @@ function watchalongClock(seconds){
 }
 function ensureWatchalongYoutubeApi(callback){
  if(window.YT?.Player){callback();return}
- window.__hvWatchalongYoutubeReady=window.__hvWatchalongYoutubeReady||[];
- window.__hvWatchalongYoutubeReady.push(callback);
- if(window.__hvWatchalongYoutubeRequested)return;
- window.__hvWatchalongYoutubeRequested=true;
+ window.__hvYoutubeReadyCallbacks=window.__hvYoutubeReadyCallbacks||[];
+ window.__hvYoutubeReadyCallbacks.push(callback);
+ if(window.__hvYoutubeApiRequested)return;
+ window.__hvYoutubeApiRequested=true;
  const previous=window.onYouTubeIframeAPIReady;
  window.onYouTubeIframeAPIReady=function(){
-  if(typeof previous==='function')previous();
-  const callbacks=window.__hvWatchalongYoutubeReady.splice(0);
-  callbacks.forEach(fn=>fn());
+  try{if(typeof previous==='function')previous();}catch(_error){}
+  const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
+  callbacks.forEach(fn=>{try{fn();}catch(_error){}});
  };
- const script=document.createElement('script');script.src='https://www.youtube.com/iframe_api';document.head.appendChild(script);
+ const existing=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+ if(!existing){
+  const script=document.createElement('script');script.src='https://www.youtube.com/iframe_api';document.head.appendChild(script);
+ }else{
+  const retry=()=>{
+   if(window.YT?.Player){
+    const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
+    callbacks.forEach(fn=>{try{fn();}catch(_error){}});
+   }else setTimeout(retry,50);
+  };
+  setTimeout(retry,50);
+ }
 }
 async function renderWatchalongSession(){
  if(location.pathname!=='/watchalong/session')return;
