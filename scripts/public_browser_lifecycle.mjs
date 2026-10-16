@@ -43,6 +43,10 @@ await page.route(api+'/**',async route=>{
  else if(url.pathname==='/v1/collab/live')body={schema_version:'public-experience-v1',kind:'collab',events:[collabEvent]};
  else if(url.pathname==='/v1/collab/events/evt-1')body={schema_version:'public-experience-v1',event:collabEvent};
  else if(url.pathname==='/v1/history')body={items:streams.map(x=>({...x,lifecycle_state:'ended'})),total:2,has_more:false};
+ else if(url.pathname.startsWith('/v1/catalog/videos/')){
+   const id=decodeURIComponent(url.pathname.slice('/v1/catalog/videos/'.length));
+   body=streams.find(x=>x.video_id===id)||{video_id:id,title:'Catalog '+id,channel_id:'UC_'+id.slice(0,2),channel_name:'Catalog Channel'};
+ }
  else if(url.pathname==='/v1/watchalong/recent')body={schema_version:'public-experience-v1',kind:'watchalong',scope:'recent',events:[{event_id:'watch-1',title:'Test Watchalong',day:'2026-10-16',scheduled_time:'20:00',member_only:false,hosts:[{label:'Host A',video_id:'AAAAAAAAAAA'}],source_mapping:null,capabilities:{source_mapping:false,translation:false,telemetry:false}}]};
  else if(url.pathname==='/v1/watchalong/events/watch-1')body={schema_version:'public-experience-v1',event:{event_id:'watch-1',title:'Test Watchalong',day:'2026-10-16',scheduled_time:'20:00',member_only:false,hosts:[{label:'Host A',video_id:'AAAAAAAAAAA'}],source_mapping:null,capabilities:{source_mapping:false,translation:false,telemetry:false}}};
  else if(url.pathname==='/v1/ptt/today')body=ptt;
@@ -78,6 +82,7 @@ try{
  await freshDocument(page,()=>page.locator('#multiWatch').click(),url=>url.pathname==='/custom-view/session'&&url.searchParams.getAll('stream').length===1);
  await page.waitForSelector('#stage .player-card');
  assert(await page.locator('#stage .player-card').count()===1,'single viewer did not mount one card');
+ assert((await page.locator('#stage .player-card .player-label').textContent())==='Live A','fresh Viewer document did not rehydrate stream metadata');
  const box=await page.locator('#stage .player-card .video-wrap').boundingBox();
  assert(box&&box.height>100,'single viewer video viewport collapsed');
  assert(await page.locator('[data-test-youtube="1"]').count()===1,'YouTube player stub did not mount');
@@ -159,6 +164,16 @@ try{
  await page.waitForSelector('#stage .player-card:nth-child(2)');
  assert(new URL(page.url()).pathname==='/custom-view/session','browser Forward did not restore viewer URL');
 
+
+ // Direct canonical History URL must restore its own date/page state on a fresh document.
+ await page.goto(base+'/history?date=2026-10-15&page=1',{waitUntil:'domcontentloaded'});
+ await page.waitForSelector('#history-list .stream-card');
+ assert((await page.locator('#historyDate').inputValue())==='2026-10-15','History deep link ignored its date query');
+
+ // Direct Watchalong master URL remains usable even when recent cards are merely supplemental.
+ await page.goto(base+'/watchalong?master=AAAAAAAAAAA#manual',{waitUntil:'domcontentloaded'});
+ await page.waitForSelector('#watchalongBuilder [name="master"]');
+ assert((await page.locator('#watchalongBuilder [name="master"]').inputValue())==='AAAAAAAAAAA','Watchalong deep link did not restore master');
 
  // Watchalong recent API + manual YouTube session use real document navigation.
  await freshDocument(page,()=>page.locator('a[data-route="watchalong"]').click(),url=>url.pathname==='/watchalong');
