@@ -653,7 +653,7 @@ function controlAllPlayback(playing){
 }
 // Explicit group controls remain permitted; never infer archive offsets.
 playAll?.addEventListener('click',()=>controlAllPlayback(true));
-setInterval(()=>{
+const verifiedSyncTimer=setInterval(()=>{
  if(!hasVerifiedTimeline||!syncPlayback?.checked)return;
  const master=players[syncMaster];
  if(!master||typeof master.getPlayerState!=='function')return;
