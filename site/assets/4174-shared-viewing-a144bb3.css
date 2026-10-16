@@ -1559,3 +1559,27 @@ body.custom-session-watching.single-ptt:not(.custom-immersive) #stage > .player-
   flex-shrink:0!important
  }
 }
+
+
+/* Public SPA safety: video-only custom sessions need a definite remaining
+   viewport height. Do not rely on the historical height:0 flex arbitration,
+   which can collapse #stage to zero after transplant mount. */
+body.custom-session-watching .custom-content-grid.video-only{
+ display:block!important;flex:1 1 auto!important;height:auto!important;
+ min-height:0!important;max-height:none!important;overflow:hidden!important
+}
+body.custom-session-watching .custom-content-grid.video-only .custom-player-column,
+body.custom-session-watching .custom-content-grid.video-only #stage{
+ width:100%!important;height:100%!important;min-height:0!important;max-height:100%!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage{
+ display:grid!important;grid-template-columns:repeat(var(--columns,1),minmax(0,1fr))!important;
+ grid-auto-rows:minmax(0,1fr)!important;align-content:stretch!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage > .player-card{
+ height:100%!important;min-height:0!important;max-height:100%!important
+}
+body.custom-session-watching .custom-content-grid.video-only #stage .video-wrap{
+ flex:1 1 0!important;height:auto!important;min-height:0!important;max-height:none!important;
+ aspect-ratio:auto!important
+}
