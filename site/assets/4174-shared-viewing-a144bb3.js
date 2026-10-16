@@ -797,6 +797,7 @@ function mountWatchPlayer(index){
   });
   players[index]=mounted;
 }
+let youtubeReadyRetryTimer=null;
 function mountAllWatchPlayers(){streams.forEach((stream,index)=>mountWatchPlayer(index));}
 if(window.YT?.Player){
  mountAllWatchPlayers();
@@ -812,16 +813,23 @@ if(window.YT?.Player){
    callbacks.forEach(callback=>{try{callback();}catch(_e){}});
   };
   const existingApi=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-  if(!existingApi){const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);}
-  else{
+  if(!existingApi){
+   const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';
+   api.onerror=()=>{window.__hvYoutubeApiRequested=false;statusBox.textContent='YouTube 播放器載入失敗，請重新整理後再試。';};
+   document.head.appendChild(api);
+  }else{
    let attempts=0;
-   const retry=setInterval(()=>{
+   youtubeReadyRetryTimer=setInterval(()=>{
     attempts++;
     if(window.YT?.Player){
-     clearInterval(retry);
+     clearInterval(youtubeReadyRetryTimer);youtubeReadyRetryTimer=null;
      const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
      callbacks.forEach(callback=>{try{callback();}catch(_e){}});
-    }else if(attempts>=200)clearInterval(retry);
+    }else if(attempts>=200){
+     clearInterval(youtubeReadyRetryTimer);youtubeReadyRetryTimer=null;
+     window.__hvYoutubeApiRequested=false;
+     statusBox.textContent='YouTube 播放器初始化逾時，請重新整理後再試。';
+    }
    },50);
   }
  }
@@ -833,6 +841,7 @@ window.hvDestroy4174SharedViewer=function hvDestroy4174SharedViewer(){
  clearInterval(translationRefreshTimer);
  clearInterval(verifiedSyncTimer);
  if(collabPollTimer)clearInterval(collabPollTimer);
+ if(youtubeReadyRetryTimer)clearInterval(youtubeReadyRetryTimer);
  players.forEach(player=>{try{if(player&&typeof player.destroy==='function')player.destroy();}catch(_e){}});
  for(const name of ['watch-multi','watch-grid','layout-auto','layout-equal','layout-primary','single-ptt','single-live','single-vod','multi-stream','viewer-has-ptt','viewer-video-only','collab-live-session','settings-open','custom-immersive']){
   document.body.classList.remove(name);
