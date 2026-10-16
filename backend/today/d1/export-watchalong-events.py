@@ -15,7 +15,7 @@ def q(value):
         return "NULL"
     return "'" + str(value).replace("'", "''") + "'"
 
-PTT_PATH=re.compile(r"^/bbs/C_Chat/(M\.[0-9]{9,11}\.A\.[A-Fa-f0-9]+)\.html$")
+PTT_PATH=re.compile(r"^/bbs/C_Chat/(M\.[0-9]{9,11}\.A\.[A-Fa-f0-9]+)(?:\.html)?/?$")
 
 def canonical_article_url(url):
     """Map verified original PTT and existing pttweb mirror URLs to one article."""
@@ -31,7 +31,7 @@ def canonical_article_url(url):
         parsed.query or parsed.fragment or parsed.params):
         return None
     match=PTT_PATH.fullmatch(parsed.path)
-    return "https://www.ptt.cc"+parsed.path if match else None
+    return "https://www.ptt.cc/bbs/C_Chat/"+match.group(1)+".html" if match else None
 
 def event_signature(event):
     ids=tuple(sorted({stream.video_id for stream in event.streams if stream.video_id}))
