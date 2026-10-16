@@ -19,17 +19,33 @@ def refresh_coverage_ok(stats):
     return (not stats["errors"] and
             stats["targets"] == stats["already_cached"] + stats["fetched"])
 
-def validate_projection(events):
-    """Validate public-only output before any SQL/JSON artifact is written."""
+def projection_issues(events):
+    """Return bounded, non-private diagnostics for the rejected export."""
     video_id=re.compile(r"^[A-Za-z0-9_-]{11}$")
-    ids=[e["event_id"] for e in events]
-    return (len(ids)==len(set(ids)) and
-            all(isinstance(e.get("source_url"),str) and
-                e["source_url"].startswith("https://www.ptt.cc/bbs/C_Chat/") and
-                e.get("streams") and
-                all(isinstance(s.get("video_id"),str) and
-                    video_id.fullmatch(s["video_id"]) for s in e["streams"])
-                for e in events))
+    source=re.compile(r"^https://(?:www\\.)?ptt\\.cc/bbs/C_Chat/M\\.[0-9]+\\.A\\.[A-Za-z0-9]+\\.html$")
+    seen=set()
+    issues=[]
+    for index,e in enumerate(events):
+        kinds=[]
+        event_id=e.get("event_id")
+        if event_id in seen:
+            kinds.append("duplicate_event_id")
+        seen.add(event_id)
+        if not isinstance(e.get("source_url"),str) or not source.fullmatch(e["source_url"]):
+            kinds.append("unverified_source_url")
+        hosts=e.get("streams")
+        if not isinstance(hosts,list) or not hosts:
+            kinds.append("missing_hosts")
+        elif any(not isinstance(h,dict) or not isinstance(h.get("video_id"),str)
+                 or not video_id.fullmatch(h["video_id"]) for h in hosts):
+            kinds.append("invalid_host_video_id")
+        if kinds:
+            issues.append({"index":index,"event_id":event_id,
+                           "day":e.get("day"),"aid":e.get("aid"),"reasons":kinds})
+    return issues
+
+def validate_projection(events):
+    return not projection_issues(events)
 
 def main():
     ap=argparse.ArgumentParser()
@@ -156,10 +172,11 @@ def main():
             "description":event.description,"member_only":bool(event.member_only),
             "streams":[{"label":s.label,"video_id":s.video_id} for s in event.streams],
         })
-    valid=validate_projection(out)
-    if not valid:
+    issues=projection_issues(out)
+    if issues:
         print(json.dumps({"status":"BLOCKED_PROJECTION_INTEGRITY",
-            "refresh":refresh_stats,"events":len(out),"streams":None,
+            "refresh":refresh_stats,"events":len(out),"integrity_issues":issues[:30],
+            "integrity_issue_count":len(issues),"streams":None,
             "sql":None,"json":None},ensure_ascii=False))
         raise SystemExit(2)
     lines=["-- Generated minimal Watchalong event projection; no PTT article body is included.","BEGIN TRANSACTION;"]
