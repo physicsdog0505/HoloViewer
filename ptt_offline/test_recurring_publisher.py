@@ -87,6 +87,21 @@ class RecurringPublisherTests(unittest.TestCase):
             self.assertEqual(delivered,[expected_article])
             self.assertTrue(result["backlog_may_remain"])
 
+    def test_fresh_state_baseline_is_zero_remote_posts(self):
+        source="d"*64
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",return_value={"status":"BASELINED","sent":0,"eligible":0}) as publisher:
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=10,max_batches=1,clock=lambda:0)
+        self.assertEqual(result["status"],"BASELINED")
+        self.assertEqual(result["sent"],0)
+        self.assertEqual(result["http_posts"],0)
+        self.assertEqual(result["modeled_d1_writes_ceiling"],0)
+        self.assertEqual(result["modeled_d1_queries_ceiling"],0)
+        self.assertEqual(publisher.call_count,1)
+
     def test_empty_collector_never_posts(self):
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
              patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[]), \
