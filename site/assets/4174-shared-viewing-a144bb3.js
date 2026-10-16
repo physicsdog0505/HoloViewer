@@ -381,6 +381,210 @@ const pendingArchiveFollowers=new Set();
 let nextPlayerSlotId=0;
 const players=Array(streams.length).fill(null),stage=document.getElementById('stage'),statusBox=document.getElementById('status');
 let replacementTarget=0;
+
+const pttWorkerConfig={};
+const pttResolverUrl=(config.pttResolverUrl||'');
+let pttPlayback=null,pttTransport=null,pttPollTimer=null,pttResolveToken=0;
+const pttWorkerFeed=document.getElementById('ptt-worker-feed');
+const pttWorkerStatus=document.getElementById('ptt-worker-status');
+const pttWorkerFollow=document.getElementById('ptt-worker-follow');
+const pttWorkerStyle=document.getElementById('ptt-worker-style');
+const pttWorkerFloor=document.getElementById('ptt-worker-floor');
+const pttWorkerFloorQuick=document.getElementById('ptt-worker-floor-quick');
+const pttDynamicTitle=document.getElementById('ptt-dynamic-title');
+const pttLiveFrame=document.getElementById('ptt-live-frame');
+const pttUnavailable=document.getElementById('ptt-dynamic-unavailable');
+const pttWorkerOptions=document.getElementById('ptt-worker-options');
+const pttWorkerFollowLabel=document.getElementById('ptt-worker-follow-label');
+function pttReadSetting(name,fallback){
+ try{const x=localStorage.getItem(name);return x===null?fallback:x;}catch(_){return fallback;}
+}
+function pttSaveSetting(name,value){
+ try{localStorage.setItem(name,value);}catch(_){}
+}
+function pttApplyReaderSettings(){
+ if(!pttWorkerFeed)return;
+ const style=pttWorkerStyle?pttWorkerStyle.value:'history';
+ const floors=pttWorkerFloor?pttWorkerFloor.checked:(pttWorkerFloorQuick?pttWorkerFloorQuick.checked:true);
+ if(pttWorkerFloor)pttWorkerFloor.checked=floors;
+ if(pttWorkerFloorQuick)pttWorkerFloorQuick.checked=floors;
+ pttWorkerFeed.classList.toggle('ptt-worker-original',style==='original');
+ pttWorkerFeed.classList.toggle('ptt-worker-hide-floor',!floors);
+ pttWorkerFeed.querySelectorAll('.ptt-worker-floor').forEach(el=>{el.hidden=!floors;});
+ if(pttLiveFrame?.contentWindow){
+  pttLiveFrame.contentWindow.postMessage({type:'holoviewer:ptt-show-floor',show:Boolean(floors)},location.origin);
+ }
+}
+if(pttWorkerStyle){
+ pttWorkerStyle.value=pttReadSetting('holoviewer-ptt-style','history')==='original'?'original':'history';
+ pttWorkerStyle.addEventListener('change',()=>{
+  pttSaveSetting('holoviewer-ptt-style',pttWorkerStyle.value);pttApplyReaderSettings();
+ });
+}
+const savedFloorSetting=pttReadSetting('holoviewer-ptt-show-floor','true')!=='false';
+if(pttWorkerFloor)pttWorkerFloor.checked=savedFloorSetting;
+if(pttWorkerFloorQuick)pttWorkerFloorQuick.checked=savedFloorSetting;
+function pttSetFloorVisibility(checked){
+ if(pttWorkerFloor)pttWorkerFloor.checked=checked;
+ if(pttWorkerFloorQuick)pttWorkerFloorQuick.checked=checked;
+ pttSaveSetting('holoviewer-ptt-show-floor',String(checked));
+ pttApplyReaderSettings();
+}
+pttWorkerFloor?.addEventListener('change',()=>pttSetFloorVisibility(pttWorkerFloor.checked));
+pttWorkerFloorQuick?.addEventListener('change',()=>pttSetFloorVisibility(pttWorkerFloorQuick.checked));
+pttApplyReaderSettings();
+let pttPermanentWarning='';
+function pttWarn(message){pttPermanentWarning=message;pttSetStatus('');}
+function pttSetStatus(message){if(pttWorkerStatus)pttWorkerStatus.textContent=pttPermanentWarning?(pttPermanentWarning+' · '+message):message;}
+function pttRender(rows,state){
+ if(!pttWorkerFeed)return;
+ const isNearBottom=pttWorkerFeed.scrollHeight-pttWorkerFeed.clientHeight-pttWorkerFeed.scrollTop<32;
+ const oldNodes=Array.from(pttWorkerFeed.children);
+ const oldScroll=pttWorkerFeed.scrollTop;
+ const oldPositions=new Map(oldNodes.map(el=>[el.dataset.key,{top:el.offsetTop,height:el.offsetHeight}]));
+ const existing=new Map(oldNodes.map(el=>[el.dataset.key,el]));
+ const fragment=document.createDocumentFragment();
+ rows.slice(-300).forEach(row=>{
+  let el=existing.get(row.key);
+  if(!el){
+   el=document.createElement('div');el.className='ptt-worker-row';el.dataset.key=row.key;
+   const kind=document.createElement('span');kind.className='ptt-worker-kind';kind.textContent=row.kind||'推';
+   const clock=document.createElement('span');clock.className='ptt-worker-clock';clock.textContent=row.clock||'';
+   const floor=document.createElement('span');floor.className='ptt-worker-floor';floor.textContent=row.floor?row.floor+'樓':'';
+   const body=document.createElement('span');body.className='ptt-worker-body';
+   const author=document.createElement('span');author.className='ptt-worker-author';author.textContent=row.author+': ';
+   const content=document.createElement('span');content.className='ptt-worker-content';content.textContent=row.content;
+   body.append(author,content);el.append(kind,clock,floor,body);
+  }
+  const floor=el.querySelector('.ptt-worker-floor');
+  if(floor)floor.hidden=Boolean(pttWorkerFloor&&!pttWorkerFloor.checked);
+  fragment.appendChild(el);
+ });
+ const firstVisible=oldNodes.find(el=>
+  oldPositions.get(el.dataset.key).top+oldPositions.get(el.dataset.key).height>oldScroll)||oldNodes[0];
+ const incomingKeys=new Set(rows.slice(-300).map(row=>row.key));
+ const survivors=oldNodes.filter(el=>incomingKeys.has(el.dataset.key));
+ const anchor=(firstVisible&&incomingKeys.has(firstVisible.dataset.key))
+  ?firstVisible
+  :survivors.find(el=>oldPositions.get(el.dataset.key).top>=oldScroll)||survivors[survivors.length-1];
+ const anchorKey=anchor&&anchor.dataset.key;
+ const anchorOffset=anchor?oldPositions.get(anchorKey).top-oldScroll:0;
+ pttWorkerFeed.replaceChildren(fragment);
+ if(pttWorkerFollow&&pttWorkerFollow.checked&&isNearBottom)pttWorkerFeed.scrollTop=pttWorkerFeed.scrollHeight;
+ else {
+  const restored=anchorKey&&Array.from(pttWorkerFeed.children).find(el=>el.dataset.key===anchorKey);
+  pttWorkerFeed.scrollTop=restored?restored.offsetTop-anchorOffset:oldScroll;
+ }
+ pttSetStatus('同步推文 '+state.visible+' / '+state.total+' 則');
+}
+function disposePttBinding(){
+ if(pttPollTimer){clearInterval(pttPollTimer);pttPollTimer=null;}
+ if(pttTransport){pttTransport.stop();pttTransport=null;}
+ if(pttPlayback){pttPlayback.dispose();pttPlayback=null;}
+ pttPermanentWarning='';
+}
+function showArchivePtt(index,payload){
+ disposePttBinding();
+ if(!players[index]||!pttWorkerFeed)return;
+ if(pttLiveFrame){pttLiveFrame.hidden=true;pttLiveFrame.removeAttribute('src');}
+ if(pttUnavailable)pttUnavailable.hidden=true;
+ pttWorkerFeed.hidden=false;
+ if(pttWorkerOptions){pttWorkerOptions.hidden=false;pttWorkerOptions.classList.remove('live-ptt-controls');}
+ if(pttWorkerFollowLabel)pttWorkerFollowLabel.hidden=false;
+ if(pttDynamicTitle)pttDynamicTitle.textContent='同時段歷史 PTT（未確認完整）';
+ pttWorkerFeed.replaceChildren();
+ pttPlayback=HoloViewerPttPlayer.attach({
+  player:players[index],start:payload.start,render:pttRender,
+  initialMessages:Array.isArray(payload.messages)?payload.messages:[],
+  status:(state,msg)=>{if(state==='error')pttSetStatus(msg);}
+ });
+ pttApplyReaderSettings();
+ pttSetStatus('跟隨主視角 · 同時段歷史推文');
+}
+function showLivePtt(){
+ disposePttBinding();
+ if(pttWorkerFeed)pttWorkerFeed.hidden=true;
+ if(pttUnavailable)pttUnavailable.hidden=true;
+ // Keep the font slider available after the live iframe replaces the archive feed.
+ // Archive-only style/floor options are suppressed by the live-ptt-controls class.
+ if(pttWorkerOptions){pttWorkerOptions.hidden=false;pttWorkerOptions.classList.add('live-ptt-controls');}
+ if(pttWorkerFollowLabel)pttWorkerFollowLabel.hidden=true;
+ if(pttLiveFrame){
+  const src=pttLiveFrame.dataset.src||'/ptt-today?focus=1&embed=1';
+  if(pttLiveFrame.getAttribute('src')!==src)pttLiveFrame.setAttribute('src',src);
+  pttLiveFrame.hidden=false;
+ }
+ if(pttDynamicTitle)pttDynamicTitle.textContent='PTT 今日專串';
+ pttSetStatus('跟隨目前主視角 LIVE');
+ pttApplyReaderSettings();
+}
+function showUnavailablePtt(){
+ disposePttBinding();
+ if(pttWorkerFeed)pttWorkerFeed.hidden=true;
+ if(pttLiveFrame){pttLiveFrame.hidden=true;pttLiveFrame.removeAttribute('src');}
+ if(pttWorkerOptions)pttWorkerOptions.hidden=true;
+ if(pttWorkerFollowLabel)pttWorkerFollowLabel.hidden=true;
+ if(pttUnavailable){
+  pttUnavailable.hidden=false;
+  pttUnavailable.textContent='目前主視角沒有可驗證的歷史 PTT 時間範圍；不會沿用上一支影片的推文。';
+ }
+ if(pttDynamicTitle)pttDynamicTitle.textContent='PTT 尚未對齊';
+ pttSetStatus('');
+}
+async function refreshPrimaryPtt(index=primaryIndex){
+ if(!pttResolverUrl)return;
+ const stream=streams[index],player=players[index];
+ if(!stream||!player)return;
+ const token=++pttResolveToken;
+ pttSetStatus('依主視角載入…');
+ try{
+  let payload;
+  if(typeof config.pttResolve==='function')payload=await config.pttResolve(stream.videoId);
+  else{
+   const join=pttResolverUrl.includes('?')?'&':'?';
+   const response=await fetch(pttResolverUrl+join+'video_id='+encodeURIComponent(stream.videoId),{cache:'no-store',credentials:'same-origin'});
+   if(!response.ok)throw new Error('PTT HTTP '+response.status);
+   payload=await response.json();
+  }
+  if(token!==pttResolveToken||streams[index]?.videoId!==stream.videoId)return;
+  if(payload?.mode==='archive')showArchivePtt(index,payload);
+  else if(payload?.mode==='live')showLivePtt();
+  else showUnavailablePtt();
+ }catch(_error){
+  if(token===pttResolveToken)showUnavailablePtt();
+ }
+}
+function startPttBridge(index){
+ if(pttResolverUrl){
+  if(index===primaryIndex)refreshPrimaryPtt(index);
+  return;
+ }
+ if(!pttWorkerFeed||pttPlayback||streams[index].videoId!==pttWorkerConfig.videoId)return;
+ pttPlayback=HoloViewerPttPlayer.attach({
+  player:players[index],start:pttWorkerConfig.start,render:pttRender,
+  initialMessages:pttWorkerConfig.mode==='archive'?pttWorkerConfig.rows:[],
+  status:(state,msg)=>{if(state==='error')pttSetStatus(msg);}
+ });
+ if(pttWorkerConfig.mode==='archive'){
+  pttSetStatus('同時段歷史推文 · 來源 Coverage／Gap 未確認完整，非影片專屬留言');
+  return;
+ }
+ pttTransport=HoloViewerWorkerPtt.create({
+  aid:pttWorkerConfig.aid,endpoint:pttWorkerConfig.endpoint,mode:'history',
+  onRows:rows=>pttPlayback.ingest(rows),
+  onGap:cursor=>pttWarn('歷史資料存在缺口（purged cursor '+cursor+'）')
+ });
+ const refresh=()=>{
+  const selected=players[index];
+  if(selected&&typeof selected.getPlayerState==='function'&&typeof YT!=='undefined'&&YT.PlayerState&&selected.getPlayerState()===YT.PlayerState.ENDED){
+    disposePttBinding();return;
+  }
+  return pttTransport.run().catch(error=>pttSetStatus('PTT 更新失敗：'+error.message));
+ };
+ refresh();pttPollTimer=setInterval(refresh,10000);
+}
+window.addEventListener('pagehide',disposePttBinding,{once:true});
+
 const watchSingleMode=document.getElementById('watchSingleMode'),watchMultiMode=document.getElementById('watchMultiMode'),watchModeToggle=document.getElementById('watchModeToggle');
 function refreshWatchMode(){
  const single=watchMode==='single';
