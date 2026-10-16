@@ -92,6 +92,22 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertEqual(receipt["remote_writes"],0)
         self.assertNotIn("do not disclose",str(receipt))
 
+    def test_exact_source_line_audit_accepts_hash_prefixed_collector_aid(self):
+        self.db.execute("UPDATE articles SET aid=? WHERE id=1",("#"+self.aid,))
+        self.db.execute(
+            "INSERT INTO pushes VALUES(4,1,4,1,'→','late','redacted','10/16','06:36','2026-10-15T23:01:23Z')"
+        )
+        self.db.commit()
+        filename=str(Path(self.tmp.name)/"collector-hash.sqlite3")
+        target=sqlite3.connect(filename)
+        try:
+            self.db.backup(target)
+        finally:
+            target.close()
+        receipt=audit(filename,"#"+self.aid,4)
+        self.assertEqual(receipt["status"],"ELIGIBLE")
+        self.assertEqual(receipt["occurred_at"],"2026-10-15T22:36:00Z")
+
     def test_bounded_scan_tracks_all_normal_100_plus_lines(self):
         self.db.executemany("INSERT INTO pushes VALUES(?,?,?,?,?,?,?,?,?,?)",[
           (n,1,n,1,'推','a',f'bulk-{n}','10/15','18:01','2026-10-15T10:02:07Z')
