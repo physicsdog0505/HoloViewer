@@ -115,7 +115,10 @@ try{
  // Canonical Custom View builder uses full-document session navigation.
  await freshDocument(page,()=>page.locator('a[data-route="single"]').click(),url=>url.pathname==='/custom-view');
  await page.waitForSelector('#custom-live-picker [data-live-pick]');
- await page.locator('#custom-live-picker [data-live-pick]').nth(0).click();
+ await page.locator('[data-library-tab="history"]').click();
+ await page.waitForSelector('#custom-history-picker [data-live-pick]');
+ assert(await page.locator('#custom-history-picker [data-live-pick]').count()===2,'Custom View history library did not load');
+ await page.locator('#custom-history-picker [data-live-pick]').nth(0).click();
  await freshDocument(page,()=>page.locator('#start').click(),url=>url.pathname==='/custom-view/session'&&url.searchParams.getAll('stream').length===1);
  await page.waitForSelector('#stage .player-card');
  const pttFrameHandle=await page.waitForSelector('.ptt-live-panel iframe');
