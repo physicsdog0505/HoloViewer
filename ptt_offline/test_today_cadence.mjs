@@ -73,7 +73,7 @@ test('known lifecycle refresh uses one bounded videos.list request',async()=>{
     {TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:db},
     {now:new Date('2026-10-15T21:50:00Z'),fetchImpl:async url=>{
       calls++;
-      assert.match(url,/youtubeapis\.com\/youtube\/v3\/videos/);
+      assert.match(url,/googleapis\.com\/youtube\/v3\/videos/);
       assert.match(url,/id=abcdefghijk/);
       return new Response(JSON.stringify({items:[{
         id:'abcdefghijk',
