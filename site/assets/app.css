@@ -440,3 +440,8 @@ body:has(#watchalong-session.active) .client-main{max-width:1580px;width:100%}
 [data-support-mode="dual_color"] .live-channel-avatar{background:var(--member-accent-dual)!important;border-color:transparent!important;padding:3px}
 
 .live-channel-rail[hidden]{display:none!important}
+
+.watch-master-input{margin-top:14px}
+.watch-source-kind-label{margin:0 0 8px;font-size:12px;font-weight:800;color:#5e5a54}
+.selected-master{position:relative}
+.live-picker-cover{position:relative}
