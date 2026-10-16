@@ -49,6 +49,11 @@ class TodayBackendReleaseTests(unittest.TestCase):
                     key=lambda x:int(x.rsplit("_",1)[1])))
                 decoded=json.loads(payload)
                 self.assertEqual(len(decoded["channels"]),66)
+                self.assertTrue(all(
+                    len(value.encode("utf-8")) <= 4000
+                    for key, value in cfg["vars"].items()
+                    if key.startswith("TODAY_SUPPORT_COLORS_JSON_")
+                ))
             finally:
                 holder.cleanup()
 
