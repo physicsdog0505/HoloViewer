@@ -282,6 +282,7 @@ function forceMultiImmersiveGeometry(active){
    pttContent.style.setProperty('max-height','none','important');
   }
  }
+}
 
 function applyImmersiveState(active){
  immersiveEnabled=Boolean(active);
