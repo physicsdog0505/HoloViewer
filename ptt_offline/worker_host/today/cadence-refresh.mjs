@@ -1,5 +1,6 @@
 import {refreshTodayDiscovery} from './discovery-refresh.mjs';
 import {writeEvidence} from './store.mjs';
+import {readLifecycleCursor,commitLifecycleCursor} from './websub-hardening.mjs';
 
 const ID=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
@@ -11,21 +12,32 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
   if(!env?.DB?.prepare||!env?.YOUTUBE_API_KEY)throw Error('Today cadence configuration missing');
   if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('invalid lifecycle refresh limit');
 
-  const got=await env.DB.prepare(`
-    SELECT video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_observed_at,
-      scheduled_start,actual_start,actual_end,
-      EXISTS(
-        SELECT 1 FROM public_today_websub_events e
-        WHERE e.video_id=public_today_canonical.video_id AND e.status='processed'
-      ) AS from_discovery
+  const meta=await env.DB.prepare('SELECT roster_version FROM public_today_catalog_meta WHERE singleton=1').first();
+  const rosterVersion=meta?.roster_version;
+  if(typeof rosterVersion!=='string'||!rosterVersion)return {status:'idle',requests:0,updated:0,selected:0};
+  const cursor=await readLifecycleCursor(env.DB,rosterVersion);
+  const selectSql=`
+    SELECT public_today_canonical.video_id,public_today_canonical.publisher_channel_id,
+      public_today_canonical.roster_version,public_today_canonical.channel_group,ac.channel_group AS approved_group,
+      public_today_canonical.title,public_today_canonical.channel_name,public_today_canonical.lifecycle_state,
+      public_today_canonical.lifecycle_observed_at,public_today_canonical.scheduled_start,
+      public_today_canonical.actual_start,public_today_canonical.actual_end,
+      EXISTS(SELECT 1 FROM public_today_websub_events e
+        WHERE e.video_id=public_today_canonical.video_id AND e.status='processed') AS from_discovery
     FROM public_today_canonical
-    WHERE lifecycle_state!='ended'
-    ORDER BY lifecycle_observed_at ASC,video_id ASC
-    LIMIT ?`).bind(limit).all();
-  const rows=got.results??[];
+    JOIN public_today_approved_channels ac
+      ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
+    WHERE public_today_canonical.lifecycle_state!='ended'
+      AND public_today_canonical.video_id>?
+    ORDER BY public_today_canonical.video_id ASC LIMIT ?`;
+  let rows=(await env.DB.prepare(selectSql).bind(rosterVersion,cursor,limit).all()).results??[];
+  // Wrap only when the cursor is at the end. Do not fill a short tail with the
+  // beginning of the list: that would repeatedly check overlapping batches.
+  if(!rows.length&&cursor){
+    rows=(await env.DB.prepare(selectSql).bind(rosterVersion,'',limit).all()).results??[];
+  }
   const ids=rows.map(r=>r.video_id).filter(id=>ID.test(id??''));
-  if(!ids.length)return {status:'idle',requests:0,updated:0,selected:0};
-
+  if(!ids.length)return {status:'idle',requests:0,updated:0,selected:0,unchanged:0};
   const url=new URL('https://www.googleapis.com/youtube/v3/videos');
   url.searchParams.set('part','snippet,liveStreamingDetails');
   url.searchParams.set('id',ids.join(','));
@@ -40,41 +52,48 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
   const byId=new Map(payload.items.map(item=>[item.id,item]));
   const expected=new Map(rows.map(r=>[r.video_id,r]));
   const observed_at=now.toISOString().replace(/\.\d{3}Z$/,'Z');
-  let updated=0,missing=0,removed_non_live=0;
-
+  let updated=0,missing=0,removed_non_live=0,unchanged=0;
   for(const id of ids){
-    const base=expected.get(id),v=byId.get(id),s=v?.snippet,d=v?.liveStreamingDetails??{};
-    if(!base||!v||!s){missing++;continue;}
-    if(!CHANNEL.test(base.publisher_channel_id??'')||s.channelId!==base.publisher_channel_id)throw Error('publisher mismatch');
+    const base=rows.find(r=>r.video_id===id),v=byId.get(id),snippet=v?.snippet,d=v?.liveStreamingDetails??{};
+    if(!base||!v||!snippet){missing++;continue;}
+    if(!CHANNEL.test(base.publisher_channel_id??'')||snippet.channelId!==base.publisher_channel_id)throw Error('publisher mismatch');
     const actualEnd=iso(d.actualEndTime),actualStart=iso(d.actualStartTime),scheduled=iso(d.scheduledStartTime);
-    const hasLivestreamEvidence=Boolean(
-      actualEnd || actualStart || scheduled ||
-      s.liveBroadcastContent==='live' || s.liveBroadcastContent==='upcoming'
-    );
-    if(!hasLivestreamEvidence && Boolean(base.from_discovery)){
-      await env.DB.prepare('DELETE FROM public_today_canonical WHERE video_id=?').bind(id).run();
-      removed_non_live++;
+    const hasLivestreamEvidence=Boolean(actualEnd||actualStart||scheduled||
+      snippet.liveBroadcastContent==='live'||snippet.liveBroadcastContent==='upcoming');
+    if(!hasLivestreamEvidence){
+      if(Boolean(base.from_discovery)){
+        await env.DB.prepare('DELETE FROM public_today_canonical WHERE video_id=?').bind(id).run();
+        removed_non_live++;
+      }else unchanged++;
       continue;
     }
-    const lifecycle=actualEnd?'ended':s.liveBroadcastContent==='live'?'live':
-      s.liveBroadcastContent==='upcoming'?'upcoming':actualStart?'live':'unknown';
-    await writeEvidence(env.DB,{
-      video_id:id,
-      channel_id:base.publisher_channel_id,
-      roster_version:base.roster_version,
-      group:base.channel_group,
-      title:String(s.title??base.title??''),
-      channel_name:String(s.channelTitle??base.channel_name??''),
-      lifecycle_state:lifecycle,
-      observed_at,
-      scheduled_start:scheduled,
-      actual_start:actualStart,
-      actual_end:actualEnd,
-      source_label:'YouTube'
+    const lifecycle=actualEnd?'ended':snippet.liveBroadcastContent==='live'?'live':
+      snippet.liveBroadcastContent==='upcoming'?'upcoming':actualStart?'live':'unknown';
+    const title=String(snippet.title??'');
+    const channelName=String(snippet.channelTitle??'');
+    const group=base.approved_group??base.channel_group;
+    const same=
+      base.lifecycle_state===lifecycle &&
+      base.title===title &&
+      base.channel_name===channelName &&
+      base.scheduled_start===scheduled &&
+      base.actual_start===actualStart &&
+      base.actual_end===actualEnd &&
+      base.roster_version===rosterVersion &&
+      base.channel_group===group;
+    if(same){unchanged++;continue;}
+    const result=await writeEvidence(env.DB,{
+      video_id:id,channel_id:base.publisher_channel_id,roster_version:rosterVersion,group,
+      title,channel_name:channelName,lifecycle_state:lifecycle,observed_at,
+      scheduled_start:scheduled,actual_start:actualStart,actual_end:actualEnd,source_label:'YouTube'
     });
-    updated++;
+    if(result.changed)updated++;else unchanged++;
   }
-  return {status:'refreshed',requests:1,selected:ids.length,updated,missing,removed_non_live};
+  const lastVideoId=ids[ids.length-1];
+  if(lastVideoId&&lastVideoId!==cursor){
+    await commitLifecycleCursor(env.DB,{rosterVersion,lastVideoId,now});
+  }
+  return {status:'refreshed',requests:1,selected:ids.length,updated,unchanged,missing,removed_non_live};
 }
 
 export function shouldRunLifecycleRefresh(now){
