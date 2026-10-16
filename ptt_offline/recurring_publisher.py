@@ -54,6 +54,8 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
         else:
             total_sent=0
             total_posts=0
+            modeled_queries=0
+            modeled_writes=0
             last_status="NO_NEW_ROWS"
             backlog=False
             pending=0
@@ -87,12 +89,18 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     total_posts+=1
                     count=batch.get("sent",0)
                     total_sent+=count
+                    # Mirrors d1_owner_writer's conservative one-AID budget:
+                    # thread + state + push/evidence, plus pre/post readbacks.
+                    modeled_writes+=2+2*count
+                    modeled_queries+=2+5*count
                     if count<batch_cap:
                         break
                 backlog=backlog or (count==batch_cap)
             result={"status":last_status if send else "READ_ONLY",
                     "sent":total_sent,"eligible":pending,
                     "http_posts":total_posts,"batch_count":total_posts,
+                    "modeled_d1_writes_ceiling":modeled_writes,
+                    "modeled_d1_queries_ceiling":modeled_queries,
                     "articles_checked":len(article_ids),"backlog_may_remain":backlog}
     return {**result,"elapsed_ms":round((clock()-started)*1000),
         "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
