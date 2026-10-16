@@ -842,6 +842,9 @@ window.hvDestroy4174SharedViewer=function hvDestroy4174SharedViewer(){
  clearInterval(verifiedSyncTimer);
  if(collabPollTimer)clearInterval(collabPollTimer);
  if(youtubeReadyRetryTimer)clearInterval(youtubeReadyRetryTimer);
+ if(Array.isArray(window.__hvYoutubeReadyCallbacks)){
+  window.__hvYoutubeReadyCallbacks=window.__hvYoutubeReadyCallbacks.filter(callback=>callback!==mountAllWatchPlayers);
+ }
  players.forEach(player=>{try{if(player&&typeof player.destroy==='function')player.destroy();}catch(_e){}});
  for(const name of ['watch-multi','watch-grid','layout-auto','layout-equal','layout-primary','single-ptt','single-live','single-vod','multi-stream','viewer-has-ptt','viewer-video-only','collab-live-session','settings-open','custom-immersive']){
   document.body.classList.remove(name);
