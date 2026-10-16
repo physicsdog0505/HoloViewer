@@ -186,13 +186,29 @@ function setHomeCollabEvents(data){
  homeCollabByVideo=new Map();
  for(const event of homeCollabEvents)for(const stream of collabEventStreams(event))homeCollabByVideo.set(stream.video_id,event);
 }
+function collabDetailUrl(event){
+ const eventId=String(event?.event_id||'');if(!eventId||!config.apiBase)return '';
+ return config.apiBase.replace(/\/$/,'')+'/v1/collab/events/'+encodeURIComponent(eventId);
+}
+function verifiedTimelineStartsForEvent(event){
+ if(event?.sync?.available!==true)return {};
+ const starts={};
+ for(const stream of collabEventStreams(event)){
+  const seconds=Date.parse(String(stream.actual_start||''))/1000;
+  if(Number.isFinite(seconds))starts[stream.video_id]=seconds;
+ }
+ return starts;
+}
 function openCollabEvent(event){
  const streams=collabEventStreams(event);
  const ids=streams.map(x=>x.video_id);
  if(ids.length<2)return;
+ const pollable=streams.some(x=>['live','upcoming','waiting'].includes(String(x.lifecycle_state||'').toLowerCase()));
  state.multi=ids.slice();renderMulti();
  window.hvOpenCustomSession?.(ids,{layout:'auto',ptt:'video',primary:0,audio:0,
+  collabPollUrl:pollable?collabDetailUrl(event):'',
   collabLabel:String(event.label||'多人連動'),
+  verifiedTimelineStarts:verifiedTimelineStartsForEvent(event),
   streamMetadata:streams.map(x=>({videoId:x.video_id,label:String(x.title||x.channel_name||x.video_id),channelId:String(x.channel_id||'')}))});
 }
 function collabEntry(event){
@@ -827,7 +843,12 @@ function sessionAudio(){
 window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
- try{sessionStorage.setItem('hvCustomViewing',JSON.stringify({ids:clean,layout:opts.layout||'auto',ptt:opts.ptt||'video',primary:opts.primary||0,audio:opts.audio||0}));}catch{}
+ const savedSession={ids:clean,layout:opts.layout||'auto',ptt:opts.ptt||'video',primary:opts.primary||0,audio:opts.audio||0};
+ if(typeof opts.collabPollUrl==='string'&&opts.collabPollUrl)savedSession.collabPollUrl=opts.collabPollUrl;
+ if(typeof opts.collabLabel==='string'&&opts.collabLabel)savedSession.collabLabel=opts.collabLabel;
+ if(opts.verifiedTimelineStarts&&typeof opts.verifiedTimelineStarts==='object')savedSession.verifiedTimelineStarts=opts.verifiedTimelineStarts;
+ if(Array.isArray(opts.streamMetadata)&&opts.streamMetadata.length)savedSession.streamMetadata=opts.streamMetadata;
+ try{sessionStorage.setItem('hvCustomViewing',JSON.stringify(savedSession));}catch{}
  viewing.ids=clean;
  viewing.ptt=opts.ptt==='live'?'live':'video';
  viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
@@ -865,7 +886,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
   translationB:[],
   verifiedTimelineStarts:opts.verifiedTimelineStarts&&typeof opts.verifiedTimelineStarts==='object'?opts.verifiedTimelineStarts:{},
   manualTimelineStarts:{},
-  collabPollUrl:'',
+  collabPollUrl:typeof opts.collabPollUrl==='string'?opts.collabPollUrl:'',
   collabLabel:typeof opts.collabLabel==='string'?opts.collabLabel:''
  });
 };
@@ -1108,6 +1129,10 @@ watchForm.addEventListener('submit',event=>{
   layout:urls.length?params.get('layout'):saved.layout,
   ptt:urls.length?params.get('ptt'):saved.ptt,
   primary:urls.length?Number(params.get('primary')||0):saved.primary,
-  audio:urls.length?Number(params.get('audio')||0):saved.audio
+  audio:urls.length?Number(params.get('audio')||0):saved.audio,
+  collabPollUrl:urls.length?'':saved?.collabPollUrl,
+  collabLabel:urls.length?'':saved?.collabLabel,
+  verifiedTimelineStarts:urls.length?{}:(saved?.verifiedTimelineStarts||{}),
+  streamMetadata:urls.length?[]:(Array.isArray(saved?.streamMetadata)?saved.streamMetadata:[])
  });
 })();
