@@ -4,6 +4,7 @@ import {readLifecycleCursor,commitLifecycleCursor} from './websub-hardening.mjs'
 
 const ID=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
+const MAX_LIFECYCLE_WATERMARKS=500;
 
 function iso(x){return x?new Date(x).toISOString().replace(/\.\d{3}Z$/,'Z'):null;}
 
@@ -15,7 +16,9 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
   const meta=await env.DB.prepare('SELECT roster_version FROM public_today_catalog_meta WHERE singleton=1').first();
   const rosterVersion=meta?.roster_version;
   if(typeof rosterVersion!=='string'||!rosterVersion)return {status:'idle',requests:0,updated:0,selected:0};
-  const cursor=await readLifecycleCursor(env.DB,rosterVersion);
+  const cursorState=await readLifecycleCursor(env.DB,rosterVersion);
+  const cursor=cursorState.lastVideoId;
+  const checkedAtByVideo={...cursorState.checkedAtByVideo};
   const selectSql=`
     SELECT public_today_canonical.video_id,public_today_canonical.publisher_channel_id,
       public_today_canonical.roster_version,public_today_canonical.channel_group,ac.channel_group AS approved_group,
@@ -63,8 +66,23 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
     if(!hasLivestreamEvidence){
       if(Boolean(base.from_discovery)){
         await env.DB.prepare('DELETE FROM public_today_canonical WHERE video_id=?').bind(id).run();
+        delete checkedAtByVideo[id];
         removed_non_live++;
-      }else unchanged++;
+      }else if(base.lifecycle_state!=='unknown'||base.scheduled_start||base.actual_start||base.actual_end){
+        // A previously active row that has lost all positive livestream evidence
+        // must transition once to unknown; never repeatedly write the same unknown snapshot.
+        const result=await writeEvidence(env.DB,{
+          video_id:id,channel_id:base.publisher_channel_id,roster_version:rosterVersion,
+          group:base.approved_group??base.channel_group,title:String(snippet.title??''),
+          channel_name:String(snippet.channelTitle??''),lifecycle_state:'unknown',observed_at,
+          scheduled_start:null,actual_start:null,actual_end:null,source_label:'YouTube'
+        });
+        if(result.changed)updated++;else unchanged++;
+        checkedAtByVideo[id]=observed_at;
+      }else{
+        checkedAtByVideo[id]=observed_at;
+        unchanged++;
+      }
       continue;
     }
     const lifecycle=actualEnd?'ended':snippet.liveBroadcastContent==='live'?'live':
@@ -81,17 +99,27 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
       base.actual_end===actualEnd &&
       base.roster_version===rosterVersion &&
       base.channel_group===group;
-    if(same){unchanged++;continue;}
+    if(same){checkedAtByVideo[id]=observed_at;unchanged++;continue;}
     const result=await writeEvidence(env.DB,{
       video_id:id,channel_id:base.publisher_channel_id,roster_version:rosterVersion,group,
       title,channel_name:channelName,lifecycle_state:lifecycle,observed_at,
       scheduled_start:scheduled,actual_start:actualStart,actual_end:actualEnd,source_label:'YouTube'
     });
+    checkedAtByVideo[id]=observed_at;
     if(result.changed)updated++;else unchanged++;
   }
+  // Keep the freshness receipt bounded while covering the 200-card Today read window
+  // plus headroom. The singleton cursor is the only periodic D1 write on an unchanged sweep.
+  const watermarkEntries=Object.entries(checkedAtByVideo)
+    .filter(([id,time])=>ID.test(id)&&typeof time==='string'&&Number.isFinite(Date.parse(time)))
+    .sort((a,b)=>Date.parse(a[1])-Date.parse(b[1]));
+  while(watermarkEntries.length>MAX_LIFECYCLE_WATERMARKS){
+    const [expired]=watermarkEntries.shift();
+    delete checkedAtByVideo[expired];
+  }
   const lastVideoId=ids[ids.length-1];
-  if(lastVideoId&&lastVideoId!==cursor){
-    await commitLifecycleCursor(env.DB,{rosterVersion,lastVideoId,now});
+  if(lastVideoId){
+    await commitLifecycleCursor(env.DB,{rosterVersion,lastVideoId,checkedAtByVideo,now});
   }
   return {status:'refreshed',requests:1,selected:ids.length,updated,unchanged,missing,removed_non_live};
 }
