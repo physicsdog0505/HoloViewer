@@ -18,7 +18,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .activate_production_publisher import start_publisher
+from .activate_production_publisher import PRODUCTION_PROFILE,start_publisher
 from .recurring_publisher import run_snapshot
 
 
@@ -141,7 +141,9 @@ def main(argv=None):
 
     preview=run_snapshot(
         source=source,state_dir=str(state_dir),send=False,
-        batch_cap=25,max_batches=8,max_articles=4,
+        batch_cap=PRODUCTION_PROFILE["rows"],
+        max_batches=PRODUCTION_PROFILE["max_batches"],
+        max_articles=PRODUCTION_PROFILE["max_articles"],
     )
     if preview.get("publisher_mode")!="DRY_RUN":
         raise SystemExit("unexpected preview mode")
