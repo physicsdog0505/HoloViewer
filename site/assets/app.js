@@ -854,7 +854,13 @@ window.hvOpenCustomSession=function(ids,opts={}){
 };
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
+function navigateSidebarLink(event,destination){
+ event.preventDefault();route(destination);
+ // Pointer clicks must not leave :focus-within latched after SPA navigation.
+ // Keep keyboard focus for accessible navigation and rail expansion.
+ if(event.detail>0)event.currentTarget.blur();
+}
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.route)));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileRoute)));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,'home')));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
 const hashRoute=location.hash.substring(1).split('?')[0];
 const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):
