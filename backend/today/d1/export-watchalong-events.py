@@ -6,7 +6,7 @@ telemetry, or private Watchalong source mappings.
 """
 from __future__ import annotations
 import argparse, hashlib, json, sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 def q(value):
@@ -26,18 +26,54 @@ def main():
         raise SystemExit("days outside safe range")
     source_root=args.source_root.expanduser().resolve()
     sys.path.insert(0,str(source_root))
-    from watchalong_ptt_catalog import load_recent_events
+    from client_runtime import client_runtime_root
+    from frontend_config import database_paths
+    from frontend_time import TAIPEI
+    from live_stream_discovery import LiveDiscoveryCache
+    from watchalong_ptt_catalog import load_recent_events, parse_watchalong_events
+
+    runtime_root=client_runtime_root()
     if args.database is not None:
         database=args.database.expanduser().resolve()
     else:
         # Reuse the accepted 4174 runtime DB resolver; do not invent another path.
-        from client_runtime import client_runtime_root
-        from frontend_config import database_paths
-        _collector, web_database=database_paths(root=client_runtime_root())
+        _collector, web_database=database_paths(root=runtime_root)
         database=Path(web_database).expanduser().resolve()
     if not database.is_file():
         raise SystemExit(f"PTT Web history DB not found: {database}")
-    events=load_recent_events(database,days=args.days)
+
+    # Match accepted 4174 Watchalong landing semantics exactly:
+    # fresh/current discovery cache + body-complete historical Web DB.
+    current=datetime.now(TAIPEI)
+    events=[]
+    cache=LiveDiscoveryCache(runtime_root/".ptt_stream_discovery_cache.json")
+    try:
+        for offset in range(args.days):
+            day=(current.date()-timedelta(days=offset)).isoformat()
+            for snapshot in cache.for_day(day):
+                events.extend(parse_watchalong_events(
+                    aid=snapshot.aid,
+                    article_title=snapshot.title,
+                    source_url=snapshot.source_url,
+                    body_text=snapshot.body_text,
+                ))
+    except (OSError, ValueError, TypeError):
+        pass
+
+    events.extend(load_recent_events(database,days=args.days,now=current))
+    events.sort(
+        key=lambda event:(event.article_datetime,event.scheduled_time,event.aid),
+        reverse=True,
+    )
+    deduped=[]
+    seen=set()
+    for event in events:
+        signature=tuple(sorted(stream.video_id for stream in event.streams))
+        if not signature or signature in seen:
+            continue
+        seen.add(signature)
+        deduped.append(event)
+    events=deduped
     imported=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     out=[]
     for event in events:
