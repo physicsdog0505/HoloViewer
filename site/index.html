@@ -160,6 +160,14 @@
  </section>
  <section id="watchalong" class="page">
  <div class="page-head"><div><h1>同時視聽</h1></div></div>
+ <section class="section recent-watch-section" id="recent-watchalong">
+  <div class="section-head"><div><h2>近期同時視聽</h2><p>選擇 Hololive 主直播後，再設定你要看的片源。</p></div></div>
+  <label class="recent-watch-search-label" for="recentWatchSearch">搜尋近期同時視聽</label>
+  <input class="recent-watch-search" id="recentWatchSearch" type="search" placeholder="搜尋標題或成員">
+  <div id="recentWatchGrid" class="watch-grid"></div>
+  <p class="recent-watch-no-matches" id="recentWatchNoMatches" hidden>沒有符合的近期同時視聽。</p>
+  <p class="empty-note" id="recentWatchEmpty">讀取近期同時視聽中…</p>
+ </section>
  <section class="section">
   <div class="tool-card manual-shell" id="manual">
    <p id="watch-error" class="form-error" hidden></p>
@@ -206,6 +214,10 @@
    </form>
   </div>
  </section>
+ </section>
+ <section id="watchalong-session" class="page">
+  <div class="viewer-head"><h1>同時視聽</h1><a class="subtle-action" href="/watchalong">返回同時視聽</a></div>
+  <div id="watchalong-session-shell" class="watchalong-session-shell"></div>
  </section>
  </main>
  <script src="/assets/config.js"></script><script src="/assets/4174-shared-viewing-a144bb3-dom.js"></script><script src="/assets/4174-shared-viewing-a144bb3.js"></script><script src="/assets/app.js"></script></body></html>
