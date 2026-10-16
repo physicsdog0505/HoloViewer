@@ -49,7 +49,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             last_status="NO_NEW_ROWS"
             backlog=False
             pending=0
-            for article_id in article_ids:
+            for article_index,article_id in enumerate(article_ids):
                 plan=inspect_latest_article(db,article_id=article_id)
                 if plan["status"]!="READY":
                     continue
@@ -59,8 +59,15 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                        executor=executor,send=False,batch_cap=batch_cap,article_id=article_id)
                     pending+=result.get("eligible",0)
                     continue
-                # A per-article cap prevents a busy thread starving another.
-                per_article_cap=max(1,(max_batches-total_posts)//max(1,len(article_ids)))
+                # max_batches is a GLOBAL per-snapshot network/write budget.
+                # Never turn a zero share into one: that previously allowed
+                # max_batches=1 to send once for every active AID.
+                remaining=max_batches-total_posts
+                if remaining<=0:
+                    backlog=True
+                    break
+                remaining_articles=max(1,len(article_ids)-article_index)
+                per_article_cap=max(1,remaining//remaining_articles)
                 count=0
                 for _ in range(per_article_cap):
                     batch=run_live_once(db,state_path=state,secret=secret,
