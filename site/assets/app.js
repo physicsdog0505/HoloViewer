@@ -1119,6 +1119,11 @@ window.hvCustomAdd=addStream;
 })();
 
 
+function playlistId(input){
+ const raw=String(input||'').trim();if(/^[A-Za-z0-9_-]{10,}$/.test(raw))return raw;
+ try{const u=new URL(raw);if(!['youtube.com','www.youtube.com','m.youtube.com'].includes(u.hostname))return '';return String(u.searchParams.get('list')||'')}catch{return ''}
+}
+
 // Accepted 4174 watchalong landing mode/tab interactions.
 (function(){
 
@@ -1162,10 +1167,6 @@ document.querySelectorAll('[data-youtube-mode]').forEach(button=>button.addEvent
 applySourceKind();
 
 const watchForm=document.getElementById('watchalongBuilder');
-function playlistId(input){
- const raw=String(input||'').trim();if(/^[A-Za-z0-9_-]{10,}$/.test(raw))return raw;
- try{const u=new URL(raw);if(!['youtube.com','www.youtube.com','m.youtube.com'].includes(u.hostname))return '';return String(u.searchParams.get('list')||'')}catch{return ''}
-}
 watchForm.addEventListener('submit',event=>{
  event.preventDefault();
  const form=new FormData(watchForm);
