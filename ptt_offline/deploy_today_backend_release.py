@@ -8,6 +8,9 @@ from __future__ import annotations
 import argparse, json, subprocess, tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+
+SUPPORT_COLOR_PREFIX="TODAY_SUPPORT_COLORS_JSON"
+SUPPORT_COLOR_CHUNK_BYTES=3800
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
@@ -84,7 +87,37 @@ def verify_ptt_rollout(state_root, config):
         raise SystemExit("PTT Public GET returned no pushes")
     return {"ack":ack,"day":day,"public_http":200,"public_pushes":len(pushes)}
 
-def safe_deploy_config(config_path):
+def load_support_color_chunks(path):
+    payload=json.loads(Path(path).read_text(encoding="utf-8"))
+    if payload.get("schema_version")!=1 or payload.get("fallback")!="neutral":
+        raise SystemExit("unsupported support-color export")
+    rows=payload.get("channels")
+    if not isinstance(rows,list) or len(rows)!=66:
+        raise SystemExit("support-color export must contain exact verified legacy 66")
+    ids=[row.get("channel_id") for row in rows if isinstance(row,dict)]
+    if len(ids)!=66 or len(set(ids))!=66 or not all(isinstance(x,str) and len(x)==24 and x.startswith("UC") for x in ids):
+        raise SystemExit("support-color export has invalid/duplicate channel IDs")
+    compact=json.dumps(payload,ensure_ascii=False,separators=(",",":"))
+    raw=compact.encode("utf-8")
+    chunks=[]
+    start=0
+    while start<len(raw):
+        end=min(len(raw),start+SUPPORT_COLOR_CHUNK_BYTES)
+        while end>start:
+            try:
+                chunk=raw[start:end].decode("utf-8")
+                break
+            except UnicodeDecodeError:
+                end-=1
+        if end==start:
+            raise SystemExit("could not split support-color payload")
+        chunks.append(chunk)
+        start=end
+    if not chunks:
+        raise SystemExit("support-color export is empty")
+    return chunks
+
+def safe_deploy_config(config_path, *, support_colors_path):
     cfg=load_config(config_path)
     cfg=json.loads(json.dumps(cfg))
     vars=dict(cfg.get("vars") or {})
@@ -94,6 +127,16 @@ def safe_deploy_config(config_path):
         vars.pop(name,None)
     vars["TODAY_CADENCE_ENABLED"]="true"
     vars["TODAY_DISCOVERY_ENABLED"]="false"
+    # Wrangler deploy replaces plaintext vars as a set. Rehydrate the verified
+    # support-color payload on every backend release instead of trusting a
+    # previous deployment's ephemeral vars to survive.
+    vars.pop(SUPPORT_COLOR_PREFIX,None)
+    for key in list(vars):
+        if key.startswith(SUPPORT_COLOR_PREFIX+"_"):
+            vars.pop(key,None)
+    chunks=load_support_color_chunks(support_colors_path)
+    for index,chunk in enumerate(chunks):
+        vars[f"{SUPPORT_COLOR_PREFIX}_{index}"]=chunk
     cfg["vars"]=vars
     td=tempfile.TemporaryDirectory(prefix="holoviewer-today-release-")
     path=Path(td.name)/"wrangler.json"
@@ -105,6 +148,7 @@ def main():
     p.add_argument("--apply",action="store_true")
     p.add_argument("--config",required=True)
     p.add_argument("--profiles-json",default="/tmp/hv47-legacy-avatars.json")
+    p.add_argument("--support-colors-json",default=str(Path.home()/"Downloads"/"Hololive-PTT-Viewer"/"holoviewer-channel-support-colors.json"))
     p.add_argument("--ptt-state-root",default=str(Path.home()/"Downloads"/"Hololive-PTT-Viewer"/".ptt-publisher-state"))
     args=p.parse_args()
     if not args.apply:
@@ -125,7 +169,7 @@ def main():
          "--file",str(discovery_schema)])
 
     # 3) Deploy only the SAME existing API Worker with backend cadence/discovery source.
-    td,deploy_cfg=safe_deploy_config(config)
+    td,deploy_cfg=safe_deploy_config(config, support_colors_path=args.support_colors_json)
     try:
         run(["npx","wrangler","deploy",str(repo_root/"ptt_offline"/"worker_host"/"index.mjs"),
              "--name",WORKER,"--config",str(deploy_cfg)])
@@ -159,6 +203,7 @@ def main():
       "profile_rows_expected":66,
       "today_cadence_enabled":True,
       "today_discovery_enabled":False,
+      "support_color_chunks":len(load_support_color_chunks(args.support_colors_json)),
       "nonlive_discovery_rows_after_cleanup":0,
       "preserved_secret_bindings":secrets,
       "ptt_preflight":ptt
