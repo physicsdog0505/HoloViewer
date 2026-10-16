@@ -46,8 +46,8 @@ def assert_recent_completed_cycle(metrics: Path, *, now=None, max_age_seconds=20
                 continue
     if not isinstance(last,dict):
         raise SystemExit("Publisher metrics contain no valid completed cycle")
-    if last.get("status") not in {"ACK","NO_NEW_ROWS"}:
-        raise SystemExit("latest Publisher cycle is not a clean completed send/no-op")
+    if last.get("status") not in {"ACK","NO_NEW_ROWS","BASELINED"}:
+        raise SystemExit("latest Publisher cycle is not a clean completed send/no-op/baseline")
     stamp=last.get("observed_at")
     try:
         observed=datetime.fromisoformat(str(stamp).replace("Z","+00:00")).astimezone(timezone.utc)
