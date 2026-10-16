@@ -35,7 +35,7 @@ def seconds_until_next_snapshot(now=None):
         target=local.replace(hour=next_minute//60,minute=next_minute%60,second=0,microsecond=0)
     return max(0,(target-local).total_seconds())
 
-def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=8,max_articles=4):
+def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=1,max_articles=4):
     if type(max_batches) is not int or not 1<=max_batches<=16:
         raise ContractError('invalid bounded batches per snapshot')
     started=clock()
@@ -109,7 +109,7 @@ def main(argv=None):
     p.add_argument("--iterations",type=int,default=1)
     p.add_argument("--send",action="store_true")
     p.add_argument("--batch-cap",type=int,default=5)
-    p.add_argument("--max-batches",type=int,default=8)
+    p.add_argument("--max-batches",type=int,default=1)
     p.add_argument("--max-articles",type=int,default=4)
     p.add_argument("--approve-live-capture-policy",action="store_true")
     p.add_argument("--endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish")
