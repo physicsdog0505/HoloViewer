@@ -51,3 +51,32 @@ test('single stream or same-channel rows never become a collab event',()=>{
     {video_id:'bbbbbbbbbbb',channel_id:C1,channel_name:'A',title:'Misty Mountain Gaming Collab',lifecycle_state:'live',actual_start:'2026-10-16T10:05:00Z'}
   ]),[]);
 });
+
+
+test('ingestion provenance never creates a shared-topic candidate',()=>{
+  const events=detectCollabCandidates([
+    {video_id:'aaaaaaaaaaa',channel_id:C1,title:'Japanese Ramen Simulator',
+      source_label:'YouTube videos.list verified bootstrap',lifecycle_state:'live',
+      actual_start:'2026-10-16T10:00:00Z'},
+    {video_id:'bbbbbbbbbbb',channel_id:C2,title:'APEX battle royale',
+      source_label:'YouTube videos.list verified bootstrap',lifecycle_state:'live',
+      actual_start:'2026-10-16T10:05:00Z'},
+  ]);
+  assert.deepEqual(events,[]);
+});
+
+test('real title overlap still yields candidate even with provenance present',()=>{
+  const events=detectCollabCandidates([
+    {video_id:'aaaaaaaaaaa',channel_id:C1,title:'【#インボキア】こわこわなボドゲ',
+      source_label:'YouTube videos.list verified bootstrap',lifecycle_state:'live',
+      actual_start:'2026-10-16T10:00:00Z'},
+    {video_id:'bbbbbbbbbbb',channel_id:C2,title:'【#インボキア】呪いのダイスゲーム',
+      source_label:'YouTube videos.list verified bootstrap',lifecycle_state:'live',
+      actual_start:'2026-10-16T10:05:00Z'},
+  ]);
+  assert.equal(events.length,1);
+  assert.equal(events[0].confidence,'shared-topic');
+  assert.deepEqual(events[0].streams.map(s=>s.video_id),['aaaaaaaaaaa','bbbbbbbbbbb']);
+  assert.equal(events[0].candidate,true);
+  assert.equal(events[0].sync.available,false);
+});
