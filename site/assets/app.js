@@ -1124,15 +1124,18 @@ function playlistId(input){
  try{const u=new URL(raw);if(!['youtube.com','www.youtube.com','m.youtube.com'].includes(u.hostname))return '';return String(u.searchParams.get('list')||'')}catch{return ''}
 }
 watchForm.addEventListener('submit',event=>{
+ event.preventDefault();
  const form=new FormData(watchForm);
  const master=videoId(String(form.get('master')||''));
  const error=document.getElementById('watch-error');error.hidden=true;
- if(!master){event.preventDefault();error.textContent='Hololive 主影片無法辨識，請確認 YouTube URL 或 Video ID。';error.hidden=false;return}
- if(form.get('source_kind')==='youtube'&&form.get('youtube_mode')==='single'&&!videoId(String(form.get('source')||''))){event.preventDefault();error.textContent='請提供有效的 YouTube 片源網址或 Video ID。';error.hidden=false;return}
- if(form.get('source_kind')==='youtube'&&form.get('youtube_mode')==='playlist'&&!playlistId(String(form.get('playlist')||''))){event.preventDefault();error.textContent='請提供有效的 YouTube Playlist URL。';error.hidden=false;return}
+ if(!master){error.textContent='Hololive 主影片無法辨識，請確認 YouTube URL 或 Video ID。';error.hidden=false;return}
+ if(form.get('source_kind')==='youtube'&&form.get('youtube_mode')==='single'&&!videoId(String(form.get('source')||''))){error.textContent='請提供有效的 YouTube 片源網址或 Video ID。';error.hidden=false;return}
+ if(form.get('source_kind')==='youtube'&&form.get('youtube_mode')==='playlist'&&!playlistId(String(form.get('playlist')||''))){error.textContent='請提供有效的 YouTube Playlist URL。';error.hidden=false;return}
  if(form.get('source_kind')==='external'){
-  try{const u=new URL(String(form.get('external_source')||''));if(!['https:','http:'].includes(u.protocol))throw Error('invalid')}catch{event.preventDefault();error.textContent='外部片源網址無法辨識，請提供 http(s) 網址。';error.hidden=false;return}
+  try{const u=new URL(String(form.get('external_source')||''));if(!['https:','http:'].includes(u.protocol))throw Error('invalid')}catch{error.textContent='外部片源網址無法辨識，請提供 http(s) 網址。';error.hidden=false;return}
  }
+ const q=new URLSearchParams();for(const [key,value] of form.entries())q.append(key,String(value));
+ location.href='/watchalong/session?'+q.toString();
 });
 })();
 
@@ -1203,7 +1206,7 @@ async function renderWatchalongSession(){
   const anchor=node('button','以目前位置建立對齊點');anchor.type='button';anchor.className='primary-action';const target=node('strong','00:00','watchalong-target');body.append(anchor,node('div','目前應播放到：'),target);
   let anchorMaster=0,anchorSource=0,correction=0;
   const parseClock=value=>{const parts=String(value||'').trim().split(':').map(Number);if(!parts.length||parts.some(v=>!Number.isFinite(v)||v<0))return null;if(parts.length===3)return parts[0]*3600+parts[1]*60+parts[2];if(parts.length===2)return parts[0]*60+parts[1];if(parts.length===1)return parts[0];return null};
-  anchor.onclick=()=>{const source=parseClock(input.value);if(source===null){status.textContent='外部片源时间格式无法辨识';return}anchorMaster=Number(masterPlayer?.getCurrentTime?.()||0);anchorSource=source;correction=0};
+  anchor.onclick=()=>{const source=parseClock(input.value);if(source===null){status.textContent='外部片源時間格式無法辨識';return}anchorMaster=Number(masterPlayer?.getCurrentTime?.()||0);anchorSource=source;correction=0};
   const adjust=node('div',undefined,'watchalong-adjust-row');for(const delta of [-5,-1,1,5]){const b=node('button',(delta>0?'+':'')+delta+' 秒');b.type='button';b.onclick=()=>{correction+=delta};adjust.append(b)}body.append(adjust);
   const externalTick=()=>{const mt=Number(masterPlayer?.getCurrentTime?.()||0);target.textContent=watchalongClock(Math.max(0,anchorSource+(mt-anchorMaster)+correction));};
   const oldTick=tick;tick=()=>{externalTick();oldTick()};
@@ -1214,7 +1217,7 @@ async function renderWatchalongSession(){
   if(youtubeMode==='playlist'&&!playlist){location.replace('/watchalong?master='+encodeURIComponent(master));return}
   const sourceCard=node('section',undefined,'watchalong-player-card');sourceCard.append(node('div',youtubeMode==='playlist'?'同時視聽來源（YouTube Playlist）':'同時視聽來源（YouTube）','watchalong-player-head'));
   const sourceWrap=node('div',undefined,'watchalong-player-wrap'),sourceHost=node('div');sourceHost.id='watchalong-source-player';sourceHost.className='watchalong-player';sourceWrap.append(sourceHost);sourceCard.append(sourceWrap);
-  if(resolvedMode!=='live')sourceCard.append(node('div','Public API 目前不发布 source mapping / transcript，对齐保持手动；不会伪造自动时间轴。','watchalong-session-note'));
+  if(resolvedMode!=='live')sourceCard.append(node('div','Public API 目前不公開 source mapping / transcript，对齐保持手动；不会伪造自动时间轴。','watchalong-session-note'));
   layout.append(sourceCard);
  }
  shell.append(actions,layout,status);
