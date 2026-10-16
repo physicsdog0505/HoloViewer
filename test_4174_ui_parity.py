@@ -489,9 +489,12 @@ class ParityContract(unittest.TestCase):
         self.assertIn('function pttPollDelayMs(now=new Date())',js)
         self.assertIn("const fast=weekend?(hour>=16&&hour<22):(hour>=18&&hour<22);",js)
         self.assertIn('return fast?10000:120000;',js)
-        self.assertIn('pttPollTimer=setTimeout(async()=>{',js)
-        self.assertIn('pttPollStopped=true;',js)
-        self.assertNotIn("if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();\n},10000);",js)
+        self.assertIn('let pttNextPollAt=Date.now()+pttPollDelayMs();',js)
+        self.assertIn('const pttPollTimer=setInterval(async()=>{',js)
+        self.assertIn('if(now<pttNextPollAt)return;',js)
+        self.assertIn('pttNextPollAt=now+pttPollDelayMs();',js)
+        self.assertIn('clearInterval(pttPollTimer);',js)
+        self.assertNotIn('setTimeout(',js)
 
     def test_viewer_teardown_tracks_every_recurring_timer(self):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
