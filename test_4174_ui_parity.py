@@ -80,6 +80,30 @@ class ParityContract(unittest.TestCase):
         self.assertIn("height:auto!important",css)
         self.assertIn("overflow:visible!important",css)
 
+    def test_frontend_parity_closure_on_safe_release(self):
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        # Sidebar pointer navigation releases focus while keyboard focus remains accessible.
+        self.assertIn("function navigateSidebarLink(event,destination)",app)
+        self.assertIn("if(event.detail>0)event.currentTarget.blur();",app)
+        # Non-viewer routes scrub every viewer-owned state before Home/History/PTT render.
+        self.assertIn("if(r!=='custom-session')",app)
+        for name in ("custom-session-watching","watch-multi","watch-grid","layout-auto","layout-equal","layout-primary","single-ptt","single-live","single-vod","collab-live-session","settings-open","custom-immersive"):
+            self.assertIn("'"+name+"'",app)
+        self.assertIn("if(r==='ptt'||r==='ptt-focus')loadPtt();",app)
+        # Collab context survives entry/reload and the accepted 4174 viewer consumes it.
+        self.assertIn("function collabDetailUrl(event)",app)
+        self.assertIn("function verifiedTimelineStartsForEvent(event)",app)
+        self.assertIn("collabPollUrl:pollable?collabDetailUrl(event):''",app)
+        self.assertIn("savedSession.collabPollUrl=opts.collabPollUrl",app)
+        self.assertIn("collabPollUrl:typeof opts.collabPollUrl==='string'?opts.collabPollUrl:''",app)
+        self.assertIn("Array.isArray(payload.event?.streams)?payload.event.streams:[]",viewer)
+        self.assertIn("appendWatchStream(id,String(item.label||item.title||item.channel_name||id)",viewer)
+        # Collab cards show event identity / date / POV status instead of arbitrary first-video title.
+        self.assertIn("String(event.label||'多人連動').replace(/候選/g,'')",app)
+        self.assertIn("parts.join(' · ')+' · 進入多人連動畫面'",app)
+        self.assertIn("youtube.dataset.youtubeHref='https://www.youtube.com/watch?v='+first.video_id",app)
+
     def test_4174_sidebar_exact_order_and_labels(self):
         parser = SidebarParser()
         parser.feed((ROOT / "site/index.html").read_text(encoding="utf-8"))
