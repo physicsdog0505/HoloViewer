@@ -1,0 +1,197 @@
+{
+  "schema": "holoviewer-channel-roster-candidates-v1",
+  "purpose": "Source-confirmed nonlegacy official/group IDs; live channels.list validation still required before subscribing",
+  "source_legacy_count": 66,
+  "channels": [
+    {
+      "channel_id": "UCJFZiqLMntJufDCHc6bQixg",
+      "display_name": "hololive official",
+      "branch": "JP",
+      "kind": "organization",
+      "evidence_url": "https://files.microcms-assets.io/assets/6368857617454c2591b02acff18e76bb/4a40ac4510fb46bf9e57400b07a08f70/Press-Release-hololive-Indonesia-Gen-2-English-2.pdf",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCotXwY6s8pWmuWd_snKYjhg",
+      "display_name": "hololive English official",
+      "branch": "EN",
+      "kind": "organization",
+      "evidence_url": "https://files.microcms-assets.io/assets/6368857617454c2591b02acff18e76bb/f3c3e1ef51784160877f7292baeff6f4/PRESS-Second-Round-Auditions-for-VTuber-Group-hololive-English-Begins_v2.pdf",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCfrWoRGlawPQDQxxeIDRP0Q",
+      "display_name": "hololive Indonesia official",
+      "branch": "ID",
+      "kind": "organization",
+      "evidence_url": "https://files.microcms-assets.io/assets/6368857617454c2591b02acff18e76bb/4a40ac4510fb46bf9e57400b07a08f70/Press-Release-hololive-Indonesia-Gen-2-English-2.pdf",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCWsfcksUUpoEvhia0_ut0bA",
+      "display_name": "HOLOSTARS official",
+      "branch": "HOLOSTARS JP",
+      "kind": "organization",
+      "evidence_url": "https://files.microcms-assets.io/assets/6368857617454c2591b02acff18e76bb/f3c3e1ef51784160877f7292baeff6f4/PRESS-Second-Round-Auditions-for-VTuber-Group-hololive-English-Begins_v2.pdf",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UC10wVt6hoQiwySRhz7RdOUA",
+      "display_name": "hololive DEV_IS ReGLOSS",
+      "branch": "DEV_IS",
+      "kind": "group",
+      "evidence_url": "https://holodex.net/channel/UC10wVt6hoQiwySRhz7RdOUA",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCu2n3qHuOuQIygREMnWeQWg",
+      "display_name": "hololive DEV_IS FLOW GLOW",
+      "branch": "DEV_IS",
+      "kind": "group",
+      "evidence_url": "https://www.holo-comment.com/channels/UCu2n3qHuOuQIygREMnWeQWg",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCJxZpzx4wHzEYD-eCiZPikg",
+      "display_name": "HOLOSTARS English official",
+      "branch": "HOLOSTARS EN",
+      "kind": "organization",
+      "evidence_url": "https://holostars.hololivepro.com/en/news/20220718-01-2/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCyxtGMdWlURZ30WSnEjDOQw",
+      "display_name": "Regis Altare",
+      "branch": "HOLOSTARS EN",
+      "kind": "talent",
+      "evidence_url": "https://hololivepro.com/news/20230828-01-60/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UC2hx0xVkMoHGWijwr_lA01w",
+      "display_name": "Axel Syrios",
+      "branch": "HOLOSTARS EN",
+      "kind": "talent",
+      "evidence_url": "https://hololivepro.com/news/20230828-01-60/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCHP4f7G2dWD4qib7BMatGAw",
+      "display_name": "Gavis Bettel",
+      "branch": "HOLOSTARS EN",
+      "kind": "talent",
+      "evidence_url": "https://hololivepro.com/news/20230828-01-60/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UC060r4zABV18vcahAWR1n7w",
+      "display_name": "Machina X Flayon",
+      "branch": "HOLOSTARS EN",
+      "kind": "talent",
+      "evidence_url": "https://hololivepro.com/news/20230828-01-60/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UC7gxU6NXjKF1LrgOddPzgTw",
+      "display_name": "Banzoin Hakka",
+      "branch": "HOLOSTARS EN",
+      "kind": "talent",
+      "evidence_url": "https://hololivepro.com/news/20230828-01-60/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCMqGG8BRAiI1lJfKOpETM_w",
+      "display_name": "Josuiji Shinri",
+      "branch": "HOLOSTARS EN",
+      "kind": "talent",
+      "evidence_url": "https://hololivepro.com/news/20230828-01-60/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UC7MMNHR-kf9EN1rXiesMTMw",
+      "display_name": "Magni Dezmond (alum)",
+      "branch": "HOLOSTARS EN",
+      "kind": "talent",
+      "evidence_url": "https://holostars.hololivepro.com/en/news/20220718-01-2/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCDRWSO281bIHYVi-OV3iFYA",
+      "display_name": "Noir Vesper (alum)",
+      "branch": "HOLOSTARS EN",
+      "kind": "talent",
+      "evidence_url": "https://holostars.hololivepro.com/en/news/20220718-01-2/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCc88OV45ICgHbn3ZqLLb52w",
+      "display_name": "Yatogami Fuma",
+      "branch": "HOLOSTARS JP",
+      "kind": "talent",
+      "evidence_url": "https://holostars.hololivepro.com/news/20220322-01-14/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCgRqGV1gBf2Esxh0Tz1vxzw",
+      "display_name": "Utsugi Uyu",
+      "branch": "HOLOSTARS JP",
+      "kind": "talent",
+      "evidence_url": "https://holostars.hololivepro.com/news/20220322-01-14/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCkT1u65YS49ca_LsFwcTakw",
+      "display_name": "Hizaki Gamma (alum)",
+      "branch": "HOLOSTARS JP",
+      "kind": "talent",
+      "evidence_url": "https://holostars.hololivepro.com/news/20220322-01-14/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    },
+    {
+      "channel_id": "UCdfMHxjcCc2HSd9qFvfJgjg",
+      "display_name": "Minase Rio",
+      "branch": "HOLOSTARS JP",
+      "kind": "talent",
+      "evidence_url": "https://holostars.hololivepro.com/news/20220322-01-14/",
+      "legacy_duplicate": false,
+      "live_checked": false,
+      "live_enabled": false
+    }
+  ]
+}
