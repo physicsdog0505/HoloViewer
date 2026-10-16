@@ -115,7 +115,7 @@ class ParityContract(unittest.TestCase):
         for item in ('class="ptt-shell"', 'class="ptt-toolbar"', 'class="ptt-reader"',
                      'id="ptt-today-meta"', 'id="ptt-refresh"', 'id="ptt-focus"'):
             self.assertIn(item, html)
-        self.assertIn('.ptt-reader{border:1px solid var(--line)', css)
+        self.assertIn('.ptt-reader{position:relative;border:1px solid var(--line)', css)
         self.assertIn('ptt-focus-mode', css)
         self.assertIn('document.body.classList.toggle(\'ptt-focus-mode\'', js)
         self.assertIn("/v1/ptt/today?day=", js)
