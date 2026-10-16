@@ -1327,14 +1327,31 @@ renderWatchalongSession();
   }));
   for(const item of resolved){if(item)knownMetadata.set(item.videoId,item)}
  }
- // Match accepted 4174 behavior: an ended VOD must never inherit today's live PTT.
- // Public currently has no verified per-video historical PTT resolver, so fail closed.
- if(ids.length===1&&opts.ptt==='live'){
+ // Thin API adapter only: preserve 4174 live/archive/unavailable PTT resolution.
+ // Do not invent a frontend PTT mode from lifecycle alone.
+ if(ids.length===1){
   let row=catalogRows.get(ids[0])||null;
   if(!row){
    try{row=await api('/v1/catalog/videos/'+encodeURIComponent(ids[0]));}catch(_error){}
   }
-  if(String(row?.lifecycle_state||'').toLowerCase()==='ended')opts.ptt='video';
+  const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
+  const rawStart=String(row?.actual_start||row?.scheduled_start||row?.start_at||'');
+  const startedAt=new Date(rawStart);
+  let streamDay='';
+  if(Number.isFinite(startedAt.getTime())){
+   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(startedAt);
+   const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+   streamDay=out.year+'-'+out.month+'-'+out.day;
+  }
+  if(['live','upcoming','waiting'].includes(lifecycle)&&streamDay===taipeiDay()){
+   opts.ptt='live';
+   opts.pttResolverUrl=config.apiBase.replace(/\/$/,'')+'/v1/ptt/today?day='+encodeURIComponent(taipeiDay());
+  }else if(lifecycle==='ended'&&streamDay){
+   opts.ptt='archive';
+   opts.pttResolverUrl=config.apiBase.replace(/\/$/,'')+'/v1/ptt/history?day='+encodeURIComponent(streamDay);
+  }else{
+   opts.ptt='unavailable';
+  }
  }
  opts.streamMetadata=ids.map(id=>knownMetadata.get(id)).filter(Boolean);
  window.hvOpenCustomSession(ids,opts);
