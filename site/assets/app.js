@@ -1386,6 +1386,7 @@ renderWatchalongSession();
   }else{
    opts.ptt='unavailable';
   }
+  opts.pttResolve=resolveProductionPtt;
  }
  opts.streamMetadata=ids.map(id=>knownMetadata.get(id)).filter(Boolean);
  window.hvOpenCustomSession(ids,opts);
