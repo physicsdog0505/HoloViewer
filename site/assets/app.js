@@ -1229,7 +1229,7 @@ async function renderWatchalongSession(){
   if(youtubeMode==='playlist'&&!playlist){location.replace('/watchalong?master='+encodeURIComponent(master));return}
   const sourceCard=node('section',undefined,'watchalong-player-card');sourceCard.append(node('div',youtubeMode==='playlist'?'同時視聽來源（YouTube Playlist）':'同時視聽來源（YouTube）','watchalong-player-head'));
   const sourceWrap=node('div',undefined,'watchalong-player-wrap'),sourceHost=node('div');sourceHost.id='watchalong-source-player';sourceHost.className='watchalong-player';sourceWrap.append(sourceHost);sourceCard.append(sourceWrap);
-  if(resolvedMode!=='live')sourceCard.append(node('div','Public API 目前不公開 source mapping / transcript，对齐保持手动；不会伪造自动时间轴。','watchalong-session-note'));
+  if(resolvedMode!=='live')sourceCard.append(node('div','Public API 目前不公開 source mapping / transcript，對齊保持手動；不會偽造自動時間軸。','watchalong-session-note'));
   layout.append(sourceCard);
  }
  shell.append(actions,layout,status);
