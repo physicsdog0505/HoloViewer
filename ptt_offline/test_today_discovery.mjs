@@ -179,6 +179,7 @@ test('one new livestream candidate: bounded end-to-end budget is six changed row
  assert.equal(db.queries,71);
  assert.equal(db.readQueries,6);
  assert.equal(db.writeQueries,65);
+ assert.equal(db.returnedReadRows,68,'result rows in the test double, not Cloudflare billed Rows Read');
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical").get().n,1);
  db.raw.close();
 });
@@ -199,6 +200,7 @@ test('full 30-channel / 60-entry minute remains bounded while discovery stays mi
  assert.equal(db.queries,365);
  assert.equal(db.readQueries,104);
  assert.equal(db.writeQueries,261);
+ assert.equal(db.returnedReadRows,117,'result rows in the test double, not Cloudflare billed Rows Read');
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_websub_events WHERE status='pending'").get().n,10);
  db.raw.close();
 });
