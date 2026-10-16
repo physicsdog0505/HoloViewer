@@ -102,7 +102,7 @@ function homeFilter(){try{const x=localStorage.getItem(HOME_FILTER_KEY);return H
 function setHomeFilter(value){if(!HOME_FILTERS.has(value))return;try{localStorage.setItem(HOME_FILTER_KEY,value)}catch{}applyHomeFilter(value)}
 function applyHomeFilter(value=homeFilter()){
  document.querySelectorAll('#homeDynamic .stream-card').forEach(card=>{card.hidden=value!=='all'&&card.dataset.group!==value});
- document.querySelectorAll('#live-channel-list .live-channel-rail-item').forEach(card=>{card.hidden=(value!=='all'&&card.dataset.group!==value)||(watchMode==='multi'&&viewing.ids.includes(card.dataset.liveVideoId))});
+ document.querySelectorAll('#live-channel-list .live-channel-rail-item').forEach(card=>{card.hidden=(value!=='all'&&card.dataset.group!==value)});
  document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.classList.toggle('active',button.dataset.filter===value));
 }
 function selectedHomePttMode(){
@@ -696,10 +696,6 @@ async function loadCustomLibrary(){
   if(customCatalogCache===null){const data=await api('/v1/catalog/today');if(!Array.isArray(data.streams||data.items))throw Error('資料格式錯誤');customCatalogCache=data.streams||data.items}
   window.hvCustomCatalog?.(customCatalogCache);
  }catch(e){$('custom-live-empty').textContent='無法讀取目前直播：'+e.message;$('custom-live-empty').hidden=false}
-}
-function sessionMute(iframe,mute){
- if(!iframe?.contentWindow)return;
- iframe.contentWindow.postMessage(JSON.stringify({event:'command',func:mute?'mute':'unMute',args:[]}), 'https://www.youtube-nocookie.com');
 }
 const viewing={ids:[],layout:'auto',primary:0,audio:0,ptt:'video'};
 async function resolveProductionPtt(videoIdValue){
