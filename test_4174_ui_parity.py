@@ -51,6 +51,14 @@ class SidebarParser(HTMLParser):
             self.route = None
 
 class ParityContract(unittest.TestCase):
+    def test_home_history_selection_matches_4174_page_lifecycle(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("let currentRoute='home';",js)
+        self.assertIn("if(r!==currentRoute&&['home','history'].includes(currentRoute))selectedHomeVideos.clear();",js)
+        self.assertIn("currentRoute=r;",js)
+        self.assertNotIn("sessionStorage.setItem('selectedHomeVideos'",js)
+        self.assertNotIn("localStorage.setItem('selectedHomeVideos'",js)
+
     def test_4174_sidebar_exact_order_and_labels(self):
         parser = SidebarParser()
         parser.feed((ROOT / "site/index.html").read_text(encoding="utf-8"))
