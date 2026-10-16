@@ -51,6 +51,27 @@ class SidebarParser(HTMLParser):
             self.route = None
 
 class ParityContract(unittest.TestCase):
+    def test_4174_spa_runtime_is_torn_down_on_route_exit(self):
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
+        self.assertIn("if(currentRoute==='custom-session'&&r!=='custom-session')",app)
+        self.assertIn("window.hvDestroy4174SharedViewer?.();",app)
+        self.assertIn("window.hvDestroy4174SharedViewer=function hvDestroy4174SharedViewer()",viewer)
+        for name in ("watch-multi","watch-grid","layout-auto","layout-equal","layout-primary","single-ptt","single-live","single-vod","collab-live-session","settings-open","custom-immersive"):
+            self.assertIn("'"+name+"'",viewer)
+        self.assertIn("clearInterval(translationRefreshTimer)",viewer)
+        self.assertIn("clearInterval(verifiedSyncTimer)",viewer)
+        self.assertIn(".custom-content-grid.video-only",css)
+        self.assertIn("flex:1 1 auto!important;height:auto!important",css)
+
+    def test_4174_home_selection_is_page_transient(self):
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("let currentRoute='home';",app)
+        self.assertIn("selectedHomeVideos.clear();",app)
+        self.assertNotIn("sessionStorage.setItem('selectedHomeVideos'",app)
+        self.assertNotIn("localStorage.setItem('selectedHomeVideos'",app)
+
     def test_4174_sidebar_exact_order_and_labels(self):
         parser = SidebarParser()
         parser.feed((ROOT / "site/index.html").read_text(encoding="utf-8"))
