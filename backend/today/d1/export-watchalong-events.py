@@ -8,11 +8,35 @@ from __future__ import annotations
 import argparse, hashlib, json, re, sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 def q(value):
     if value is None:
         return "NULL"
     return "'" + str(value).replace("'", "''") + "'"
+
+PTT_PATH=re.compile(r"^/bbs/C_Chat/(M\\.[0-9]{9,11}\\.A\\.[A-Fa-f0-9]+)\\.html$")
+
+def canonical_article_url(url):
+    """Map verified original PTT and existing pttweb mirror URLs to one article."""
+    if not isinstance(url,str):
+        return None
+    try:
+        parsed=urlparse(url)
+    except ValueError:
+        return None
+    if (parsed.scheme!="https" or parsed.hostname not in
+        {"www.ptt.cc","ptt.cc","www.pttweb.cc","pttweb.cc"} or
+        parsed.username or parsed.password or parsed.port not in (None,443) or
+        parsed.query or parsed.fragment or parsed.params):
+        return None
+    match=PTT_PATH.fullmatch(parsed.path)
+    return "https://www.ptt.cc"+parsed.path if match else None
+
+def event_signature(event):
+    ids=tuple(sorted({stream.video_id for stream in event.streams if stream.video_id}))
+    url=canonical_article_url(event.source_url)
+    return (url,event.day,ids) if url and ids else None
 
 def refresh_coverage_ok(stats):
     """A requested refresh never passes with any discovery/fetch error."""
@@ -31,7 +55,7 @@ def projection_issues(events):
         if event_id in seen:
             kinds.append("duplicate_event_id")
         seen.add(event_id)
-        if not isinstance(e.get("source_url"),str) or not source.fullmatch(e["source_url"]):
+        if not canonical_article_url(e.get("source_url")):
             kinds.append("unverified_source_url")
         hosts=e.get("streams")
         if not isinstance(hosts,list) or not hosts:
@@ -152,10 +176,11 @@ def main():
     deduped=[]
     seen=set()
     for event in events:
-        signature=(event.aid,event.day,tuple(sorted(stream.video_id for stream in event.streams)))
-        if not signature or signature in seen:
+        signature=event_signature(event)
+        if signature is not None and signature in seen:
             continue
-        seen.add(signature)
+        if signature is not None:
+            seen.add(signature)
         deduped.append(event)
     events=deduped
     imported=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -166,8 +191,8 @@ def main():
         digest=hashlib.sha256("\n".join(ids).encode()).hexdigest()[:20]
         event_id="watch:"+digest
         out.append({
-            "event_id":event_id,"aid":event.aid,"article_title":event.article_title,
-            "source_url":event.source_url,"article_datetime":event.article_datetime,
+            "event_id":event_id,"aid":canonical.rsplit("/",1)[-1].removesuffix(".html"),"article_title":event.article_title,
+            "source_url":canonical,"article_datetime":event.article_datetime,
             "day":event.day,"scheduled_time":event.scheduled_time,
             "description":event.description,"member_only":bool(event.member_only),
             "streams":[{"label":s.label,"video_id":s.video_id} for s in event.streams],
