@@ -56,6 +56,22 @@ class ProjectionGateTests(unittest.TestCase):
                          module.event_signature(source(mirror,"2026-09-27")))
         self.assertNotEqual(module.event_signature(source(official,"2026-09-27")),
                             module.event_signature(source(mirror,"2026-09-28")))
+    def test_real_projection_builder_canonicalizes_before_id(self):
+        from types import SimpleNamespace
+        def src(url,day="2026-09-27"):
+            return SimpleNamespace(aid="M.1790506113.A.7E3",source_url=url,
+                day=day,streams=[SimpleNamespace(video_id="U2o13h1Oib4",label="Pekora")],
+                article_title="Watchalong",article_datetime="2026-09-27T12:00+08:00",
+                scheduled_time="12:00",description="test",member_only=False)
+        mirror="https://www.pttweb.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        official="https://www.ptt.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        a=module.build_export_event(src(mirror))
+        b=module.build_export_event(src(official))
+        self.assertEqual(a["source_url"],official)
+        self.assertEqual(a["event_id"],b["event_id"])
+        self.assertEqual(a["aid"],"M.1790506113.A.7E3")
+        self.assertTrue(module.validate_projection([a]))
+        self.assertNotEqual(a["event_id"],module.build_export_event(src(mirror,"2026-09-28"))["event_id"])
     def test_valid(self):
         self.assertTrue(module.validate_projection([event(),event("watch:456","8pF4qHcshDc")]))
     def test_duplicate_events_fail(self):
