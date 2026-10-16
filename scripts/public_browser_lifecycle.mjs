@@ -172,8 +172,9 @@ try{
 
  // Direct Watchalong master URL remains usable even when recent cards are merely supplemental.
  await page.goto(base+'/watchalong?master=AAAAAAAAAAA#manual',{waitUntil:'domcontentloaded'});
- await page.waitForSelector('#watchalongBuilder [name="master"]');
+ await page.waitForSelector('#watchalongBuilder [name="master"]',{state:'attached'});
  assert((await page.locator('#watchalongBuilder [name="master"]').inputValue())==='AAAAAAAAAAA','Watchalong deep link did not restore master');
+ await page.waitForSelector('#watchalongBuilder .selected-master');
 
  // Watchalong recent API + manual YouTube session use real document navigation.
  await freshDocument(page,()=>page.locator('a[data-route="watchalong"]').click(),url=>url.pathname==='/watchalong');
@@ -198,7 +199,10 @@ try{
 
  // External-provider companion remains in a separate normal browser tab and the Public page only tracks time.
  await freshDocument(page,()=>page.locator('a[data-route="watchalong"]').click(),url=>url.pathname==='/watchalong');
- await page.locator('#watchalongBuilder [name="master"]').fill('AAAAAAAAAAA');
+ const externalMaster=page.locator('#watchalongBuilder [name="master"]');
+ await externalMaster.waitFor({state:'attached'});
+ if((await externalMaster.getAttribute('type'))!=='hidden')await externalMaster.fill('AAAAAAAAAAA');
+ else assert((await externalMaster.inputValue())==='AAAAAAAAAAA','Watchalong external flow lost selected master');
  await page.locator('#watchalongBuilder input[name="source_kind"][value="external"]').check();
  await page.locator('#watchalongBuilder [name="external_source"]').fill('https://example.com/watch');
  await freshDocument(page,()=>page.locator('#watchalongBuilder button[type="submit"]').click(),url=>url.pathname==='/watchalong/session'&&url.searchParams.get('source_kind')==='external');
