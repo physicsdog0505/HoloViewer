@@ -119,26 +119,61 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertTrue(limited["scan_truncated"])
         self.assertEqual(limited["checked_source_rows"],101)
 
-    def test_exact_ack_replay_and_unknown_remote_stop_latch(self):
+    def test_existing_rows_baseline_without_remote_write_then_new_push_acks_once(self):
+        calls=[]
+        baseline=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=lambda batch: calls.append(batch),send=True)
+        self.assertEqual(baseline["status"],"BASELINED")
+        self.assertEqual(baseline["sent"],0)
+        self.assertEqual(baseline["eligible"],0)
+        self.assertEqual(calls,[])
+        # A genuinely new near-live row after the baseline publishes normally.
+        self.db.execute("INSERT INTO pushes VALUES(4,1,4,1,'推','d','after baseline','10/15','18:03','2026-10-15T10:03:30Z')")
         def approve(batch):
-            self.assertEqual(len(batch["rows"]),2)
-            self.assertTrue(all(len(x["time_proof"])==64 for x in batch["rows"]))
+            calls.append(batch)
+            self.assertEqual(len(batch["rows"]),1)
+            self.assertEqual(batch["rows"][0]["source_line"],4)
             return {"status":"ACK","batch_id":batch["batch_id"],"digest":batch["digest"],
-              "logical_rows_acked":2,"d1_query_count":8,"d1_rows_written":5,
+              "logical_rows_acked":1,"d1_query_count":7,"d1_rows_written":4,
               "http_requests":1}
         result=run_live_once(self.db,state_path=self.state,secret="k"*40,
                              executor=approve,send=True)
         self.assertEqual(result["status"],"ACK")
-        self.assertEqual(result["sent"],2)
+        self.assertEqual(result["sent"],1)
         second=run_live_once(self.db,state_path=self.state,secret="k"*40,
                               executor=lambda _:self.fail("must not replay"),send=True)
         self.assertEqual(second["status"],"NO_NEW_ROWS")
-        # Unknown remote state is deliberately not retried.
+
+    def test_unknown_remote_stop_latch_after_baseline(self):
         alt=str(Path(self.tmp.name)/"uncertain.json")
+        baseline=run_live_once(self.db,state_path=alt,secret="k"*40,
+            executor=lambda _:self.fail("baseline must not post"),send=True)
+        self.assertEqual(baseline["status"],"BASELINED")
+        self.db.execute("INSERT INTO pushes VALUES(4,1,4,1,'推','d','uncertain new','10/15','18:03','2026-10-15T10:03:30Z')")
         with self.assertRaisesRegex(RuntimeError,"connection lost"):
             run_live_once(self.db,state_path=alt,secret="k"*40,
                 executor=lambda _: (_ for _ in ()).throw(RuntimeError("connection lost")),send=True)
         with self.assertRaisesRegex(ContractError,"remote ACK unresolved"):
             run_live_once(self.db,state_path=alt,secret="k"*40,
-                executor=approve,send=True)
+                executor=lambda _:self.fail("must not replay"),send=True)
+
+    def test_verified_delayed_row_after_baseline_still_publishes(self):
+        baseline=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=lambda _:self.fail("baseline must not post"),send=True)
+        self.assertEqual(baseline["status"],"BASELINED")
+        self.db.execute(
+            "INSERT INTO pushes VALUES(4,1,4,1,'→','late','delayed after baseline','10/16','06:36','2026-10-15T23:01:23Z')"
+        )
+        seen=[]
+        def approve(batch):
+            seen.extend(batch["rows"])
+            return {"status":"ACK","batch_id":batch["batch_id"],"digest":batch["digest"],
+              "logical_rows_acked":1,"d1_query_count":7,"d1_rows_written":4,
+              "http_requests":1}
+        result=run_live_once(self.db,state_path=self.state,secret="k"*40,
+                             executor=approve,send=True)
+        self.assertEqual(result["status"],"ACK")
+        self.assertEqual(result["sent"],1)
+        self.assertEqual(seen[0]["source_line"],4)
+        self.assertEqual(seen[0]["occurred_at"],"2026-10-15T22:36:00Z")
 if __name__=="__main__":unittest.main()
