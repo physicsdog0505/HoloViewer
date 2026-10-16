@@ -51,17 +51,18 @@ async function fetchFeed(channel,fetchImpl){
   return entries(xml).filter(x=>x.channel_id===channel.id);
 }
 
-async function reconcileWave(db,roster,{fetchImpl,now}){
-  const window=await nextReconcileWindow(db,roster,{now,limit:CHANNELS_PER_WAVE});
+async function reconcileWave(db,roster,{fetchImpl,now,startIndex}){
+  const window=await nextReconcileWindow(db,roster,{now,limit:CHANNELS_PER_WAVE,startIndex});
   const settled=await Promise.allSettled(window.selected.map(async channel=>({
     channel,
     items:await fetchFeed(channel,fetchImpl)
   })));
-  let discovered=0,failed=0;
+  let discovered=0,feed_entries=0,failed=0;
   for(const item of settled){
     if(item.status!=='fulfilled'){failed++;continue;}
     const result=item.value;
     for(const entry of result.items){
+      feed_entries++;
       const bytes=new TextEncoder().encode(
         'feed-reconcile-v2:'+entry.channel_id+':'+entry.video_id+':'+roster.version
       );
@@ -69,20 +70,19 @@ async function reconcileWave(db,roster,{fetchImpl,now}){
         new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),
         b=>b.toString(16).padStart(2,'0')
       ).join('');
-      await persistEvent(db,{
+      const stored=await persistEvent(db,{
         raw_sha256:hash,
         channel_id:entry.channel_id,
         video_id:entry.video_id,
         roster_version:roster.version
       },{now});
-      discovered++;
+      if(stored.inserted)discovered++;
     }
   }
   // Never let one temporarily unavailable channel freeze the rotating discovery
   // cursor forever. Successful channels are durable; failed channels are revisited
   // on the next roster rotation and the run reports an explicit gap count.
-  await commitReconcileWindow(db,window);
-  return {channels:window.selected.length,discovered,failed};
+  return {channels:window.selected.length,discovered,feed_entries,failed,window};
 }
 
 function videoFetcher(env,fetchImpl){
@@ -110,13 +110,21 @@ export async function refreshTodayDiscovery(env,{fetchImpl=fetch,now=new Date()}
   if(!env?.DB?.prepare||!env?.YOUTUBE_API_KEY)throw Error('Today discovery configuration missing');
 
   const roster=await loadApprovedRoster(env.DB);
-  let channels=0,discovered=0,feed_failures=0;
+  // Read the rotating cursor once; process three consecutive 10-channel waves in memory.
+  // Persisting the cursor per wave generated three identical D1 writes per scheduled minute.
+  const firstWindow=await nextReconcileWindow(env.DB,roster,{now,limit:CHANNELS_PER_WAVE});
+  let channels=0,discovered=0,feed_entries=0,feed_failures=0,lastWindow=firstWindow;
   for(let i=0;i<WAVES_PER_RUN;i++){
-    const wave=await reconcileWave(env.DB,roster,{fetchImpl,now});
+    const wave=await reconcileWave(env.DB,roster,{fetchImpl,now,
+      startIndex:(firstWindow.start+i*CHANNELS_PER_WAVE)%roster.channels.length});
     channels+=wave.channels;
     discovered+=wave.discovered;
+    feed_entries+=wave.feed_entries;
     feed_failures+=wave.failed??0;
+    lastWindow=wave.window;
   }
+  // One cursor write per minute at most, regardless of the three feed waves.
+  await commitReconcileWindow(env.DB,lastWindow);
   const status=await refreshPendingVideos({
     db:env.DB,
     roster,
@@ -130,6 +138,7 @@ export async function refreshTodayDiscovery(env,{fetchImpl=fetch,now=new Date()}
     feed_requests:channels,
     channels,
     discovered,
+    feed_entries,
     feed_failures,
     updated:status.updated??0,
     failed:status.failed??0,
