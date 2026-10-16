@@ -506,8 +506,29 @@ async function loadWatchalongRecent(){
   empty.hidden=grid.childElementCount>0;
   if(!grid.childElementCount)empty.textContent='目前沒有近期同時視聽資料。';
   const params=new URLSearchParams(location.search),master=videoId(String(params.get('master')||''));
-  const masterInput=document.querySelector('#watchalongBuilder [name="master"]');
-  if(master&&masterInput){masterInput.value=master;document.getElementById('manual')?.scrollIntoView({block:'start'});}
+  if(master){
+   const chosen=data.events.find(event=>Array.isArray(event?.hosts)&&event.hosts.some(host=>host.video_id===master));
+   const host=chosen?.hosts?.find(item=>item.video_id===master);
+   const copy=document.querySelector('#watchalongBuilder .manual-copy');
+   if(chosen&&host&&copy){
+    copy.replaceChildren();
+    copy.append(node('span','已選擇同時視聽','eyebrow'),node('h2',String(chosen.title||'同時視聽')),node('p','主直播已選好，右邊只要選擇要同步的片源。'));
+    const actions=node('div',undefined,'selection-actions');
+    const cancel=node('a','取消選擇','selection-link');cancel.href='/watchalong?fresh=1#manual';
+    const back=node('a','回到上方選擇','selection-link');back.href='#recent-watchalong';actions.append(cancel,back);copy.append(actions);
+    const selected=node('div',undefined,'selected-master');selected.style.position='relative';
+    const img=node('img');img.src='https://i.ytimg.com/vi/'+master+'/hqdefault.jpg';img.alt='';img.loading='lazy';selected.append(img);
+    const source=node('span','YouTube ↗','youtube-source-link');source.role='link';source.tabIndex=0;source.dataset.youtubeHref='https://www.youtube.com/watch?v='+master;
+    source.onclick=event=>{event.preventDefault();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')};
+    source.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')}};
+    selected.append(source);
+    const selectedCopy=node('div',undefined,'selected-master-copy');selectedCopy.append(node('strong',String(host.label||master)),node('span',[chosen.day,chosen.scheduled_time].filter(Boolean).join(' ')));selected.append(selectedCopy);copy.append(selected);
+    const hidden=document.createElement('input');hidden.type='hidden';hidden.name='master';hidden.value=master;copy.append(hidden);
+    document.getElementById('manual')?.scrollIntoView({block:'start'});
+   }else{
+    const masterInput=document.querySelector('#watchalongBuilder [name="master"]');if(masterInput)masterInput.value=master;
+   }
+  }
   document.getElementById('recentWatchSearch')?.dispatchEvent(new Event('input'));
   if(noMatches)noMatches.hidden=true;
  }catch(error){
