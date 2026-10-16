@@ -82,6 +82,8 @@ class RecurringPublisherTests(unittest.TestCase):
                                     max_articles=4,clock=lambda v=clock_value:v)
             self.assertEqual(result["http_posts"],1)
             self.assertEqual(result["sent"],10)
+            self.assertEqual(result["modeled_d1_writes_ceiling"],22)
+            self.assertEqual(result["modeled_d1_queries_ceiling"],52)
             self.assertEqual(delivered,[expected_article])
             self.assertTrue(result["backlog_may_remain"])
 
