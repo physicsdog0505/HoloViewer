@@ -570,6 +570,16 @@ function pttInitControls(){
  },{passive:true});
  $('ptt-show-floor').onchange=()=>pttApplyFloorPreference($('ptt-show-floor').checked);
 }
+function pttEmbeddedMessage(event){
+ if(event.origin!==location.origin||event.source!==window.parent)return;
+ const data=event.data&&typeof event.data==='object'?event.data:null;if(!data)return;
+ if(data.type==='holoviewer:ptt-show-floor'){pttApplyFloorPreference(Boolean(data.show));return}
+ if(data.type==='holoviewer:ptt-font-size'){
+  const size=Math.max(12,Math.min(26,Number(data.size)||16));
+  document.documentElement.style.setProperty('--ptt-font-size',size+'px');
+ }
+}
+if(window.parent!==window)window.addEventListener('message',pttEmbeddedMessage);
 async function loadPtt(){
  if(pttLoadInFlight)return;
  const today=taipeiDay();
