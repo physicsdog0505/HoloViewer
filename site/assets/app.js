@@ -594,6 +594,18 @@ function pttInitControls(){
   latest.hidden=pttFollowing;
  },{passive:true});
  $('ptt-show-floor').onchange=()=>pttApplyFloorPreference($('ptt-show-floor').checked);
+ const settleToLatest=()=>{if(pttFollowing&&pttLastGoodCount)requestAnimationFrame(()=>requestAnimationFrame(()=>pttToLatest(true)))};
+ window.addEventListener('load',settleToLatest,{once:true});
+ window.addEventListener('pageshow',settleToLatest);
+ if(typeof ResizeObserver==='function'){
+  const observer=new ResizeObserver(()=>{if(pttFollowing&&pttLastGoodCount)pttToLatest()});
+  observer.observe(list);
+  if(list.parentElement)observer.observe(list.parentElement);
+ }
+ if(typeof MutationObserver==='function'){
+  const observer=new MutationObserver(()=>{if(pttFollowing&&pttLastGoodCount)pttToLatest()});
+  observer.observe(list,{childList:true,subtree:true});
+ }
 }
 function pttEmbeddedMessage(event){
  if(event.origin!==location.origin||event.source!==window.parent)return;
@@ -679,7 +691,7 @@ function sessionMute(iframe,mute){
  if(!iframe?.contentWindow)return;
  iframe.contentWindow.postMessage(JSON.stringify({event:'command',func:mute?'mute':'unMute',args:[]}), 'https://www.youtube-nocookie.com');
 }
-const viewing={ids:[],layout:'auto',primary:0,audio:0,ptt:'video'};
+const viewing={ids:[],layout:'auto',primary:0,audio:0,ptt:'live'};
 const viewerPttPanel=$('custom-session-ptt-panel');
 // 4174 watching controls — preserve mounted YouTube iframe instances.
 let watchMode='single';
