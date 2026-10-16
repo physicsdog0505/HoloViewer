@@ -985,7 +985,8 @@ window.hvOpenCustomSession=function(ids,opts={}){
   section.replaceChildren(Object.assign(document.createElement('p'),{className:'form-error',textContent:'4174 viewer transplant assets failed to load.'}));
   return;
  }
- const hasPttResolver=typeof opts.pttResolve==='function'||Boolean(opts.pttResolverUrl);\n section.replaceChildren(window.render4174SharedViewerDOM(viewing.ptt==='live',hasPttResolver));
+ const hasPttResolver=typeof opts.pttResolve==='function'||Boolean(opts.pttResolverUrl);
+ section.replaceChildren(window.render4174SharedViewerDOM(viewing.ptt==='live',hasPttResolver));
  route('custom-session');
 
  const streamMetadata=new Map([...document.querySelectorAll('.live-channel-rail-item[data-live-video-id]')].map(item=>[
@@ -1003,7 +1004,9 @@ window.hvOpenCustomSession=function(ids,opts={}){
   layout:viewing.layout,
   primaryIndex:viewing.primary,
   audioMasterIndex:viewing.audio,
-  singlePttKind:viewing.ptt==='live'?'live':(viewing.ptt==='archive'?'vod':''),\n  pttResolverUrl:typeof opts.pttResolverUrl==='string'?opts.pttResolverUrl:'',\n  pttResolve:typeof opts.pttResolve==='function'?opts.pttResolve:null,
+  singlePttKind:viewing.ptt==='live'?'live':(viewing.ptt==='archive'?'vod':''),
+  pttResolverUrl:typeof opts.pttResolverUrl==='string'?opts.pttResolverUrl:'',
+  pttResolve:typeof opts.pttResolve==='function'?opts.pttResolve:null,
   translationA:[],
   translationB:[],
   verifiedTimelineStarts:opts.verifiedTimelineStarts&&typeof opts.verifiedTimelineStarts==='object'?opts.verifiedTimelineStarts:{},
