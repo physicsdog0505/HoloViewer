@@ -484,6 +484,15 @@ class ParityContract(unittest.TestCase):
         self.assertIn('window.hvExit4174Immersive?.()',app)
         self.assertNotIn('function applyViewerImmersive(enabled)',app)
 
+    def test_public_ptt_polling_uses_peak_and_offpeak_cadence(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('function pttPollDelayMs(now=new Date())',js)
+        self.assertIn("const fast=weekend?(hour>=16&&hour<22):(hour>=18&&hour<22);",js)
+        self.assertIn('return fast?10000:120000;',js)
+        self.assertIn('pttPollTimer=setTimeout(async()=>{',js)
+        self.assertIn('pttPollStopped=true;',js)
+        self.assertNotIn("if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();\n},10000);",js)
+
     def test_viewer_teardown_tracks_every_recurring_timer(self):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
         self.assertIn('const translationRefreshTimer=setInterval(',js)
