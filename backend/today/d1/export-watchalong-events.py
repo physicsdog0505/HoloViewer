@@ -14,6 +14,18 @@ def q(value):
         return "NULL"
     return "'" + str(value).replace("'", "''") + "'"
 
+def validate_projection(events):
+    """Validate public-only output before any SQL/JSON artifact is written."""
+    video_id=re.compile(r"^[A-Za-z0-9_-]{11}$")
+    ids=[e["event_id"] for e in events]
+    return (len(ids)==len(set(ids)) and
+            all(isinstance(e.get("source_url"),str) and
+                e["source_url"].startswith("https://www.ptt.cc/bbs/C_Chat/") and
+                e.get("streams") and
+                all(isinstance(s.get("video_id"),str) and
+                    video_id.fullmatch(s["video_id"]) for s in e["streams"])
+                for e in events))
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--database",type=Path)
@@ -139,14 +151,7 @@ def main():
             "description":event.description,"member_only":bool(event.member_only),
             "streams":[{"label":s.label,"video_id":s.video_id} for s in event.streams],
         })
-    ids=[item["event_id"] for item in out]
-    valid_video=re.compile(r"^[A-Za-z0-9_-]{11}$")
-    valid=(
-        len(ids)==len(set(ids)) and
-        all(item["source_url"].startswith("https://www.ptt.cc/bbs/C_Chat/")
-            and item["streams"] and all(valid_video.fullmatch(v["video_id"]) for v in item["streams"])
-            for item in out)
-    )
+    valid=validate_projection(out)
     if not valid:
         print(json.dumps({"status":"BLOCKED_PROJECTION_INTEGRITY",
             "refresh":refresh_stats,"events":len(out),"streams":None,
