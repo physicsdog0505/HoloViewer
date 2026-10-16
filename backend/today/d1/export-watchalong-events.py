@@ -152,7 +152,7 @@ def main():
     deduped=[]
     seen=set()
     for event in events:
-        signature=tuple(sorted(stream.video_id for stream in event.streams))
+        signature=(event.aid,event.day,tuple(sorted(stream.video_id for stream in event.streams)))
         if not signature or signature in seen:
             continue
         seen.add(signature)
