@@ -191,7 +191,7 @@ def main():
         digest=hashlib.sha256("\n".join(ids).encode()).hexdigest()[:20]
         event_id="watch:"+digest
         out.append({
-            "event_id":event_id,"aid":canonical.rsplit("/",1)[-1].removesuffix(".html"),"article_title":event.article_title,
+            "event_id":event_id,"aid":(canonical.rsplit("/",1)[-1].removesuffix(".html") if canonical else event.aid),"article_title":event.article_title,
             "source_url":canonical,"article_datetime":event.article_datetime,
             "day":event.day,"scheduled_time":event.scheduled_time,
             "description":event.description,"member_only":bool(event.member_only),
