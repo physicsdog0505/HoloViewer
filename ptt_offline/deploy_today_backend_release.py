@@ -84,7 +84,37 @@ def verify_ptt_rollout(state_root, config):
         raise SystemExit("PTT Public GET returned no pushes")
     return {"ack":ack,"day":day,"public_http":200,"public_pushes":len(pushes)}
 
-def safe_deploy_config(config_path):
+def validated_support_colors(path):
+    body=json.loads(Path(path).read_text(encoding="utf-8"))
+    if body.get("schema_version")!=1 or body.get("fallback")!="neutral":
+        raise SystemExit("invalid support-color export header")
+    rows=body.get("channels")
+    if not isinstance(rows,list) or len(rows)!=66:
+        raise SystemExit("support-color export must contain exact legacy 66 rows")
+    ids=[row.get("channel_id") for row in rows]
+    if len(set(ids))!=66 or any(not isinstance(x,str) or not x.startswith("UC") or len(x)!=24 for x in ids):
+        raise SystemExit("invalid support-color channel identities")
+    colored=0; neutral=0; dual=0
+    for row in rows:
+        mode=row.get("display_mode")
+        if mode=="dual_color":
+            colors=row.get("color_hexes")
+            if not isinstance(colors,list) or len(colors)!=2:
+                raise SystemExit("invalid dual support-color row")
+            dual+=1; colored+=1
+        elif mode=="solid":
+            if not isinstance(row.get("color_hex"),str):
+                raise SystemExit("invalid solid support-color row")
+            colored+=1
+        elif mode=="neutral":
+            neutral+=1
+        else:
+            raise SystemExit("invalid support-color display mode")
+    if (colored,neutral,dual)!=(57,9,1):
+        raise SystemExit("support-color receipt mismatch")
+    return json.dumps(body,ensure_ascii=False,separators=(",",":"))
+
+def safe_deploy_config(config_path, support_colors_path):
     cfg=load_config(config_path)
     cfg=json.loads(json.dumps(cfg))
     vars=dict(cfg.get("vars") or {})
@@ -94,6 +124,17 @@ def safe_deploy_config(config_path):
         vars.pop(name,None)
     vars["TODAY_CADENCE_ENABLED"]="true"
     vars["TODAY_DISCOVERY_ENABLED"]="false"
+    # Cloudflare deploy replaces Worker vars from this config. Re-materialize the
+    # owner-verified legacy-66 support-color payload on every backend release so
+    # later backend deploys cannot silently erase card/channel styling metadata.
+    for name in list(vars):
+        if name=="TODAY_SUPPORT_COLORS_JSON" or name.startswith("TODAY_SUPPORT_COLORS_JSON_"):
+            vars.pop(name,None)
+    color_payload=validated_support_colors(support_colors_path)
+    chunk_size=7000
+    chunks=[color_payload[i:i+chunk_size] for i in range(0,len(color_payload),chunk_size)]
+    for i,chunk in enumerate(chunks):
+        vars[f"TODAY_SUPPORT_COLORS_JSON_{i}"]=chunk
     cfg["vars"]=vars
     td=tempfile.TemporaryDirectory(prefix="holoviewer-today-release-")
     path=Path(td.name)/"wrangler.json"
@@ -105,6 +146,7 @@ def main():
     p.add_argument("--apply",action="store_true")
     p.add_argument("--config",required=True)
     p.add_argument("--profiles-json",default="/tmp/hv47-legacy-avatars.json")
+    p.add_argument("--support-colors-json",default=str(Path.home()/"Downloads"/"Hololive-PTT-Viewer"/"holoviewer-channel-support-colors.json"))
     p.add_argument("--ptt-state-root",default=str(Path.home()/"Downloads"/"Hololive-PTT-Viewer"/".ptt-publisher-state"))
     args=p.parse_args()
     if not args.apply:
@@ -125,7 +167,7 @@ def main():
          "--file",str(discovery_schema)])
 
     # 3) Deploy only the SAME existing API Worker with backend cadence/discovery source.
-    td,deploy_cfg=safe_deploy_config(config)
+    td,deploy_cfg=safe_deploy_config(config,args.support_colors_json)
     try:
         run(["npx","wrangler","deploy",str(repo_root/"ptt_offline"/"worker_host"/"index.mjs"),
              "--name",WORKER,"--config",str(deploy_cfg)])
@@ -157,6 +199,7 @@ def main():
       "frontend_changed":False,
       "api_contract_changed":False,
       "profile_rows_expected":66,
+      "support_colors_expected":{"rows":66,"colored":57,"neutral":9,"dual":1},
       "today_cadence_enabled":True,
       "today_discovery_enabled":False,
       "nonlive_discovery_rows_after_cleanup":0,
