@@ -10,7 +10,7 @@ module=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 def event(event_id="watch:123",video_id="U2o13h1Oib4"):
-    return {"event_id":event_id,"source_url":"https://www.ptt.cc/bbs/C_Chat/M.123.A.ABC.html",
+    return {"event_id":event_id,"source_url":"https://www.ptt.cc/bbs/C_Chat/M.1789081207.A.5FC.html",
             "streams":[{"video_id":video_id,"label":"host"}]}
 
 class ProjectionGateTests(unittest.TestCase):
