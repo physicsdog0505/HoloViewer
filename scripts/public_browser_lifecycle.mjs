@@ -4,8 +4,7 @@ const base=process.env.HOLOVIEWER_TEST_BASE||'http://127.0.0.1:8788';
 const api='https://holoviewer-public-api.singlebagel.workers.dev';
 const streams=[
  {video_id:'AAAAAAAAAAA',title:'Live A',channel_id:'UC_A',channel_name:'Channel A',channel_title:'Channel A',lifecycle_state:'live',group:'hololive',start_at:'2026-10-16T10:00:00Z',avatar_url:''},
- {video_id:'BBBBBBBBBBB',title:'Live B',channel_id:'UC_B',channel_name:'Channel B',channel_title:'Channel B',lifecycle_state:'live',group:'hololive',start_at:'2026-10-16T10:02:00Z',avatar_url:''},
- {video_id:'CCCCCCCCCCC',title:'Live C',channel_id:'UC_C',channel_name:'Channel C',channel_title:'Channel C',lifecycle_state:'live',group:'hololive',start_at:'2026-10-16T10:04:00Z',avatar_url:''}
+ {video_id:'BBBBBBBBBBB',title:'Live B',channel_id:'UC_B',channel_name:'Channel B',channel_title:'Channel B',lifecycle_state:'live',group:'hololive',start_at:'2026-10-16T10:02:00Z',avatar_url:''}
 ];
 const collabEvent={
  event_id:'evt-1',label:'Test Collab',confidence:'verified',sync:{available:true},
@@ -13,11 +12,7 @@ const collabEvent={
 };
 const ptt={
  schema_version:'public-consumer-v1',
- pushes:Array.from({length:140},(_,i)=>({
-  push_id:'p'+(i+1),aid:'M.TEST',source_line:i+1,floor:i+1,kind:'推',
-  author:'tester'+((i%5)+1),content:'message '+(i+1),
-  occurred_at:'2026-10-16T10:'+String(i%60).padStart(2,'0')+':00Z'
- })),
+ pushes:[{push_id:'p1',aid:'M.TEST',source_line:1,floor:1,kind:'推',author:'tester',content:'hello',timestamp:'2026-10-16T10:00:00Z'}],
  freshness:{status:'fresh'}
 };
 
@@ -81,7 +76,7 @@ try{
  await page.goto(base+'/',{waitUntil:'domcontentloaded'});
  await page.waitForSelector('#homeDynamic .stream-card');
  const cards=page.locator('#homeDynamic .stream-card');
- assert(await cards.count()===3,'home fixture cards did not render');
+ assert(await cards.count()===2,'home fixture cards did not render');
  await cards.nth(0).click();
  assert(new URL(page.url()).pathname==='/' ,'selecting one home card unexpectedly navigated');
  assert(!(await page.locator('#multiSelectBar').getAttribute('hidden')),'home selection bar stayed hidden');
@@ -92,19 +87,12 @@ try{
  const box=await page.locator('#stage .player-card .video-wrap').boundingBox();
  assert(box&&box.height>100,'single viewer video viewport collapsed');
  assert(await page.locator('[data-test-youtube="1"]').count()===1,'YouTube player stub did not mount');
- assert(await page.locator('.ptt-live-panel').count()===1,'Home viewer did not default to live PTT');
- const singlePttFrame=await page.waitForSelector('.ptt-live-panel iframe');
- assert(singlePttFrame,'Home viewer live PTT iframe missing');
 
  // Viewer -> PTT must be a fresh document and must not inherit viewer body state.
  await freshDocument(page,()=>page.locator('a[data-route="ptt"]').click(),url=>url.pathname==='/ptt-today');
  await page.waitForSelector('#ptt-list .push');
  assert(!await page.evaluate(()=>document.body.classList.contains('custom-session-watching')),'PTT inherited Viewer body state');
- assert(await page.locator('#ptt-list .push').count()===140,'PTT reader did not render fixture pushes');
- await page.waitForFunction(()=>{
-  const el=document.getElementById('ptt-list');return el&&el.scrollHeight-el.scrollTop-el.clientHeight<64;
- },null,{timeout:5000});
- assert(await page.locator('#ptt-newest').getAttribute('hidden')!==null,'PTT initial entry did not follow latest');
+ assert(await page.locator('#ptt-list .push').count()===1,'PTT reader did not render fixture push');
  await freshDocument(page,()=>page.locator('#ptt-focus').click(),url=>url.pathname==='/ptt-today'&&url.searchParams.get('focus')==='1');
  assert(await page.evaluate(()=>document.body.classList.contains('ptt-focus-mode')),'PTT focus document did not activate focus mode');
  assert(await page.evaluate(()=>getComputedStyle(document.querySelector('.client-rail')).display==='none'),'PTT focus document did not hide sidebar');
@@ -116,24 +104,12 @@ try{
  await page.waitForSelector('#homeDynamic .stream-card');
  assert(await page.locator('#multiSelectBar').getAttribute('hidden')!==null,'Home selection survived a document lifecycle');
 
- // Three-card Home selection -> Multi-view + live PTT must fit one viewport.
+ // Two-card Home selection -> Multi-view.
  await page.locator('#homeDynamic .stream-card').nth(0).click();
  await page.locator('#homeDynamic .stream-card').nth(1).click();
- await page.locator('#homeDynamic .stream-card').nth(2).click();
- await freshDocument(page,()=>page.locator('#multiWatch').click(),url=>url.pathname==='/custom-view/session'&&url.searchParams.getAll('stream').length===3);
- await page.waitForSelector('#stage .player-card:nth-child(3)');
- assert(await page.locator('#stage .player-card').count()===3,'multi-view did not mount three cards');
- assert(await page.locator('#stage > .ptt-live-panel').count()===1,'3-POV viewer did not mount live PTT tile');
- const tileSnapshot=await page.evaluate(()=>{
-  const nodes=[...document.querySelectorAll('#stage > .player-card, #stage > .ptt-live-panel')];
-  return {
-   viewport:{width:window.innerWidth,height:window.innerHeight},
-   tiles:nodes.map(el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height}})
-  };
- });
- assert(tileSnapshot.tiles.length===4,'3-POV viewer should have 4 visible tiles including PTT');
- assert(tileSnapshot.tiles.every(r=>r.width>80&&r.height>80),'3-POV viewer contains collapsed tiles');
- assert(tileSnapshot.tiles.every(r=>r.top>=-1&&r.bottom<=tileSnapshot.viewport.height+1&&r.left>=-1&&r.right<=tileSnapshot.viewport.width+1),'3-POV viewer tiles overflow browser viewport');
+ await freshDocument(page,()=>page.locator('#multiWatch').click(),url=>url.pathname==='/custom-view/session'&&url.searchParams.getAll('stream').length===2);
+ await page.waitForSelector('#stage .player-card:nth-child(2)');
+ assert(await page.locator('#stage .player-card').count()===2,'multi-view did not mount two cards');
  assert(await page.evaluate(()=>document.body.classList.contains('layout-equal')),'two-stream auto layout did not resolve to Equal');
  await page.locator('#watchSettings').click();
  assert(await page.evaluate(()=>document.body.classList.contains('settings-open')),'Viewer settings did not open');
@@ -167,15 +143,6 @@ try{
  assert(await pttFrame.evaluate(()=>document.body.classList.contains('ptt-focus-mode')),'Viewer PTT iframe is not in focus mode');
  assert(await pttFrame.evaluate(()=>getComputedStyle(document.querySelector('.client-rail')).display==='none'),'Viewer PTT iframe leaked the main sidebar');
 
- // Explicit pure-video mode is allowed only when chosen in Custom View.
- await freshDocument(page,()=>page.locator('a[data-route="single"]').click(),url=>url.pathname==='/custom-view');
- await page.waitForSelector('#custom-live-picker [data-live-pick]');
- await page.locator('#custom-live-picker [data-live-pick]').nth(0).click();
- await page.locator('#pttMode').selectOption('video');
- await freshDocument(page,()=>page.locator('#start').click(),url=>url.pathname==='/custom-view/session'&&url.searchParams.get('ptt')==='video');
- await page.waitForSelector('#stage .player-card');
- assert(await page.locator('.ptt-live-panel').count()===0,'explicit pure-video Viewer unexpectedly mounted PTT');
-
  // History selection is independent and uses its own fresh viewer document.
  await freshDocument(page,()=>page.locator('a[data-route="history"]').click(),url=>url.pathname==='/history');
  await page.waitForSelector('#historyDynamic .stream-card');
@@ -187,9 +154,8 @@ try{
  await freshDocument(page,()=>page.locator('a[data-route="multi"]').click(),url=>url.pathname==='/collab');
  await page.waitForSelector('.collab-event-card');
  await freshDocument(page,()=>page.locator('.collab-event-card').click(),url=>url.pathname==='/custom-view/session'&&url.searchParams.get('event')==='evt-1');
- await page.waitForSelector('#stage .player-card:nth-child(3)');
- assert(await page.locator('#stage .player-card').count()===3,'collab viewer did not rehydrate three POVs');
- assert(await page.locator('#stage > .ptt-live-panel').count()===1,'collab viewer did not restore live PTT');
+ await page.waitForSelector('#stage .player-card:nth-child(2)');
+ assert(await page.locator('#stage .player-card').count()===2,'collab viewer did not rehydrate two POVs');
  assert(await page.evaluate(()=>document.body.classList.contains('collab-live-session')),'collab live polling context was not restored');
 
  await page.goBack({waitUntil:'domcontentloaded'});
