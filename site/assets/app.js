@@ -521,7 +521,7 @@ async function loadWatchalongRecent(){
     const actions=node('div',undefined,'selection-actions');
     const cancel=node('a','取消選擇','selection-link');cancel.href='/watchalong?fresh=1#manual';
     const back=node('a','回到上方選擇','selection-link');back.href='#recent-watchalong';actions.append(cancel,back);copy.append(actions);
-    const selected=node('div',undefined,'selected-master');selected.style.position='relative';
+    const selected=node('div',undefined,'selected-master');
     const img=node('img');img.src='https://i.ytimg.com/vi/'+master+'/hqdefault.jpg';img.alt='';img.loading='lazy';selected.append(img);
     const source=node('span','YouTube ↗','youtube-source-link');source.role='link';source.tabIndex=0;source.dataset.youtubeHref='https://www.youtube.com/watch?v='+master;
     source.onclick=event=>{event.preventDefault();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')};
@@ -1023,7 +1023,7 @@ function render(){
     const grip=document.createElement('button');grip.type='button';grip.className='drag-handle';grip.textContent='⠿';grip.title='拖曳排序；也可使用 Alt 加上下方向鍵';grip.setAttribute('aria-label','拖曳或鍵盤排序 '+value);
     grip.onkeydown=e=>{if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){e.preventDefault();moveStream(index,index+(e.key==='ArrowUp'?-1:1));}};
     const metadata=streamMetadata.get(value);
-    const avatar=document.createElement('img');avatar.className='selected-avatar';avatar.alt='';avatar.loading='lazy';avatar.src=metadata?.avatar||'/favicon.ico';avatar.onerror=()=>{avatar.onerror=null;avatar.style.visibility='hidden';};
+    const avatar=document.createElement('img');avatar.className='selected-avatar';avatar.alt='';avatar.loading='lazy';avatar.src=metadata?.avatar||'/favicon.ico';avatar.onerror=()=>{avatar.onerror=null;avatar.hidden=true;};
     const name=document.createElement('div');name.className='selected-name';
     const channel=document.createElement('span');channel.className='selected-channel';channel.textContent=(index+1)+' · '+(metadata?.channel||value);
     const title=document.createElement('span');title.className='selected-title';title.textContent=metadata?.title||'';name.title=streamLabel(value);name.append(channel,title);
@@ -1107,7 +1107,7 @@ window.hvCustomCatalog=function(rows){
   const channel=String(row.channel_title||row.channel_name||'Hololive');const title=String(row.title||id);
   const avatar=String(row.avatar_url||'');streamMetadata.set(id,{channel,title,avatar:/^https:\/\/(yt3\.ggpht\.com|i\.ytimg\.com)\//.test(avatar)?avatar:''});
   const card=node('div',undefined,'live-picker-item');card.setAttribute('role','button');card.tabIndex=0;card.dataset.livePick=id;card.setAttribute('aria-pressed',String(items.includes(id)));
-  const cover=node('div');cover.style.position='relative';const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';img.alt='';img.loading='lazy';cover.append(img);
+  const cover=node('div',undefined,'live-picker-cover');const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';img.alt='';img.loading='lazy';cover.append(img);
   const source=node('span','YouTube ↗','youtube-source-link');source.setAttribute('role','link');source.tabIndex=0;source.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;cover.append(source);card.append(cover);
   const label=node('span');const strong=node('strong',channel);label.append(strong,document.createTextNode(' · '+title));card.append(label);box.append(card);
  }
