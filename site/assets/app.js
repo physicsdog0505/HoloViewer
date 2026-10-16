@@ -1229,7 +1229,7 @@ async function renderWatchalongSession(){
  masterCard.append(node('div','Hololive 直播（主時間軸）','watchalong-player-head'));
  const masterWrap=node('div',undefined,'watchalong-player-wrap'),masterHost=node('div');masterHost.id='watchalong-master-player';masterHost.className='watchalong-player';masterWrap.append(masterHost);masterCard.append(masterWrap);
  layout.append(masterCard);
- let masterPlayer=null,sourcePlayer=null,raf=0;
+ let masterPlayer=null,sourcePlayer=null,statusTimer=null;
  const setFocus=enabled=>{layout.classList.toggle('focus-source',enabled);compare.classList.toggle('active',!enabled);focus.classList.toggle('active',enabled)};
  const setImmersive=enabled=>{
   document.body.classList.toggle('watchalong-immersive',Boolean(enabled));
@@ -1247,9 +1247,8 @@ async function renderWatchalongSession(){
   const mt=Number(masterPlayer?.getCurrentTime?.()||0),st=Number(sourcePlayer?.getCurrentTime?.()||0);
   if(kind==='youtube')status.textContent=(resolvedMode==='live'?'即時模式 · 右側片源獨立控制':'手動模式 · 右側片源獨立控制')+' · 主時間 '+watchalongClock(mt)+' · 來源 '+watchalongClock(st);
   else status.textContent='外部平台 companion · 主時間 '+watchalongClock(mt);
-  raf=requestAnimationFrame(tick);
  }
- window.addEventListener('pagehide',()=>{if(raf)cancelAnimationFrame(raf);try{masterPlayer?.destroy?.();sourcePlayer?.destroy?.()}catch{}},{once:true});
+ window.addEventListener('pagehide',()=>{if(statusTimer)clearInterval(statusTimer);try{masterPlayer?.destroy?.();sourcePlayer?.destroy?.()}catch{}},{once:true});
  if(kind==='external'){
   const external=String(params.get('external_source')||'');
   let valid='';try{const u=new URL(external);if(['https:','http:'].includes(u.protocol))valid=u.toString()}catch{}
@@ -1285,6 +1284,7 @@ async function renderWatchalongSession(){
    sourcePlayer=new YT.Player('watchalong-source-player',options);
   }
   play.onclick=()=>masterPlayer?.playVideo?.();pause.onclick=()=>masterPlayer?.pauseVideo?.();tick();
+  if(!statusTimer)statusTimer=setInterval(tick,500);
  });
 }
 renderWatchalongSession();
