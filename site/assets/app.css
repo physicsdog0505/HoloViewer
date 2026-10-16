@@ -391,6 +391,15 @@ body:has(#watchalong-session.active) .client-main{max-width:1580px;width:100%}
 .watchalong-adjust-row button{border:1px solid #444;background:#1e1e1e;color:#eee;border-radius:6px;padding:7px 10px;cursor:pointer}
 .watchalong-target{font-size:24px}
 @media(max-width:820px){.watchalong-player-grid,.watchalong-player-grid.focus-source{grid-template-columns:1fr}}
+body.watchalong-immersive{overflow:hidden;background:#0b0b0b}
+body.watchalong-immersive .client-rail,body.watchalong-immersive .client-topbar,body.watchalong-immersive footer{display:none!important}
+body.watchalong-immersive .client-main{padding:0!important;max-width:none!important;width:100%!important}
+body.watchalong-immersive #watchalong-session{display:block!important;min-height:100dvh;background:#0b0b0b;padding:8px!important}
+body.watchalong-immersive #watchalong-session .viewer-head{display:none!important}
+body.watchalong-immersive .watchalong-session-shell{min-height:calc(100dvh - 16px);grid-template-rows:auto minmax(0,1fr) auto}
+body.watchalong-immersive .watchalong-player-grid{min-height:0;height:100%;align-items:stretch}
+body.watchalong-immersive .watchalong-player-card{display:flex;flex-direction:column;min-height:0}
+body.watchalong-immersive .watchalong-player-wrap{flex:1 1 auto;min-height:0;aspect-ratio:auto}
 
 
 /* Accepted 4174 Collab hub CSS from client_home.py (cab0adb51). */
