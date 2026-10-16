@@ -175,6 +175,17 @@ class ParityContract(unittest.TestCase):
         self.assertIn("collabLabel:typeof opts.collabLabel==='string'?opts.collabLabel:''", js)
         self.assertIn("if(event.target.closest('.stream-collab-entry'))return", js)
 
+    def test_collab_hub_card_follows_4174_event_presentation(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("const ordered=streams.slice().sort(",js)
+        self.assertIn("String(event.label||'多人連動').replace(/候選/g,'')",js)
+        self.assertIn("const dateLabel=dateTimes.length?",js)
+        self.assertIn("timeZone:'Asia/Taipei'",js)
+        self.assertIn("seenChannels=new Set()",js)
+        self.assertIn("parts.join(' · ')+' · 進入多人連動畫面'",js)
+        self.assertIn("youtube.dataset.youtubeHref='https://www.youtube.com/watch?v='+first.video_id",js)
+        self.assertIn("if(e.target.closest('[data-youtube-href]'))return",js)
+
     def test_original_4174_home_highlights_have_verified_rules(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')

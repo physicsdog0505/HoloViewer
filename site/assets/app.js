@@ -403,20 +403,37 @@ function collabEventState(event){
 }
 function collabEventCard(event){
  const streams=collabEventStreams(event);if(streams.length<2)return null;
- const first=streams[0],card=node('a',undefined,'collab-event-card '+collabEventState(event));card.href='#custom-session';
- card.onclick=e=>{e.preventDefault();openCollabEvent(event)};
+ const ordered=streams.slice().sort((a,b)=>Date.parse(a.actual_start||a.scheduled_start||a.start_at||0)-Date.parse(b.actual_start||b.scheduled_start||b.start_at||0)||String(a.video_id).localeCompare(String(b.video_id)));
+ const first=ordered[0],status=collabEventState(event);
+ const card=node('a',undefined,'collab-event-card '+status);card.href='#custom-session';
+ card.onclick=e=>{e.preventDefault();if(e.target.closest('[data-youtube-href]'))return;openCollabEvent(event)};
  const thumb=node('div',undefined,'collab-event-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+first.video_id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
- const state=collabEventState(event);thumb.append(node('span',state==='live'?'LIVE':state==='upcoming'?'即將開始':'已結束','status-pill '+(state==='live'?'live':state==='upcoming'?'upcoming':'ended')));card.append(thumb);
+ const youtube=node('span','YouTube ↗','youtube-source-link');youtube.role='link';youtube.tabIndex=0;youtube.dataset.youtubeHref='https://www.youtube.com/watch?v='+first.video_id;
+ youtube.onclick=e=>{e.preventDefault();e.stopPropagation();window.open(youtube.dataset.youtubeHref,'_blank','noopener,noreferrer')};
+ youtube.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();window.open(youtube.dataset.youtubeHref,'_blank','noopener,noreferrer')}};
+ thumb.append(youtube);
+ thumb.append(node('span',status==='live'?'LIVE':status==='upcoming'?'稍後':'已結束','status-pill '+status));card.append(thumb);
+ const dateTimes=streams.map(x=>Date.parse(x.actual_start||x.scheduled_start||x.start_at||'')).filter(Number.isFinite);
+ const dateLabel=dateTimes.length?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(Math.max(...dateTimes)):'日期未明';
  const copy=node('div',undefined,'collab-event-copy');const kicker=node('div',undefined,'collab-event-kicker');
- kicker.append(node('span',String(event.label||'多人連動')),node('span',String(event.confidence||'candidate')));copy.append(kicker);
- copy.append(node('h3',String(first.title||event.label||'多人連動')));
- const avatars=node('div',undefined,'collab-avatars');
- for(const stream of streams){
+ kicker.append(node('span',dateLabel),node('span',String(event.confidence||'candidate')));copy.append(kicker);
+ copy.append(node('h3',String(event.label||'多人連動').replace(/候選/g,'').replace(/[ ·]+$/g,'')||'多人連動'));
+ const avatars=node('div',undefined,'collab-avatars'),seenChannels=new Set();
+ for(const stream of ordered){
+  const channel=String(stream.channel_id||stream.channel_name||stream.video_id);if(seenChannels.has(channel))continue;seenChannels.add(channel);
   const avatar=node('span',undefined,'collab-avatar');avatar.title=String(stream.channel_name||'');
   const url=homeAvatarUrl(stream);if(url){const av=node('img');av.src=url;av.alt='';av.loading='lazy';avatar.append(av)}else avatar.append(node('span',(String(stream.channel_name||'H')[0]||'H').toUpperCase()));
   avatars.append(avatar);
  }
- copy.append(avatars);copy.append(node('p',streams.length+' POV · 進入多人連動畫面'));card.append(copy);return card;
+ copy.append(avatars);
+ const live=streams.filter(x=>x.lifecycle_state==='live').length;
+ const upcoming=streams.filter(x=>['upcoming','waiting'].includes(x.lifecycle_state)).length;
+ const ended=streams.filter(x=>x.lifecycle_state==='ended').length;
+ const parts=[streams.length+' 個 POV'];
+ if(live)parts.push(live+' 個直播中');
+ if(upcoming)parts.push(upcoming+' 個稍後開始');
+ if(ended)parts.push(ended+' 個已結束');
+ copy.append(node('p',parts.join(' · ')+' · 進入多人連動畫面'));card.append(copy);return card;
 }
 async function loadCollab(){
  for(const id of ['collab-live','collab-upcoming','collab-ended']){
