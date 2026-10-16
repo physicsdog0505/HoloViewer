@@ -934,7 +934,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
  viewing.ids=clean;
- viewing.ptt=opts.ptt==='live'?'live':'video';
+ viewing.ptt=opts.ptt==='video'?'video':'live';
  viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
  viewing.primary=Math.max(0,Math.min(clean.length-1,Number(opts.primary)||0));
  viewing.audio=Math.max(0,Math.min(clean.length-1,Number(opts.audio)||0));
