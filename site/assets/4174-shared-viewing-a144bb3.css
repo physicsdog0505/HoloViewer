@@ -1706,3 +1706,89 @@ body.custom-session-watching .custom-content-grid.video-only #stage > .player-ca
   min-height:0!important;max-height:none!important;overflow:auto!important
  }
 }
+
+
+/* FINAL PUBLIC MULTI-VIEW AUTHORITY.
+   Two/three+ POV, with or without PTT, share one definite viewport grid.
+   This intentionally overrides the accumulated transplant arbitration above. */
+@media(min-width:761px){
+ body.custom-session-watching.multi-stream:not(.custom-immersive){
+  overflow:hidden!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive) .client-main{
+  height:100dvh!important;max-height:100dvh!important;overflow:hidden!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive) .viewer-workspace{
+  display:flex!important;flex-direction:column!important;
+  width:100%!important;height:100%!important;min-height:0!important;max-height:100%!important;
+  overflow:hidden!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive) .watch-actions{
+  flex:0 0 auto!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive) .custom-content-grid{
+  display:block!important;flex:1 1 0!important;
+  width:100%!important;height:0!important;min-height:0!important;max-height:none!important;
+  overflow:hidden!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive) .custom-player-column{
+  display:block!important;width:100%!important;height:100%!important;
+  min-height:0!important;max-height:100%!important;overflow:hidden!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive).layout-auto #stage,
+ body.custom-session-watching.multi-stream:not(.custom-immersive).layout-equal #stage{
+  display:grid!important;width:100%!important;height:100%!important;
+  min-height:0!important;max-height:100%!important;overflow:hidden!important;
+  grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important;
+  grid-template-rows:repeat(var(--tile-rows,1),minmax(0,1fr))!important;
+  grid-auto-rows:minmax(0,1fr)!important;align-items:stretch!important;align-content:stretch!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive).layout-auto #stage > .player-card,
+ body.custom-session-watching.multi-stream:not(.custom-immersive).layout-equal #stage > .player-card,
+ body.custom-session-watching.multi-stream:not(.custom-immersive).layout-auto #stage > .ptt-live-panel,
+ body.custom-session-watching.multi-stream:not(.custom-immersive).layout-equal #stage > .ptt-live-panel{
+  position:relative!important;display:flex!important;flex-direction:column!important;
+  grid-column:auto!important;grid-row:auto!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:100%!important;overflow:hidden!important;align-self:stretch!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive) #stage > .player-card .video-wrap{
+  position:relative!important;display:block!important;flex:1 1 0!important;
+  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+  aspect-ratio:auto!important;overflow:hidden!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive) #stage > .player-card .video-wrap .player,
+ body.custom-session-watching.multi-stream:not(.custom-immersive) #stage > .player-card .video-wrap iframe{
+  position:absolute!important;inset:0!important;display:block!important;
+  width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important
+ }
+ body.custom-session-watching.multi-stream:not(.custom-immersive) #stage > .player-card .player-controls{
+  flex:0 0 auto!important
+ }
+ body.custom-session-watching.multi-stream.viewer-has-ptt:not(.custom-immersive) #stage > .ptt-live-panel iframe:not([hidden]),
+ body.custom-session-watching.multi-stream.viewer-has-ptt:not(.custom-immersive) #stage > .ptt-live-panel #ptt-worker-feed:not([hidden]){
+  display:block!important;flex:1 1 0!important;width:100%!important;height:auto!important;
+  min-height:0!important;max-height:none!important;overflow:auto!important
+ }
+ body.custom-session-watching.multi-stream.viewer-video-only:not(.custom-immersive) .custom-content-grid.video-only{
+  display:block!important;height:0!important;flex:1 1 0!important;overflow:hidden!important
+ }
+ body.custom-session-watching.multi-stream.viewer-video-only:not(.custom-immersive) .custom-content-grid.video-only #stage{
+  height:100%!important;max-height:100%!important;overflow:hidden!important;
+  grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important;
+  grid-template-rows:repeat(var(--tile-rows,1),minmax(0,1fr))!important
+ }
+}
+
+/* Immersive multi-view owns the viewport regardless of whether PTT exists. */
+body.custom-session-watching.multi-stream.custom-immersive .custom-content-grid{
+ position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;
+ min-height:0!important;max-height:100dvh!important;margin:0!important;padding:0!important;
+ overflow:hidden!important;background:#000!important;z-index:2147483000!important
+}
+body.custom-session-watching.multi-stream.custom-immersive .custom-player-column,
+body.custom-session-watching.multi-stream.custom-immersive #stage{
+ width:100%!important;height:100%!important;min-height:0!important;max-height:100%!important;
+ overflow:hidden!important
+}
