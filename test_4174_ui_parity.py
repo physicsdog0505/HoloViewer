@@ -178,6 +178,18 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('addEventListener', route_body)
         self.assertNotIn("multiWatch').onclick", route_body)
 
+    def test_viewer_ptt_iframe_controls_have_same_origin_receiver(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        self.assertIn("event.origin!==location.origin",js)
+        self.assertIn("event.source!==window.parent",js)
+        self.assertIn("data.type==='holoviewer:ptt-show-floor'",js)
+        self.assertIn("data.type==='holoviewer:ptt-font-size'",js)
+        self.assertIn("postMessage({type:'holoviewer:ptt-show-floor'",viewer)
+        self.assertIn("postMessage({type:'holoviewer:ptt-font-size'",viewer)
+        self.assertIn("font-size:var(--ptt-font-size,16px)",css)
+
     def test_ptt_reader_preserves_4174_shell_without_fake_data(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
