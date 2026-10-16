@@ -71,6 +71,22 @@ def projection_issues(events):
 def validate_projection(events):
     return not projection_issues(events)
 
+def build_export_event(event):
+    """Canonicalize source before computing release identity and projection."""
+    ids=sorted({s.video_id for s in event.streams if s.video_id})
+    canonical=canonical_article_url(event.source_url)
+    digest=hashlib.sha256(json.dumps([canonical or event.source_url,event.day,ids],
+            ensure_ascii=False,separators=(",",":")).encode()).hexdigest()[:20]
+    return {
+        "event_id":"watch:"+digest,
+        "aid":canonical.rsplit("/",1)[-1].removesuffix(".html") if canonical else event.aid,
+        "article_title":event.article_title,"source_url":canonical,
+        "article_datetime":event.article_datetime,"day":event.day,
+        "scheduled_time":event.scheduled_time,"description":event.description,
+        "member_only":bool(event.member_only),
+        "streams":[{"label":stream.label,"video_id":stream.video_id} for stream in event.streams],
+    }
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--database",type=Path)
@@ -184,19 +200,7 @@ def main():
         deduped.append(event)
     events=deduped
     imported=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    out=[]
-    for event in events:
-        ids=sorted({s.video_id for s in event.streams if s.video_id})
-        if not ids: continue
-        digest=hashlib.sha256("\n".join(ids).encode()).hexdigest()[:20]
-        event_id="watch:"+digest
-        out.append({
-            "event_id":event_id,"aid":(canonical.rsplit("/",1)[-1].removesuffix(".html") if canonical else event.aid),"article_title":event.article_title,
-            "source_url":canonical,"article_datetime":event.article_datetime,
-            "day":event.day,"scheduled_time":event.scheduled_time,
-            "description":event.description,"member_only":bool(event.member_only),
-            "streams":[{"label":s.label,"video_id":s.video_id} for s in event.streams],
-        })
+    out=[build_export_event(event) for event in events]
     issues=projection_issues(out)
     if issues:
         print(json.dumps({"status":"BLOCKED_PROJECTION_INTEGRITY",
