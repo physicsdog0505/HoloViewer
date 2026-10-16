@@ -30,6 +30,8 @@ class RestartProductionPublisherTests(unittest.TestCase):
             fresh=(now-timedelta(seconds=5)).isoformat()
             p.write_text(json.dumps({"status":"NO_NEW_ROWS","observed_at":fresh})+"\n",encoding="utf-8")
             self.assertEqual(assert_recent_completed_cycle(p,now=now)["status"],"NO_NEW_ROWS")
+            p.write_text(json.dumps({"status":"BASELINED","observed_at":fresh})+"\n",encoding="utf-8")
+            self.assertEqual(assert_recent_completed_cycle(p,now=now)["status"],"BASELINED")
             p.write_text(json.dumps({"status":"STOP_RECONCILE","observed_at":fresh})+"\n",encoding="utf-8")
             with self.assertRaises(SystemExit):
                 assert_recent_completed_cycle(p,now=now)
