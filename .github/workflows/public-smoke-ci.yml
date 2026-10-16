@@ -33,7 +33,10 @@ jobs:
         run: |
           node --check site/assets/app.js
           node --check site/assets/config.js
-          ! grep -E 'setTimeout|location.reload|eval\(|innerHTML|document.write\(' site/assets/app.js
+          ! grep -E 'location.reload|eval\(|innerHTML|document.write\(' site/assets/app.js
+          test "$(grep -o 'setTimeout(' site/assets/app.js | wc -l | tr -d ' ')" = "1"
+          grep -F "pttPollTimer=setTimeout(async()=>{" site/assets/app.js
+          grep -F "if(pttPollTimer)clearTimeout(pttPollTimer)" site/assets/app.js
           test "$(grep -o 'setInterval(' site/assets/app.js | wc -l | tr -d ' ')" = "2"
       - name: Real browser 4174 document-lifecycle acceptance
         shell: bash
