@@ -117,7 +117,7 @@ test('Taipei requested day excludes unrelated prior-day entries',async()=>{
 });
 test('bounded cross-midnight LIVE survives and unrelated ancient LIVE is excluded',async()=>{
   const d=db();
-  await writeEvidence(d,{...fixture({id:'carrylive01',observed:'2026-10-14T14:00:00Z'}),actual_start:'2026-10-14T13:00:00Z',scheduled_start:'2026-10-14T13:00:00Z'});
+  await writeEvidence(d,{...fixture({id:'carrylive01',observed:'2026-10-15T01:59:00Z'}),actual_start:'2026-10-14T13:00:00Z',scheduled_start:'2026-10-14T13:00:00Z'});
   await writeEvidence(d,{...fixture({id:'distantlive',observed:'2026-10-12T02:00:00Z'}),actual_start:'2026-10-12T01:00:00Z',scheduled_start:'2026-10-12T01:00:00Z'});
   await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T02:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
   const result=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T02:00:00Z')});
@@ -290,5 +290,30 @@ test('4174 Home drops a row with corrupt primary identity but preserves valid si
  const result=await readToday(corrupt,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z')});
  assert.equal(result.streams.length,1);
  assert.match(result.streams[0].video_id,/^[A-Za-z0-9_-]{11}$/);
+ d.close();
+});
+
+test('Today membership uses actual/scheduled starts, not later refresh or end timestamps',async()=>{
+ const d=db();
+ const cases=[
+  {id:'oct13ended1',start:'2026-10-13T10:00:00Z',end:'2026-10-13T12:00:00Z',observed:'2026-10-16T07:00:00Z',state:'ended',visible:false},
+  {id:'oct14ended1',start:'2026-10-14T10:00:00Z',end:'2026-10-14T12:00:00Z',observed:'2026-10-16T07:00:00Z',state:'ended',visible:false},
+  {id:'oct16ended1',start:'2026-10-16T02:00:00Z',end:'2026-10-16T03:00:00Z',observed:'2026-10-16T07:00:00Z',state:'ended',visible:true},
+  {id:'oct16upcom1',start:'2026-10-16T12:00:00Z',end:null,observed:'2026-10-16T07:00:00Z',state:'upcoming',visible:true},
+  {id:'oct16live01',start:'2026-10-16T06:00:00Z',end:null,observed:'2026-10-16T07:00:00Z',state:'live',visible:true},
+  {id:'crosslive01',start:'2026-10-15T14:00:00Z',end:null,observed:'2026-10-16T06:59:00Z',state:'live',visible:true},
+  {id:'staleoldlv1',start:'2026-10-13T12:00:00Z',end:null,observed:'2026-10-14T12:00:00Z',state:'live',visible:false},
+ ];
+ for(const c of cases){
+  await writeEvidence(d,{...fixture({id:c.id,state:c.state,observed:c.observed,end:c.end}),
+    actual_start:c.state==='upcoming'?null:c.start,scheduled_start:c.start});
+ }
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-16T07:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:false,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-16',now:new Date('2026-10-16T07:00:00Z')});
+ const present=new Set(x.streams.map(r=>r.video_id));
+ for(const c of cases)assert.equal(present.has(c.id),c.visible,c.id);
+ // Today filtering is a read-only projection; older source remains untouched.
+ assert.equal(d.raw.prepare('SELECT COUNT(*) AS n FROM public_today_canonical').get().n,cases.length);
  d.close();
 });

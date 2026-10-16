@@ -1,0 +1,34 @@
+name: Collab Watchalong API Gate
+
+on:
+  push:
+    branches:
+      - issue47-public-collab-watchalong-api
+  pull_request:
+    paths:
+      - 'backend/today/d1/experience-read.mjs'
+      - 'backend/today/d1/experience-read.test.mjs'
+      - 'backend/today/d1/experience-read.PROPOSED.sql'
+      - 'backend/today/d1/export-watchalong-events.py'
+      - 'backend/today/d1/api-shell.mjs'
+      - 'backend/today/d1/api-shell.test.mjs'
+      - 'backend/today/d1/EXPERIENCE_API_CONTRACT.md'
+      - '.github/workflows/collab-watchalong-api.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  experience-read:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: node --check backend/today/d1/experience-read.mjs
+      - name: Contract tests
+        run: node --test backend/today/d1/experience-read.test.mjs backend/today/d1/api-shell.test.mjs
+      - name: Python exporter syntax
+        run: python3 -m py_compile backend/today/d1/export-watchalong-events.py

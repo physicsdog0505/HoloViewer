@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Dependency-free test of the Public Watchalong export integrity policy."""
+import importlib.util
+from pathlib import Path
+import unittest
+
+MODULE=Path(__file__).with_name("export-watchalong-events.py")
+spec=importlib.util.spec_from_file_location("watchalong_exporter",MODULE)
+module=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+def event(event_id="watch:123",video_id="U2o13h1Oib4"):
+    return {"event_id":event_id,"source_url":"https://www.ptt.cc/bbs/C_Chat/M.1789081207.A.5FC.html",
+            "streams":[{"video_id":video_id,"label":"host"}]}
+
+class ProjectionGateTests(unittest.TestCase):
+    def test_refresh_fail_closed_on_fetch_errors(self):
+        stats={"targets":58,"already_cached":13,"fetched":0,
+               "errors":[{"stage":"fetch","error":"missing playwright"}]}
+        self.assertFalse(module.refresh_coverage_ok(stats))
+    def test_refresh_fail_closed_on_unaccounted_targets(self):
+        self.assertFalse(module.refresh_coverage_ok({"targets":58,"already_cached":13,
+                     "fetched":42,"errors":[]}))
+    def test_refresh_complete_if_all_cached(self):
+        self.assertTrue(module.refresh_coverage_ok({"targets":13,"already_cached":13,
+                     "fetched":0,"errors":[]}))
+    def test_refresh_complete_if_all_fetched(self):
+        self.assertTrue(module.refresh_coverage_ok({"targets":3,"already_cached":0,
+                     "fetched":3,"errors":[]}))
+    def test_integrity_reports_reasons_without_body(self):
+        wrong=event(video_id="bad")
+        wrong["aid"]="sample"
+        wrong["day"]="2026-10-15"
+        wrong["body_text"]="PRIVATE"
+        issues=module.projection_issues([wrong])
+        self.assertEqual(issues[0]["reasons"],["invalid_host_video_id"])
+        self.assertNotIn("PRIVATE",str(issues))
+    def test_duplicate_diagnostic(self):
+        issues=module.projection_issues([event(),event()])
+        self.assertEqual(issues[0]["reasons"],["duplicate_event_id"])
+    def test_ptt_mirror_and_official_url_share_canonical_source(self):
+        official="https://www.ptt.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        mirror="https://www.pttweb.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        self.assertEqual(module.canonical_article_url(official),official)
+        self.assertEqual(module.canonical_article_url(mirror),official)
+        self.assertEqual(module.canonical_article_url(mirror.removesuffix(".html")),official)
+        self.assertEqual(module.canonical_article_url(mirror.removesuffix(".html")+"/"),official)
+        self.assertIsNone(module.canonical_article_url("https://bad.example/bbs/C_Chat/M.1790506113.A.7E3.html"))
+        self.assertIsNone(module.canonical_article_url(mirror+"?unexpected=1"))
+    def test_two_source_representations_dedupe_without_collapsing_other_day(self):
+        from types import SimpleNamespace
+        official="https://www.ptt.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        mirror="https://www.pttweb.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        def source(url,day):
+            return SimpleNamespace(aid="#legacy" if url==official else "M.1790506113.A.7E3",
+                 source_url=url,day=day,streams=[SimpleNamespace(video_id="U2o13h1Oib4")])
+        self.assertEqual(module.event_signature(source(official,"2026-09-27")),
+                         module.event_signature(source(mirror,"2026-09-27")))
+        self.assertNotEqual(module.event_signature(source(official,"2026-09-27")),
+                            module.event_signature(source(mirror,"2026-09-28")))
+    def test_real_projection_builder_canonicalizes_before_id(self):
+        from types import SimpleNamespace
+        def src(url,day="2026-09-27"):
+            return SimpleNamespace(aid="M.1790506113.A.7E3",source_url=url,
+                day=day,streams=[SimpleNamespace(video_id="U2o13h1Oib4",label="Pekora")],
+                article_title="Watchalong",article_datetime="2026-09-27T12:00+08:00",
+                scheduled_time="12:00",description="test",member_only=False)
+        mirror="https://www.pttweb.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        official="https://www.ptt.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
+        a=module.build_export_event(src(mirror))
+        b=module.build_export_event(src(official))
+        self.assertEqual(a["source_url"],official)
+        self.assertEqual(a["event_id"],b["event_id"])
+        self.assertEqual(a["aid"],"M.1790506113.A.7E3")
+        self.assertTrue(module.validate_projection([a]))
+        self.assertNotEqual(a["event_id"],module.build_export_event(src(mirror,"2026-09-28"))["event_id"])
+    def test_valid(self):
+        self.assertTrue(module.validate_projection([event(),event("watch:456","8pF4qHcshDc")]))
+    def test_duplicate_events_fail(self):
+        self.assertFalse(module.validate_projection([event(),event()]))
+    def test_missing_hosts_fail(self):
+        x=event();x["streams"]=[]
+        self.assertFalse(module.validate_projection([x]))
+    def test_malformed_video_fail(self):
+        self.assertFalse(module.validate_projection([event(video_id="bad")]))
+    def test_private_source_url_fail(self):
+        x=event();x["source_url"]="file:///private/ptt"
+        self.assertFalse(module.validate_projection([x]))
+
+if __name__=="__main__":
+    unittest.main()
