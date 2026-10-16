@@ -504,6 +504,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn('clearInterval(translationRefreshTimer)',js)
         self.assertIn('clearInterval(verifiedSyncTimer)',js)
         self.assertIn('if(collabPollTimer)clearInterval(collabPollTimer)',js)
+        self.assertIn('if(youtubeReadyRetryTimer)clearInterval(youtubeReadyRetryTimer)',js)
 
     def test_youtube_api_loader_is_shared_and_does_not_drop_ready_callbacks(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
