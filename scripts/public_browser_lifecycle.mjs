@@ -166,7 +166,13 @@ try{
  assert(await page.locator('#recentWatchGrid .recent-watch-card').count()===1,'Watchalong recent API card did not render');
  await page.locator('#watchalongBuilder [name="master"]').fill('AAAAAAAAAAA');
  await page.locator('#watchalongBuilder [name="source"]').fill('CCCCCCCCCCC');
- await freshDocument(page,()=>page.locator('#watchalongBuilder button[type="submit"]').click(),url=>url.pathname==='/watchalong/session'&&url.searchParams.get('master')==='AAAAAAAAAAA');
+ await freshDocument(page,()=>page.locator('#watchalongBuilder button[type="submit"]').click(),url=>
+  url.pathname==='/watchalong/session'&&
+  url.searchParams.get('master')==='AAAAAAAAAAA'&&
+  url.searchParams.get('source_kind')==='youtube'&&
+  url.searchParams.get('youtube_mode')==='single'&&
+  url.searchParams.get('source')==='CCCCCCCCCCC'
+ );
  await page.waitForSelector('.watchalong-player-grid',{timeout:8000}).catch(()=>{assertNoBrowserErrors('Watchalong session');throw new Error('Watchalong session grid did not render at '+page.url())});
  assertNoBrowserErrors('Watchalong session');
  assert(await page.locator('.watchalong-player-card').count()===2,'Watchalong YouTube session did not render two player cards');
