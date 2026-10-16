@@ -555,7 +555,7 @@ async function refreshPrimaryPtt(index=primaryIndex){
  }
 }
 function startPttBridge(index){
- if(pttResolverUrl){
+ if(pttResolverUrl||typeof config.pttResolve==='function'){
   if(index===primaryIndex)refreshPrimaryPtt(index);
   return;
  }
