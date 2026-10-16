@@ -15,7 +15,7 @@ def q(value):
         return "NULL"
     return "'" + str(value).replace("'", "''") + "'"
 
-PTT_PATH=re.compile(r"^/bbs/C_Chat/(M\\.[0-9]{9,11}\\.A\\.[A-Fa-f0-9]+)\\.html$")
+PTT_PATH=re.compile(r"^/bbs/C_Chat/(M\.[0-9]{9,11}\.A\.[A-Fa-f0-9]+)\.html$")
 
 def canonical_article_url(url):
     """Map verified original PTT and existing pttweb mirror URLs to one article."""
