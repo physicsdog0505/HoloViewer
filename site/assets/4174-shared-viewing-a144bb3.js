@@ -297,42 +297,44 @@ function applyImmersiveState(active){
 }
 immerse?.addEventListener('click',async()=>{
  const next=!immersiveEnabled;
- applyImmersiveState(next);
+ if(!next){await window.hvExit4174Immersive?.();return}
+ applyImmersiveState(true);
  try{
-  if(next&&!document.fullscreenElement){
-   // Fullscreen the viewing surface itself, not the document: it enters the
-   // browser top layer and cannot inherit the Client shell's max-width/rails.
+  if(!document.fullscreenElement){
    const surface=pttPanel&&contentGrid?contentGrid:document.documentElement;
    await surface.requestFullscreen();
   }
-  else if(!next&&document.fullscreenElement)await document.exitFullscreen();
  }catch(_e){
-  // Keep the CSS immersive state even when browser fullscreen is unavailable.
-  statusBox.textContent=next?'已進入沉浸介面（瀏覽器未提供全螢幕）':'已退出沉浸介面';
+  statusBox.textContent='已進入沉浸介面（瀏覽器未提供全螢幕）';
  }
 });
 window.hvExit4174Immersive=async function hvExit4174Immersive(){
- applyImmersiveState(false);
+ if(immersiveExiting)return;
+ immersiveExiting=true;
+ // State must be cleared before leaving the browser fullscreen top layer.
+ immersiveEnabled=false;
  document.body.classList.remove('custom-immersive');
+ mountImmersiveSurface(false);
  forceSingleImmersiveGeometry(false);
  forceMultiImmersiveGeometry(false);
- if(document.fullscreenElement){
-  try{await document.exitFullscreen();}catch(_e){}
- }
+ repinWorkerPttAfterLayout();
+ immerse?.setAttribute('aria-pressed','false');
+ if(watchImmersive)watchImmersive.textContent='沉浸模式';
+ if(immerse)immerse.textContent='沉浸模式';
+ try{
+  if(document.fullscreenElement)await document.exitFullscreen();
+ }catch(_e){}
+ immersiveExiting=false;
 };
 immersiveExit?.addEventListener('click',()=>window.hvExit4174Immersive?.());
 document.addEventListener('keydown',event=>{
- if(event.key!=='Escape'||!immersiveEnabled)return;
- setTimeout(()=>{if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);},0);
+ if(event.key!=='Escape'||!immersiveEnabled||immersiveExiting)return;
+ window.hvExit4174Immersive?.();
 });
 document.addEventListener('fullscreenchange',()=>{
- // Escape exits immersive if fullscreen was actually active. CSS-only immersive
- // remains valid when the browser refuses requestFullscreen().
- if(!document.fullscreenElement&&immersiveEnabled){
-  applyImmersiveState(false);
- }else if(document.fullscreenElement){
-  applyImmersiveState(true);
- }
+ if(immersiveExiting)return;
+ if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);
+ else if(document.fullscreenElement&&!immersiveEnabled)applyImmersiveState(true);
 });
 
 function refreshMultiControls(){const active=streams.length>1;document.querySelectorAll('[data-layout]').forEach(button=>button.hidden=!active);for(const id of ['playerSyncLabel','focusChoices','focusCarousel','focusCarouselIntervalLabel','audioFollowLabel','playAll','pauseAll']){const el=document.getElementById(id);if(el)el.hidden=!active;}}
@@ -572,13 +574,13 @@ function syncFollowers(master,playing){
     if(playing&&!canPlay){
       pendingArchiveFollowers.add(index);
       if(typeof player.pauseVideo==='function'){
-        syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
+        syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
         player.pauseVideo();
       }
       return;
     }
     pendingArchiveFollowers.delete(index);
-    const expected=playing?YT.PlayerState.PLAYING:YT.PlayerState.PAUSED;
+    const expected=playing?window.YT.PlayerState.PLAYING:window.YT.PlayerState.PAUSED;
     if(typeof player.getPlayerState==='function'&&player.getPlayerState()===expected)return;
     syncEchoes.set(index,{expected,expires:Date.now()+2000});
     if(playing&&typeof player.playVideo==='function')player.playVideo();
@@ -599,8 +601,8 @@ function handlePlayerState(index,event){
   // Keep the expected echo until it matches; a real PAUSED/PLAYING
   // user action with a different state still propagates.
  }
- if(event.data===YT.PlayerState.PLAYING)syncFollowers(index,true);
- else if(event.data===YT.PlayerState.PAUSED)syncFollowers(index,false);
+ if(event.data===window.YT.PlayerState.PLAYING)syncFollowers(index,true);
+ else if(event.data===window.YT.PlayerState.PAUSED)syncFollowers(index,false);
 }
 syncPlayback?.addEventListener('change',()=>{
  syncEchoes.clear();
@@ -610,8 +612,8 @@ syncPlayback?.addEventListener('change',()=>{
  const master=players[syncMaster];
  if(!master||typeof master.getPlayerState!=='function')return;
  const state=master.getPlayerState();
- if(state===YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
- else if(state===YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
+ if(state===window.YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
+ else if(state===window.YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
 });
 manualTimelineAlign?.addEventListener('change',()=>{
  syncEchoes.clear();pendingArchiveFollowers.clear();
@@ -628,8 +630,8 @@ manualTimelineAlign?.addEventListener('change',()=>{
   syncMaster=primaryIndex;
   const master=players[syncMaster];
   const state=master&&typeof master.getPlayerState==='function'?master.getPlayerState():null;
-  if(state===YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
-  else if(state===YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
+  if(state===window.YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
+  else if(state===window.YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
   else players.forEach((_,index)=>{if(index!==syncMaster)alignFollower(index,syncMaster);});
   statusBox.textContent='已啟用依實際開播時間自動對齊';
  }else{
@@ -648,12 +650,12 @@ function controlAllPlayback(playing){
   if(playing&&hasVerifiedTimeline&&index!==syncMaster&&!alignFollower(index,syncMaster)){
    pendingArchiveFollowers.add(index);
    if(typeof player.pauseVideo==='function'){
-    syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
+    syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
     player.pauseVideo();
    }
    return;
   }
-  const expected=playing?YT.PlayerState.PLAYING:YT.PlayerState.PAUSED;
+  const expected=playing?window.YT.PlayerState.PLAYING:window.YT.PlayerState.PAUSED;
   if(typeof player.getPlayerState==='function'&&player.getPlayerState()===expected)return;
   syncEchoes.set(index,{expected,expires:Date.now()+2000});
   if(playing&&typeof player.playVideo==='function')player.playVideo();
@@ -669,7 +671,7 @@ const verifiedSyncTimer=setInterval(()=>{
  const master=players[syncMaster];
  if(!master||typeof master.getPlayerState!=='function')return;
  const state=master.getPlayerState();
- if(state!==YT.PlayerState.PLAYING&&state!==YT.PlayerState.PAUSED)return;
+ if(state!==window.YT.PlayerState.PLAYING&&state!==window.YT.PlayerState.PAUSED)return;
  players.forEach((_,index)=>{
   if(index===syncMaster)return;
   const ready=alignFollower(index,syncMaster);
@@ -678,8 +680,8 @@ const verifiedSyncTimer=setInterval(()=>{
    const follower=players[index];
    if(follower&&typeof follower.pauseVideo==='function'&&
       typeof follower.getPlayerState==='function'&&
-      follower.getPlayerState()!==YT.PlayerState.PAUSED){
-    syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
+      follower.getPlayerState()!==window.YT.PlayerState.PAUSED){
+    syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
     follower.pauseVideo();
    }
    return;
@@ -687,8 +689,8 @@ const verifiedSyncTimer=setInterval(()=>{
   if(ready&&pendingArchiveFollowers.has(index)){
    pendingArchiveFollowers.delete(index);
    const follower=players[index];
-   if(state===YT.PlayerState.PLAYING&&follower&&typeof follower.playVideo==='function'){
-    syncEchoes.set(index,{expected:YT.PlayerState.PLAYING,expires:Date.now()+2000});
+   if(state===window.YT.PlayerState.PLAYING&&follower&&typeof follower.playVideo==='function'){
+    syncEchoes.set(index,{expected:window.YT.PlayerState.PLAYING,expires:Date.now()+2000});
     follower.playVideo();
    }
   }
@@ -790,12 +792,16 @@ function mountWatchPlayer(index){
   const stream=streams[index];
   if(!stream||players[index])return;
   const card=stage.querySelector('.player-card[data-index="'+index+'"]');
-  if(!card)return;
-  const mounted=new YT.Player('player-'+card.dataset.slotId,{
-      videoId:stream.videoId,width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
-      events:{onReady:()=>{const current=players.indexOf(mounted);if(current<0)return;applyAudio();if(playAll)playAll.disabled=false;if(pauseAll)pauseAll.disabled=false;if(typeof startPttBridge==='function')startPttBridge(current);},onStateChange:event=>{const current=players.indexOf(mounted);if(current>=0)handlePlayerState(current,event);},onError:event=>{const current=players.indexOf(mounted);if(current<0)return;const code=Number(event?.data);statusBox.textContent='YouTube 內嵌播放失敗'+(Number.isFinite(code)?'（錯誤 '+code+'）':'')+'；可用 YouTube ↗ 開啟原影片確認。';}}
-  });
-  players[index]=mounted;
+  if(!card||!window.YT?.Player)return;
+  try{
+   const mounted=new window.YT.Player('player-'+card.dataset.slotId,{
+    videoId:stream.videoId,width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
+    events:{onReady:()=>{const current=players.indexOf(mounted);if(current<0)return;applyAudio();if(playAll)playAll.disabled=false;if(pauseAll)pauseAll.disabled=false;if(typeof startPttBridge==='function')startPttBridge(current);},onStateChange:event=>{const current=players.indexOf(mounted);if(current>=0)handlePlayerState(current,event);},onError:event=>{const current=players.indexOf(mounted);if(current<0)return;const code=Number(event?.data);statusBox.textContent='YouTube 內嵌播放失敗'+(Number.isFinite(code)?'（錯誤 '+code+'）':'')+'；可用 YouTube ↗ 開啟原影片確認。';}}
+   });
+   players[index]=mounted;
+  }catch(error){
+   statusBox.textContent='YouTube 播放器初始化失敗：'+String(error?.message||error);
+  }
 }
 let youtubeReadyRetryTimer=null;
 function mountAllWatchPlayers(){streams.forEach((stream,index)=>mountWatchPlayer(index));}
