@@ -181,7 +181,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("String(event.label||'多人連動').replace(/候選/g,'')",js)
         self.assertIn("const dateLabel=dateTimes.length?",js)
         self.assertIn("timeZone:'Asia/Taipei'",js)
-        self.assertIn("const seenChannels=new Set()",js.replace(",seenChannels=new Set()",";const seenChannels=new Set()") if False else js)
+        self.assertIn("seenChannels=new Set()",js)
         self.assertIn("parts.join(' · ')+' · 進入多人連動畫面'",js)
         self.assertIn("youtube.dataset.youtubeHref='https://www.youtube.com/watch?v='+first.video_id",js)
         self.assertIn("if(e.target.closest('[data-youtube-href]'))return",js)
