@@ -73,6 +73,7 @@ function route(r){
  document.body.classList.toggle('ptt-focus-mode',r==='ptt-focus');
  document.body.classList.toggle('watchalong-wide',r==='watchalong');
  $('ptt-focus').textContent=r==='ptt-focus'?'退出專注':'⛶ 專注模式';
+ $('ptt-floor-toggle').hidden=r!=='ptt-focus';
  $('live-channel-rail').hidden=!['home','custom-session'].includes(r)||!$('live-channel-list').childElementCount;
  if(r==='home')loadHome();
  if(r==='history')loadHistory();
@@ -364,13 +365,67 @@ async function loadCollab(){
  }
  $('collab-empty').textContent='目前沒有偵測到可用的多人連動。';
 }
-let pttLastGoodCount=0,pttLastGoodDay='',pttLoadInFlight=false;
+let pttLastGoodCount=0,pttLastGoodDay='',pttLoadInFlight=false,pttFollowing=true,pttProgrammatic=false;
+function pttAtBottom(){
+ const list=$('ptt-list');
+ return list.scrollHeight-list.scrollTop-list.clientHeight<48;
+}
+function pttToLatest(force=false){
+ const list=$('ptt-list');
+ if(!force&&!pttFollowing)return;
+ pttProgrammatic=true;list.scrollTop=list.scrollHeight;
+ window.setTimeout(()=>{pttProgrammatic=false},180);
+ $('ptt-newest').hidden=true;
+}
+function pttRow(row){
+ const push=node('div',undefined,'push');
+ push.dataset.pushId=String(row.push_id||row.aid+':'+row.source_line);
+ const kind=String(row.kind||'→');
+ const kindEl=node('div',kind,'ptt-push-kind '+(kind==='噓'?'kind-boo':kind==='→'?'kind-arrow':''));
+ const meta=node('div',undefined,'ptt-push-meta');
+ const when=new Date(String(row.occurred_at||''));
+ if(Number.isFinite(when.getTime())){
+  const label=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(when);
+  meta.append(node('time',label,'ptt-push-time'));
+ }
+ if(Number.isInteger(row.floor)&&row.floor>0)meta.append(node('span',row.floor+'樓','ptt-push-floor'));
+ const body=node('div',undefined,'ptt-push-body');
+ body.append(node('span',String(row.author||'unknown')+':','ptt-push-author'));
+ body.append(node('span',String(row.content||''),'ptt-push-content'));
+ push.append(kindEl,meta,body);
+ if(row.source_url){
+  push.title='點兩下開啟 PTT 原文';
+  push.ondblclick=()=>window.open(String(row.source_url),'_blank','noopener,noreferrer');
+ }
+ return push;
+}
+function pttApplyFloorPreference(show){
+ document.body.classList.toggle('ptt-floor-hidden',!show);
+ $('ptt-show-floor').checked=show;
+ try{localStorage.setItem('holoviewer-ptt-show-floor',String(Boolean(show)))}catch{}
+}
+function pttInitControls(){
+ const list=$('ptt-list'),latest=$('ptt-newest');
+ let show=true;try{show=localStorage.getItem('holoviewer-ptt-show-floor')!=='false'}catch{}
+ pttApplyFloorPreference(show);
+ latest.onclick=()=>{pttFollowing=true;pttToLatest(true)};
+ list.addEventListener('wheel',event=>{
+  if(event.deltaY<0)pttFollowing=false;
+  else if(event.deltaY>0&&pttAtBottom())pttFollowing=true;
+ },{passive:true});
+ list.addEventListener('scroll',()=>{
+  if(pttProgrammatic)return;
+  pttFollowing=pttAtBottom();
+  latest.hidden=pttFollowing;
+ },{passive:true});
+ $('ptt-show-floor').onchange=()=>pttApplyFloorPreference($('ptt-show-floor').checked);
+}
 async function loadPtt(){
  if(pttLoadInFlight)return;
  const today=taipeiDay();
- const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty');
+ const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty'),latest=$('ptt-newest');
  if(pttLastGoodDay&&pttLastGoodDay!==today){
-  pttLastGoodCount=0;pttLastGoodDay='';list.replaceChildren();list.hidden=true;
+  pttLastGoodCount=0;pttLastGoodDay='';list.replaceChildren();list.hidden=true;latest.hidden=true;pttFollowing=true;
  }
  if(!pttLastGoodCount){
   meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
@@ -385,37 +440,41 @@ async function loadPtt(){
  try{
   const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
-  const next=document.createDocumentFragment();let count=0;
-  for(const row of data.pushes){
-   if(!row||typeof row.content!=='string')continue;
-   const push=node('div',undefined,'push');
-   const head=node('div',undefined,'ptt-push-meta');
-   const kind=typeof row.kind==='string'?row.kind:'→';
-   head.append(node('span',kind,'ptt-push-kind'));
-   head.append(node('strong',String(row.author||'unknown'),'ptt-push-author'));
-   if(Number.isInteger(row.floor)&&row.floor>0)head.append(node('span','#'+row.floor,'ptt-push-floor'));
-   const when=new Date(String(row.occurred_at||''));
-   if(Number.isFinite(when.getTime())){
-    const label=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(when);
-    head.append(node('time',label,'ptt-push-time'));
+  const rows=data.pushes.filter(row=>row&&typeof row.content==='string');
+  const wasEmpty=!pttLastGoodCount;
+  const nearBottom=pttFollowing||pttAtBottom();
+  const previousScroll=list.scrollTop;
+  if(wasEmpty){
+   const frag=document.createDocumentFragment();
+   rows.forEach(row=>frag.append(pttRow(row)));
+   list.replaceChildren(frag);
+  }else{
+   const seen=new Set([...list.children].map(el=>el.dataset.pushId));
+   for(const row of rows){
+    const key=String(row.push_id||row.aid+':'+row.source_line);
+    if(!seen.has(key)){list.append(pttRow(row));seen.add(key)}
    }
-   push.append(head,node('div',row.content,'ptt-push-content'));
-   next.append(push);count++;
+   while(list.children.length>300)list.firstElementChild?.remove();
   }
-  list.replaceChildren(next);pttLastGoodCount=count;pttLastGoodDay=today;
+  pttLastGoodCount=list.children.length;pttLastGoodDay=today;
   const freshness=String(data.freshness?.status||'unknown');
   const freshnessLabel=freshness==='fresh'?'即時':freshness==='stale'?'資料稍舊':'狀態未知';
-  meta.textContent=today.replaceAll('-','/')+' · '+freshnessLabel+' · '+count+' 則 · 純 PTT 閱讀';
-  list.hidden=!count;empty.hidden=Boolean(count);
-  if(!count)empty.textContent='目前沒有今天的推文。';
+  meta.textContent=today.replaceAll('-','/')+' · '+pttLastGoodCount+' 則推文 · '+freshnessLabel+' · 純 PTT 閱讀';
+  list.hidden=!pttLastGoodCount;empty.hidden=Boolean(pttLastGoodCount);
+  if(!pttLastGoodCount)empty.textContent='目前沒有今天的推文。';
+  if(pttLastGoodCount){
+   if(wasEmpty||nearBottom){pttFollowing=true;requestAnimationFrame(()=>requestAnimationFrame(()=>pttToLatest(true)))}
+   else{list.scrollTop=previousScroll;latest.hidden=false}
+  }
  }catch(e){
   meta.textContent=today.replaceAll('-','/')+' · 後端暫未就緒 · 10 秒後重試 · 純 PTT 閱讀';
   if(!pttLastGoodCount){
-   list.hidden=true;empty.hidden=false;
+   list.hidden=true;empty.hidden=false;latest.hidden=true;
    empty.textContent='今日 PTT 後端資料暫未就緒；頁面會每 10 秒自動重試。';
   }
- } finally{pttLoadInFlight=false}
+ }finally{pttLoadInFlight=false}
 }
+pttInitControls();
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
