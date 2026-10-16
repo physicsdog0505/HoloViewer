@@ -7,13 +7,9 @@ const streams=config.streams;
 const singlePttKind=(config.singlePttKind||"");
 function syncSessionCardinalityClasses(){
  const single=streams.length===1;
- const hasPttPanel=Boolean(document.querySelector('.ptt-live-panel'));
  document.body.classList.toggle('single-ptt',single&&Boolean(singlePttKind));
  document.body.classList.toggle('single-live',single&&singlePttKind==='live');
  document.body.classList.toggle('single-vod',single&&singlePttKind==='vod');
- document.body.classList.toggle('multi-stream',streams.length>1);
- document.body.classList.toggle('viewer-has-ptt',hasPttPanel);
- document.body.classList.toggle('viewer-video-only',!hasPttPanel);
 }
 syncSessionCardinalityClasses();
 const translationTracks={A:(config.translationA||[]),B:(config.translationB||[])};
@@ -45,7 +41,7 @@ function refreshTranslationText(){
  const cue=translationTracks[activeTranslationTrack].find(row=>now>=Number(row.start)&&now<Number(row.end));
  translationText.textContent=cue?.translated||'';
 }
-const translationRefreshTimer=setInterval(refreshTranslationText,250);
+setInterval(refreshTranslationText,250);
 let watchMode=streams.length>1?"multi":"single";
 // No product-imposed stream cap: stop adding only for duplicates or browser/API failures.
 const liveRailItems=Array.from(document.querySelectorAll('.live-channel-rail-item[data-live-video-id]'));
@@ -101,7 +97,6 @@ recomputeVerifiedTimeline();
 const immerse=document.getElementById('customImmerse');
 const watchSettings=document.getElementById('watchSettings');
 const watchImmersive=document.getElementById('watchImmersive');
-const immersiveExit=document.getElementById('immersiveExit');
 watchSettings?.addEventListener('click',()=>{
  const open=document.body.classList.toggle('settings-open');
  watchSettings.setAttribute('aria-expanded',String(open));
@@ -160,14 +155,14 @@ function forceSingleImmersiveGeometry(active){
  pttPanel.style.setProperty('grid-row','1','important');
 }
 function forceMultiImmersiveGeometry(active){
- if(!contentGrid||streams.length<2)return;
+ if(!contentGrid||!pttPanel||streams.length<2)return;
  const playerColumn=document.querySelector('.custom-player-column');
  const stageNode=document.getElementById('stage');
  const cards=Array.from(stageNode?.querySelectorAll('.player-card')||[]);
  const wraps=cards.map(card=>card.querySelector('.video-wrap')).filter(Boolean);
  const playersNodes=wraps.flatMap(wrap=>Array.from(wrap.querySelectorAll('.player,iframe')));
  const controls=cards.map(card=>card.querySelector('.player-controls')).filter(Boolean);
- const nodes=[contentGrid,playerColumn,stageNode,...(pttPanel?[pttPanel]:[]),...cards,...wraps,...playersNodes,...controls].filter(Boolean);
+ const nodes=[contentGrid,playerColumn,stageNode,pttPanel,...cards,...wraps,...playersNodes,...controls].filter(Boolean);
  if(!active){
   nodes.forEach(node=>{
    const saved=node.dataset.multiImmersiveStyle;
@@ -259,28 +254,26 @@ function forceMultiImmersiveGeometry(active){
   node.style.setProperty('max-height','none','important');
  });
  controls.forEach(node=>node.style.setProperty('display','none','important'));
- if(pttPanel){
-  pttPanel.style.setProperty('position','relative','important');
-  pttPanel.style.setProperty('display','flex','important');
-  pttPanel.style.setProperty('flex-direction','column','important');
-  pttPanel.style.setProperty('width','100%','important');
-  pttPanel.style.setProperty('height','100%','important');
-  pttPanel.style.setProperty('min-width','0','important');
-  pttPanel.style.setProperty('min-height','0','important');
-  pttPanel.style.setProperty('max-width','none','important');
-  pttPanel.style.setProperty('max-height','none','important');
-  pttPanel.style.setProperty('overflow','hidden','important');
-  if(layout==='primary'){pttPanel.style.setProperty('grid-column','2','important');pttPanel.style.setProperty('grid-row',streams.length===2?'2 / 4':'3','important');}
-  else{pttPanel.style.setProperty('grid-column','auto','important');pttPanel.style.setProperty('grid-row','auto','important');}
-  const pttContent=pttPanel.querySelector('iframe:not([hidden]),#ptt-worker-feed:not([hidden])');
-  if(pttContent){
-   pttContent.style.setProperty('display','block','important');
-   pttContent.style.setProperty('flex','1 1 0','important');
-   pttContent.style.setProperty('width','100%','important');
-   pttContent.style.setProperty('height','100%','important');
-   pttContent.style.setProperty('min-height','0','important');
-   pttContent.style.setProperty('max-height','none','important');
-  }
+ pttPanel.style.setProperty('position','relative','important');
+ pttPanel.style.setProperty('display','flex','important');
+ pttPanel.style.setProperty('flex-direction','column','important');
+ pttPanel.style.setProperty('width','100%','important');
+ pttPanel.style.setProperty('height','100%','important');
+ pttPanel.style.setProperty('min-width','0','important');
+ pttPanel.style.setProperty('min-height','0','important');
+ pttPanel.style.setProperty('max-width','none','important');
+ pttPanel.style.setProperty('max-height','none','important');
+ pttPanel.style.setProperty('overflow','hidden','important');
+ if(layout==='primary'){pttPanel.style.setProperty('grid-column','2','important');pttPanel.style.setProperty('grid-row',streams.length===2?'2 / 4':'3','important');}
+ else{pttPanel.style.setProperty('grid-column','auto','important');pttPanel.style.setProperty('grid-row','auto','important');}
+ const pttContent=pttPanel.querySelector('iframe:not([hidden]),#ptt-worker-feed:not([hidden])');
+ if(pttContent){
+  pttContent.style.setProperty('display','block','important');
+  pttContent.style.setProperty('flex','1 1 0','important');
+  pttContent.style.setProperty('width','100%','important');
+  pttContent.style.setProperty('height','100%','important');
+  pttContent.style.setProperty('min-height','0','important');
+  pttContent.style.setProperty('max-height','none','important');
  }
 }
 
@@ -297,44 +290,28 @@ function applyImmersiveState(active){
 }
 immerse?.addEventListener('click',async()=>{
  const next=!immersiveEnabled;
- if(!next){await window.hvExit4174Immersive?.();return}
- applyImmersiveState(true);
+ applyImmersiveState(next);
  try{
-  if(!document.fullscreenElement){
+  if(next&&!document.fullscreenElement){
+   // Fullscreen the viewing surface itself, not the document: it enters the
+   // browser top layer and cannot inherit the Client shell's max-width/rails.
    const surface=pttPanel&&contentGrid?contentGrid:document.documentElement;
    await surface.requestFullscreen();
   }
+  else if(!next&&document.fullscreenElement)await document.exitFullscreen();
  }catch(_e){
-  statusBox.textContent='已進入沉浸介面（瀏覽器未提供全螢幕）';
+  // Keep the CSS immersive state even when browser fullscreen is unavailable.
+  statusBox.textContent=next?'已進入沉浸介面（瀏覽器未提供全螢幕）':'已退出沉浸介面';
  }
 });
-window.hvExit4174Immersive=async function hvExit4174Immersive(){
- if(immersiveExiting)return;
- immersiveExiting=true;
- // State must be cleared before leaving the browser fullscreen top layer.
- immersiveEnabled=false;
- document.body.classList.remove('custom-immersive');
- mountImmersiveSurface(false);
- forceSingleImmersiveGeometry(false);
- forceMultiImmersiveGeometry(false);
- repinWorkerPttAfterLayout();
- immerse?.setAttribute('aria-pressed','false');
- if(watchImmersive)watchImmersive.textContent='沉浸模式';
- if(immerse)immerse.textContent='沉浸模式';
- try{
-  if(document.fullscreenElement)await document.exitFullscreen();
- }catch(_e){}
- immersiveExiting=false;
-};
-immersiveExit?.addEventListener('click',()=>window.hvExit4174Immersive?.());
-document.addEventListener('keydown',event=>{
- if(event.key!=='Escape'||!immersiveEnabled||immersiveExiting)return;
- window.hvExit4174Immersive?.();
-});
 document.addEventListener('fullscreenchange',()=>{
- if(immersiveExiting)return;
- if(!document.fullscreenElement&&immersiveEnabled)applyImmersiveState(false);
- else if(document.fullscreenElement&&!immersiveEnabled)applyImmersiveState(true);
+ // Escape exits immersive if fullscreen was actually active. CSS-only immersive
+ // remains valid when the browser refuses requestFullscreen().
+ if(!document.fullscreenElement&&immersiveEnabled&&document.visibilityState==='visible'){
+  applyImmersiveState(false);
+ }else if(document.fullscreenElement){
+  applyImmersiveState(true);
+ }
 });
 
 function refreshMultiControls(){const active=streams.length>1;document.querySelectorAll('[data-layout]').forEach(button=>button.hidden=!active);for(const id of ['playerSyncLabel','focusChoices','focusCarousel','focusCarouselIntervalLabel','audioFollowLabel','playAll','pauseAll']){const el=document.getElementById(id);if(el)el.hidden=!active;}}
@@ -574,13 +551,13 @@ function syncFollowers(master,playing){
     if(playing&&!canPlay){
       pendingArchiveFollowers.add(index);
       if(typeof player.pauseVideo==='function'){
-        syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
+        syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
         player.pauseVideo();
       }
       return;
     }
     pendingArchiveFollowers.delete(index);
-    const expected=playing?window.YT.PlayerState.PLAYING:window.YT.PlayerState.PAUSED;
+    const expected=playing?YT.PlayerState.PLAYING:YT.PlayerState.PAUSED;
     if(typeof player.getPlayerState==='function'&&player.getPlayerState()===expected)return;
     syncEchoes.set(index,{expected,expires:Date.now()+2000});
     if(playing&&typeof player.playVideo==='function')player.playVideo();
@@ -601,8 +578,8 @@ function handlePlayerState(index,event){
   // Keep the expected echo until it matches; a real PAUSED/PLAYING
   // user action with a different state still propagates.
  }
- if(event.data===window.YT.PlayerState.PLAYING)syncFollowers(index,true);
- else if(event.data===window.YT.PlayerState.PAUSED)syncFollowers(index,false);
+ if(event.data===YT.PlayerState.PLAYING)syncFollowers(index,true);
+ else if(event.data===YT.PlayerState.PAUSED)syncFollowers(index,false);
 }
 syncPlayback?.addEventListener('change',()=>{
  syncEchoes.clear();
@@ -612,8 +589,8 @@ syncPlayback?.addEventListener('change',()=>{
  const master=players[syncMaster];
  if(!master||typeof master.getPlayerState!=='function')return;
  const state=master.getPlayerState();
- if(state===window.YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
- else if(state===window.YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
+ if(state===YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
+ else if(state===YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
 });
 manualTimelineAlign?.addEventListener('change',()=>{
  syncEchoes.clear();pendingArchiveFollowers.clear();
@@ -630,8 +607,8 @@ manualTimelineAlign?.addEventListener('change',()=>{
   syncMaster=primaryIndex;
   const master=players[syncMaster];
   const state=master&&typeof master.getPlayerState==='function'?master.getPlayerState():null;
-  if(state===window.YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
-  else if(state===window.YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
+  if(state===YT.PlayerState.PLAYING)syncFollowers(syncMaster,true);
+  else if(state===YT.PlayerState.PAUSED)syncFollowers(syncMaster,false);
   else players.forEach((_,index)=>{if(index!==syncMaster)alignFollower(index,syncMaster);});
   statusBox.textContent='已啟用依實際開播時間自動對齊';
  }else{
@@ -650,12 +627,12 @@ function controlAllPlayback(playing){
   if(playing&&hasVerifiedTimeline&&index!==syncMaster&&!alignFollower(index,syncMaster)){
    pendingArchiveFollowers.add(index);
    if(typeof player.pauseVideo==='function'){
-    syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
+    syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
     player.pauseVideo();
    }
    return;
   }
-  const expected=playing?window.YT.PlayerState.PLAYING:window.YT.PlayerState.PAUSED;
+  const expected=playing?YT.PlayerState.PLAYING:YT.PlayerState.PAUSED;
   if(typeof player.getPlayerState==='function'&&player.getPlayerState()===expected)return;
   syncEchoes.set(index,{expected,expires:Date.now()+2000});
   if(playing&&typeof player.playVideo==='function')player.playVideo();
@@ -666,12 +643,12 @@ function controlAllPlayback(playing){
 }
 // Explicit group controls remain permitted; never infer archive offsets.
 playAll?.addEventListener('click',()=>controlAllPlayback(true));
-const verifiedSyncTimer=setInterval(()=>{
+setInterval(()=>{
  if(!hasVerifiedTimeline||!syncPlayback?.checked)return;
  const master=players[syncMaster];
  if(!master||typeof master.getPlayerState!=='function')return;
  const state=master.getPlayerState();
- if(state!==window.YT.PlayerState.PLAYING&&state!==window.YT.PlayerState.PAUSED)return;
+ if(state!==YT.PlayerState.PLAYING&&state!==YT.PlayerState.PAUSED)return;
  players.forEach((_,index)=>{
   if(index===syncMaster)return;
   const ready=alignFollower(index,syncMaster);
@@ -680,8 +657,8 @@ const verifiedSyncTimer=setInterval(()=>{
    const follower=players[index];
    if(follower&&typeof follower.pauseVideo==='function'&&
       typeof follower.getPlayerState==='function'&&
-      follower.getPlayerState()!==window.YT.PlayerState.PAUSED){
-    syncEchoes.set(index,{expected:window.YT.PlayerState.PAUSED,expires:Date.now()+2000});
+      follower.getPlayerState()!==YT.PlayerState.PAUSED){
+    syncEchoes.set(index,{expected:YT.PlayerState.PAUSED,expires:Date.now()+2000});
     follower.pauseVideo();
    }
    return;
@@ -689,8 +666,8 @@ const verifiedSyncTimer=setInterval(()=>{
   if(ready&&pendingArchiveFollowers.has(index)){
    pendingArchiveFollowers.delete(index);
    const follower=players[index];
-   if(state===window.YT.PlayerState.PLAYING&&follower&&typeof follower.playVideo==='function'){
-    syncEchoes.set(index,{expected:window.YT.PlayerState.PLAYING,expires:Date.now()+2000});
+   if(state===YT.PlayerState.PLAYING&&follower&&typeof follower.playVideo==='function'){
+    syncEchoes.set(index,{expected:YT.PlayerState.PLAYING,expires:Date.now()+2000});
     follower.playVideo();
    }
   }
@@ -748,12 +725,11 @@ async function refreshLiveCollab(){
   const response=await fetch(collabPollUrl,{cache:'no-store',headers:{'Accept':'application/json'}});
   if(!response.ok)return;
   const payload=await response.json();
-  const additions=Array.isArray(payload.streams)?payload.streams:
-    Array.isArray(payload.event?.streams)?payload.event.streams:[];
+  const additions=Array.isArray(payload.streams)?payload.streams:[];
   additions.forEach(item=>{
    const id=String(item.video_id||'');
    if(!/^[A-Za-z0-9_-]{11}$/.test(id)||streams.some(stream=>stream.videoId===id))return;
-   appendWatchStream(id,String(item.label||item.title||item.channel_name||id),String(item.channel_id||''));
+   appendWatchStream(id,String(item.label||id),String(item.channel_id||''));
   });
   if(additions.length&&collabLabel)statusBox.title=collabLabel+' · Live POV 自動更新中';
  }catch(_error){
@@ -792,72 +768,13 @@ function mountWatchPlayer(index){
   const stream=streams[index];
   if(!stream||players[index])return;
   const card=stage.querySelector('.player-card[data-index="'+index+'"]');
-  if(!card||!window.YT?.Player)return;
-  try{
-   const mounted=new window.YT.Player('player-'+card.dataset.slotId,{
-    videoId:stream.videoId,width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
-    events:{onReady:()=>{const current=players.indexOf(mounted);if(current<0)return;applyAudio();if(playAll)playAll.disabled=false;if(pauseAll)pauseAll.disabled=false;if(typeof startPttBridge==='function')startPttBridge(current);},onStateChange:event=>{const current=players.indexOf(mounted);if(current>=0)handlePlayerState(current,event);},onError:event=>{const current=players.indexOf(mounted);if(current<0)return;const code=Number(event?.data);statusBox.textContent='YouTube 內嵌播放失敗'+(Number.isFinite(code)?'（錯誤 '+code+'）':'')+'；可用 YouTube ↗ 開啟原影片確認。';}}
-   });
-   players[index]=mounted;
-  }catch(error){
-   statusBox.textContent='YouTube 播放器初始化失敗：'+String(error?.message||error);
-  }
+  if(!card)return;
+  const mounted=new YT.Player('player-'+card.dataset.slotId,{
+      videoId:stream.videoId,width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,controls:1},
+      events:{onReady:()=>{const current=players.indexOf(mounted);if(current<0)return;applyAudio();if(playAll)playAll.disabled=false;if(pauseAll)pauseAll.disabled=false;if(typeof startPttBridge==='function')startPttBridge(current);},onStateChange:event=>{const current=players.indexOf(mounted);if(current>=0)handlePlayerState(current,event);},onError:event=>{const current=players.indexOf(mounted);if(current<0)return;const code=Number(event?.data);statusBox.textContent='YouTube 內嵌播放失敗'+(Number.isFinite(code)?'（錯誤 '+code+'）':'')+'；可用 YouTube ↗ 開啟原影片確認。';}}
+  });
+  players[index]=mounted;
 }
-let youtubeReadyRetryTimer=null;
-function mountAllWatchPlayers(){streams.forEach((stream,index)=>mountWatchPlayer(index));}
-if(window.YT?.Player){
- mountAllWatchPlayers();
-}else{
- window.__hvYoutubeReadyCallbacks=window.__hvYoutubeReadyCallbacks||[];
- window.__hvYoutubeReadyCallbacks.push(mountAllWatchPlayers);
- if(!window.__hvYoutubeApiRequested){
-  window.__hvYoutubeApiRequested=true;
-  const previous=window.onYouTubeIframeAPIReady;
-  window.onYouTubeIframeAPIReady=function(){
-   try{if(typeof previous==='function')previous();}catch(_e){}
-   const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
-   callbacks.forEach(callback=>{try{callback();}catch(_e){}});
-  };
-  const existingApi=document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-  if(!existingApi){
-   const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';
-   api.onerror=()=>{window.__hvYoutubeApiRequested=false;statusBox.textContent='YouTube 播放器載入失敗，請重新整理後再試。';};
-   document.head.appendChild(api);
-  }else{
-   let attempts=0;
-   youtubeReadyRetryTimer=setInterval(()=>{
-    attempts++;
-    if(window.YT?.Player){
-     clearInterval(youtubeReadyRetryTimer);youtubeReadyRetryTimer=null;
-     const callbacks=window.__hvYoutubeReadyCallbacks.splice(0);
-     callbacks.forEach(callback=>{try{callback();}catch(_e){}});
-    }else if(attempts>=200){
-     clearInterval(youtubeReadyRetryTimer);youtubeReadyRetryTimer=null;
-     window.__hvYoutubeApiRequested=false;
-     statusBox.textContent='YouTube 播放器初始化逾時，請重新整理後再試。';
-    }
-   },50);
-  }
- }
-}
-window.hvDestroy4174SharedViewer=function hvDestroy4174SharedViewer(){
- try{applyImmersiveState(false);}catch(_e){}
- document.body.classList.remove('custom-immersive');
- stopFocusCarousel();
- clearInterval(translationRefreshTimer);
- clearInterval(verifiedSyncTimer);
- if(collabPollTimer)clearInterval(collabPollTimer);
- if(youtubeReadyRetryTimer)clearInterval(youtubeReadyRetryTimer);
- if(Array.isArray(window.__hvYoutubeReadyCallbacks)){
-  window.__hvYoutubeReadyCallbacks=window.__hvYoutubeReadyCallbacks.filter(callback=>callback!==mountAllWatchPlayers);
- }
- players.forEach(player=>{try{if(player&&typeof player.destroy==='function')player.destroy();}catch(_e){}});
- for(const name of ['watch-multi','watch-grid','layout-auto','layout-equal','layout-primary','single-ptt','single-live','single-vod','multi-stream','viewer-has-ptt','viewer-video-only','collab-live-session','settings-open','custom-immersive']){
-  document.body.classList.remove(name);
- }
- for(const name of ['--tile-count','--tile-columns','--tile-rows','--columns','--side-count','--ptt-font-size']){
-  document.documentElement.style.removeProperty(name);
- }
- window.hvDestroy4174SharedViewer=null;
-};
+window.onYouTubeIframeAPIReady=function(){streams.forEach((stream,index)=>mountWatchPlayer(index));};
+const api=document.createElement('script');api.src='https://www.youtube.com/iframe_api';document.head.appendChild(api);
 };
