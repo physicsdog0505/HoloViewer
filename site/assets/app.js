@@ -34,10 +34,16 @@ function updateClientTopbar(routeName){
 }
 
 
+let currentRoute='home';
 function route(r){
  // Hash query belongs to the session, not the route key.
  r=String(r||'').split('?')[0];
  if(!names[r])r='home';
+ // 4174 page navigation destroys transient card selection. Public is an SPA,
+ // so explicitly emulate that page lifecycle instead of carrying selection
+ // across Home/History -> Viewer/other routes.
+ if(r!==currentRoute&&['home','history'].includes(currentRoute))selectedHomeVideos.clear();
+ currentRoute=r;
  // A viewing route without mounted players must never display an empty workspace.
  if(r==='custom-session'&&!viewing.ids.length){
   const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
