@@ -552,6 +552,11 @@ function pttToLatest(force=false){
  requestAnimationFrame(()=>requestAnimationFrame(()=>{pttProgrammatic=false}));
  $('ptt-newest').hidden=true;
 }
+function pttSettleLatest(frames=12){
+ if(!pttFollowing||!pttLastGoodCount)return;
+ pttToLatest(true);
+ if(frames>0)requestAnimationFrame(()=>pttSettleLatest(frames-1));
+}
 function pttRow(row){
  const push=node('div',undefined,'push');
  push.dataset.pushId=String(row.push_id||row.aid+':'+row.source_line);
@@ -594,7 +599,7 @@ function pttInitControls(){
   latest.hidden=pttFollowing;
  },{passive:true});
  $('ptt-show-floor').onchange=()=>pttApplyFloorPreference($('ptt-show-floor').checked);
- const settleToLatest=()=>{if(pttFollowing&&pttLastGoodCount)requestAnimationFrame(()=>requestAnimationFrame(()=>pttToLatest(true)))};
+ const settleToLatest=()=>pttSettleLatest();
  window.addEventListener('load',settleToLatest,{once:true});
  window.addEventListener('pageshow',settleToLatest);
  if(typeof ResizeObserver==='function'){
@@ -660,7 +665,7 @@ async function loadPtt(){
   list.hidden=!pttLastGoodCount;empty.hidden=Boolean(pttLastGoodCount);
   if(!pttLastGoodCount)empty.textContent='目前沒有今天的推文。';
   if(pttLastGoodCount){
-   if(wasEmpty||nearBottom){pttFollowing=true;requestAnimationFrame(()=>requestAnimationFrame(()=>pttToLatest(true)))}
+   if(wasEmpty||nearBottom){pttFollowing=true;pttSettleLatest()}
    else{list.scrollTop=previousScroll;latest.hidden=false}
   }
  }catch(e){
