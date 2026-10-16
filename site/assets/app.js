@@ -14,7 +14,7 @@ function youtubeEmbedUrl(id){
  return url.toString();
 }
 function frame(id){const f=document.createElement('iframe');f.className='frame';f.title='YouTube player '+id;f.src=youtubeEmbedUrl(id);f.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';f.referrerPolicy='strict-origin-when-cross-origin';f.allowFullscreen=true;return f}
-function single(id,target='single-player'){if(!id){if($(target))message(target,'請輸入有效的 YouTube 網址或影片 ID。');return}if(!$(target)){openViewingDocument([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}$(target).replaceChildren(frame(id))}
+function single(id,target='single-player'){if(!id){if($(target))message(target,'請輸入有效的 YouTube 網址或影片 ID。');return}if(!$(target)){openViewingDocument([id],{layout:'auto',primary:0,audio:0});return}$(target).replaceChildren(frame(id))}
 function viewingSessionUrl(ids,opts={}){
  const clean=[...new Set((ids||[]).map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return '/custom-view';
@@ -23,7 +23,7 @@ function viewingSessionUrl(ids,opts={}){
  q.set('layout',['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto');
  q.set('primary',String(Math.max(0,Number(opts.primary)||0)));
  q.set('audio',String(Math.max(0,Number(opts.audio)||0)));
- q.set('ptt',opts.ptt==='live'?'live':'video');
+ if(opts.ptt==='video')q.set('ptt','video');
  if(opts.eventId)q.set('event',String(opts.eventId));
  return '/custom-view/session?'+q.toString();
 }
@@ -94,7 +94,7 @@ function route(r){
  if(r==='watchalong')loadWatchalongRecent();
 }
 async function api(path){if(!config.apiBase||!/^https:\/\//.test(config.apiBase))throw Error('尚未設定正式 Worker API');const base=config.apiBase.replace(/\/$/,'');const response=await fetch(base+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}});if(!response.ok)throw Error('API HTTP '+response.status);return response.json()}
-function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>openViewingDocument([item.video_id],{layout:'auto',ptt:'video',primary:0,audio:0});card.append(btn);container.append(card)}
+function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>openViewingDocument([item.video_id],{layout:'auto',primary:0,audio:0});card.append(btn);container.append(card)}
 const HOME_FILTER_KEY='holoviewer-live-filter';
 const HOME_FILTERS=new Set(['hololive','holostars','mekpark','all']);
 const selectedHomeVideos=new Set();
@@ -202,7 +202,7 @@ function openCollabEvent(event){
  const streams=collabEventStreams(event);
  const ids=streams.map(x=>x.video_id);
  if(ids.length<2)return;
- location.href=viewingSessionUrl(ids,{layout:'auto',ptt:'video',primary:0,audio:0,eventId:String(event.event_id||'')});
+ location.href=viewingSessionUrl(ids,{layout:'auto',primary:0,audio:0,eventId:String(event.event_id||'')});
 }
 function collabEntry(event){
  const streams=collabEventStreams(event);
@@ -238,7 +238,7 @@ function homeCard(item,container){
   if(event.target.closest('.stream-collab-entry'))return;
   const source=event.target.closest('[data-youtube-href]');
   if(source){event.preventDefault();event.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer');return}
-  event.preventDefault();if(!card.dataset.multiviewId){openViewingDocument([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}
+  event.preventDefault();if(!card.dataset.multiviewId){openViewingDocument([id],{layout:'auto',primary:0,audio:0});return}
   if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);homeSelection()
  });
  card.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open(event.target.dataset.youtubeHref,'_blank','noopener,noreferrer')}});
@@ -310,7 +310,7 @@ function renderHomeHighlights(rows){
    const message=node('span',undefined,'announcement-entry');message.dataset.announcementIndex=String(i);message.hidden=i!==0;
    const link=node('a');link.href='/custom-view/session?stream='+encodeURIComponent(pick.row.video_id);
    link.append(node('strong',pick.label),document.createTextNode(' · '+String(pick.row.channel_title||pick.row.channel_name||'Hololive')+'：'+String(pick.row.title||'')));
-   link.onclick=e=>{e.preventDefault();openViewingDocument([pick.row.video_id],{layout:'auto',ptt:'video',primary:0,audio:0})};
+   link.onclick=e=>{e.preventDefault();openViewingDocument([pick.row.video_id],{layout:'auto',primary:0,audio:0})};
    message.append(link);track.append(message);
   });
   messages.append(track);aside.append(messages);announcement.append(aside);
@@ -323,7 +323,7 @@ function renderHomeHighlights(rows){
   const row=pick.row,id=row.video_id;const state=String(row.lifecycle_state||row.state||'').toLowerCase();
   const slide=node('div',undefined,'highlight-slide');slide.dataset.slide=String(i);slide.hidden=i!==0;
   const card=node('a',undefined,'home-highlight');card.href='/custom-view/session?stream='+encodeURIComponent(id);
-  card.onclick=e=>{if(e.target.closest('[data-youtube-href]'))return;e.preventDefault();openViewingDocument([id],{layout:'auto',ptt:'video',primary:0,audio:0})};
+  card.onclick=e=>{if(e.target.closest('[data-youtube-href]'))return;e.preventDefault();openViewingDocument([id],{layout:'auto',primary:0,audio:0})};
   const thumb=node('div',undefined,'highlight-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
   const source=node('span','YouTube ↗','youtube-source-link');source.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;source.setAttribute('role','link');source.tabIndex=0;
   source.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer')});
@@ -424,7 +424,7 @@ function collabEventCard(event){
  const eventTimes=members.map(x=>Date.parse(x.actual_start||x.scheduled_start||x.start_at||'')).filter(Number.isFinite);
  const eventAt=eventTimes.length?Math.max(...eventTimes):NaN;
  const dateLabel=Number.isFinite(eventAt)?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(eventAt)):'日期未明';
- const card=node('a',undefined,'collab-event-card '+state);card.href=viewingSessionUrl(members.map(x=>x.video_id),{layout:'auto',ptt:'video',primary:0,audio:0,eventId:String(event.event_id||'')});
+ const card=node('a',undefined,'collab-event-card '+state);card.href=viewingSessionUrl(members.map(x=>x.video_id),{layout:'auto',primary:0,audio:0,eventId:String(event.event_id||'')});
  card.dataset.eventDate=dateLabel;
  card.onclick=e=>{if(e.target.closest('[data-youtube-href]'))return;e.preventDefault();openCollabEvent(event)};
  const thumb=node('div',undefined,'collab-event-thumb'),img=node('img');img.src='https://i.ytimg.com/vi/'+representative.video_id+'/hqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
@@ -552,6 +552,11 @@ function pttToLatest(force=false){
  requestAnimationFrame(()=>requestAnimationFrame(()=>{pttProgrammatic=false}));
  $('ptt-newest').hidden=true;
 }
+function pttSettleLatest(frames=12){
+ if(!pttFollowing||!pttLastGoodCount)return;
+ pttToLatest(true);
+ if(frames>0)requestAnimationFrame(()=>pttSettleLatest(frames-1));
+}
 function pttRow(row){
  const push=node('div',undefined,'push');
  push.dataset.pushId=String(row.push_id||row.aid+':'+row.source_line);
@@ -594,6 +599,18 @@ function pttInitControls(){
   latest.hidden=pttFollowing;
  },{passive:true});
  $('ptt-show-floor').onchange=()=>pttApplyFloorPreference($('ptt-show-floor').checked);
+ const settleToLatest=()=>pttSettleLatest();
+ window.addEventListener('load',settleToLatest,{once:true});
+ window.addEventListener('pageshow',settleToLatest);
+ if(typeof ResizeObserver==='function'){
+  const observer=new ResizeObserver(()=>{if(pttFollowing&&pttLastGoodCount)pttToLatest()});
+  observer.observe(list);
+  if(list.parentElement)observer.observe(list.parentElement);
+ }
+ if(typeof MutationObserver==='function'){
+  const observer=new MutationObserver(()=>{if(pttFollowing&&pttLastGoodCount)pttToLatest()});
+  observer.observe(list,{childList:true,subtree:true});
+ }
 }
 function pttEmbeddedMessage(event){
  if(event.origin!==location.origin||event.source!==window.parent)return;
@@ -648,7 +665,7 @@ async function loadPtt(){
   list.hidden=!pttLastGoodCount;empty.hidden=Boolean(pttLastGoodCount);
   if(!pttLastGoodCount)empty.textContent='目前沒有今天的推文。';
   if(pttLastGoodCount){
-   if(wasEmpty||nearBottom){pttFollowing=true;requestAnimationFrame(()=>requestAnimationFrame(()=>pttToLatest(true)))}
+   if(wasEmpty||nearBottom){pttFollowing=true;pttSettleLatest()}
    else{list.scrollTop=previousScroll;latest.hidden=false}
   }
  }catch(e){
@@ -663,9 +680,9 @@ pttInitControls();
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHomeFilter()});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',ptt:'video',primary:0,audio:0})};
+$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',ptt:'video',primary:0,audio:0})};
+$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};
 $('ptt-refresh').onclick=event=>{event.preventDefault();location.href='/ptt-today'};
 $('ptt-focus').onclick=event=>{event.preventDefault();location.href=document.body.classList.contains('ptt-focus-mode')?'/ptt-today':'/ptt-today?focus=1'};
 let customCatalogCache=null;
@@ -679,7 +696,7 @@ function sessionMute(iframe,mute){
  if(!iframe?.contentWindow)return;
  iframe.contentWindow.postMessage(JSON.stringify({event:'command',func:mute?'mute':'unMute',args:[]}), 'https://www.youtube-nocookie.com');
 }
-const viewing={ids:[],layout:'auto',primary:0,audio:0,ptt:'video'};
+const viewing={ids:[],layout:'auto',primary:0,audio:0,ptt:'live'};
 const viewerPttPanel=$('custom-session-ptt-panel');
 // 4174 watching controls — preserve mounted YouTube iframe instances.
 let watchMode='single';
@@ -922,7 +939,7 @@ window.hvOpenCustomSession=function(ids,opts={}){
  const clean=[...new Set(ids.map(id=>videoId(String(id||''))).filter(Boolean))];
  if(!clean.length)return;
  viewing.ids=clean;
- viewing.ptt=opts.ptt==='live'?'live':'video';
+ viewing.ptt=opts.ptt==='video'?'video':'live';
  viewing.layout=['auto','equal','primary'].includes(opts.layout)?opts.layout:'auto';
  viewing.primary=Math.max(0,Math.min(clean.length-1,Number(opts.primary)||0));
  viewing.audio=Math.max(0,Math.min(clean.length-1,Number(opts.audio)||0));
@@ -1314,7 +1331,7 @@ renderWatchalongSession();
  if(!ids.length){location.replace('/custom-view');return;}
  const opts={
   layout:params.get('layout'),
-  ptt:params.get('ptt'),
+  ptt:params.get('ptt')==='video'?'video':'live',
   primary:Number(params.get('primary')||0),
   audio:Number(params.get('audio')||0)
  };
