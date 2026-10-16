@@ -278,17 +278,6 @@ function forceMultiImmersiveGeometry(active){
    pttContent.style.setProperty('max-height','none','important');
   }
  }
-}tPanel.style.setProperty('grid-column','auto','important');pttPanel.style.setProperty('grid-row','auto','important');}
- const pttContent=pttPanel.querySelector('iframe:not([hidden]),#ptt-worker-feed:not([hidden])');
- if(pttContent){
-  pttContent.style.setProperty('display','block','important');
-  pttContent.style.setProperty('flex','1 1 0','important');
-  pttContent.style.setProperty('width','100%','important');
-  pttContent.style.setProperty('height','100%','important');
-  pttContent.style.setProperty('min-height','0','important');
-  pttContent.style.setProperty('max-height','none','important');
- }
-}
 
 function applyImmersiveState(active){
  immersiveEnabled=Boolean(active);
