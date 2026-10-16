@@ -1,9 +1,10 @@
 """Optional owner-gated near-live Collector -> existing Cloudflare API one-shot Publisher.
 
 This is a separate LIVE cursor, never a claim of complete historical lines.
-Only first-seen pushes matching PTT displayed Taipei minute within 180 seconds
-can be signed. Uncertain remote outcomes persist a stop latch: never retry
-automatically. No synthetic content or public write endpoints.
+First-seen pushes can be signed after a strong 180-second observed-time match,
+or a verified source-chronology reconstruction with an at-most-two-hour Collector
+delay. Rows without explicit timezone authority stay pending. Uncertain remote
+outcomes persist a stop latch: never retry automatically. No synthetic content or public write endpoints.
 """
 import argparse
 from datetime import datetime,timezone,timedelta
@@ -92,7 +93,10 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
         if observed is None:
             recovered=recovered_by_line.get(row["source_line"])
             try:
-                collected=datetime.fromisoformat(row["collected_at"].replace("Z","+00:00")).astimezone(timezone.utc)
+                collected=datetime.fromisoformat(row["collected_at"].replace("Z","+00:00"))
+                if collected.tzinfo is None:
+                    raise ValueError("collected_at timezone missing")
+                collected=collected.astimezone(timezone.utc)
                 canonical=(datetime.fromisoformat(recovered.replace("Z","+00:00")).astimezone(timezone.utc)
                            if recovered else None)
                 delay=(collected-canonical).total_seconds() if canonical else None
