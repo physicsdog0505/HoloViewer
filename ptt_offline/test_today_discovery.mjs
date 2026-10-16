@@ -112,7 +112,7 @@ function discoveryFetch(){
     feedCalls++;
     return feedResponse(ordinal);
   }
-  if(url.includes('youtube.googleapis.com/youtube/v3/videos')){
+  if(url.includes('googleapis.com/youtube/v3/videos')){
     videoCalls++;
     const ids=new URL(url).searchParams.get('id').split(',');
     const items=ids.map(id=>{
