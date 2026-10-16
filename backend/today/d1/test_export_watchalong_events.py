@@ -43,6 +43,8 @@ class ProjectionGateTests(unittest.TestCase):
         mirror="https://www.pttweb.cc/bbs/C_Chat/M.1790506113.A.7E3.html"
         self.assertEqual(module.canonical_article_url(official),official)
         self.assertEqual(module.canonical_article_url(mirror),official)
+        self.assertEqual(module.canonical_article_url(mirror.removesuffix(".html")),official)
+        self.assertEqual(module.canonical_article_url(mirror.removesuffix(".html")+"/"),official)
         self.assertIsNone(module.canonical_article_url("https://bad.example/bbs/C_Chat/M.1790506113.A.7E3.html"))
         self.assertIsNone(module.canonical_article_url(mirror+"?unexpected=1"))
     def test_two_source_representations_dedupe_without_collapsing_other_day(self):
