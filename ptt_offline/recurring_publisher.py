@@ -83,6 +83,12 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     batch=run_live_once(db,state_path=state,secret=secret,
                         executor=executor,send=True,batch_cap=batch_cap,article_id=article_id)
                     last_status=batch.get("status",last_status)
+                    if batch.get("status")=="BASELINED":
+                        # Local first-seen baseline is a successful zero-write
+                        # activation outcome, not a remote failure.
+                        count=0
+                        last_status="BASELINED"
+                        break
                     if batch.get("status")!="ACK":
                         count=0
                         break
