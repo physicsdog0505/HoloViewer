@@ -363,11 +363,14 @@ class ParityContract(unittest.TestCase):
 
     def test_shared_shell_has_no_invented_footer_or_dead_id_bindings(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')
         self.assertNotIn('<footer',html)
-        element_ids=set(re.findall(r'\bid="([^"]+)"',html))
+        element_ids=set(re.findall(r'\bid="([^"]+)"',html+"\n"+dom))
         required_ids=set(re.findall(r"\$\('([^']+)'\)",js))
-        self.assertEqual(required_ids-element_ids,set(),"JS required ID missing in Public HTML")
+        required_ids.update(re.findall(r"getElementById\('([^']+)'\)",viewer))
+        self.assertEqual(required_ids-element_ids,set(),"JS required ID missing from Public shell + transplanted Viewer DOM")
 
     def test_4174_watching_controls_and_no_iframe_remount_on_mode_toggle(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
