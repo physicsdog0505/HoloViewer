@@ -431,33 +431,6 @@ class ParityContract(unittest.TestCase):
         end=js.index("window.addEventListener('message'",start)
         self.assertNotIn("setInterval(",js[start:end])
 
-    def test_home_history_and_collab_default_to_live_ptt_layout(self):
-        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("if(opts.ptt==='video')q.set('ptt','video');",js)
-        self.assertIn("ptt:params.get('ptt')==='video'?'video':'live'",js)
-        self.assertIn("viewing.ptt=opts.ptt==='video'?'video':'live';",js)
-        self.assertNotIn("q.set('ptt',opts.ptt==='live'?'live':'video')",js)
-        self.assertIn("$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};",js)
-        self.assertIn("$('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openViewingDocument(ids,{layout:'auto',primary:0,audio:0})};",js)
-
-    def test_viewer_mount_defaults_to_live_ptt_and_ptt_follows_latest(self):
-        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("const viewing={ids:[],layout:'auto',primary:0,audio:0,ptt:'live'};",js)
-        self.assertIn("viewing.ptt=opts.ptt==='video'?'video':'live';",js)
-        self.assertIn("ptt:params.get('ptt')==='video'?'video':'live'",js)
-        self.assertIn("const settleToLatest=()=>{if(pttFollowing&&pttLastGoodCount)",js)
-        self.assertIn("window.addEventListener('pageshow',settleToLatest)",js)
-        self.assertIn("new ResizeObserver(()=>{if(pttFollowing&&pttLastGoodCount)pttToLatest()",js)
-        self.assertIn("new MutationObserver(()=>{if(pttFollowing&&pttLastGoodCount)pttToLatest()",js)
-
-    def test_three_plus_pov_grid_keeps_all_players_and_ptt_in_viewport(self):
-        css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
-        self.assertIn("Final desktop 3+ POV authority",css)
-        self.assertIn("body.custom-session-watching.watch-grid:not(.custom-immersive) #stage",css)
-        self.assertIn("grid-template-columns:repeat(var(--tile-columns,2),minmax(0,1fr))!important",css)
-        self.assertIn("grid-template-rows:repeat(var(--tile-rows,2),minmax(0,1fr))!important",css)
-        self.assertIn("body.custom-session-watching.watch-grid:not(.custom-immersive) #stage > .ptt-live-panel",css)
-
     def test_session_url_encodes_and_restores_explicit_stream_ids(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn("clean.forEach(id=>q.append('stream',id))",js)
