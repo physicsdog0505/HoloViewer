@@ -41,6 +41,7 @@ const playerCards=[];
 let catalogRows=[];
 const syncExpected=new WeakMap();
 let carouselTimer=null;
+let lockedIndex=null;
 let pttFollowing=true;
 let pttLoaded=false;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
@@ -96,12 +97,12 @@ function setLayoutPreset(preset){
  if(preset==='equal'){layout='equal';workspaceLayout='sidebar'}
  else if(preset==='focus'){layout='primary';workspaceLayout='focus'}
  else{layout='primary';workspaceLayout='sidebar'}
- if(preset==='equal'&&carousel.checked){
-  carousel.checked=false;
-  startCarousel();
- }
+ carousel.checked=preset!=='equal';
+ if(preset==='focus')lockedIndex=primaryIndex;
+ else lockedIndex=null;
  renderControls();
  applyLayout();
+ startCarousel();
 }
 function hideSettings(){
  document.body.classList.remove('settings-open');
@@ -167,8 +168,8 @@ function renderControls(){
   const button=node('button',undefined,'focus-avatar-button');
   button.type='button';
   button.dataset.focusIndex=String(index);
-  button.title='設為主視角：'+stream.label;
-  button.setAttribute('aria-label','設為主視角：'+stream.label);
+  button.title=(currentLayoutPreset()==='focus'?'鎖定主視角：':'切換目前視角：')+stream.label;
+  button.setAttribute('aria-label',button.title);
   applyFocusAccent(button,stream);
   const avatar=streamAvatarUrl(stream);
   if(avatar){
@@ -188,8 +189,8 @@ function renderControls(){
  document.getElementById('layoutGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!multi;
  persistentPlaybackControls.hidden=!multi;
- carouselControl.hidden=!focusMode;
- carouselIntervalGroup.hidden=!focusMode||!carousel.checked;
+ carouselControl.hidden=true;
+ carouselIntervalGroup.hidden=!focusMode;
  multiModeSwitch.checked=watchMode==='multi';
  applyModeClass();
  settingsButton.classList.toggle('active',!controls.hidden);
@@ -202,9 +203,9 @@ function refreshControlState(){
   button.setAttribute('aria-pressed',String(active));
  });
  [...focusChoices.children].forEach((button,index)=>{
-  const active=index===primaryIndex;
-  button.classList.toggle('active',active);
-  button.setAttribute('aria-pressed',String(active));
+  const locked=currentLayoutPreset()==='focus'&&index===lockedIndex;
+  button.classList.toggle('active',locked);
+  button.setAttribute('aria-pressed',String(locked));
  });
  playerCards.forEach((card,index)=>{
   if(!card)return;
@@ -241,6 +242,7 @@ function setAudioMaster(index){
 function setPrimary(index){
  if(index<0||index>=streams.length)return;
  primaryIndex=index;
+ if(currentLayoutPreset()==='focus')lockedIndex=index;
  setAudioMaster(index);
  applyLayout();
  resolvePrimaryPtt();
@@ -299,6 +301,7 @@ function switchWatchMode(nextMode){
  clearInterval(carouselTimer);
  carouselTimer=null;
  carousel.checked=false;
+ lockedIndex=null;
  if(watchMode==='single'&&streams.length>1){
   const selected={...(streams[primaryIndex]||streams[0])};
   destroyPlayers();
@@ -699,9 +702,9 @@ async function loadPtt(){
 function startCarousel(){
  clearInterval(carouselTimer);
  carouselTimer=null;
- if(!carousel.checked||watchMode!=='multi'||streams.length<2)return;
+ if(currentLayoutPreset()==='equal'||watchMode!=='multi'||streams.length<2)return;
  const ms=Math.max(30,Math.min(60,Number(carouselInterval.value)||30))*1000;
- carouselTimer=setInterval(()=>setPrimary((primaryIndex+1)%streams.length),ms);
+ if(currentLayoutPreset()==='primary')carouselTimer=setInterval(()=>setPrimary((primaryIndex+1)%streams.length),ms);
 }
 function readSettings(){
  try{
@@ -745,8 +748,9 @@ syncPlayback.addEventListener('change',()=>{
 document.querySelectorAll('[data-layout-preset]').forEach(button=>button.addEventListener('click',()=>{
  setLayoutPreset(button.dataset.layoutPreset);
 }));
-playAll.addEventListener('click',()=>players.forEach(player=>{try{player?.playVideo()}catch{}}));
-pauseAll.addEventListener('click',()=>players.forEach(player=>{try{player?.pauseVideo()}catch{}}));
+function flashTransport(button){button.classList.add('is-feedback');clearTimeout(button._feedbackTimer);button._feedbackTimer=setTimeout(()=>button.classList.remove('is-feedback'),300)}
+playAll.addEventListener('click',()=>{flashTransport(playAll);players.forEach(player=>{try{player?.playVideo()}catch{}})});
+pauseAll.addEventListener('click',()=>{flashTransport(pauseAll);players.forEach(player=>{try{player?.pauseVideo()}catch{}})});
 carousel.addEventListener('change',()=>{
  carouselIntervalGroup.hidden=!carousel.checked;
  startCarousel();
