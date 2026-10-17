@@ -23,6 +23,8 @@ const syncPlayback=document.getElementById('syncPlayback');
 const playAll=document.getElementById('playAll');
 const pauseAll=document.getElementById('pauseAll');
 const carousel=document.getElementById('focusCarousel');
+const carouselControl=document.getElementById('carouselControl');
+const carouselIntervalGroup=document.getElementById('carouselIntervalGroup');
 const carouselInterval=document.getElementById('focusCarouselInterval');
 const carouselOutput=document.getElementById('focusCarouselIntervalOutput');
 const pttPanel=document.getElementById('pttPanel');
@@ -76,6 +78,16 @@ function streamCatalogRow(stream){
 function streamAvatarUrl(stream){
  return safeAvatar(stream?.avatarUrl||streamCatalogRow(stream)?.avatar_url||'');
 }
+function applyFocusAccent(button,stream){
+ const row=streamCatalogRow(stream)||{};
+ const accent=accentFor(row);
+ button.style.setProperty('--member-accent',accent);
+ const dual=Array.isArray(row?.member_accent_dual)?row.member_accent_dual:[];
+ if(String(row?.support_mode||'')==='dual_color'&&dual.length===2&&dual.every(value=>/^#[0-9a-fA-F]{6}$/.test(String(value)))){
+  button.dataset.supportMode='dual_color';
+  button.style.setProperty('--member-accent-dual','linear-gradient(135deg,'+dual[0]+' 0 50%,'+dual[1]+' 50% 100%)');
+ }
+}
 function currentLayoutPreset(){
  if(layout==='equal')return 'equal';
  return workspaceLayout==='focus'?'focus':'primary';
@@ -84,6 +96,11 @@ function setLayoutPreset(preset){
  if(preset==='equal'){layout='equal';workspaceLayout='sidebar'}
  else if(preset==='focus'){layout='primary';workspaceLayout='focus'}
  else{layout='primary';workspaceLayout='sidebar'}
+ if(preset==='equal'&&carousel.checked){
+  carousel.checked=false;
+  startCarousel();
+ }
+ renderControls();
  applyLayout();
 }
 function hideSettings(){
@@ -159,6 +176,7 @@ function renderControls(){
   button.dataset.focusIndex=String(index);
   button.title='設為主視角：'+stream.label;
   button.setAttribute('aria-label','設為主視角：'+stream.label);
+  applyFocusAccent(button,stream);
   const avatar=streamAvatarUrl(stream);
   if(avatar){
    const img=document.createElement('img');
@@ -172,20 +190,25 @@ function renderControls(){
   focusChoices.append(button);
  });
  const multi=watchMode==='multi'&&streams.length>1;
+ const focusMode=multi&&currentLayoutPreset()!=='equal';
  playerCards.forEach(card=>{const remove=card?.querySelector('.player-remove');if(remove)remove.hidden=!multi});
  document.getElementById('layoutGroup').hidden=!multi;
- document.getElementById('focusGroup').hidden=!multi;
- syncPlayback.parentElement.hidden=!multi;
+ document.getElementById('focusGroup').hidden=!focusMode;
+ syncPlayback.closest('.control-toggle').hidden=!multi;
  playAll.hidden=!multi;
  pauseAll.hidden=!multi;
- carousel.parentElement.hidden=!multi;
- carouselInterval.parentElement.hidden=!multi;
+ carouselControl.hidden=!focusMode;
+ carouselIntervalGroup.hidden=!focusMode||!carousel.checked;
  multiModeSwitch.checked=watchMode==='multi';
  applyModeClass();
  refreshControlState();
 }
 function refreshControlState(){
- document.querySelectorAll('[data-layout-preset]').forEach(button=>button.classList.toggle('active',button.dataset.layoutPreset===currentLayoutPreset()));
+ document.querySelectorAll('[data-layout-preset]').forEach(button=>{
+  const active=button.dataset.layoutPreset===currentLayoutPreset();
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-pressed',String(active));
+ });
  [...focusChoices.children].forEach((button,index)=>{
   const active=index===primaryIndex;
   button.classList.toggle('active',active);
@@ -738,7 +761,11 @@ document.querySelectorAll('[data-layout-preset]').forEach(button=>button.addEven
 }));
 playAll.addEventListener('click',()=>players.forEach(player=>{try{player?.playVideo()}catch{}}));
 pauseAll.addEventListener('click',()=>players.forEach(player=>{try{player?.pauseVideo()}catch{}}));
-carousel.addEventListener('change',startCarousel);
+carousel.addEventListener('change',()=>{
+ carouselIntervalGroup.hidden=!carousel.checked;
+ startCarousel();
+ armSettingsAutoHide();
+});
 carouselInterval.addEventListener('input',()=>{
  carouselOutput.textContent=carouselInterval.value+'s';
  startCarousel();
