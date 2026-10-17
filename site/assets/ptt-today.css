@@ -21,6 +21,7 @@
  box-shadow:var(--shadow);height:calc(100vh - 185px);min-height:560px
 }
 .ptt-empty{padding:52px 24px;text-align:center;color:#8f9498;background:#101010;height:100%;display:grid;place-items:center}
+.ptt-empty[hidden]{display:none!important}
 .ptt-reader .pushes{height:100%;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#555 #111;padding:6px 8px 12px}
 .ptt-reader .push{
  display:grid;grid-template-columns:1.3em minmax(92px,auto) minmax(0,1fr);column-gap:6px;align-items:start;
