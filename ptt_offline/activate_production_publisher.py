@@ -25,7 +25,7 @@ PRODUCTION_PROFILE={
     "queries":60,
     "writes":24,
     "max_batches":1,
-    "burst_max_batches":3,
+    "burst_max_batches":5,
     "max_articles":4,
 }
 BINDINGS={
