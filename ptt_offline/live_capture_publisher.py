@@ -261,6 +261,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
         atomic_receipt(path,{"status":"ACKED","source_identity":plan["source_identity"],
                             "accepted":accepted,"last_batch_id":batch["batch_id"],
                             "legacy_backlog_fence_v2":bool(current.get("legacy_backlog_fence_v2")),
+                            "reconciled_from_remote_commit":bool(current.get("reconciled_from_remote_commit")),
                             "pending_count":len(plan["pending_source_lines"])})
         return {**receipt,"status":"ACK","sent":len(rows),"batch_id":batch["batch_id"]}
 
