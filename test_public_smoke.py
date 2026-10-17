@@ -101,8 +101,11 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("setInterval(()=>{if(!document.hidden)loadPtt()},10000)", js)
         self.assertIn("body.ptt-focus-mode", css)
         self.assertIn('href="/ptt-today/"', shell)
-        self.assertNotIn('data-route="ptt" href="/ptt-today"', shell)
+        self.assertIn('data-route="ptt" href="/ptt-today/"', shell)
         self.assertNotIn('data-page-link="ptt"', shell)
+        app = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        self.assertIn("if(destination==='ptt')", app)
+        self.assertIn("allow", app)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
