@@ -146,7 +146,9 @@ body.immersive .viewer-workspace.workspace-focus.layout-primary{
 body.immersive .viewer-workspace.workspace-focus.layout-primary.count-2{grid-template-rows:auto minmax(0,1fr)}
 body.immersive .viewer-workspace.workspace-focus.layout-primary.count-3{grid-template-rows:auto auto minmax(0,1fr)}
 body.immersive .viewer-workspace.workspace-focus.layout-primary.count-4{grid-template-rows:auto auto auto minmax(0,1fr)}
-body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card{
+body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-1,
+body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-2,
+body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-3{
  align-self:start;
  aspect-ratio:16/9;
  height:auto;
@@ -154,6 +156,10 @@ body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .p
 }
 body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.primary{
  grid-row:1 / -1;
+ align-self:stretch;
+ aspect-ratio:auto;
+ height:100%;
+ width:100%;
 }
 
 @media(max-width:900px){
