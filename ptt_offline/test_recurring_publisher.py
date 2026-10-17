@@ -90,9 +90,9 @@ class RecurringPublisherTests(unittest.TestCase):
     def test_fresh_backlog_activates_three_batch_burst(self):
         source="e"*64
         responses=[
-            {"status":"ACK","sent":10,"eligible":30,"fresh_eligible":30},
-            {"status":"ACK","sent":10,"eligible":20,"fresh_eligible":20},
-            {"status":"ACK","sent":10,"eligible":10,"fresh_eligible":10},
+            {"status":"ACK","sent":10,"eligible":30,"fresh_eligible":30,"burst_safe_candidates":30},
+            {"status":"ACK","sent":10,"eligible":20,"fresh_eligible":20,"burst_safe_candidates":20},
+            {"status":"ACK","sent":10,"eligible":10,"fresh_eligible":10,"burst_safe_candidates":10},
         ]
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
              patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
@@ -109,28 +109,46 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertTrue(publisher.call_args_list[1].kwargs["fresh_only"])
         self.assertTrue(publisher.call_args_list[2].kwargs["fresh_only"])
 
-    def test_delayed_recovery_backlog_never_activates_burst(self):
+    def test_safe_two_hour_backlog_bursts_when_fresh_surge_exists(self):
         source="f"*64
+        responses=[
+            {"status":"ACK","sent":10,"eligible":908,"fresh_eligible":54,"burst_safe_candidates":908},
+            {"status":"ACK","sent":10,"eligible":898,"fresh_eligible":54,"burst_safe_candidates":898},
+            {"status":"ACK","sent":10,"eligible":888,"fresh_eligible":54,"burst_safe_candidates":888},
+        ]
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",side_effect=responses) as publisher:
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=10,max_batches=1,burst_max_batches=3)
+        self.assertEqual(result["sent"],30)
+        self.assertEqual(result["http_posts"],3)
+        self.assertTrue(result["burst_activated"])
+        self.assertEqual(result["burst_batches"],2)
+        self.assertEqual(publisher.call_count,3)
+
+    def test_burst_stays_off_when_recovery_window_is_not_fully_verified(self):
+        source="7"*64
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
              patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
              patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
              patch("ptt_offline.recurring_publisher.run_live_once",
-                   return_value={"status":"ACK","sent":10,"eligible":30,"fresh_eligible":29}) as publisher:
+                   return_value={"status":"ACK","sent":10,"eligible":30,"fresh_eligible":20,"burst_safe_candidates":29}) as publisher:
             result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
                                 send=True,batch_cap=10,max_batches=1,burst_max_batches=3)
         self.assertEqual(result["sent"],10)
         self.assertEqual(result["http_posts"],1)
         self.assertFalse(result["burst_activated"])
-        self.assertEqual(result["burst_batches"],0)
         self.assertEqual(publisher.call_count,1)
 
     def test_dry_run_aggregates_fence_preview_counts(self):
         source="9"*64
         responses=[
             {"status":"READ_ONLY","eligible":12,"fresh_eligible":3,
-             "legacy_baseline_candidates":7,"retained_recovery_candidates":5,"sent":0},
+             "legacy_baseline_candidates":7,"retained_recovery_candidates":5,"burst_safe_candidates":5,"sent":0},
             {"status":"READ_ONLY","eligible":8,"fresh_eligible":2,
-             "legacy_baseline_candidates":6,"retained_recovery_candidates":2,"sent":0},
+             "legacy_baseline_candidates":6,"retained_recovery_candidates":2,"burst_safe_candidates":2,"sent":0},
         ]
         def plan(_,article_id=None):
             return {"status":"READY","source_identity":str(article_id)*64}
@@ -145,6 +163,7 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(result["fresh_eligible"],5)
         self.assertEqual(result["legacy_baseline_candidates"],13)
         self.assertEqual(result["retained_recovery_candidates"],7)
+        self.assertEqual(result["burst_safe_candidates"],7)
         self.assertEqual(result["sent"],0)
         self.assertEqual(result["http_posts"],0)
 
