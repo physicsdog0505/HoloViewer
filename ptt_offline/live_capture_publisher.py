@@ -126,14 +126,17 @@ def content_digest(row):
     return sha256(json.dumps([row.get(k) for k in OUTPUT_KEYS if k!="time_proof"],
           ensure_ascii=False,separators=(",",":")).encode("utf-8")).hexdigest()
 
-def _fresh_for_burst(row, *, now=None, max_age_seconds=180):
+def _row_age_seconds(row, *, now=None):
     current=(now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     try:
         occurred=datetime.fromisoformat(row["occurred_at"].replace("Z","+00:00")).astimezone(timezone.utc)
     except (KeyError,TypeError,ValueError,AttributeError):
-        return False
-    age=(current-occurred).total_seconds()
-    return 0<=age<=max_age_seconds
+        return None
+    return (current-occurred).total_seconds()
+
+def _fresh_for_burst(row, *, now=None, max_age_seconds=180):
+    age=_row_age_seconds(row,now=now)
+    return age is not None and 0<=age<=max_age_seconds
 
 def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap=5,article_id=None,
                   fresh_only=False,now=None):
@@ -179,9 +182,39 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             if key in accepted and accepted[key]!=digest:
                 raise ContractError("ACKed source line mutated since publication")
             if key not in accepted:missing.append(row)
+
+        # One-time upgrade fence for legacy Publisher state created before the
+        # safe baseline semantics existed. Historical missing rows older than
+        # the accepted <=2h recovery window are local backlog, not near-live
+        # delivery. Mark only those stale rows accepted locally; preserve all
+        # rows from the last two hours so fresh and verified delayed recovery
+        # continue normally. This fence never performs a remote write.
+        legacy_baselined=0
+        if send and current and not current.get("legacy_backlog_fence_v2"):
+            stale=[]
+            keep=[]
+            for row in missing:
+                age=_row_age_seconds(row,now=now)
+                if age is not None and age>RECOVERY_MAX_DELAY_SECONDS:
+                    stale.append(row)
+                else:
+                    keep.append(row)
+            for row in stale:
+                accepted[row["source_record_key"]]=content_digest(row)
+            legacy_baselined=len(stale)
+            atomic_receipt(path,{"status":"ACKED",
+                "source_identity":plan["source_identity"],
+                "accepted":accepted,
+                "legacy_backlog_fence_v2":True,
+                "legacy_baselined":legacy_baselined,
+                "pending_count":len(plan["pending_source_lines"])})
+            current={**current,"legacy_backlog_fence_v2":True}
+            missing=keep
+
         fresh_eligible=sum(1 for row in missing if _fresh_for_burst(row,now=now))
         receipt={"status":"READ_ONLY","aid":plan["aid"],
                  "eligible":len(missing),"fresh_eligible":fresh_eligible,
+                 "legacy_baselined":legacy_baselined,
                  "pending":len(plan["pending_source_lines"]),
                  "source_identity":plan["source_identity"],"sent":0}
         if not send:return receipt
@@ -207,6 +240,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             accepted[row["source_record_key"]]=content_digest(row)
         atomic_receipt(path,{"status":"ACKED","source_identity":plan["source_identity"],
                             "accepted":accepted,"last_batch_id":batch["batch_id"],
+                            "legacy_backlog_fence_v2":Boolean(current.get("legacy_backlog_fence_v2")),
                             "pending_count":len(plan["pending_source_lines"])})
         return {**receipt,"status":"ACK","sent":len(rows),"batch_id":batch["batch_id"]}
 
