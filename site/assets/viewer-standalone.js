@@ -700,7 +700,7 @@ function startCarousel(){
  clearInterval(carouselTimer);
  carouselTimer=null;
  if(!carousel.checked||watchMode!=='multi'||streams.length<2)return;
- const ms=Math.max(5,Math.min(30,Number(carouselInterval.value)||10))*1000;
+ const ms=Math.max(30,Math.min(60,Number(carouselInterval.value)||30))*1000;
  carouselTimer=setInterval(()=>setPrimary((primaryIndex+1)%streams.length),ms);
 }
 function readSettings(){
