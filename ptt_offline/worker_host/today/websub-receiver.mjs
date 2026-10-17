@@ -23,18 +23,25 @@ export function parseAtomEnvelope(xml){
  // raw and require a separate parser/reconciliation before publishing lifecycle.
  return {channel_id:channel,video_id:video??null};
 }
-export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrigin,confirmChallenge,authorizeDelivery}={}){
+export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrigin,confirmChallenge,authorizeDelivery,isApprovedChannel}={}){
  const url=new URL(request.url);
  if(url.pathname!=='/internal/today/websub')return json({error:'not_found'},404);
  if(!secret||!roster||typeof saveEvent!=='function')return json({error:'receiver_disabled'},503);
+ async function isApproved(channel){
+  if(!CHANNEL.test(channel??''))return false;
+  if(typeof isApprovedChannel!=='function')return approved(roster,channel);
+  return Boolean(await isApprovedChannel(channel,roster.version));
+ }
  if(request.method==='GET'){
   const mode=url.searchParams.get('hub.mode'),topic=url.searchParams.get('hub.topic');
   const challenge=url.searchParams.get('hub.challenge'),lease=url.searchParams.get('hub.lease_seconds');
   const channel=topic?.startsWith(TOPIC)?topic.slice(TOPIC.length):null;
-  if(!['subscribe','unsubscribe'].includes(mode)||!approved(roster,channel)
-    ||!challenge||challenge.length>1024||!/^\d{1,9}$/.test(lease??''))
+  if(!['subscribe','unsubscribe'].includes(mode)||!channel||!challenge||challenge.length>1024||!/^\\d{1,9}$/.test(lease??''))
    return json({error:'challenge_rejected'},403);
   if(callbackOrigin&&url.origin!==callbackOrigin)return json({error:'callback_origin_mismatch'},403);
+  let approvedTopic=false;
+  try{approvedTopic=await isApproved(channel)}catch{return json({error:'roster_unavailable'},503)}
+  if(!approvedTopic)return json({error:'challenge_rejected'},403);
   if(confirmChallenge){
    try{await confirmChallenge({channelId:channel,rosterVersion:roster.version,mode,leaseSeconds:Number(lease)})}
    catch{return json({error:'unrecognized_challenge'},403)}
@@ -52,7 +59,9 @@ export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrig
  if(!equal(expected,match[2].toLowerCase()))return json({error:'signature_rejected'},401);
  let event;
  try{event=parseAtomEnvelope(dec.decode(raw))}catch{return json({error:'invalid_atom'},400)}
- if(!approved(roster,event.channel_id))return json({error:'channel_not_approved'},403);
+ let approvedEvent=false;
+ try{approvedEvent=await isApproved(event.channel_id)}catch{return json({error:'roster_unavailable'},503)}
+ if(!approvedEvent)return json({error:'channel_not_approved'},403);
  if(authorizeDelivery){
   try{await authorizeDelivery(event.channel_id,roster.version)}catch{return json({error:'subscription_not_active'},403)}
  }
