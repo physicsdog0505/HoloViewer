@@ -196,8 +196,12 @@ function mountPlayerAt(index,autoplay=false){
   playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
   events:{
    onReady:event=>{
-    setAudioMaster(primaryIndex);
-    if(autoplay){try{event.target.playVideo()}catch{}}
+    if(autoplay){
+     try{event.target.mute()}catch{}
+     try{event.target.playVideo()}catch{}
+    }else{
+     setAudioMaster(primaryIndex);
+    }
    },
    onStateChange:event=>{
     if(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED)syncPlayers(event.data,index);
@@ -234,33 +238,92 @@ function switchWatchMode(nextMode){
  renderLiveRail(catalogRows);
  updateUrl();
 }
-function replaceSingleStream(row){
- const id=String(row?.video_id||'');
- if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
- if(!streams.length){
-  streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||'')});
-  primaryIndex=0;
-  audioMaster=0;
-  renderShell();
-  if(window.YT?.Player)mountPlayerAt(0,true);
- }else{
-  const stream=streams[0];
-  stream.videoId=id;
-  stream.label=catalogName(row);
-  stream.channelId=String(row?.channel_id||'');
-  primaryIndex=0;
-  audioMaster=0;
-  const label=playerCards[0]?.querySelector('.player-label');
-  if(label)label.textContent=stream.label;
-  const player=players[0];
-  if(player?.loadVideoById)player.loadVideoById(id);
-  else if(window.YT?.Player)mountPlayerAt(0,true);
-  setAudioMaster(0);
+function commitSingleStream(row,id){
+ if(!streams.length)streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||'')});
+ else{
+  streams[0].videoId=id;
+  streams[0].label=catalogName(row);
+  streams[0].channelId=String(row?.channel_id||'');
  }
+ primaryIndex=0;
+ audioMaster=0;
+ const label=playerCards[0]?.querySelector('.player-label');
+ if(label)label.textContent=streams[0].label;
  renderControls();
  applyLayout();
  renderLiveRail(catalogRows);
  resolvePrimaryPtt();
+}
+function currentPlayerVideoId(player){
+ try{return String(player?.getVideoData?.()?.video_id||'')}catch{return ''}
+}
+function recreateSinglePlayer(row,id){
+ const card=playerCards[0];
+ if(!card||!window.YT?.Player)return;
+ const old=players[0];
+ try{old?.destroy()}catch{}
+ players[0]=null;
+ const stale=document.getElementById('viewer-player-0');
+ stale?.remove();
+ const host=node('div',undefined,'player-host');
+ host.id='viewer-player-0';
+ card.append(host);
+ let committed=false;
+ players[0]=new YT.Player(host,{
+  videoId:id,
+  playerVars:{playsinline:1,rel:0,enablejsapi:1,autoplay:1,origin:location.origin},
+  events:{
+   onReady:event=>{
+    // This path always comes from an explicit avatar click. Try audible play first;
+    // if the browser declines it, fall back to muted autoplay without a second click.
+    try{event.target.unMute()}catch{}
+    try{event.target.playVideo()}catch{}
+    setTimeout(()=>{
+     try{
+      if(event.target.getPlayerState()!==YT.PlayerState.PLAYING){
+       event.target.mute();
+       event.target.playVideo();
+      }
+     }catch{}
+    },350);
+    if(!committed){committed=true;commitSingleStream(row,id)}
+   },
+   onStateChange:event=>{
+    if(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED)syncPlayers(event.data,0);
+   }
+  }
+ });
+}
+function replaceSingleStream(row){
+ const id=String(row?.video_id||'');
+ if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
+ const existing=streams[0]?.videoId||'';
+ const player=players[0];
+
+ if(existing===id){
+  try{player?.playVideo()}catch{}
+  return;
+ }
+
+ if(player?.loadVideoById){
+  try{
+   player.loadVideoById(id);
+   try{player.unMute()}catch{}
+   try{player.playVideo()}catch{}
+   let attempts=0;
+   const verify=()=>{
+    if(currentPlayerVideoId(player)===id){
+     commitSingleStream(row,id);
+     return;
+    }
+    if(++attempts<12){setTimeout(verify,100);return}
+    recreateSinglePlayer(row,id);
+   };
+   setTimeout(verify,80);
+   return;
+  }catch{}
+ }
+ recreateSinglePlayer(row,id);
 }
 function appendMultiStream(row){
  const id=String(row?.video_id||'');
@@ -368,7 +431,6 @@ function pttRow(row){
  const body=node('span',undefined,'ptt-body');
  body.append(node('span',String(row?.author||'unknown')+':','ptt-author'),node('span',String(row?.content||''),'ptt-content'));
  el.append(kindEl,time,body);
- if(row?.source_url)el.addEventListener('dblclick',()=>window.open(String(row.source_url),'_blank','noopener,noreferrer'));
  return el;
 }
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
@@ -552,6 +614,10 @@ pttFeed.addEventListener('scroll',()=>{
  pttNewest.hidden=pttFollowing;
 },{passive:true});
 pttFeed.addEventListener('wheel',event=>{if(event.deltaY<0)pttFollowing=false},{passive:true});
+pttFeed.addEventListener('dblclick',event=>{
+ event.preventDefault();
+ window.open('/ptt-today','_blank','noopener,noreferrer');
+});
 pttNewest.addEventListener('click',pttToLatest);
 fullscreenButton.addEventListener('click',async()=>{
  try{
