@@ -400,3 +400,6 @@ body.immersive .viewer-stage{align-content:start}
 .layout-segment button.active{
  background:color-mix(in srgb,var(--brand-main) 92%,#fff)!important;
 }
+
+/* Immediate feedback for the shared playback transport controls. */
+.transport-button.is-feedback{background:#A65788!important;color:#fff!important;box-shadow:0 0 0 3px rgba(184,166,216,.35);transform:scale(.93);transition:background .12s,transform .12s,box-shadow .12s}
