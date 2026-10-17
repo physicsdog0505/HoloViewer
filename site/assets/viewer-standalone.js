@@ -172,7 +172,8 @@ function renderControls(){
   const button=node('button',undefined,'focus-avatar-button');
   button.type='button';
   button.dataset.focusIndex=String(index);
-  button.title=(currentLayoutPreset()==='focus'?'鎖定主視角：':'切換目前視角：')+stream.label;
+  const lockedHere=currentLayoutPreset()==='focus'&&index===lockedIndex;
+  button.title=(lockedHere?'解除鎖定並回到輪播：':currentLayoutPreset()==='focus'?'改鎖定主視角：':'鎖定主視角：')+stream.label;
   button.setAttribute('aria-label',button.title);
   applyFocusAccent(button,stream);
   const avatar=streamAvatarUrl(stream);
@@ -184,7 +185,7 @@ function renderControls(){
   }else{
    button.append(node('span',[...String(stream.label||'H')][0]||'H','focus-avatar-fallback'));
   }
-  button.addEventListener('click',()=>setPrimary(index));
+  button.addEventListener('click',()=>handleFocusAvatarClick(index));
   focusChoices.append(button);
  });
  const multi=watchMode==='multi'&&streams.length>1;
@@ -270,6 +271,19 @@ function setPrimary(index){
  setAudioMaster(index);
  applyLayout();
  resolvePrimaryPtt();
+}
+function handleFocusAvatarClick(index){
+ if(index<0||index>=streams.length)return;
+ if(currentLayoutPreset()==='focus'&&lockedIndex===index){
+  setLayoutPreset('primary');
+  return;
+ }
+ if(currentLayoutPreset()!=='focus'){
+  setPrimary(index);
+  setLayoutPreset('focus');
+  return;
+ }
+ setPrimary(index);
 }
 function syncPlayers(state,sourceIndex){
  if(watchMode!=='multi'||!syncPlayback.checked||streams.length<2)return;
