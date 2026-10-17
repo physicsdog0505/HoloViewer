@@ -257,6 +257,9 @@ function commitSingleStream(row,id){
 function recreateSinglePlayer(row,id){
  const card=playerCards[0];
  if(!card||!window.YT?.Player)return;
+
+ let wasPlaying=false;
+ try{wasPlaying=players[0]?.getPlayerState()===YT.PlayerState.PLAYING}catch{}
  try{players[0]?.destroy()}catch{}
  players[0]=null;
  card.querySelector('.player-host')?.remove();
@@ -268,20 +271,25 @@ function recreateSinglePlayer(row,id){
  let committed=false;
  players[0]=new YT.Player(host,{
   videoId:id,
-  playerVars:{playsinline:1,rel:0,enablejsapi:1,autoplay:1,origin:location.origin},
+  playerVars:{playsinline:1,rel:0,enablejsapi:1,autoplay:0,origin:location.origin},
   events:{
    onReady:event=>{
-    // Avatar click is an explicit user gesture. Start the selected live immediately.
+    // Preserve the user's playback intent. If the previous live was already
+    // playing, try to continue the newly selected live with sound.
     try{event.target.unMute()}catch{}
-    try{event.target.playVideo()}catch{}
-    setTimeout(()=>{
-     try{
-      if(event.target.getPlayerState()!==YT.PlayerState.PLAYING){
-       event.target.mute();
-       event.target.playVideo();
-      }
-     }catch{}
-    },350);
+    if(wasPlaying){
+     try{event.target.playVideo()}catch{}
+     setTimeout(()=>{
+      try{
+       // Never fall back to muted autoplay. If audible autoplay is blocked,
+       // leave the new live ready and unmuted so one click starts it with sound.
+       if(event.target.getPlayerState()!==YT.PlayerState.PLAYING){
+        event.target.pauseVideo();
+        event.target.unMute();
+       }
+      }catch{}
+     },350);
+    }
     if(!committed){
      committed=true;
      commitSingleStream(row,id);
