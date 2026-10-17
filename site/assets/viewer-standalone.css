@@ -98,7 +98,7 @@ body.settings-open .viewer-main{height:calc(100vh - 109px)}
 .ptt-feed{flex:1;min-height:0;overflow:auto;padding:6px 8px;font-size:var(--ptt-font-size,14px);line-height:1.45;scrollbar-width:thin}
 .ptt-row{display:grid;grid-template-columns:1.3em 4.1em minmax(0,1fr);column-gap:6px;align-items:start;padding:4px 2px;border-bottom:1px solid #25282a;overflow-wrap:anywhere}
 .ptt-kind{text-align:center;font-weight:800;color:#f4f4f4}.ptt-kind.boo{color:#ff4b4b}.ptt-kind.arrow{color:#ff3030}
-.ptt-time{color:#dedede;font-size:.72em;font-weight:500;white-space:nowrap;padding-top:.25em}
+.ptt-time{color:#dedede;font-size:.72em;white-space:nowrap;padding-top:.25em}
 .ptt-body{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .ptt-author{color:#ffff00;font-weight:650;margin-right:4px}.ptt-content{color:#a9a900}
 .ptt-newest{position:absolute;right:12px;bottom:12px;border:1px solid #454a50;border-radius:999px;background:#171a1e;color:#fff;padding:6px 10px;cursor:pointer}
