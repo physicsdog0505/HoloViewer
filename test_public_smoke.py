@@ -60,6 +60,7 @@ class PublicSmokeTests(unittest.TestCase):
             self.assertIn(label, html)
         for old in (">鎖定<", ">平均<", ">主視角<", ">直播優先<"):
             self.assertNotIn(old, html)
+        self.assertNotIn('id="viewerModeStatus"', html)
         self.assertIn("const MAX_STREAMS=16;", js)
         self.assertIn("const FOCUS_VISIBLE_SLOTS=4;", js)
         self.assertIn("carousel.checked=currentLayoutPreset()!=='equal';", js)
