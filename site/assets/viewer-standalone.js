@@ -44,6 +44,7 @@ let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let confirmedLiveIds=new Set();
 let draggedLiveId='';
+let settingsHideTimer=null;
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
@@ -69,13 +70,40 @@ function accentFor(row){
  const audited=String(row?.member_accent||'');
  return /^#[0-9a-fA-F]{6}$/.test(audited)?audited:'#9ab8c4';
 }
+function streamCatalogRow(stream){
+ return catalogRows.find(row=>String(row?.video_id||'')===String(stream?.videoId||''))||null;
+}
+function streamAvatarUrl(stream){
+ return safeAvatar(stream?.avatarUrl||streamCatalogRow(stream)?.avatar_url||'');
+}
+function currentLayoutPreset(){
+ if(layout==='equal')return 'equal';
+ return workspaceLayout==='focus'?'focus':'primary';
+}
+function setLayoutPreset(preset){
+ if(preset==='equal'){layout='equal';workspaceLayout='sidebar'}
+ else if(preset==='focus'){layout='primary';workspaceLayout='focus'}
+ else{layout='primary';workspaceLayout='sidebar'}
+ applyLayout();
+}
+function hideSettings(){
+ clearTimeout(settingsHideTimer);
+ settingsHideTimer=null;
+ document.body.classList.remove('settings-open');
+ controls.hidden=true;
+ settingsButton.setAttribute('aria-expanded','false');
+}
+function armSettingsAutoHide(){
+ clearTimeout(settingsHideTimer);
+ settingsHideTimer=setTimeout(()=>{
+  if(!controls.matches(':hover'))hideSettings();
+ },10000);
+}
 function applyModeClass(){
  document.body.classList.toggle('mode-single',watchMode==='single');
  document.body.classList.toggle('mode-multi',watchMode==='multi');
  if(watchMode==='single'){
-  document.body.classList.remove('settings-open');
-  controls.hidden=true;
-  settingsButton.setAttribute('aria-expanded','false');
+  hideSettings();
  }
 }
 function updateUrl(){
@@ -126,17 +154,26 @@ function renderShell(){
 function renderControls(){
  focusChoices.replaceChildren();
  streams.forEach((stream,index)=>{
-  const button=node('button',String.fromCharCode(65+index));
+  const button=node('button',undefined,'focus-avatar-button');
   button.type='button';
   button.dataset.focusIndex=String(index);
-  button.title=stream.label;
+  button.title='設為主視角：'+stream.label;
+  button.setAttribute('aria-label','設為主視角：'+stream.label);
+  const avatar=streamAvatarUrl(stream);
+  if(avatar){
+   const img=document.createElement('img');
+   img.src=avatar;
+   img.alt='';
+   button.append(img);
+  }else{
+   button.append(node('span',[...String(stream.label||'H')][0]||'H','focus-avatar-fallback'));
+  }
   button.addEventListener('click',()=>setPrimary(index));
   focusChoices.append(button);
  });
  const multi=watchMode==='multi'&&streams.length>1;
  playerCards.forEach(card=>{const remove=card?.querySelector('.player-remove');if(remove)remove.hidden=!multi});
  document.getElementById('layoutGroup').hidden=!multi;
- document.getElementById('workspaceGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!multi;
  syncPlayback.parentElement.hidden=!multi;
  playAll.hidden=!multi;
@@ -148,9 +185,12 @@ function renderControls(){
  refreshControlState();
 }
 function refreshControlState(){
- document.querySelectorAll('[data-layout]').forEach(button=>button.classList.toggle('active',button.dataset.layout===layout));
- document.querySelectorAll('[data-workspace]').forEach(button=>button.classList.toggle('active',button.dataset.workspace===workspaceLayout));
- [...focusChoices.children].forEach((button,index)=>button.classList.toggle('active',index===primaryIndex));
+ document.querySelectorAll('[data-layout-preset]').forEach(button=>button.classList.toggle('active',button.dataset.layoutPreset===currentLayoutPreset()));
+ [...focusChoices.children].forEach((button,index)=>{
+  const active=index===primaryIndex;
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-pressed',String(active));
+ });
  playerCards.forEach((card,index)=>{
   if(!card)return;
   card.classList.toggle('primary',index===primaryIndex);
@@ -266,6 +306,7 @@ function commitSingleStream(row,id){
   streams[0].videoId=id;
   streams[0].label=catalogName(row);
   streams[0].channelId=String(row?.channel_id||'');
+  streams[0].avatarUrl=safeAvatar(row?.avatar_url);
  }
  primaryIndex=0;
  audioMaster=0;
@@ -315,7 +356,7 @@ function appendMultiStream(row){
  if(existing>=0){setPrimary(existing);return}
  if(streams.length>=4)return;
  const index=streams.length;
- streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||'')});
+ streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||''),avatarUrl:safeAvatar(row?.avatar_url)});
  const card=createPlayerCard(index);
  stage.append(card);
  players[index]=null;
@@ -466,6 +507,7 @@ async function loadCatalog(){
    if(!row)return;
    stream.label=catalogName(row);
    stream.channelId=String(row.channel_id||'');
+   stream.avatarUrl=safeAvatar(row.avatar_url);
    const label=playerCards[index]?.querySelector('.player-label');
    if(label)label.textContent=stream.label;
   });
@@ -668,10 +710,21 @@ stage.addEventListener('drop',event=>{
 
 settingsButton.addEventListener('click',()=>{
  if(watchMode==='single')return;
- const open=document.body.classList.toggle('settings-open');
- controls.hidden=!open;
- settingsButton.setAttribute('aria-expanded',String(open));
+ const open=controls.hidden;
+ if(open){
+  document.body.classList.add('settings-open');
+  controls.hidden=false;
+  settingsButton.setAttribute('aria-expanded','true');
+  armSettingsAutoHide();
+ }else{
+  hideSettings();
+ }
 });
+controls.addEventListener('pointerenter',()=>{
+ clearTimeout(settingsHideTimer);
+ settingsHideTimer=null;
+});
+controls.addEventListener('pointerleave',()=>armSettingsAutoHide());
 multiModeSwitch.addEventListener('change',()=>switchWatchMode(multiModeSwitch.checked?'multi':'single'));
 syncPlayback.addEventListener('change',()=>{
  if(!syncPlayback.checked||watchMode!=='multi'||streams.length<2)return;
@@ -679,13 +732,9 @@ syncPlayback.addEventListener('change',()=>{
  try{state=players[primaryIndex]?.getPlayerState()}catch{}
  if(state===YT.PlayerState.PLAYING||state===YT.PlayerState.PAUSED)syncPlayers(state,primaryIndex);
 });
-document.querySelectorAll('[data-layout]').forEach(button=>button.addEventListener('click',()=>{
- layout=button.dataset.layout;
- applyLayout();
-}));
-document.querySelectorAll('[data-workspace]').forEach(button=>button.addEventListener('click',()=>{
- workspaceLayout=button.dataset.workspace;
- applyLayout();
+document.querySelectorAll('[data-layout-preset]').forEach(button=>button.addEventListener('click',()=>{
+ setLayoutPreset(button.dataset.layoutPreset);
+ armSettingsAutoHide();
 }));
 playAll.addEventListener('click',()=>players.forEach(player=>{try{player?.playVideo()}catch{}}));
 pauseAll.addEventListener('click',()=>players.forEach(player=>{try{player?.pauseVideo()}catch{}}));
