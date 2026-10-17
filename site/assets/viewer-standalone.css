@@ -61,7 +61,7 @@ body:has(.viewer-live-rail:hover) .viewer-shell,body:has(.viewer-live-rail:focus
 
 .viewer-main{height:calc(100vh - 58px);padding:6px;background:#080a0d}
 body.settings-open .viewer-main{height:calc(100vh - 109px)}
-.viewer-workspace{display:grid;grid-template-columns:minmax(0,calc(100% - 28vw - 6px)) 312px;gap:6px;width:100%;height:100%;justify-content:start}
+.viewer-workspace{display:grid;grid-template-columns:minmax(0,1fr) 312px;gap:6px;width:100%;height:100%}
 .viewer-workspace.video-only{grid-template-columns:1fr}
 .viewer-stage{display:grid;gap:6px;width:100%;height:100%;min-width:0;min-height:0}
 .viewer-stage.layout-equal{grid-template-columns:repeat(var(--viewer-cols,1),minmax(0,1fr));grid-template-rows:repeat(var(--viewer-rows,1),minmax(0,1fr))}
