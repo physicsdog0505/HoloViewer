@@ -242,7 +242,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             accepted[row["source_record_key"]]=content_digest(row)
         atomic_receipt(path,{"status":"ACKED","source_identity":plan["source_identity"],
                             "accepted":accepted,"last_batch_id":batch["batch_id"],
-                            "legacy_backlog_fence_v2":Boolean(current.get("legacy_backlog_fence_v2")),
+                            "legacy_backlog_fence_v2":bool(current.get("legacy_backlog_fence_v2")),
                             "pending_count":len(plan["pending_source_lines"])})
         return {**receipt,"status":"ACK","sent":len(rows),"batch_id":batch["batch_id"]}
 
