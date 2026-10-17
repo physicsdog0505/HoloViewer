@@ -109,7 +109,8 @@ export async function refreshTodayDiscovery(env,{fetchImpl=fetch,now=new Date()}
     const ready=env?.TODAY_WEBSUB_RECEIVER_ENABLED==='true'&&
       env?.TODAY_WEBSUB_PROCESS_ENABLED==='true'&&env?.TODAY_WEBSUB_RENEW_ENABLED==='true'&&
       typeof env?.TODAY_WEBSUB_CALLBACK_URL==='string'&&
-      typeof env?.TODAY_WEBSUB_SECRET==='string'&&env.TODAY_WEBSUB_SECRET.length>=32;
+      typeof env?.TODAY_WEBSUB_SECRET==='string'&&env.TODAY_WEBSUB_SECRET.length>=32&&
+      typeof env?.YOUTUBE_API_KEY==='string'&&env.YOUTUBE_API_KEY.length>0;
     return {status:ready?'disabled_websub_primary':'blocked_websub_primary_not_ready',
       feed_requests:0,channels:0,discovered:0,updated:0};
   }
