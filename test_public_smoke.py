@@ -71,6 +71,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("setLayoutPreset('focus');", js)
         self.assertIn("button.addEventListener('click',()=>handleFocusAvatarClick(index));", js)
         self.assertIn(".player-card.viewer-hidden{display:none!important}", css)
+        self.assertIn(".viewer-workspace.workspace-focus.layout-primary,.viewer-workspace.workspace-sidebar.layout-primary{", css)
+        self.assertIn(".viewer-workspace.workspace-focus.layout-primary .viewer-stage,.viewer-workspace.workspace-sidebar.layout-primary .viewer-stage{display:contents}", css)
         self.assertIn(".transport-button.is-feedback", css)
         self.assertIn("location.href='/viewer/?'+q.toString();", app)
 
