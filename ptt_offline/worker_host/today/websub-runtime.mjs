@@ -80,9 +80,9 @@ export function mountTodayWebSubOnWorker(base,{fetchImpl=fetch}={}){
     roster,secret:env.TODAY_WEBSUB_SECRET,callbackOrigin:callback.origin,
     confirmChallenge:args=>confirmSubscriptionChallenge(env.DB,args),
     authorizeDelivery:async channelId=>{
-     const lease=await env.DB.prepare('SELECT roster_version,state FROM public_today_websub_leases WHERE channel_id=?')
+     const lease=await env.DB.prepare('SELECT roster_version,state,expires_at FROM public_today_websub_leases WHERE channel_id=?')
       .bind(channelId).first();
-     if(!lease||lease.roster_version!==roster.version||lease.state!=='active')throw Error('no active roster-bound lease');
+     if(!lease||lease.roster_version!==roster.version||lease.state!=='active'||!lease.expires_at||Date.parse(lease.expires_at)<=Date.now())throw Error('no active roster-bound lease');
     },
     saveEvent:event=>persistEvent(env.DB,event)
    });
@@ -116,7 +116,7 @@ export function mountTodayWebSubOnWorker(base,{fetchImpl=fetch}={}){
    }else if(enabled(env,'TODAY_WEBSUB_RENEW_ENABLED')){
     websub.renewal={status:'receiver_disabled',sent:0};
    }
-   return {base:baseResult,websub};
+   return {...(baseResult&&typeof baseResult==='object'?baseResult:{}),websub};
   }
  };
 }
