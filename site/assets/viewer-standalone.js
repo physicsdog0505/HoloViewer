@@ -41,6 +41,7 @@ let pttLoaded=false;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let confirmedLiveIds=new Set();
+let draggedLiveId='';
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
@@ -258,6 +259,8 @@ function commitSingleStream(row,id){
  }
  primaryIndex=0;
  audioMaster=0;
+ const label=playerCards[0]?.querySelector('.player-label');
+ if(label)label.textContent=streams[0].label;
  renderControls();
  applyLayout();
  renderLiveRail(catalogRows);
@@ -387,11 +390,16 @@ function renderLiveRail(rows){
   button.append(avatar,node('strong',catalogName(row)));
   button.addEventListener('click',()=>handleLiveRailClick(row));
   button.addEventListener('dragstart',event=>{
-   event.dataTransfer?.setData('text/plain',String(row.video_id));
+   draggedLiveId=String(row.video_id);
+   event.dataTransfer?.setData('text/plain',draggedLiveId);
    if(event.dataTransfer)event.dataTransfer.effectAllowed='copy';
    button.classList.add('is-dragging');
   });
-  button.addEventListener('dragend',()=>button.classList.remove('is-dragging'));
+  button.addEventListener('dragend',()=>{
+   draggedLiveId='';
+   button.classList.remove('is-dragging');
+   stage.classList.remove('drag-target');
+  });
   liveList.append(button);
  });
  liveRail.hidden=!liveList.childElementCount;
@@ -598,8 +606,7 @@ function readSettings(){
 }
 
 stage.addEventListener('dragover',event=>{
- const id=event.dataTransfer?.getData('text/plain')||'';
- if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
+ if(!/^[A-Za-z0-9_-]{11}$/.test(draggedLiveId))return;
  event.preventDefault();
  if(event.dataTransfer)event.dataTransfer.dropEffect='copy';
  stage.classList.add('drag-target');
@@ -610,7 +617,8 @@ stage.addEventListener('dragleave',event=>{
 stage.addEventListener('drop',event=>{
  event.preventDefault();
  stage.classList.remove('drag-target');
- const id=event.dataTransfer?.getData('text/plain')||'';
+ const id=String(event.dataTransfer?.getData('text/plain')||draggedLiveId||'');
+ draggedLiveId='';
  const row=catalogRows.find(item=>String(item?.video_id||'')===id);
  if(row)addDraggedLive(row);
 });
