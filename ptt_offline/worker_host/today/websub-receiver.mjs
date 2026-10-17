@@ -36,7 +36,7 @@ export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrig
   const mode=url.searchParams.get('hub.mode'),topic=url.searchParams.get('hub.topic');
   const challenge=url.searchParams.get('hub.challenge'),lease=url.searchParams.get('hub.lease_seconds');
   const channel=topic?.startsWith(TOPIC)?topic.slice(TOPIC.length):null;
-  if(!['subscribe','unsubscribe'].includes(mode)||!channel||!challenge||challenge.length>1024||!/^\\d{1,9}$/.test(lease??''))
+  if(!['subscribe','unsubscribe'].includes(mode)||!channel||!challenge||challenge.length>1024||!/^\d{1,9}$/.test(lease??''))
    return json({error:'challenge_rejected'},403);
   if(callbackOrigin&&url.origin!==callbackOrigin)return json({error:'callback_origin_mismatch'},403);
   let approvedTopic=false;
