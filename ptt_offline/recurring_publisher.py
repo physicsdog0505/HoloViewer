@@ -65,6 +65,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             pending=0
             legacy_baseline_candidates=0
             retained_recovery_candidates=0
+            burst_safe_candidates=0
             fresh_eligible=0
             burst_activated=False
             burst_batches=0
@@ -79,6 +80,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     pending+=result.get("eligible",0)
                     legacy_baseline_candidates+=result.get("legacy_baseline_candidates",0)
                     retained_recovery_candidates+=result.get("retained_recovery_candidates",0)
+                    burst_safe_candidates+=result.get("burst_safe_candidates",0)
                     fresh_eligible+=result.get("fresh_eligible",0)
                     continue
                 # max_batches is a GLOBAL per-snapshot network/write budget.
@@ -114,14 +116,16 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     if count<batch_cap:
                         break
                 backlog=backlog or (count==batch_cap)
-                # Adaptive burst is allowed only after a normal full batch proves
-                # the entire current missing set is fresh (<=180s). Every extra
-                # batch re-checks fresh_only inside run_live_once; delayed-recovery
-                # rows therefore remain on the normal one-batch path.
+                # Adaptive burst starts only when there is enough genuinely
+                # fresh traffic to prove a live surge. Extra batches may drain
+                # older FIFO rows only while run_live_once confirms every
+                # remaining row has verified age within the <=2h recovery window.
                 initial_eligible=batch.get("eligible",0) if isinstance(batch,dict) else 0
                 initial_fresh=batch.get("fresh_eligible",0) if isinstance(batch,dict) else 0
+                initial_burst_safe=batch.get("burst_safe_candidates",0) if isinstance(batch,dict) else 0
                 if (send and count==batch_cap and burst_max_batches>max_batches and
-                    initial_eligible>batch_cap and initial_fresh==initial_eligible):
+                    initial_eligible>batch_cap and initial_fresh>=batch_cap and
+                    initial_burst_safe==initial_eligible):
                     while total_posts<burst_max_batches:
                         burst=run_live_once(db,state_path=state,secret=secret,
                             executor=executor,send=True,batch_cap=batch_cap,
@@ -145,6 +149,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     "fresh_eligible":fresh_eligible,
                     "legacy_baseline_candidates":legacy_baseline_candidates,
                     "retained_recovery_candidates":retained_recovery_candidates,
+                    "burst_safe_candidates":burst_safe_candidates,
                     "http_posts":total_posts,"batch_count":total_posts,
                     "modeled_d1_writes_ceiling":modeled_writes,
                     "modeled_d1_queries_ceiling":modeled_queries,
