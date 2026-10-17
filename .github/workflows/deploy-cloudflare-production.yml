@@ -41,12 +41,16 @@ jobs:
           test -s site/assets/app.js
           test -s site/assets/app.css
           test -s site/assets/config.js
+          test -s site/viewer/index.html
+          test -s site/assets/viewer-standalone.js
+          test -s site/assets/viewer-standalone.css
           grep -F 'https://holoviewer-public-api.singlebagel.workers.dev' site/assets/config.js
           ! grep -R -E 'http://(localhost|127\.0\.0\.1)' site || exit 1
       - name: Validate public client JavaScript and request policy
         run: |
           node --check site/assets/app.js
           node --check site/assets/config.js
+          node --check site/assets/viewer-standalone.js
           ! grep -E 'setTimeout|location.reload|eval\(|innerHTML|document.write\(' site/assets/app.js
           test "$(grep -o 'setInterval(' site/assets/app.js | wc -l | tr -d ' ')" = "2"
           python -B -m unittest -v test_public_smoke test_4174_ui_parity
