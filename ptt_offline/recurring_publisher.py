@@ -69,6 +69,9 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             fresh_eligible=0
             burst_activated=False
             burst_batches=0
+            mutation_blocked_aids=[]
+            mutation_blocked_count=0
+            stale_fenced_rows=0
             for article_index,article_id in enumerate(article_ids):
                 plan=inspect_latest_article(db,article_id=article_id)
                 if plan["status"]!="READY":
@@ -82,6 +85,10 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     retained_recovery_candidates+=result.get("retained_recovery_candidates",0)
                     burst_safe_candidates+=result.get("burst_safe_candidates",0)
                     fresh_eligible+=result.get("fresh_eligible",0)
+                    stale_fenced_rows+=result.get("stale_fenced_rows",0)
+                    if result.get("status")=="LOCAL_SOURCE_MUTATION_BLOCKED":
+                        mutation_blocked_aids.append(result.get("aid"))
+                        mutation_blocked_count+=result.get("mutation_count",0)
                     continue
                 # max_batches is a GLOBAL per-snapshot network/write budget.
                 # Never turn a zero share into one: that previously allowed
@@ -97,6 +104,12 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     batch=run_live_once(db,state_path=state,secret=secret,
                         executor=executor,send=True,batch_cap=batch_cap,article_id=article_id)
                     last_status=batch.get("status",last_status)
+                    stale_fenced_rows+=batch.get("stale_fenced_rows",0)
+                    if batch.get("status")=="LOCAL_SOURCE_MUTATION_BLOCKED":
+                        mutation_blocked_aids.append(batch.get("aid"))
+                        mutation_blocked_count+=batch.get("mutation_count",0)
+                        count=0
+                        break
                     if batch.get("status")=="BASELINED":
                         # Local first-seen baseline is a successful zero-write
                         # activation outcome, not a remote failure.
@@ -130,6 +143,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                         burst=run_live_once(db,state_path=state,secret=secret,
                             executor=executor,send=True,batch_cap=batch_cap,
                             article_id=article_id,fresh_only=True)
+                        stale_fenced_rows+=burst.get("stale_fenced_rows",0)
                         if burst.get("status")=="BURST_BLOCKED":
                             break
                         if burst.get("status")!="ACK":
@@ -144,7 +158,11 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                         backlog=backlog or (burst_count==batch_cap)
                         if burst_count<batch_cap:
                             break
-            result={"status":last_status if send else "READ_ONLY",
+            snapshot_status=last_status if send else "READ_ONLY"
+            if mutation_blocked_aids:
+                snapshot_status=("PARTIAL_SUCCESS" if total_posts
+                                 else "LOCAL_SOURCE_MUTATION_BLOCKED")
+            result={"status":snapshot_status,
                     "sent":total_sent,"eligible":pending,
                     "fresh_eligible":fresh_eligible,
                     "legacy_baseline_candidates":legacy_baseline_candidates,
@@ -154,7 +172,11 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     "modeled_d1_writes_ceiling":modeled_writes,
                     "modeled_d1_queries_ceiling":modeled_queries,
                     "articles_checked":len(article_ids),"backlog_may_remain":backlog,
-                    "burst_activated":burst_activated,"burst_batches":burst_batches}
+                    "burst_activated":burst_activated,"burst_batches":burst_batches,
+                    "mutation_blocked_articles":len(mutation_blocked_aids),
+                    "mutation_blocked_aids":mutation_blocked_aids,
+                    "mutation_blocked_count":mutation_blocked_count,
+                    "stale_fenced_rows":stale_fenced_rows}
     return {**result,"elapsed_ms":round((clock()-started)*1000),
         "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "publisher_mode":"OWNER_APPROVED_SEND" if send else "DRY_RUN",

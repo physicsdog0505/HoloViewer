@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from datetime import datetime
-from ptt_offline.live_capture_publisher import active_article_ids,inspect_latest_article,run_live_once,state_for_source
+from ptt_offline.live_capture_publisher import active_article_ids,content_digest,inspect_latest_article,run_live_once,state_for_source
 from ptt_offline.audit_live_line import audit
 from ptt_offline.ptt_aid_identity import aid_from_article_url
 from ptt_offline.public_today_contract import ContractError
@@ -37,7 +37,8 @@ class LiveCapturePublisherTests(unittest.TestCase):
                  patch("ptt_offline.live_capture_publisher.sign_time_proof",return_value="proof"), \
                  patch("ptt_offline.live_capture_publisher.execute_once",return_value=ack), \
                  patch("ptt_offline.live_capture_publisher.apply_ack",return_value=None):
-                result=run_live_once(object(),state_path=path,secret="s"*32,executor=lambda *_: None,send=True,batch_cap=1)
+                result=run_live_once(object(),state_path=path,secret="s"*32,executor=lambda *_: None,
+                    send=True,batch_cap=1,now=datetime.fromisoformat("2026-10-17T07:01:00+00:00"))
             self.assertEqual(result["status"],"ACK")
             saved=json.loads(path.read_text(encoding="utf-8"))
             self.assertTrue(saved["reconciled_from_remote_commit"])
@@ -172,7 +173,8 @@ class LiveCapturePublisherTests(unittest.TestCase):
               "logical_rows_acked":1,"d1_query_count":7,"d1_rows_written":4,
               "http_requests":1}
         result=run_live_once(self.db,state_path=self.state,secret="k"*40,
-                             executor=approve,send=True)
+                             executor=approve,send=True,
+                             now=datetime.fromisoformat("2026-10-15T10:04:00+00:00"))
         self.assertEqual(result["status"],"ACK")
         self.assertEqual(result["sent"],1)
         second=run_live_once(self.db,state_path=self.state,secret="k"*40,
@@ -255,7 +257,8 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.db.execute("INSERT INTO pushes VALUES(4,1,4,1,'推','d','uncertain new','10/15','18:03','2026-10-15T10:03:30Z')")
         with self.assertRaisesRegex(RuntimeError,"connection lost"):
             run_live_once(self.db,state_path=alt,secret="k"*40,
-                executor=lambda _: (_ for _ in ()).throw(RuntimeError("connection lost")),send=True)
+                executor=lambda _: (_ for _ in ()).throw(RuntimeError("connection lost")),send=True,
+                now=datetime.fromisoformat("2026-10-15T10:04:00+00:00"))
         with self.assertRaisesRegex(ContractError,"remote ACK unresolved"):
             run_live_once(self.db,state_path=alt,secret="k"*40,
                 executor=lambda _:self.fail("must not replay"),send=True)
@@ -274,9 +277,78 @@ class LiveCapturePublisherTests(unittest.TestCase):
               "logical_rows_acked":1,"d1_query_count":7,"d1_rows_written":4,
               "http_requests":1}
         result=run_live_once(self.db,state_path=self.state,secret="k"*40,
-                             executor=approve,send=True)
+                             executor=approve,send=True,
+                             now=datetime.fromisoformat("2026-10-15T23:02:00+00:00"))
         self.assertEqual(result["status"],"ACK")
         self.assertEqual(result["sent"],1)
         self.assertEqual(seen[0]["source_line"],4)
         self.assertEqual(seen[0]["occurred_at"],"2026-10-15T22:36:00Z")
+
+    def test_source_mutation_blocks_only_this_run_and_recovers_without_state_change(self):
+        from unittest.mock import patch
+        plan=inspect_latest_article(self.db)
+        original=plan["candidate_rows"][0]
+        Path(self.state).write_text(json.dumps({
+            "status":"ACKED","source_identity":plan["source_identity"],
+            "accepted":{original["source_record_key"]:content_digest(original)},
+            "legacy_backlog_fence_v2":True,
+        }),encoding="utf-8")
+        before=Path(self.state).read_bytes()
+        changed={**original,"content":"transient pagination shift"}
+        changed_plan={**plan,"candidate_rows":[changed]}
+        stable_plan={**plan,"candidate_rows":[original]}
+        with patch("ptt_offline.live_capture_publisher.inspect_latest_article",
+                   side_effect=[changed_plan,stable_plan]):
+            blocked=run_live_once(self.db,state_path=self.state,send=True,
+                secret="k"*40,executor=lambda _:self.fail("must not post"))
+            self.assertEqual(blocked["status"],"LOCAL_SOURCE_MUTATION_BLOCKED")
+            self.assertEqual(blocked["mutation_count"],1)
+            self.assertEqual(blocked["mutations"][0]["aid"],plan["aid"])
+            self.assertEqual(blocked["mutations"][0]["source_record_key"],original["source_record_key"])
+            self.assertEqual(blocked["mutations"][0]["source_line"],original["source_line"])
+            self.assertEqual(Path(self.state).read_bytes(),before)
+            recovered=run_live_once(self.db,state_path=self.state,send=True,
+                secret="k"*40,executor=lambda _:self.fail("must not replay"))
+        self.assertEqual(recovered["status"],"NO_NEW_ROWS")
+        self.assertEqual(Path(self.state).read_bytes(),before)
+
+    def test_runtime_fence_with_migration_marker_drops_1800_stale_and_sends_20_recoverable(self):
+        from unittest.mock import patch
+        aid="1runtime"
+        identity="f"*64
+        url="https://www.ptt.cc/bbs/C_Chat/M.1792180800.A.001.html"
+        def row(line,occurred_at):
+            return {"push_id":f"p{line}","aid":aid,"day":"2026-10-17",
+                "source_line":line,"kind":"推","author":"u","content":f"line-{line}",
+                "occurred_at":occurred_at,"floor":line,"source_url":url,
+                "source_record_key":f"{aid}:{line}"}
+        rows=([row(line,"2026-10-17T06:00:00Z") for line in range(1,1801)]+
+              [row(line,"2026-10-17T09:30:00Z") for line in range(1801,1821)])
+        plan={"status":"READY","aid":aid,"source_identity":identity,
+              "candidate_rows":rows,"pending_source_lines":[],"scan_truncated":False}
+        Path(self.state).write_text(json.dumps({"status":"ACKED",
+            "source_identity":identity,"accepted":{},
+            "legacy_backlog_fence_v2":True}),encoding="utf-8")
+        sent=[]
+        def approve(batch):
+            sent.extend(batch["rows"])
+            return {"status":"ACK","batch_id":batch["batch_id"],"digest":batch["digest"],
+                "logical_rows_acked":len(batch["rows"]),"d1_query_count":102,
+                "d1_rows_written":42,"http_requests":1}
+        with patch("ptt_offline.live_capture_publisher.inspect_latest_article",return_value=plan):
+            result=run_live_once(self.db,state_path=self.state,send=True,
+                secret="k"*40,executor=approve,batch_cap=25,
+                now=datetime.fromisoformat("2026-10-17T10:00:00+00:00"))
+            again=run_live_once(self.db,state_path=self.state,send=True,
+                secret="k"*40,executor=lambda _:self.fail("must not replay"),batch_cap=25,
+                now=datetime.fromisoformat("2026-10-17T10:00:00+00:00"))
+        self.assertEqual(result["status"],"ACK")
+        self.assertEqual(result["stale_fenced_rows"],1800)
+        self.assertEqual(result["eligible"],20)
+        self.assertEqual([x["source_line"] for x in sent],list(range(1801,1821)))
+        self.assertEqual(again["status"],"NO_NEW_ROWS")
+        self.assertEqual(again["stale_fenced_rows"],0)
+        saved=json.loads(Path(self.state).read_text(encoding="utf-8"))
+        self.assertEqual(len(saved["accepted"]),1820)
+        self.assertTrue(saved["legacy_backlog_fence_v2"])
 if __name__=="__main__":unittest.main()

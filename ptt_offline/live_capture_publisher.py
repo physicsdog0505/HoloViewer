@@ -178,46 +178,65 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
                     "baselined":len(baseline),"pending":len(plan["pending_source_lines"]),
                     "source_identity":plan["source_identity"],"sent":0}
         missing=[]
+        mutations=[]
         for row in plan["candidate_rows"]:
             key=row["source_record_key"]
             digest=content_digest(row)
             if key in accepted and accepted[key]!=digest:
-                raise ContractError("ACKed source line mutated since publication")
+                mutations.append({"aid":plan["aid"],
+                    "source_record_key":key,"source_line":row["source_line"]})
             if key not in accepted:missing.append(row)
 
-        # One-time upgrade fence for legacy Publisher state created before the
-        # safe baseline semantics existed. Historical missing rows older than
-        # the accepted <=2h recovery window are local backlog, not near-live
-        # delivery. Mark only those stale rows accepted locally; preserve all
-        # rows from the last two hours so fresh and verified delayed recovery
-        # continue normally. This fence never performs a remote write.
+        # PTT pagination may transiently shift an already-ACKed source line.
+        # Quarantine only this AID for this snapshot, without changing its
+        # accepted checkpoint. A later stable scan whose digest matches the
+        # checkpoint therefore recovers naturally. This is deliberately not
+        # used for REMOTE_UNCERTAIN, which remains a global fail-closed error.
+        if mutations:
+            return {"status":"LOCAL_SOURCE_MUTATION_BLOCKED","aid":plan["aid"],
+                    "mutation_count":len(mutations),"mutations":mutations,
+                    "eligible":0,"fresh_eligible":0,
+                    "legacy_baseline_candidates":0,
+                    "retained_recovery_candidates":0,
+                    "burst_safe_candidates":0,"stale_fenced_rows":0,
+                    "pending":len(plan["pending_source_lines"]),
+                    "source_identity":plan["source_identity"],"sent":0}
+
+        # Runtime recovery fence. On every send, historical missing rows older
+        # than the accepted <=2h recovery window are local backlog, not
+        # near-live delivery. Only rows with a reliable occurred_at and a
+        # verified age beyond that limit are accepted locally. The legacy
+        # marker records migration completion; it does not disable this fence.
         legacy_baselined=0
-        if send and current and not current.get("legacy_backlog_fence_v2"):
-            stale=[]
-            keep=[]
-            for row in missing:
-                age=_row_age_seconds(row,now=now)
-                if age is not None and age>RECOVERY_MAX_DELAY_SECONDS:
-                    stale.append(row)
-                else:
-                    keep.append(row)
+        stale=[]
+        keep=[]
+        for row in missing:
+            age=_row_age_seconds(row,now=now)
+            if age is not None and age>RECOVERY_MAX_DELAY_SECONDS:
+                stale.append(row)
+            else:
+                keep.append(row)
+        stale_fenced_rows=0
+        if send and current:
             for row in stale:
                 accepted[row["source_record_key"]]=content_digest(row)
-            legacy_baselined=len(stale)
-            atomic_receipt(path,{"status":"ACKED",
-                "source_identity":plan["source_identity"],
-                "accepted":accepted,
-                "legacy_backlog_fence_v2":True,
-                "legacy_baselined":legacy_baselined,
-                "pending_count":len(plan["pending_source_lines"])})
+            stale_fenced_rows=len(stale)
+            if not current.get("legacy_backlog_fence_v2"):
+                legacy_baselined=stale_fenced_rows
+            if stale or not current.get("legacy_backlog_fence_v2"):
+                atomic_receipt(path,{"status":"ACKED",
+                    "source_identity":plan["source_identity"],
+                    "accepted":accepted,
+                    "legacy_backlog_fence_v2":True,
+                    "legacy_baselined":legacy_baselined,
+                    "reconciled_from_remote_commit":bool(current.get("reconciled_from_remote_commit")),
+                    "pending_count":len(plan["pending_source_lines"])})
             current={**current,"legacy_backlog_fence_v2":True}
             missing=keep
 
         ages=[_row_age_seconds(row,now=now) for row in missing]
-        stale_legacy_candidates=sum(
-            1 for age in ages if age is not None and age>RECOVERY_MAX_DELAY_SECONDS
-        )
-        retained_recovery_candidates=len(missing)-stale_legacy_candidates
+        stale_legacy_candidates=(len(stale) if not send else stale_fenced_rows)
+        retained_recovery_candidates=len(keep)
         fresh_eligible=sum(1 for row in missing if _fresh_for_burst(row,now=now))
         burst_safe_candidates=sum(
             1 for age in ages
@@ -227,6 +246,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
                  "eligible":len(missing),"fresh_eligible":fresh_eligible,
                  "legacy_baselined":legacy_baselined,
                  "legacy_baseline_candidates":stale_legacy_candidates,
+                 "stale_fenced_rows":stale_fenced_rows,
                  "retained_recovery_candidates":retained_recovery_candidates,
                  "burst_safe_candidates":burst_safe_candidates,
                  "pending":len(plan["pending_source_lines"]),
@@ -252,7 +272,9 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
         checkpoint=new_checkpoint(source_identity=plan["source_identity"],day=day,aids=[plan["aid"]])
         batch=make_batch(checkpoint=checkpoint,rows=rows,batch_cap=batch_cap)
         atomic_receipt(path,{"status":"REMOTE_UNCERTAIN","source_identity":plan["source_identity"],
-                            "accepted":accepted,"pending_batch_id":batch["batch_id"]})
+                            "accepted":accepted,"pending_batch_id":batch["batch_id"],
+                            "legacy_backlog_fence_v2":bool(current.get("legacy_backlog_fence_v2")),
+                            "reconciled_from_remote_commit":bool(current.get("reconciled_from_remote_commit"))})
         ack=execute_once(batch=batch,executor=executor,max_rows=batch_cap,
             max_queries=min(150,2+5*batch_cap),max_written=min(80,2+2*batch_cap))
         apply_ack(checkpoint=checkpoint,batch=batch,ack=ack)

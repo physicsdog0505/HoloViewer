@@ -4,6 +4,7 @@ from contextlib import nullcontext
 from ptt_offline.recurring_publisher import run_snapshot,snapshot_interval,seconds_until_next_snapshot
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from ptt_offline.public_today_contract import ContractError
 
 class RecurringPublisherTests(unittest.TestCase):
     def test_taipei_overnight_snapshot_boundaries(self):
@@ -200,4 +201,38 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(result["http_posts"],0)
         self.assertIn(source,runner.call_args.kwargs["state_path"])
         self.assertFalse(runner.call_args.kwargs["send"])
+
+    def test_mutated_aid_does_not_consume_one_batch_budget_and_other_aid_acks(self):
+        def plan(_,article_id=None):
+            return {"status":"READY","source_identity":str(article_id)*64}
+        responses=[
+            {"status":"LOCAL_SOURCE_MUTATION_BLOCKED","aid":"#mutated",
+             "mutation_count":1,"sent":0},
+            {"status":"ACK","aid":"#healthy","sent":10},
+        ]
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1,2]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",side_effect=plan), \
+             patch("ptt_offline.recurring_publisher.run_live_once",side_effect=responses) as publisher:
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=10,max_batches=1,clock=lambda:0)
+        self.assertEqual([call.kwargs["article_id"] for call in publisher.call_args_list],[1,2])
+        self.assertEqual(result["status"],"PARTIAL_SUCCESS")
+        self.assertEqual(result["sent"],10)
+        self.assertEqual(result["http_posts"],1)
+        self.assertEqual(result["mutation_blocked_articles"],1)
+        self.assertEqual(result["mutation_blocked_aids"],["#mutated"])
+        self.assertEqual(result["mutation_blocked_count"],1)
+
+    def test_remote_uncertain_remains_global_fail_closed(self):
+        source="8"*64
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1,2]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",
+                   side_effect=ContractError("remote ACK unresolved; inspect D1 before any replay")) as publisher:
+            with self.assertRaisesRegex(ContractError,"remote ACK unresolved"):
+                run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                             send=True,batch_cap=10,max_batches=1,clock=lambda:0)
+        self.assertEqual(publisher.call_count,1)
 if __name__=="__main__":unittest.main()
