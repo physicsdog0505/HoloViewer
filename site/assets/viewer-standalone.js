@@ -212,7 +212,8 @@ function renderControls(){
 }
 function refreshControlState(){
  document.querySelectorAll('[data-layout-preset]').forEach(button=>{
-  const active=button.dataset.layoutPreset===currentLayoutPreset();
+  const preset=currentLayoutPreset();
+  const active=button.dataset.layoutPreset===preset||(button.dataset.layoutPreset==='primary'&&preset==='focus');
   button.classList.toggle('active',active);
   button.setAttribute('aria-pressed',String(active));
  });
