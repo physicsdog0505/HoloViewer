@@ -213,25 +213,36 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             current={**current,"legacy_backlog_fence_v2":True}
             missing=keep
 
+        ages=[_row_age_seconds(row,now=now) for row in missing]
         stale_legacy_candidates=sum(
-            1 for row in missing
-            if (lambda age: age is not None and age>RECOVERY_MAX_DELAY_SECONDS)(_row_age_seconds(row,now=now))
+            1 for age in ages if age is not None and age>RECOVERY_MAX_DELAY_SECONDS
         )
         retained_recovery_candidates=len(missing)-stale_legacy_candidates
         fresh_eligible=sum(1 for row in missing if _fresh_for_burst(row,now=now))
+        burst_safe_candidates=sum(
+            1 for age in ages
+            if age is not None and 0<=age<=RECOVERY_MAX_DELAY_SECONDS
+        )
         receipt={"status":"READ_ONLY","aid":plan["aid"],
                  "eligible":len(missing),"fresh_eligible":fresh_eligible,
                  "legacy_baselined":legacy_baselined,
                  "legacy_baseline_candidates":stale_legacy_candidates,
                  "retained_recovery_candidates":retained_recovery_candidates,
+                 "burst_safe_candidates":burst_safe_candidates,
                  "pending":len(plan["pending_source_lines"]),
                  "source_identity":plan["source_identity"],"sent":0}
         if not send:return receipt
         if not isinstance(secret,str) or len(secret)<32 or not callable(executor):
             raise ContractError("separate trusted source proof and transport required")
         if not missing:return {**receipt,"status":"NO_NEW_ROWS"}
-        if fresh_only and fresh_eligible!=len(missing):
-            return {**receipt,"status":"BURST_BLOCKED"}
+        if fresh_only:
+            burst_safe=(
+                len(missing)>=batch_cap and
+                fresh_eligible>=batch_cap and
+                burst_safe_candidates==len(missing)
+            )
+            if not burst_safe:
+                return {**receipt,"status":"BURST_BLOCKED"}
         selected=missing[:batch_cap]
         for row in selected:
             row["time_proof"]=sign_time_proof(row,secret)
