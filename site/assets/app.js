@@ -47,8 +47,25 @@ function updateClientTopbar(routeName){
 }
 
 
+const routePaths={home:'/',single:'/custom-view',multi:'/collab',history:'/history',ptt:'/ptt-today',watchalong:'/watchalong'};
+function routeFromLocation(){
+ const path=location.pathname.replace(/\/+$/,'')||'/';
+ if(path==='/custom-view')return 'single';
+ if(path==='/collab')return 'multi';
+ if(path==='/history')return 'history';
+ if(path==='/watchalong')return 'watchalong';
+ if(path==='/ptt-today')return new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt';
+ return 'home';
+}
+function syncRouteUrl(r,replace=false){
+ if(r==='custom-session'||r==='watchalong-session')return;
+ const path=r==='ptt-focus'?'/ptt-today?focus=1':(routePaths[r]||'/');
+ const current=location.pathname+location.search;
+ if(current===path)return;
+ history[replace?'replaceState':'pushState']({route:r},'',path);
+}
 let currentRoute='home';
-function route(r){
+function route(r,options={}){
  r=String(r||'').split('?')[0];
  if(!names[r])r='home';
  // A viewing route without valid stream IDs must never display an empty workspace.
@@ -65,6 +82,7 @@ function route(r){
   window.hvDestroy4174SharedViewer?.();
  }
  currentRoute=r;
+ if(options.syncUrl!==false)syncRouteUrl(r,Boolean(options.replace));
  const pageId=r==='ptt-focus'?'ptt':r;
  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id===pageId));
  const activeNav=r==='custom-session'?'single':r==='watchalong-session'?'watchalong':pageId;
@@ -257,7 +275,7 @@ function homeRail(items){const box=$('live-channel-list');box.replaceChildren();
  const avatarNode=homeAvatarChild(item,name);if(!avatarNode.matches('img'))avatarNode.className='';avatar.append(avatarNode);avatar.append(node('i'));link.append(avatar);link.append(node('strong',name));
  link.onclick=event=>{event.preventDefault();if($('custom-session').classList.contains('active')){selectWatchRailVideo(id,name);return}const card=$('stream-'+id);card?.scrollIntoView({block:'center',behavior:'smooth'})};box.append(link)});
  $('live-channel-rail').hidden=!box.children.length||(!$('home').classList.contains('active')&&!$('custom-session').classList.contains('active'));
- applyHomeFilter();refreshWatchRail();
+ applyHomeFilter();
 }
 
 /* Accepted 4174 high-signal carousel selection rules from pinned client_home.py. */
@@ -774,8 +792,9 @@ window.hvOpenCustomSession=function(ids,opts={}){
  });
 };
 document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
-const initialRoute=location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):(location.pathname==='/custom-view/session'?'custom-session':(location.hash.substring(1).split('?')[0]||'home'));
-route(initialRoute);
+const initialRoute=location.pathname==='/custom-view/session'?'custom-session':routeFromLocation();
+route(initialRoute,{syncUrl:false});
+window.addEventListener('popstate',()=>route(routeFromLocation(),{syncUrl:false}));
 
 
 
