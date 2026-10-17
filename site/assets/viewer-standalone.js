@@ -191,12 +191,17 @@ function renderControls(){
  const focusMode=multi&&currentLayoutPreset()!=='equal';
  playerCards.forEach(card=>{const remove=card?.querySelector('.player-remove');if(remove)remove.hidden=!multi});
  document.getElementById('layoutGroup').hidden=!multi;
- document.getElementById('focusGroup').hidden=!multi;
+ document.getElementById('focusGroup').hidden=!focusMode;
  persistentPlaybackControls.hidden=!multi;
  viewerModeStatus.hidden=!multi||currentLayoutPreset()==='equal';
- if(multi&&currentLayoutPreset()==='primary')viewerModeStatus.textContent='↻ '+carouselInterval.value+'s';
- else if(multi&&currentLayoutPreset()==='focus')viewerModeStatus.textContent='● 鎖定';
- else viewerModeStatus.textContent='';
+ viewerModeStatus.dataset.mode='';
+ if(multi&&currentLayoutPreset()==='primary'){
+  viewerModeStatus.textContent='↻ '+carouselInterval.value+'s';
+  viewerModeStatus.dataset.mode='carousel';
+ }else if(multi&&currentLayoutPreset()==='focus'){
+  viewerModeStatus.textContent='鎖定';
+  viewerModeStatus.dataset.mode='lock';
+ }else viewerModeStatus.textContent='';
  carouselControl.hidden=true;
  carouselIntervalGroup.hidden=!focusMode;
  multiModeSwitch.checked=watchMode==='multi';
