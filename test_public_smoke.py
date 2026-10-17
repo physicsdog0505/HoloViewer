@@ -68,7 +68,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("const FOCUS_VISIBLE_SLOTS=4;", js)
         self.assertIn("carousel.checked=currentLayoutPreset()!=='equal';", js)
         self.assertIn("secondaryOffset=(secondaryOffset+Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryCount))%secondaryCount;", js)
-        self.assertIn("viewerModeStatus.dataset.mode='lock';", js)
+        self.assertNotIn("viewerModeStatus", js)
         self.assertIn("button.dataset.layoutPreset===\'primary\'&&preset===\'focus\'", js)
         self.assertIn("function handleFocusAvatarClick(index)", js)
         self.assertIn("currentLayoutPreset()==='focus'&&lockedIndex===index", js)
