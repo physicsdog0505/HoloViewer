@@ -10,7 +10,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
@@ -50,6 +50,24 @@ class PublicSmokeTests(unittest.TestCase):
         frontend_config = (ROOT / "site/assets/config.js").read_text()
         self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
         self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
+
+    def test_standalone_viewer_mode_contract(self):
+        html = (ROOT / "site/viewer/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/viewer-standalone.css").read_text(encoding="utf-8")
+        app = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        for label in (">預設<", ">輪播<", ">鎖定<"):
+            self.assertIn(label, html)
+        for old in (">平均<", ">主視角<", ">直播優先<"):
+            self.assertNotIn(old, html)
+        self.assertIn("const MAX_STREAMS=16;", js)
+        self.assertIn("const FOCUS_VISIBLE_SLOTS=4;", js)
+        self.assertIn("carousel.checked=currentLayoutPreset()!=='equal';", js)
+        self.assertIn("secondaryOffset=(secondaryOffset+Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryCount))%secondaryCount;", js)
+        self.assertIn("viewerModeStatus.dataset.mode='lock';", js)
+        self.assertIn(".player-card.viewer-hidden{display:none!important}", css)
+        self.assertIn(".transport-button.is-feedback", css)
+        self.assertIn("location.href='/viewer/?'+q.toString();", app)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
