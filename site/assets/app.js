@@ -894,7 +894,7 @@ document.getElementById('start').onclick=()=>{
   q.set('ptt',document.getElementById('pttMode').value);
   q.set('primary',String(Math.max(0,items.indexOf(primaryId))));
   q.set('audio',String(Math.max(0,items.indexOf(audioId))));
-  window.open('/viewer/?'+q.toString(),'_blank','noopener');
+  location.href='/viewer/?'+q.toString();
 };
 render();
 
