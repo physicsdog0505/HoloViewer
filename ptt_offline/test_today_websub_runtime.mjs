@@ -7,6 +7,7 @@ import {recordSubscriptionRequest,confirmSubscriptionChallenge,readSubscriptionL
 import {topicForChannel} from './worker_host/today/websub-receiver.mjs';
 import {renewSubscriptions} from './worker_host/today/websub-renewal-send.mjs';
 import {writeEvidence} from './worker_host/today/store.mjs';
+import {auditWebSubSchema} from './worker_host/today/websub-schema-preflight.mjs';
 
 const secret='local-fixture-secret-0123456789abcdef';
 const version='today-roster-v85';
@@ -271,5 +272,24 @@ test('expired processing claim is recovered and completed without duplicate even
  assert.equal(out.websub.processing.updated,1);
  assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_websub_events').get().n,1);
  assert.equal(db.raw.prepare('SELECT status FROM public_today_websub_events WHERE event_hash=?').get(eventHash).status,'processed');
+ db.raw.close();
+});
+
+
+test('read-only schema preflight passes proposed fixture and fails closed when lease schema is missing',async()=>{
+ const db=makeDb();
+ const before=db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_approved_channels').get().n;
+ const good=await auditWebSubSchema(db);
+ assert.equal(good.status,'PASS');
+ assert.equal(good.mode,'READ_ONLY');
+ assert.equal(good.approved_channels,85);
+ assert.equal(good.expected_channels,85);
+ assert.ok(Object.values(good.tables).every(x=>x.status==='PASS'));
+ assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_approved_channels').get().n,before);
+ db.raw.exec('DROP TABLE public_today_websub_leases');
+ const missing=await auditWebSubSchema(db);
+ assert.equal(missing.status,'HOLD');
+ assert.deepEqual(missing.tables.public_today_websub_leases.missing_columns,
+  ['channel_id','roster_version','topic','requested_mode','state','requested_at','verified_at','expires_at','lease_seconds','last_error']);
  db.raw.close();
 });
