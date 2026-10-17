@@ -3,6 +3,7 @@ import {persistEvent} from './websub-store.mjs';
 import {confirmSubscriptionChallenge,readSubscriptionLeases} from './websub-leases.mjs';
 import {renewSubscriptions} from './websub-renewal-send.mjs';
 import {refreshPendingVideos} from './websub-status.mjs';
+import {reconcileTodayChannelsViaAtom} from './discovery-refresh.mjs';
 
 const CID=/^UC[A-Za-z0-9_-]{22}$/;
 const VID=/^[A-Za-z0-9_-]{11}$/;
@@ -114,6 +115,13 @@ export function mountTodayWebSubOnWorker(base,{fetchImpl=fetch}={}){
     websub.processing=await refreshPendingVideos({
      db:env.DB,roster,fetchVideos:videoFetcher(env,fetchImpl),now,limit:25
     });
+    if(websub.processing.reconcile_required&&websub.processing.reconcile_channels?.length){
+      websub.recovery=await reconcileTodayChannelsViaAtom(env,{
+        roster,channelIds:websub.processing.reconcile_channels,fetchImpl,now,limit:5
+      });
+    }else{
+      websub.recovery={status:'not_needed',channels:0,feed_entries:0,discovered:0,failed:0};
+    }
    }
    if(enabled(env,'TODAY_WEBSUB_RENEW_ENABLED')&&enabled(env,'TODAY_WEBSUB_RECEIVER_ENABLED')&&shouldRunRenewal(now)){
     const roster=await loadApprovedTodayRoster(env.DB);
