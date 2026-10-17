@@ -6,7 +6,7 @@ const streams=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}
 let layout=['equal','primary'].includes(params.get('layout'))?params.get('layout'):(streams.length>1?'equal':'equal');
 let primaryIndex=Math.max(0,Math.min(streams.length-1,Number(params.get('primary'))||0));
 let audioMaster=Math.max(0,Math.min(streams.length-1,Number(params.get('audio'))||0));
-const pttMode=params.get('ptt')||'live';
+const requestedPttMode=params.get('ptt')||'live';
 
 const stage=document.getElementById('stage');
 const liveRail=document.getElementById('viewerLiveRail');
@@ -26,6 +26,7 @@ const carouselOutput=document.getElementById('focusCarouselIntervalOutput');
 const pttPanel=document.getElementById('pttPanel');
 const pttFeed=document.getElementById('pttFeed');
 const pttMeta=document.getElementById('pttMeta');
+const pttTitle=document.getElementById('pttTitle');
 const pttNewest=document.getElementById('pttNewest');
 const pttFontSize=document.getElementById('pttFontSize');
 const pttFontValue=document.getElementById('pttFontValue');
@@ -38,6 +39,8 @@ let syncGuard=false;
 let carouselTimer=null;
 let pttFollowing=true;
 let pttLoaded=false;
+let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
+let pttResolveToken=0;
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
@@ -68,7 +71,7 @@ function updateUrl(){
  const q=new URLSearchParams();
  streams.forEach(s=>q.append('stream',s.videoId));
  q.set('layout',layout);
- q.set('ptt',pttMode);
+ q.set('ptt',pttContext.mode==='live'?'live':requestedPttMode);
  q.set('primary',String(primaryIndex));
  q.set('audio',String(audioMaster));
  history.replaceState(null,'','/viewer/?'+q.toString());
@@ -150,6 +153,7 @@ function setPrimary(index){
  primaryIndex=index;
  if(audioFollow.checked)setAudioMaster(index);
  applyLayout();
+ resolvePrimaryPtt();
 }
 function setAudioMaster(index){
  if(index<0||index>=streams.length)return;
@@ -203,6 +207,7 @@ function replacePrimaryStream(row){
  renderControls();
  applyLayout();
  renderLiveRail(catalogRows);
+ resolvePrimaryPtt();
 }
 function supportStyle(button,row){
  const accent=accentFor(row);
@@ -268,7 +273,8 @@ function pttRow(row){
  let clock='';
  if(Number.isFinite(when.getTime()))clock=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(when);
  const time=node('span',clock,'ptt-time');
- const floor=node('span',Number.isInteger(row?.floor)&&row.floor>0?row.floor+'樓':'','ptt-floor');
+ const floorNumber=Number(row?.floor);
+ const floor=node('span',Number.isFinite(floorNumber)&&floorNumber>0?Math.trunc(floorNumber)+'樓':'','ptt-floor');
  const body=node('span',undefined,'ptt-body');
  body.append(node('span',String(row?.author||'unknown')+':','ptt-author'),node('span',String(row?.content||''),'ptt-content'));
  el.append(kindEl,time,floor,body);
@@ -278,14 +284,29 @@ function pttRow(row){
 }
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
 function pttToLatest(){pttFeed.scrollTop=pttFeed.scrollHeight;pttNewest.hidden=true;pttFollowing=true}
-async function loadPtt(){
- if(pttMode!=='live'){
-  pttPanel.hidden=false;
-  pttFeed.replaceChildren(node('div','這個觀看組合目前沒有即時 PTT 專串。','ptt-empty'));
-  pttMeta.textContent='無即時資料';
-  return;
- }
+function taipeiDayForDate(value){
+ const date=value instanceof Date?value:new Date(value);
+ if(!Number.isFinite(date.getTime()))return '';
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+ const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return out.year+'-'+out.month+'-'+out.day;
+}
+function resetPttFeed(){
+ pttLoaded=false;
+ pttFollowing=true;
+ pttNewest.hidden=true;
+ pttFeed.replaceChildren();
+}
+function showPttUnavailable(message,meta='無可用專串'){
  pttPanel.hidden=false;
+ pttTitle.textContent='PTT 專串';
+ pttMeta.textContent=meta;
+ pttFeed.replaceChildren(node('div',message,'ptt-empty'));
+ pttNewest.hidden=true;
+}
+async function loadLivePtt(){
+ pttPanel.hidden=false;
+ pttTitle.textContent='PTT 今日專串';
  const day=taipeiDay();
  const beforeAtBottom=pttFollowing||pttAtBottom();
  try{
@@ -303,11 +324,104 @@ async function loadPtt(){
   const freshness=String(data.freshness?.status||'unknown');
   pttMeta.textContent=day.replaceAll('-','/')+' · '+pttFeed.children.length+' 則 · '+(freshness==='fresh'?'即時':freshness==='stale'?'資料稍舊':'狀態未知');
   if(beforeAtBottom)requestAnimationFrame(pttToLatest);
- }catch(e){
+ }catch(_e){
   pttMeta.textContent=day.replaceAll('-','/')+' · 讀取失敗';
   if(!pttLoaded)pttFeed.replaceChildren(node('div','PTT 暫時無法讀取，稍後會自動重試。','ptt-empty'));
  }
 }
+async function loadArchivePtt(context,token){
+ pttPanel.hidden=false;
+ pttTitle.textContent='PTT 歷史專串';
+ pttMeta.textContent=(context.day||'')+' · 讀取中';
+ const startMs=Date.parse(context.start||'');
+ const endMs=Date.parse(context.end||'');
+ const rows=[];
+ let after='',pages=0;
+ try{
+  while(pages++<50){
+   const path='/v1/ptt/history?day='+encodeURIComponent(context.day)+'&limit=200'+(after?'&after='+encodeURIComponent(after):'');
+   const data=await api(path);
+   if(token!==pttResolveToken)return;
+   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw new Error('資料格式錯誤');
+   let beyond=false;
+   for(const row of data.pushes){
+    const when=Date.parse(String(row?.occurred_at||''));
+    if(!Number.isFinite(when))continue;
+    if((!Number.isFinite(startMs)||when>=startMs)&&(!Number.isFinite(endMs)||when<=endMs))rows.push(row);
+    if(Number.isFinite(endMs)&&when>endMs)beyond=true;
+   }
+   const next=String(data.page?.next_checkpoint||'');
+   if(beyond||data.page?.has_more!==true||!next||next===after)break;
+   after=next;
+  }
+  if(token!==pttResolveToken)return;
+  pttFeed.replaceChildren(...rows.map(pttRow));
+  pttLoaded=true;
+  pttFollowing=false;
+  pttNewest.hidden=true;
+  pttFeed.scrollTop=0;
+  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+rows.length+' 則 · VOD';
+  if(!rows.length)pttFeed.replaceChildren(node('div','這段 VOD 時間範圍內沒有找到 PTT 推文。','ptt-empty'));
+ }catch(_e){
+  if(token!==pttResolveToken)return;
+  pttMeta.textContent=(context.day||'')+' · 讀取失敗';
+  pttFeed.replaceChildren(node('div','歷史 PTT 暫時無法讀取。','ptt-empty'));
+ }
+}
+async function resolvePrimaryPtt(){
+ const stream=streams[primaryIndex];
+ if(!stream){showPttUnavailable('沒有可判定的影片。');return}
+ const token=++pttResolveToken;
+ const id=stream.videoId;
+ resetPttFeed();
+ pttPanel.hidden=false;
+ pttTitle.textContent='PTT 專串';
+ pttMeta.textContent='判定 Live / VOD 中';
+ try{
+  const row=await api('/v1/catalog/videos/'+encodeURIComponent(id));
+  if(token!==pttResolveToken)return;
+  const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
+  if(lifecycle==='live'){
+   pttContext={mode:'live',videoId:id,start:'',end:'',day:taipeiDay()};
+   updateUrl();
+   await loadLivePtt();
+   return;
+  }
+  if(lifecycle==='ended'){
+   const startValue=String(row?.actual_start||row?.scheduled_start||row?.start_at||'');
+   const endValue=String(row?.actual_end||row?.end_at||'');
+   const day=taipeiDayForDate(startValue);
+   if(day){
+    pttContext={mode:'archive',videoId:id,start:startValue,end:endValue,day};
+    updateUrl();
+    await loadArchivePtt(pttContext,token);
+    return;
+   }
+  }
+  if(['upcoming','waiting'].includes(lifecycle)){
+   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
+   updateUrl();
+   showPttUnavailable('這支影片尚未開始，沒有可連接的 PTT 時間軸。','尚未開始');
+   return;
+  }
+  throw new Error('無法由 catalog 判定');
+ }catch(_e){
+  if(token!==pttResolveToken)return;
+  if(requestedPttMode==='live'){
+   pttContext={mode:'live',videoId:id,start:'',end:'',day:taipeiDay()};
+   updateUrl();
+   await loadLivePtt();
+  }else{
+   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
+   updateUrl();
+   showPttUnavailable('無法自動判定這支影片是 Live 或 VOD；未自動連接錯誤日期的 PTT。','無法判定');
+  }
+ }
+}
+async function loadPtt(){
+ if(pttContext.mode==='live')await loadLivePtt();
+}
+
 function startCarousel(){
  clearInterval(carouselTimer);carouselTimer=null;
  if(!carousel.checked||streams.length<2)return;
@@ -319,12 +433,12 @@ function readSettings(){
   const font=Math.max(12,Math.min(26,Number(localStorage.getItem('holoviewer-viewer-ptt-font'))||14));
   pttFontSize.value=String(font);pttFontValue.textContent=font+'px';
   document.documentElement.style.setProperty('--ptt-font-size',font+'px');
-  pttShowFloor.checked=localStorage.getItem('holoviewer-ptt-show-floor')!=='false';
+  pttShowFloor.checked=localStorage.getItem('holoviewer-viewer-ptt-show-floor')!=='false';
  }catch{}
 }
 function applyFloor(){
  pttFeed.querySelectorAll('.ptt-row').forEach(row=>row.classList.toggle('hide-floor',!pttShowFloor.checked));
- try{localStorage.setItem('holoviewer-ptt-show-floor',String(pttShowFloor.checked))}catch{}
+ try{localStorage.setItem('holoviewer-viewer-ptt-show-floor',String(pttShowFloor.checked))}catch{}
 }
 
 settingsButton.addEventListener('click',()=>{
@@ -366,7 +480,7 @@ document.addEventListener('fullscreenchange',()=>{
 readSettings();
 renderShell();
 loadCatalog();
-loadPtt();
+resolvePrimaryPtt();
 setInterval(loadPtt,10000);
 
 if(window.YT?.Player)mountPlayers();
