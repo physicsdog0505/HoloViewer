@@ -28,6 +28,8 @@ button,select,input{font:inherit}
 .viewer-live-rail:hover .viewer-live-item strong,.viewer-live-rail:focus-within .viewer-live-item strong{opacity:1}
 .viewer-live-item[data-support-mode="dual_color"] .viewer-live-avatar{background:var(--member-accent-dual);border-color:transparent;padding:3px}
 
+body:has(.viewer-live-rail[hidden]) .viewer-shell{margin-left:var(--rail-collapsed)}
+
 .viewer-shell{
  --watch-rail:64px;
  margin-left:calc(var(--rail-collapsed) + var(--watch-rail));
