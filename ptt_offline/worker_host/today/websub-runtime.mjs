@@ -98,7 +98,7 @@ export function mountTodayWebSubOnWorker(base,{fetchImpl=fetch}={}){
      db:env.DB,roster,fetchVideos:videoFetcher(env,fetchImpl),now,limit:25
     });
    }
-   if(enabled(env,'TODAY_WEBSUB_RENEW_ENABLED')&&shouldRunRenewal(now)){
+   if(enabled(env,'TODAY_WEBSUB_RENEW_ENABLED')&&enabled(env,'TODAY_WEBSUB_RECEIVER_ENABLED')&&shouldRunRenewal(now)){
     const roster=await loadApprovedTodayRoster(env.DB);
     const callback=configuredCallback(env);
     if(!callback||typeof env?.TODAY_WEBSUB_SECRET!=='string'||env.TODAY_WEBSUB_SECRET.length<32)
@@ -111,8 +111,10 @@ export function mountTodayWebSubOnWorker(base,{fetchImpl=fetch}={}){
       headers:{'content-type':'application/x-www-form-urlencoded'},
       body:body.toString(),signal:AbortSignal.timeout(12000)})
     });
-   }else if(enabled(env,'TODAY_WEBSUB_RENEW_ENABLED')){
+   }else if(enabled(env,'TODAY_WEBSUB_RENEW_ENABLED')&&enabled(env,'TODAY_WEBSUB_RECEIVER_ENABLED')){
     websub.renewal={status:'cadence_skip',sent:0};
+   }else if(enabled(env,'TODAY_WEBSUB_RENEW_ENABLED')){
+    websub.renewal={status:'receiver_disabled',sent:0};
    }
    return {base:baseResult,websub};
   }
