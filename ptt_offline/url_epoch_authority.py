@@ -45,7 +45,8 @@ def article_epoch(*,board:str,aid:str,url:str,identity_verifier=None) -> datetim
 
 
 def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict],
-                       identity_verifier=None) -> list[dict]:
+                       identity_verifier=None,
+                       reviewed_chronology_exceptions:bool=False) -> list[dict]:
     """Return UTC second events; require strict chronological source-line evidence.
 
     This intentionally does not use collected_at or captured_at. A first push
@@ -57,7 +58,10 @@ def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict],
                          identity_verifier=identity_verifier)
     canonical=normalize_public_aid(aid)
     output=[]
-    previous=anchor
+    # PTT exposes only minute precision. Comparing a displayed HH:MM value to
+    # URL epoch seconds would manufacture an ordering distinction the source
+    # cannot express, so anchor chronology at the containing minute.
+    previous=anchor.replace(second=0,microsecond=0)
     last_line=0
     for row in pushes:
         line=row.get("source_line")
@@ -76,14 +80,26 @@ def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict],
             raise ContractError("invalid source PTT calendar date") from exc
         # The only permitted rollover is observed Dec -> Jan, including first
         # push after a December URL-epoch article. Other regression is rejected.
+        time_quality="source-minute"
+        chronology_note=None
+        reviewed_regression=False
         if event < previous:
             if previous.month != 12 or month != 1:
-                raise ContractError("unobserved or regressive source chronology")
-            try:
-                event=event.replace(year=previous.year+1)
-            except ValueError as exc:
-                raise ContractError("invalid year rollover") from exc
-        if event < previous - timedelta(minutes=1):
+                if not reviewed_chronology_exceptions:
+                    raise ContractError("unobserved or regressive source chronology")
+                time_quality="source-minute-regression"
+                reviewed_regression=True
+                chronology_note=(
+                    f"reviewed source chronology exception: line {line} "
+                    f"{event.strftime('%m/%d %H:%M')} precedes prior source minute "
+                    f"{previous.strftime('%m/%d %H:%M')}"
+                )
+            else:
+                try:
+                    event=event.replace(year=previous.year+1)
+                except ValueError as exc:
+                    raise ContractError("invalid year rollover") from exc
+        if event < previous - timedelta(minutes=1) and not reviewed_regression:
             raise ContractError("push predates article or preceding push")
         if event - previous > timedelta(days=MAX_UNOBSERVED_DAYS):
             raise ContractError("unobserved interval requires separate time authority")
@@ -92,6 +108,8 @@ def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict],
         occurred=event.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z")
         output.append({**row,"aid":canonical,"occurred_at":occurred,
                        "day":taipei_day(occurred),
-                       "source_record_key":f"{canonical}:{line}"})
+                       "source_record_key":f"{canonical}:{line}",
+                       "time_quality":time_quality,
+                       **({"chronology_note":chronology_note} if chronology_note else {})})
         previous=event
     return output
