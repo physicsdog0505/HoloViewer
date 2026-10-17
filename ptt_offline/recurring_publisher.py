@@ -63,6 +63,9 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             last_status="NO_NEW_ROWS"
             backlog=False
             pending=0
+            legacy_baseline_candidates=0
+            retained_recovery_candidates=0
+            fresh_eligible=0
             burst_activated=False
             burst_batches=0
             for article_index,article_id in enumerate(article_ids):
@@ -74,6 +77,9 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     result=run_live_once(db,state_path=state,secret=secret,
                        executor=executor,send=False,batch_cap=batch_cap,article_id=article_id)
                     pending+=result.get("eligible",0)
+                    legacy_baseline_candidates+=result.get("legacy_baseline_candidates",0)
+                    retained_recovery_candidates+=result.get("retained_recovery_candidates",0)
+                    fresh_eligible+=result.get("fresh_eligible",0)
                     continue
                 # max_batches is a GLOBAL per-snapshot network/write budget.
                 # Never turn a zero share into one: that previously allowed
@@ -136,6 +142,9 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                             break
             result={"status":last_status if send else "READ_ONLY",
                     "sent":total_sent,"eligible":pending,
+                    "fresh_eligible":fresh_eligible,
+                    "legacy_baseline_candidates":legacy_baseline_candidates,
+                    "retained_recovery_candidates":retained_recovery_candidates,
                     "http_posts":total_posts,"batch_count":total_posts,
                     "modeled_d1_writes_ceiling":modeled_writes,
                     "modeled_d1_queries_ceiling":modeled_queries,
