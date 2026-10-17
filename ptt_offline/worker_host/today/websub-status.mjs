@@ -48,6 +48,14 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
   }
  }
  const byId=new Map(results.map(v=>[v.id,v]));
+ const currentById=new Map();
+ if(ids.length){
+  const placeholders=ids.map(()=>'?').join(',');
+  const currentRows=await db.prepare(`SELECT video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,
+   lifecycle_state,scheduled_start,actual_start,actual_end FROM public_today_canonical WHERE video_id IN (${placeholders})`)
+   .bind(...ids).all();
+  for(const row of currentRows.results??[])currentById.set(row.video_id,row);
+ }
  const observed_at=now.toISOString().replace(/\.\d{3}Z$/,'Z');
  let updated=0,failed=0,ignored_non_live=0,unchanged=0,ignored_terminal_regression=0;
  for(const e of events){
@@ -69,9 +77,7 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
    const lifecycle_state=end?'ended':s.liveBroadcastContent==='live'?'live':
      s.liveBroadcastContent==='upcoming'?'upcoming':start?'live':'unknown';
    const group=approved.get(e.channel_id);
-   const current=await db.prepare(`SELECT publisher_channel_id,roster_version,channel_group,title,channel_name,
-      lifecycle_state,scheduled_start,actual_start,actual_end
-     FROM public_today_canonical WHERE video_id=?`).bind(v.id).first();
+   const current=currentById.get(v.id)??null;
    if(current&&current.publisher_channel_id!==e.channel_id)throw Error('canonical publisher mismatch');
    if(current&&current.lifecycle_state==='ended'&&lifecycle_state!=='ended'){
     // Ended is terminal; a later duplicate/pending notice cannot resurrect it.
