@@ -213,10 +213,17 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             current={**current,"legacy_backlog_fence_v2":True}
             missing=keep
 
+        stale_legacy_candidates=sum(
+            1 for row in missing
+            if (lambda age: age is not None and age>RECOVERY_MAX_DELAY_SECONDS)(_row_age_seconds(row,now=now))
+        )
+        retained_recovery_candidates=len(missing)-stale_legacy_candidates
         fresh_eligible=sum(1 for row in missing if _fresh_for_burst(row,now=now))
         receipt={"status":"READ_ONLY","aid":plan["aid"],
                  "eligible":len(missing),"fresh_eligible":fresh_eligible,
                  "legacy_baselined":legacy_baselined,
+                 "legacy_baseline_candidates":stale_legacy_candidates,
+                 "retained_recovery_candidates":retained_recovery_candidates,
                  "pending":len(plan["pending_source_lines"]),
                  "source_identity":plan["source_identity"],"sent":0}
         if not send:return receipt
