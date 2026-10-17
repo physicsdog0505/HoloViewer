@@ -22,6 +22,7 @@ const settingsButton=document.getElementById('viewerSettings');
 const fullscreenButton=document.getElementById('viewerFullscreen');
 const multiModeSwitch=document.getElementById('multiModeSwitch');
 const focusChoices=document.getElementById('focusChoices');
+const focusCarouselStatus=document.getElementById('focusCarouselStatus');
 const syncPlayback=document.getElementById('syncPlayback');
 const playAll=document.getElementById('playAll');
 const pauseAll=document.getElementById('pauseAll');
@@ -193,6 +194,9 @@ function renderControls(){
  document.getElementById('layoutGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!focusMode;
  persistentPlaybackControls.hidden=!multi;
+ const carouselUnlocked=multi&&currentLayoutPreset()==='primary';
+ focusCarouselStatus.hidden=!carouselUnlocked;
+ focusCarouselStatus.textContent=carouselUnlocked?'↻ '+carouselInterval.value+'s':'';
  carouselControl.hidden=true;
  carouselIntervalGroup.hidden=!focusMode;
  multiModeSwitch.checked=watchMode==='multi';
