@@ -273,3 +273,65 @@ body.immersive .viewer-stage{align-content:start}
 .carousel-interval input[type="range"]{width:74px}
 .carousel-interval output{min-width:28px;font-variant-numeric:tabular-nums;color:#69645f}
 .carousel-interval[hidden],.control-toggle[hidden],.layout-segment[hidden]{display:none!important}
+
+/* HoloViewer-branded viewer controls */
+.viewer-mode-switch{gap:7px}
+.mode-switch input:checked + .mode-switch-track{background:var(--brand-main)}
+.mode-switch input:focus-visible + .mode-switch-track{outline-color:var(--brand-soft)}
+
+.persistent-playback-controls{
+ display:flex;align-items:center;gap:6px;white-space:nowrap
+}
+.persistent-playback-controls[hidden]{display:none!important}
+
+.viewer-watch-actions button.active{
+ background:var(--brand-main)!important;
+ border-color:var(--brand-main)!important;
+ color:#fff!important;
+ box-shadow:0 1px 3px rgba(166,87,136,.24)
+}
+.viewer-watch-actions button:hover,
+.viewer-controls button:hover{border-color:color-mix(in srgb,var(--brand-main) 35%,var(--line))}
+.viewer-watch-actions button:focus-visible,
+.viewer-controls button:focus-visible{outline:2px solid var(--brand-soft);outline-offset:2px}
+
+.layout-segment{
+ border-color:color-mix(in srgb,var(--brand-main) 22%,var(--line));
+ background:color-mix(in srgb,var(--brand-soft) 10%,#fff)
+}
+.layout-segment button:hover{background:color-mix(in srgb,var(--brand-soft) 20%,#fff)!important}
+.layout-segment button.active{
+ background:var(--brand-main)!important;
+ color:#fff!important;
+ box-shadow:0 1px 3px rgba(166,87,136,.26)
+}
+
+.toggle-ui{background:color-mix(in srgb,var(--brand-soft) 28%,#d7d3cd)}
+.control-toggle input:checked + .toggle-ui{background:var(--brand-main)}
+.control-toggle input:focus-visible + .toggle-ui{outline-color:var(--brand-soft)}
+
+.transport-button{
+ width:38px!important;
+ min-width:38px!important;
+ height:38px;
+ min-height:38px!important;
+ padding:0!important;
+ border-color:color-mix(in srgb,var(--brand-main) 28%,var(--line))!important;
+ color:var(--brand-main)!important;
+ background:color-mix(in srgb,var(--brand-soft) 10%,#fff)!important;
+ font-size:21px!important;
+ font-weight:900!important;
+ line-height:1!important
+}
+.transport-button:hover{
+ background:var(--brand-main)!important;
+ border-color:var(--brand-main)!important;
+ color:#fff!important
+}
+
+.carousel-interval{
+ border-color:color-mix(in srgb,var(--brand-main) 22%,var(--line));
+ background:color-mix(in srgb,var(--brand-soft) 10%,#fff)
+}
+.carousel-interval input[type="range"],
+.ptt-font-control input[type="range"]{accent-color:var(--brand-main)}
