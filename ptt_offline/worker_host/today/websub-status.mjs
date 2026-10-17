@@ -49,7 +49,7 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
  }
  const byId=new Map(results.map(v=>[v.id,v]));
  const observed_at=now.toISOString().replace(/\.\d{3}Z$/,'Z');
- let updated=0,failed=0,ignored_non_live=0;
+ let updated=0,failed=0,ignored_non_live=0,unchanged=0,ignored_terminal_regression=0;
  for(const e of events){
   try{
    const v=byId.get(e.video_id),s=v?.snippet,d=v?.liveStreamingDetails??{};
@@ -68,7 +68,23 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
    }
    const lifecycle_state=end?'ended':s.liveBroadcastContent==='live'?'live':
      s.liveBroadcastContent==='upcoming'?'upcoming':start?'live':'unknown';
-   await writeEvidence(db,{video_id:v.id,channel_id:e.channel_id,group:approved.get(e.channel_id),roster_version:roster.version,
+   const group=approved.get(e.channel_id);
+   const current=await db.prepare(`SELECT publisher_channel_id,roster_version,channel_group,title,channel_name,
+      lifecycle_state,scheduled_start,actual_start,actual_end
+     FROM public_today_canonical WHERE video_id=?`).bind(v.id).first();
+   if(current&&current.publisher_channel_id!==e.channel_id)throw Error('canonical publisher mismatch');
+   if(current&&current.lifecycle_state==='ended'&&lifecycle_state!=='ended'){
+    // Ended is terminal; a later duplicate/pending notice cannot resurrect it.
+    await finishClaim(db,e.event_hash,e.claimToken,{now});ignored_terminal_regression++;continue;
+   }
+   const same=Boolean(current)&&current.roster_version===roster.version&&current.channel_group===group&&
+    current.title===String(s.title??'')&&current.channel_name===String(s.channelTitle??'')&&
+    current.lifecycle_state===lifecycle_state&&current.scheduled_start===scheduled&&
+    current.actual_start===start&&current.actual_end===end;
+   if(same){
+    await finishClaim(db,e.event_hash,e.claimToken,{now});unchanged++;continue;
+   }
+   await writeEvidence(db,{video_id:v.id,channel_id:e.channel_id,group,roster_version:roster.version,
     title:s.title,channel_name:s.channelTitle??'',lifecycle_state,observed_at,scheduled_start:scheduled,
     actual_start:start,actual_end:end,source_label:'YouTube'});
    await finishClaim(db,e.event_hash,e.claimToken,{now});updated++;
@@ -77,5 +93,5 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
    failed++
   }
  }
- return {updated,failed,ignored_non_live,ignored_stale_roster,deleted_notices,reconcile_required,quota_units:ids.length?1:0,complete:false};
+ return {updated,failed,ignored_non_live,unchanged,ignored_terminal_regression,ignored_stale_roster,deleted_notices,reconcile_required,quota_units:ids.length?1:0,complete:false};
 }
