@@ -35,9 +35,13 @@ def seconds_until_next_snapshot(now=None):
         target=local.replace(hour=next_minute//60,minute=next_minute%60,second=0,microsecond=0)
     return max(0,(target-local).total_seconds())
 
-def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=1,max_articles=4):
+def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=1,burst_max_batches=None,max_articles=4):
     if type(max_batches) is not int or not 1<=max_batches<=16:
         raise ContractError('invalid bounded batches per snapshot')
+    if burst_max_batches is None:
+        burst_max_batches=max_batches
+    if type(burst_max_batches) is not int or not max_batches<=burst_max_batches<=16:
+        raise ContractError('invalid bounded burst batches per snapshot')
     started=clock()
     with open_source(source) as db:
         article_ids=active_article_ids(db,limit=max_articles)
@@ -59,6 +63,8 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             last_status="NO_NEW_ROWS"
             backlog=False
             pending=0
+            burst_activated=False
+            burst_batches=0
             for article_index,article_id in enumerate(article_ids):
                 plan=inspect_latest_article(db,article_id=article_id)
                 if plan["status"]!="READY":
@@ -102,12 +108,39 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     if count<batch_cap:
                         break
                 backlog=backlog or (count==batch_cap)
+                # Adaptive burst is allowed only after a normal full batch proves
+                # the entire current missing set is fresh (<=180s). Every extra
+                # batch re-checks fresh_only inside run_live_once; delayed-recovery
+                # rows therefore remain on the normal one-batch path.
+                initial_eligible=batch.get("eligible",0) if isinstance(batch,dict) else 0
+                initial_fresh=batch.get("fresh_eligible",0) if isinstance(batch,dict) else 0
+                if (send and count==batch_cap and burst_max_batches>max_batches and
+                    initial_eligible>batch_cap and initial_fresh==initial_eligible):
+                    while total_posts<burst_max_batches:
+                        burst=run_live_once(db,state_path=state,secret=secret,
+                            executor=executor,send=True,batch_cap=batch_cap,
+                            article_id=article_id,fresh_only=True)
+                        if burst.get("status")=="BURST_BLOCKED":
+                            break
+                        if burst.get("status")!="ACK":
+                            break
+                        burst_count=burst.get("sent",0)
+                        total_posts+=1
+                        burst_batches+=1
+                        burst_activated=True
+                        total_sent+=burst_count
+                        modeled_writes+=2+2*burst_count
+                        modeled_queries+=2+5*burst_count
+                        backlog=backlog or (burst_count==batch_cap)
+                        if burst_count<batch_cap:
+                            break
             result={"status":last_status if send else "READ_ONLY",
                     "sent":total_sent,"eligible":pending,
                     "http_posts":total_posts,"batch_count":total_posts,
                     "modeled_d1_writes_ceiling":modeled_writes,
                     "modeled_d1_queries_ceiling":modeled_queries,
-                    "articles_checked":len(article_ids),"backlog_may_remain":backlog}
+                    "articles_checked":len(article_ids),"backlog_may_remain":backlog,
+                    "burst_activated":burst_activated,"burst_batches":burst_batches}
     return {**result,"elapsed_ms":round((clock()-started)*1000),
         "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "publisher_mode":"OWNER_APPROVED_SEND" if send else "DRY_RUN",
@@ -124,6 +157,7 @@ def main(argv=None):
     p.add_argument("--send",action="store_true")
     p.add_argument("--batch-cap",type=int,default=5)
     p.add_argument("--max-batches",type=int,default=1)
+    p.add_argument("--burst-max-batches",type=int,default=None)
     p.add_argument("--max-articles",type=int,default=4)
     p.add_argument("--approve-live-capture-policy",action="store_true")
     p.add_argument("--endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish")
@@ -136,6 +170,8 @@ def main(argv=None):
         p.error('max articles must be 1-8')
     if not 1<=args.max_batches<=16:
         p.error('max batches must be 1-16')
+    if args.burst_max_batches is not None and not args.max_batches<=args.burst_max_batches<=16:
+        p.error('burst max batches must be between max-batches and 16')
     import os
     if args.send and (not args.approve_live_capture_policy or
        os.environ.get("PTT_ALLOW_CAPTURE_TIME_POLICY")!="true"):
@@ -152,7 +188,8 @@ def main(argv=None):
             started=time.monotonic()
             try:
                 result=run_snapshot(source=args.source,state_dir=args.state_dir,send=args.send,
-                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches,max_articles=args.max_articles)
+                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches,
+                                    burst_max_batches=args.burst_max_batches,max_articles=args.max_articles)
             except Exception as exc:
                 failure={"status":"STOP_RECONCILE","error_class":type(exc).__name__,
                          "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
