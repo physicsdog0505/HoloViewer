@@ -58,12 +58,7 @@
     <label class="control-group">輪播秒數
       <input id="focusCarouselInterval" type="range" min="5" max="30" step="1" value="10">
       <output id="focusCarouselIntervalOutput">10s</output>
-    </label>
-    <label class="control-group">PTT 字體
-      <input id="pttFontSize" type="range" min="12" max="26" step="1" value="14">
-      <output id="pttFontValue">14px</output>
-    </label>
-  </section>
+    </label>  </section>
 
   <main class="viewer-main">
     <section class="viewer-workspace">
@@ -74,7 +69,13 @@
             <strong id="pttTitle">PTT 專串</strong>
             <small id="pttMeta">讀取中</small>
           </div>
-          <a href="/ptt-today">開啟完整專串</a>
+          <div class="ptt-heading-actions">
+            <label class="ptt-font-control">字體
+              <input id="pttFontSize" type="range" min="12" max="26" step="1" value="14">
+              <output id="pttFontValue">14px</output>
+            </label>
+            <a href="/ptt-today">開啟完整專串</a>
+          </div>
         </div>
         <div id="pttFeed" class="ptt-feed"></div>
         <button id="pttNewest" class="ptt-newest" type="button" hidden>最新</button>
