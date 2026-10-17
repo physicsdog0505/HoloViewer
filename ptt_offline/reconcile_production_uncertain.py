@@ -11,7 +11,7 @@ import argparse, json, os, re, subprocess, sys
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from .activate_production_publisher import API, BROWSER_USER_AGENT, DB_NAME, start_publisher
+from .activate_production_publisher import API, BROWSER_USER_AGENT, DB_NAME, PRODUCTION_PROFILE, start_publisher
 from .collector_source_preview import open_source
 from .live_capture_publisher import (
     OUTPUT_KEYS, active_article_ids, content_digest, inspect_latest_article, state_for_source,
@@ -156,7 +156,7 @@ def main():
     config=str(Path(args.config).resolve())
 
     state_path,state=find_uncertain_state(state_dir)
-    matched,batch,accepted=reconstruct_pending(source,state,time_secret,batch_cap=25)
+    matched,batch,accepted=reconstruct_pending(source,state,time_secret,batch_cap=PRODUCTION_PROFILE["rows"])
     verify_public(batch)
     verify_d1_evidence(config,batch)
     reconcile_state(state_path,matched,batch,accepted)
