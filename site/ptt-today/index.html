@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PTT 今日專串 · HoloViewer</title>
+<link rel="stylesheet" href="/assets/shared-shell.css">
+<link rel="stylesheet" href="/assets/ptt-today.css">
+</head>
+<body>
+<aside class="client-rail" aria-label="主要功能">
+  <a class="rail-brand" href="/" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloViewer</span></a>
+  <nav class="rail-nav">
+    <a href="/"><span class="rail-icon">今</span><span class="rail-label">今日直播</span></a>
+    <a href="/history"><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
+    <a href="/watchalong"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a>
+    <a href="/custom-view"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a>
+    <a href="/collab"><span class="rail-icon">👥</span><span class="rail-label">多人連動</span></a>
+    <a href="/ptt-today/" class="active" aria-current="page"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a>
+  </nav>
+</aside>
+
+<header class="client-topbar">
+  <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="開啟導覽">☰</button>
+  <a class="mobile-top-brand" href="/">HoloViewer</a>
+  <div id="page-title" class="top-status"></div>
+</header>
+
+<div id="mobileNav" class="mobile-nav" hidden>
+  <a href="/">今日直播</a>
+  <a href="/history">歷史直播</a>
+  <a href="/watchalong">同時視聽</a>
+  <a href="/custom-view">自訂觀看</a>
+  <a href="/collab">多人連動</a>
+  <a href="/ptt-today/" class="active" aria-current="page">PTT 今日專串</a>
+</div>
+
+<main class="client-main">
+  <div class="ptt-shell">
+    <div class="page-head"><div><h1>PTT 今日專串</h1></div></div>
+    <div class="ptt-toolbar">
+      <div class="ptt-meta" id="ptt-today-meta">讀取今日專串資訊中 · 純 PTT 閱讀</div>
+      <div class="ptt-actions">
+        <label id="ptt-floor-toggle" hidden><input id="ptt-show-floor" type="checkbox" checked> 樓數</label>
+        <button class="subtle-action" id="ptt-refresh" type="button" aria-label="重新整理今日專串">↻ 重新整理</button>
+        <button class="subtle-action" id="ptt-focus" type="button" aria-label="進入專注模式">⛶ 專注模式</button>
+      </div>
+    </div>
+    <section class="ptt-reader">
+      <div id="ptt-empty" class="ptt-empty">目前尚未接通經過驗證的公開 PTT 專串資料。</div>
+      <div id="ptt-list" class="pushes" hidden></div>
+      <button id="ptt-newest" type="button" hidden>最新</button>
+    </section>
+  </div>
+</main>
+
+<script src="/assets/config.js"></script>
+<script src="/assets/ptt-today.js" defer></script>
+</body>
+</html>
