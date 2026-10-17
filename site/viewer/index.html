@@ -48,17 +48,17 @@
 
     <section id="viewerControls" class="viewer-controls" hidden>
       <div class="layout-segment" id="layoutGroup" role="group" aria-label="觀看版型">
-        <button type="button" data-layout-preset="equal" aria-pressed="false">平均</button>
-        <button type="button" data-layout-preset="primary" aria-pressed="false">主視角</button>
-        <button type="button" data-layout-preset="focus" aria-pressed="false">直播優先</button>
+        <button type="button" data-layout-preset="equal" aria-pressed="false">預設</button>
+        <button type="button" data-layout-preset="primary" aria-pressed="false">輪播</button>
+        <button type="button" data-layout-preset="focus" aria-pressed="false">鎖定</button>
       </div>
       <div class="control-group" id="focusGroup">
         <div id="focusChoices" class="choice-row" aria-label="選擇主視角"></div>
       </div>
-      <label class="control-toggle" id="carouselControl" title="依設定秒數自動切換主視角">
+      <label class="control-toggle" id="carouselControl" title="輪播自動啟用" hidden>
         <input id="focusCarousel" type="checkbox">
         <span class="toggle-ui" aria-hidden="true"></span>
-        <span>主視角輪播</span>
+        <span>輪播</span>
       </label>
       <label class="carousel-interval" id="carouselIntervalGroup" hidden>
         <input id="focusCarouselInterval" type="range" min="30" max="60" step="5" value="30" aria-label="主視角輪播秒數">
