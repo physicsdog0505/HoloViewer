@@ -25,6 +25,17 @@ function configuredCallback(env){
   return u;
  }catch{return null;}
 }
+/** Cheap callback-path roster guard: inspect current version/expected count only.
+ * Full 85-row manifest validation is performed in scheduled processor/renewal and release audit.
+ */
+export async function loadApprovedTodayRosterVersion(db){
+ if(!db?.prepare)throw Error('Today DB unavailable');
+ const meta=await db.prepare('SELECT roster_version,expected_channels FROM public_today_catalog_meta WHERE singleton=1').first();
+ if(typeof meta?.roster_version!=='string'||!meta.roster_version||
+   !Number.isInteger(meta.expected_channels)||meta.expected_channels<1||meta.expected_channels>500)
+  throw Error('approved Today roster metadata unavailable');
+ return {version:meta.roster_version,expected_channels:meta.expected_channels};
+}
 /** Use the D1-approved Today roster; never substitute an env/file roster or avatar registry. */
 export async function loadApprovedTodayRoster(db){
  if(!db?.prepare)throw Error('Today DB unavailable');
@@ -75,10 +86,16 @@ export function mountTodayWebSubOnWorker(base,{fetchImpl=fetch}={}){
    const callback=configuredCallback(env);
    if(!callback)return json({error:'callback_not_configured'},503);
    let roster;
-   try{roster=await loadApprovedTodayRoster(env.DB);}catch{return json({error:'approved_roster_unavailable'},503);}
+   try{roster=await loadApprovedTodayRosterVersion(env.DB);}catch{return json({error:'approved_roster_unavailable'},503);}
    return handleWebSub(request,{
     roster,secret:env.TODAY_WEBSUB_SECRET,callbackOrigin:callback.origin,
     confirmChallenge:args=>confirmSubscriptionChallenge(env.DB,args),
+    isApprovedChannel:async(channelId,rosterVersion)=>{
+     if(rosterVersion!==roster.version)return false;
+     const approved=await env.DB.prepare('SELECT channel_group FROM public_today_approved_channels WHERE channel_id=? AND roster_version=?')
+      .bind(channelId,roster.version).first();
+     return Boolean(approved&&GROUPS.has(approved.channel_group));
+    },
     authorizeDelivery:async channelId=>{
      const lease=await env.DB.prepare('SELECT roster_version,state,expires_at FROM public_today_websub_leases WHERE channel_id=?')
       .bind(channelId).first();
