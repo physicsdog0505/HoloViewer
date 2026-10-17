@@ -57,7 +57,8 @@ jobs:
             ptt_offline.test_live_capture_publisher \
             ptt_offline.test_recurring_publisher \
             ptt_offline.test_production_publisher_budget \
-            ptt_offline.test_restart_production_publisher
+            ptt_offline.test_restart_production_publisher \
+            ptt_offline.test_r2_archive_export
       - name: Indexed PTT 1000-row capacity receipt (synthetic, offline only)
         run: python3 -B -m ptt_offline.capacity_probe
       - name: Cloudflare Worker pure offline regressions
