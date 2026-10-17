@@ -246,3 +246,22 @@ test('ordinary uploads and Shorts without livestream evidence never enter canoni
  assert.equal(db.rowWrites,4,'two queue claims and two final acknowledgements only');
  db.raw.close();
 });
+
+
+test('WebSub primary mode blocks Atom polling unless readiness is complete or fallback is explicit',async()=>{
+ let calls=0;
+ const unavailable=await refreshTodayDiscovery({
+  TODAY_DISCOVERY_ENABLED:'true',TODAY_WEBSUB_PRIMARY_ENABLED:'true',DB:{prepare(){throw Error('must not read DB')}},
+  YOUTUBE_API_KEY:'fixture',TODAY_WEBSUB_RECEIVER_ENABLED:'true'
+ },{now:fixedNow,fetchImpl:async()=>{calls++;throw Error('no polling')}});
+ assert.equal(unavailable.status,'blocked_websub_primary_not_ready');
+ const ready=await refreshTodayDiscovery({
+  TODAY_DISCOVERY_ENABLED:'true',TODAY_WEBSUB_PRIMARY_ENABLED:'true',TODAY_WEBSUB_RECEIVER_ENABLED:'true',
+  TODAY_WEBSUB_PROCESS_ENABLED:'true',TODAY_WEBSUB_RENEW_ENABLED:'true',
+  TODAY_WEBSUB_CALLBACK_URL:'https://api.example/internal/today/websub',
+  TODAY_WEBSUB_SECRET:'fixture-secret-012345678901234567890123',
+  DB:{prepare(){throw Error('must not read DB')}},YOUTUBE_API_KEY:'fixture'
+ },{now:fixedNow,fetchImpl:async()=>{calls++;throw Error('no polling')}});
+ assert.equal(ready.status,'disabled_websub_primary');
+ assert.equal(calls,0);
+});
