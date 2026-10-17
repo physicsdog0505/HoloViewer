@@ -5,7 +5,7 @@ import {claimEvent,finishClaim,failClaim} from './websub-hardening.mjs';
 export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date(),limit=25}){
  if(!db?.prepare||typeof fetchVideos!=='function'||!Array.isArray(roster?.channels)||!roster.version||limit<1||limit>50)throw Error('invalid worker configuration');
  const approved=new Map(roster.channels.map(c=>[c.id,c.group]));
- const candidates=await getPendingEvents(db,{limit});
+ const candidates=await getPendingEvents(db,{limit,now});
  const owned=[];
  for(const event of candidates){
   const rand=crypto.getRandomValues(new Uint8Array(32));
