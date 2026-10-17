@@ -126,7 +126,7 @@ test('HMAC callback requires active lease and durable idempotent queue insert be
  assert.equal(dupe.status,204);
  assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_websub_events').get().n,1);
  const row=db.raw.prepare('SELECT channel_id,video_id,roster_version,status FROM public_today_websub_events').get();
- assert.deepEqual(row,{channel_id:channels[0].id,video_id:video,roster_version:version,status:'pending'});
+ assert.deepEqual({...row},{channel_id:channels[0].id,video_id:video,roster_version:version,status:'pending'});
  db.raw.close();
 });
 
