@@ -126,7 +126,17 @@ def content_digest(row):
     return sha256(json.dumps([row.get(k) for k in OUTPUT_KEYS if k!="time_proof"],
           ensure_ascii=False,separators=(",",":")).encode("utf-8")).hexdigest()
 
-def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap=5,article_id=None):
+def _fresh_for_burst(row, *, now=None, max_age_seconds=180):
+    current=(now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    try:
+        occurred=datetime.fromisoformat(row["occurred_at"].replace("Z","+00:00")).astimezone(timezone.utc)
+    except (KeyError,TypeError,ValueError,AttributeError):
+        return False
+    age=(current-occurred).total_seconds()
+    return 0<=age<=max_age_seconds
+
+def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap=5,article_id=None,
+                  fresh_only=False,now=None):
     if type(batch_cap) is not int or not 1<=batch_cap<=25:
         raise ContractError('invalid bounded live batch cap')
     path=Path(state_path)
@@ -169,13 +179,17 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             if key in accepted and accepted[key]!=digest:
                 raise ContractError("ACKed source line mutated since publication")
             if key not in accepted:missing.append(row)
+        fresh_eligible=sum(1 for row in missing if _fresh_for_burst(row,now=now))
         receipt={"status":"READ_ONLY","aid":plan["aid"],
-                 "eligible":len(missing),"pending":len(plan["pending_source_lines"]),
+                 "eligible":len(missing),"fresh_eligible":fresh_eligible,
+                 "pending":len(plan["pending_source_lines"]),
                  "source_identity":plan["source_identity"],"sent":0}
         if not send:return receipt
         if not isinstance(secret,str) or len(secret)<32 or not callable(executor):
             raise ContractError("separate trusted source proof and transport required")
         if not missing:return {**receipt,"status":"NO_NEW_ROWS"}
+        if fresh_only and fresh_eligible!=len(missing):
+            return {**receipt,"status":"BURST_BLOCKED"}
         selected=missing[:batch_cap]
         for row in selected:
             row["time_proof"]=sign_time_proof(row,secret)
