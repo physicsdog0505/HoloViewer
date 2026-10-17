@@ -36,6 +36,16 @@
       <span>多人</span>
     </div>
 
+    <div id="persistentPlaybackControls" class="persistent-playback-controls" hidden>
+      <label class="control-toggle compact-toggle" title="任一視角播放或暫停時，其餘視角跟著同步">
+        <input id="syncPlayback" type="checkbox" checked>
+        <span class="toggle-ui" aria-hidden="true"></span>
+        <span>連動播放</span>
+      </label>
+      <button id="playAll" class="transport-button" type="button" aria-label="全部播放" title="全部播放">▶</button>
+      <button id="pauseAll" class="transport-button" type="button" aria-label="全部暫停" title="全部暫停">Ⅱ</button>
+    </div>
+
     <section id="viewerControls" class="viewer-controls" hidden>
       <div class="layout-segment" id="layoutGroup" role="group" aria-label="觀看版型">
         <button type="button" data-layout-preset="equal" aria-pressed="false">平均</button>
@@ -45,13 +55,6 @@
       <div class="control-group" id="focusGroup">
         <div id="focusChoices" class="choice-row" aria-label="選擇主視角"></div>
       </div>
-      <label class="control-toggle" title="任一視角播放或暫停時，其餘視角跟著同步">
-        <input id="syncPlayback" type="checkbox" checked>
-        <span class="toggle-ui" aria-hidden="true"></span>
-        <span>連動播放</span>
-      </label>
-      <button id="playAll" class="transport-button" type="button" aria-label="全部播放" title="全部播放">▶</button>
-      <button id="pauseAll" class="transport-button" type="button" aria-label="全部暫停" title="全部暫停">Ⅱ</button>
       <label class="control-toggle" id="carouselControl" title="依設定秒數自動切換主視角">
         <input id="focusCarousel" type="checkbox">
         <span class="toggle-ui" aria-hidden="true"></span>
