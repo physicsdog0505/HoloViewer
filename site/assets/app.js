@@ -877,7 +877,7 @@ document.getElementById('start').onclick=()=>{
   q.set('ptt',document.getElementById('pttMode').value);
   q.set('primary',String(Math.max(0,items.indexOf(primaryId))));
   q.set('audio',String(Math.max(0,items.indexOf(audioId))));
-  location.href='/custom-view/session?'+q.toString();
+  window.open('/viewer/?'+q.toString(),'_blank','noopener');
 };
 render();
 
