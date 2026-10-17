@@ -406,15 +406,15 @@ class ParityContract(unittest.TestCase):
         self.assertIn('streams.forEach((stream,index)=>mountWatchPlayer(index))',js)
         self.assertIn('script[src="https://www.youtube.com/iframe_api"]',js)
 
-    def test_custom_url_entry_reports_add_and_start_failures(self):
+    def test_custom_url_entry_reports_add_and_standalone_start(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
         self.assertIn('id="custom-selection-status"',html)
         self.assertIn('aria-live="polite"',html)
         self.assertIn('已加入 ',js)
-        self.assertIn("typeof window.hvOpenCustomSession!=='function'",js)
-        self.assertIn("document.querySelectorAll('#stage .player-card iframe').length!==items.length",js)
-        self.assertIn('觀看尚未開始，已保留所選影片。',js)
+        self.assertIn("q.set('mode',items.length>1?'multi':'single')",js)
+        self.assertIn("location.href='/viewer/?'+q.toString();",js)
+        self.assertNotIn("document.querySelectorAll('#stage .player-card iframe').length!==items.length",js)
 
     def test_verified_timeline_engine_is_fail_closed_and_uses_4174_offset_formula(self):
         js=(ROOT/'site/assets/4174-shared-viewing-a144bb3.js').read_text(encoding='utf-8')

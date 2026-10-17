@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>自訂觀看 · HoloViewer</title>
+<link rel="stylesheet" href="/assets/shared-shell.css">
+<link rel="stylesheet" href="/assets/viewer-standalone.css">
+</head>
+<body>
+<aside class="client-rail" aria-label="主要功能">
+  <a class="rail-brand" href="/" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloViewer</span></a>
+  <nav class="rail-nav">
+    <a href="/"><span class="rail-icon">今</span><span class="rail-label">今日直播</span></a>
+    <a href="/history"><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
+    <a href="/watchalong"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a>
+    <a href="/custom-view" class="active" aria-current="page"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a>
+    <a href="/collab"><span class="rail-icon">👥</span><span class="rail-label">多人連動</span></a>
+    <a href="/ptt-today"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a>
+  </nav>
+</aside>
+
+<aside id="viewerLiveRail" class="viewer-live-rail" aria-label="目前直播頻道" hidden>
+  <span class="viewer-live-label">直播中</span>
+  <div id="viewerLiveList"></div>
+</aside>
+
+<div class="viewer-shell">
+  <header class="viewer-topbar">
+    <div class="viewer-mode-switch" role="group" aria-label="觀看模式">
+      <span>單人</span>
+      <label class="mode-switch">
+        <input id="multiModeSwitch" type="checkbox" aria-label="切換單人或多人模式">
+        <span class="mode-switch-track" aria-hidden="true"></span>
+      </label>
+      <span>多人</span>
+    </div>
+
+    <div id="persistentPlaybackControls" class="persistent-playback-controls" hidden>
+      <label class="control-toggle compact-toggle" title="任一視角播放或暫停時，其餘視角跟著同步">
+        <input id="syncPlayback" type="checkbox" checked>
+        <span class="toggle-ui" aria-hidden="true"></span>
+        <span>連動播放</span>
+      </label>
+      <button id="playAll" class="transport-button" type="button" aria-label="全部播放" title="全部播放">▶</button>
+      <button id="pauseAll" class="transport-button" type="button" aria-label="全部暫停" title="全部暫停">Ⅱ</button>
+    </div>
+
+    <span id="viewerModeStatus" class="viewer-mode-status" hidden></span>
+
+    <section id="viewerControls" class="viewer-controls" hidden>
+      <div class="layout-segment" id="layoutGroup" role="group" aria-label="觀看版型">
+        <button type="button" data-layout-preset="equal" aria-pressed="false">預設</button>
+        <button type="button" data-layout-preset="primary" aria-pressed="false">輪播</button>
+        <button type="button" data-layout-preset="focus" aria-pressed="false">鎖定</button>
+      </div>
+      <div class="control-group" id="focusGroup">
+        <div id="focusChoices" class="choice-row" aria-label="選擇主視角"></div>
+      </div>
+      <label class="control-toggle" id="carouselControl" title="輪播自動啟用" hidden>
+        <input id="focusCarousel" type="checkbox">
+        <span class="toggle-ui" aria-hidden="true"></span>
+        <span>輪播</span>
+      </label>
+      <label class="carousel-interval" id="carouselIntervalGroup" hidden>
+        <input id="focusCarouselInterval" type="range" min="30" max="60" step="5" value="30" aria-label="輪播間隔秒數">
+        <output id="focusCarouselIntervalOutput">30s</output>
+      </label>
+    </section>
+
+    <div class="viewer-watch-actions">
+      <button id="viewerSettings" type="button" aria-expanded="false">觀看設定</button>
+      <button id="viewerFullscreen" type="button">沉浸模式</button>
+    </div>
+  </header>
+
+  <main class="viewer-main">
+    <section class="viewer-workspace">
+      <div id="stage" class="viewer-stage"></div>
+      <aside id="pttPanel" class="viewer-ptt" hidden>
+        <div class="ptt-heading">
+          <div class="ptt-title-line">
+            <strong id="pttTitle">PTT 專串</strong>
+            <small id="pttMeta">讀取中</small>
+          </div>
+          <label class="ptt-font-control">字體
+            <input id="pttFontSize" type="range" min="12" max="26" step="1" value="14">
+            <output id="pttFontValue">14px</output>
+          </label>
+        </div>
+        <div id="pttFeed" class="ptt-feed"></div>
+        <button id="pttNewest" class="ptt-newest" type="button" hidden>最新</button>
+      </aside>
+    </section>
+  </main>
+</div>
+
+<script src="/assets/config.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="/assets/viewer-standalone.js" defer></script>
+</body>
+</html>
