@@ -1017,22 +1017,12 @@ input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDe
 document.getElementById('start').onclick=()=>{
   if(!items.length){alert('請先加入至少一個影片。');return;}
   const q=new URLSearchParams();items.forEach(v=>q.append('stream',v));
-  q.set('layout',items.length===1?'auto':document.getElementById('layout').value);
+  q.set('layout',items.length===1?'equal':document.getElementById('layout').value);
   q.set('ptt',document.getElementById('pttMode').value);
   q.set('primary',String(Math.max(0,items.indexOf(primaryId))));
   q.set('audio',String(Math.max(0,items.indexOf(audioId))));
-  const error=document.getElementById('custom-error');
-  try{
-   if(typeof window.hvOpenCustomSession!=='function')throw Error('播放器初始化尚未完成');
-   window.hvOpenCustomSession(items.slice(),{layout:q.get('layout'),ptt:q.get('ptt'),primary:Number(q.get('primary')),audio:Number(q.get('audio'))});
-   if(!document.getElementById('custom-session').classList.contains('active')||
-      document.querySelectorAll('#stage .player-card iframe').length!==items.length)throw Error('播放器畫面未正確建立');
-   error.hidden=true;
-  }catch(err){
-   error.textContent='開啟觀看失敗：'+(err instanceof Error?err.message:'未知錯誤')+'。請重新整理頁面再試。';
-   error.hidden=false;
-   document.getElementById('custom-selection-status').textContent='觀看尚未開始，已保留所選影片。';
-  }
+  q.set('mode',items.length>1?'multi':'single');
+  location.href='/viewer/?'+q.toString();
 };
 render();
 
