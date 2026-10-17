@@ -15,6 +15,7 @@ const workspace=document.querySelector('.viewer-workspace');
 const liveRail=document.getElementById('viewerLiveRail');
 const liveList=document.getElementById('viewerLiveList');
 const controls=document.getElementById('viewerControls');
+const persistentPlaybackControls=document.getElementById('persistentPlaybackControls');
 const settingsButton=document.getElementById('viewerSettings');
 const fullscreenButton=document.getElementById('viewerFullscreen');
 const multiModeSwitch=document.getElementById('multiModeSwitch');
@@ -46,7 +47,6 @@ let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let confirmedLiveIds=new Set();
 let draggedLiveId='';
-let settingsHideTimer=null;
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
@@ -104,17 +104,10 @@ function setLayoutPreset(preset){
  applyLayout();
 }
 function hideSettings(){
- clearTimeout(settingsHideTimer);
- settingsHideTimer=null;
  document.body.classList.remove('settings-open');
  controls.hidden=true;
+ settingsButton.classList.remove('active');
  settingsButton.setAttribute('aria-expanded','false');
-}
-function armSettingsAutoHide(){
- clearTimeout(settingsHideTimer);
- settingsHideTimer=setTimeout(()=>{
-  if(!controls.matches(':hover'))hideSettings();
- },10000);
 }
 function applyModeClass(){
  document.body.classList.toggle('mode-single',watchMode==='single');
@@ -193,14 +186,13 @@ function renderControls(){
  const focusMode=multi&&currentLayoutPreset()!=='equal';
  playerCards.forEach(card=>{const remove=card?.querySelector('.player-remove');if(remove)remove.hidden=!multi});
  document.getElementById('layoutGroup').hidden=!multi;
- document.getElementById('focusGroup').hidden=!focusMode;
- syncPlayback.closest('.control-toggle').hidden=!multi;
- playAll.hidden=!multi;
- pauseAll.hidden=!multi;
+ document.getElementById('focusGroup').hidden=!multi;
+ persistentPlaybackControls.hidden=!multi;
  carouselControl.hidden=!focusMode;
  carouselIntervalGroup.hidden=!focusMode||!carousel.checked;
  multiModeSwitch.checked=watchMode==='multi';
  applyModeClass();
+ settingsButton.classList.toggle('active',!controls.hidden);
  refreshControlState();
 }
 function refreshControlState(){
@@ -737,17 +729,12 @@ settingsButton.addEventListener('click',()=>{
  if(open){
   document.body.classList.add('settings-open');
   controls.hidden=false;
+  settingsButton.classList.add('active');
   settingsButton.setAttribute('aria-expanded','true');
-  armSettingsAutoHide();
  }else{
   hideSettings();
  }
 });
-controls.addEventListener('pointerenter',()=>{
- clearTimeout(settingsHideTimer);
- settingsHideTimer=null;
-});
-controls.addEventListener('pointerleave',()=>armSettingsAutoHide());
 multiModeSwitch.addEventListener('change',()=>switchWatchMode(multiModeSwitch.checked?'multi':'single'));
 syncPlayback.addEventListener('change',()=>{
  if(!syncPlayback.checked||watchMode!=='multi'||streams.length<2)return;
@@ -757,14 +744,12 @@ syncPlayback.addEventListener('change',()=>{
 });
 document.querySelectorAll('[data-layout-preset]').forEach(button=>button.addEventListener('click',()=>{
  setLayoutPreset(button.dataset.layoutPreset);
- armSettingsAutoHide();
 }));
 playAll.addEventListener('click',()=>players.forEach(player=>{try{player?.playVideo()}catch{}}));
 pauseAll.addEventListener('click',()=>players.forEach(player=>{try{player?.pauseVideo()}catch{}}));
 carousel.addEventListener('change',()=>{
  carouselIntervalGroup.hidden=!carousel.checked;
  startCarousel();
- armSettingsAutoHide();
 });
 carouselInterval.addEventListener('input',()=>{
  carouselOutput.textContent=carouselInterval.value+'s';
