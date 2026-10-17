@@ -9,6 +9,13 @@ export function planSubscriptions(roster,leaseState,{now=new Date(),renewBeforeS
   if(!CHANNEL.test(c.id)||seen.has(c.id))throw Error('invalid/duplicate roster identity');
   seen.add(c.id);
   const state=previous.get(c.id),expiry=state?.expires_at?Date.parse(state.expires_at):NaN;
+  // A lease bound to an old approved roster is not proof of a current-roster
+  // subscription. Re-request it in a bounded batch; never silently count it active.
+  if(state&&state.roster_version!==roster.version){
+   due.push({channel_id:c.id,roster_version:roster.version,
+    mode:'subscribe',hub:HUB,topic:'https://www.youtube.com/xml/feeds/videos.xml?channel_id='+c.id});
+   continue;
+  }
   // Hub verification is asynchronous. Do not resubmit an outstanding lease on every cron tick.
   // The existing 24-hour challenge validation window is the upper bound for a pending request.
   const requested=state?.requested_at?Date.parse(state.requested_at):NaN;
