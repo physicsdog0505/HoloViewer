@@ -18,7 +18,6 @@ const liveRail=document.getElementById('viewerLiveRail');
 const liveList=document.getElementById('viewerLiveList');
 const controls=document.getElementById('viewerControls');
 const persistentPlaybackControls=document.getElementById('persistentPlaybackControls');
-const viewerModeStatus=document.getElementById('viewerModeStatus');
 const settingsButton=document.getElementById('viewerSettings');
 const fullscreenButton=document.getElementById('viewerFullscreen');
 const multiModeSwitch=document.getElementById('multiModeSwitch');
@@ -194,15 +193,6 @@ function renderControls(){
  document.getElementById('layoutGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!focusMode;
  persistentPlaybackControls.hidden=!multi;
- viewerModeStatus.hidden=!multi||currentLayoutPreset()==='equal';
- viewerModeStatus.dataset.mode='';
- if(multi&&currentLayoutPreset()==='primary'){
-  viewerModeStatus.textContent='↻ '+carouselInterval.value+'s';
-  viewerModeStatus.dataset.mode='carousel';
- }else if(multi&&currentLayoutPreset()==='focus'){
-  viewerModeStatus.textContent='鎖定';
-  viewerModeStatus.dataset.mode='lock';
- }else viewerModeStatus.textContent='';
  carouselControl.hidden=true;
  carouselIntervalGroup.hidden=!focusMode;
  multiModeSwitch.checked=watchMode==='multi';
