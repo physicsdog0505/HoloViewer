@@ -169,7 +169,7 @@ test('scheduled processor acknowledges non-live uploads without creating Today r
   return new Response(JSON.stringify({items:[{id:video,snippet:{channelId:channels[0].id,title:'ordinary upload',channelTitle:'Test',liveBroadcastContent:'none'}}]}),{status:200});
  }});
  const out=await worker.scheduled({scheduledTime:Date.parse('2026-10-17T00:05:00Z')},env(db,{TODAY_WEBSUB_PROCESS_ENABLED:'true'}),{});
- assert.equal(out.base.status,'base-scheduled');
+ assert.equal(out.status,'base-scheduled');
  assert.equal(out.websub.processing.ignored_non_live,1);
  assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_canonical').get().n,0);
  assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,0);
@@ -238,6 +238,38 @@ test('unchanged pushed livestream snapshot acknowledges without another evidence
  assert.equal(out.websub.processing.updated,0);
  assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,beforeEvidence);
  assert.equal(db.raw.prepare('SELECT lifecycle_observed_at FROM public_today_canonical WHERE video_id=?').get(video).lifecycle_observed_at,current.observed_at);
+ assert.equal(db.raw.prepare('SELECT status FROM public_today_websub_events WHERE event_hash=?').get(eventHash).status,'processed');
+ db.raw.close();
+});
+
+
+test('expired active lease cannot continue accepting Hub callback',async()=>{
+ const db=makeDb(),worker=mountTodayWebSubOnWorker(baseWorker());
+ await activeLease(db);
+ db.raw.prepare("UPDATE public_today_websub_leases SET expires_at=? WHERE channel_id=?")
+  .run('2026-10-16T00:00:00Z',channels[0].id);
+ const result=await delivery(worker,env(db),atom());
+ assert.equal(result.status,403);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_websub_events').get().n,0);
+ db.raw.close();
+});
+
+test('expired processing claim is recovered and completed without duplicate event insert',async()=>{
+ const db=makeDb(),channel=channels[0].id,body=atom(channel);
+ const sha=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body));
+ const eventHash=Array.from(new Uint8Array(sha),b=>b.toString(16).padStart(2,'0')).join('');
+ db.raw.prepare("INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts,claim_token,claim_until) VALUES(?,?,?,?,?,'processing',0,?,?)")
+  .run(eventHash,channel,video,version,stamp(at),'a'.repeat(64),'2026-10-17T00:04:00Z');
+ const worker=mountTodayWebSubOnWorker(baseWorker(),{fetchImpl:async url=>{
+  assert.ok(String(url).includes('googleapis.com/youtube/v3/videos'));
+  return new Response(JSON.stringify({items:[{id:video,
+   snippet:{channelId:channel,title:'Recovered live',channelTitle:'Test',liveBroadcastContent:'live'},
+   liveStreamingDetails:{actualStartTime:'2026-10-17T00:00:00Z'}}]}),{status:200});
+ }});
+ const out=await worker.scheduled({scheduledTime:Date.parse('2026-10-17T00:05:30Z')},
+  env(db,{TODAY_WEBSUB_PROCESS_ENABLED:'true'}),{});
+ assert.equal(out.websub.processing.updated,1);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_websub_events').get().n,1);
  assert.equal(db.raw.prepare('SELECT status FROM public_today_websub_events WHERE event_hash=?').get(eventHash).status,'processed');
  db.raw.close();
 });
