@@ -138,3 +138,13 @@ body.mode-single .viewer-controls{display:none!important}
 .player-remove:hover,.player-remove:focus-visible{background:rgba(0,0,0,.82);outline:2px solid rgba(255,255,255,.55);outline-offset:1px}
 .player-remove[hidden]{display:none!important}
 .mode-multi .player-label{max-width:calc(100% - 52px)}
+
+.viewer-stage{position:relative}
+.viewer-drag-drop-overlay{
+ position:absolute;inset:0;z-index:20;display:grid;place-items:center;
+ border:2px dashed rgba(255,255,255,.45);border-radius:10px;
+ background:rgba(8,10,13,.58);color:#fff;font-size:14px;font-weight:700;
+ pointer-events:auto
+}
+.viewer-drag-drop-overlay.is-active{border-color:rgba(111,174,201,.95);background:rgba(8,10,13,.68)}
+.viewer-drag-drop-overlay[hidden]{display:none!important}
