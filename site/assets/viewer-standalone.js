@@ -4,12 +4,14 @@ const API_BASE=String(window.HOLOVIEWER_CONFIG?.apiBase||'').replace(/\/$/,'');
 const params=new URLSearchParams(location.search);
 const streams=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))].slice(0,4).map(id=>({videoId:id,label:id,channelId:''}));
 let layout=['equal','primary'].includes(params.get('layout'))?params.get('layout'):'equal';
+let workspaceLayout=['sidebar','focus'].includes(params.get('workspace'))?params.get('workspace'):'sidebar';
 let primaryIndex=Math.max(0,Math.min(Math.max(0,streams.length-1),Number(params.get('primary'))||0));
 let audioMaster=primaryIndex;
 let watchMode=params.get('mode')==='multi'||streams.length>1?'multi':'single';
 const requestedPttMode=params.get('ptt')||'live';
 
 const stage=document.getElementById('stage');
+const workspace=document.querySelector('.viewer-workspace');
 const liveRail=document.getElementById('viewerLiveRail');
 const liveList=document.getElementById('viewerLiveList');
 const controls=document.getElementById('viewerControls');
@@ -80,6 +82,7 @@ function updateUrl(){
  const q=new URLSearchParams();
  streams.forEach(stream=>q.append('stream',stream.videoId));
  q.set('layout',layout);
+ q.set('workspace',workspaceLayout);
  q.set('ptt',pttContext.mode==='live'?'live':requestedPttMode);
  q.set('primary',String(primaryIndex));
  q.set('audio',String(primaryIndex));
@@ -133,6 +136,7 @@ function renderControls(){
  const multi=watchMode==='multi'&&streams.length>1;
  playerCards.forEach(card=>{const remove=card?.querySelector('.player-remove');if(remove)remove.hidden=!multi});
  document.getElementById('layoutGroup').hidden=!multi;
+ document.getElementById('workspaceGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!multi;
  syncPlayback.parentElement.hidden=!multi;
  playAll.hidden=!multi;
@@ -145,6 +149,7 @@ function renderControls(){
 }
 function refreshControlState(){
  document.querySelectorAll('[data-layout]').forEach(button=>button.classList.toggle('active',button.dataset.layout===layout));
+ document.querySelectorAll('[data-workspace]').forEach(button=>button.classList.toggle('active',button.dataset.workspace===workspaceLayout));
  [...focusChoices.children].forEach((button,index)=>button.classList.toggle('active',index===primaryIndex));
  playerCards.forEach((card,index)=>{
   if(!card)return;
@@ -159,6 +164,7 @@ function refreshControlState(){
 function applyLayout(){
  const effective=watchMode==='multi'&&streams.length>1?layout:'equal';
  stage.className='viewer-stage layout-'+effective+' count-'+streams.length;
+ workspace.className='viewer-workspace workspace-'+workspaceLayout+' layout-'+effective+' count-'+streams.length;
  const cols=streams.length<=1?1:2;
  const rows=Math.max(1,Math.ceil(streams.length/cols));
  stage.style.setProperty('--viewer-cols',String(cols));
@@ -375,7 +381,7 @@ function ensureDragDropOverlay(){
   const row=catalogRows.find(item=>String(item?.video_id||'')===id);
   if(row)addDraggedLive(row);
  });
- stage.append(overlay);
+ workspace.append(overlay);
  return overlay;
 }
 function showDragDropOverlay(){
@@ -675,6 +681,10 @@ syncPlayback.addEventListener('change',()=>{
 });
 document.querySelectorAll('[data-layout]').forEach(button=>button.addEventListener('click',()=>{
  layout=button.dataset.layout;
+ applyLayout();
+}));
+document.querySelectorAll('[data-workspace]').forEach(button=>button.addEventListener('click',()=>{
+ workspaceLayout=button.dataset.workspace;
  applyLayout();
 }));
 playAll.addEventListener('click',()=>players.forEach(player=>{try{player?.playVideo()}catch{}}));
