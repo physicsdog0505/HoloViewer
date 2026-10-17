@@ -2,7 +2,7 @@
 
 const API_BASE=String(window.HOLOVIEWER_CONFIG?.apiBase||'').replace(/\/$/,'');
 const params=new URLSearchParams(location.search);
-const streams=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))].slice(0,3).map(id=>({videoId:id,label:id,channelId:''}));
+const streams=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))].slice(0,4).map(id=>({videoId:id,label:id,channelId:''}));
 let layout=['equal','primary'].includes(params.get('layout'))?params.get('layout'):'equal';
 let primaryIndex=Math.max(0,Math.min(Math.max(0,streams.length-1),Number(params.get('primary'))||0));
 let audioMaster=primaryIndex;
