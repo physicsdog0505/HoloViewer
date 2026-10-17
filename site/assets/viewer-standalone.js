@@ -254,28 +254,24 @@ function commitSingleStream(row,id){
  renderLiveRail(catalogRows);
  resolvePrimaryPtt();
 }
-function currentPlayerVideoId(player){
- try{return String(player?.getVideoData?.()?.video_id||'')}catch{return ''}
-}
 function recreateSinglePlayer(row,id){
  const card=playerCards[0];
  if(!card||!window.YT?.Player)return;
- const old=players[0];
- try{old?.destroy()}catch{}
+ try{players[0]?.destroy()}catch{}
  players[0]=null;
- const stale=document.getElementById('viewer-player-0');
- stale?.remove();
+ card.querySelector('.player-host')?.remove();
+
  const host=node('div',undefined,'player-host');
  host.id='viewer-player-0';
  card.append(host);
+
  let committed=false;
  players[0]=new YT.Player(host,{
   videoId:id,
   playerVars:{playsinline:1,rel:0,enablejsapi:1,autoplay:1,origin:location.origin},
   events:{
    onReady:event=>{
-    // This path always comes from an explicit avatar click. Try audible play first;
-    // if the browser declines it, fall back to muted autoplay without a second click.
+    // Avatar click is an explicit user gesture. Start the selected live immediately.
     try{event.target.unMute()}catch{}
     try{event.target.playVideo()}catch{}
     setTimeout(()=>{
@@ -286,15 +282,10 @@ function recreateSinglePlayer(row,id){
       }
      }catch{}
     },350);
-    let attempts=0;
-    const confirm=()=>{
-     if(currentPlayerVideoId(event.target)===id){
-      if(!committed){committed=true;commitSingleStream(row,id)}
-      return;
-     }
-     if(++attempts<20)setTimeout(confirm,100);
-    };
-    confirm();
+    if(!committed){
+     committed=true;
+     commitSingleStream(row,id);
+    }
    },
    onStateChange:event=>{
     if(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED)syncPlayers(event.data,0);
@@ -305,32 +296,15 @@ function recreateSinglePlayer(row,id){
 function replaceSingleStream(row){
  const id=String(row?.video_id||'');
  if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
- const existing=streams[0]?.videoId||'';
- const player=players[0];
 
- if(existing===id){
-  try{player?.playVideo()}catch{}
+ if(streams[0]?.videoId===id){
+  try{players[0]?.playVideo()}catch{}
   return;
  }
 
- if(player?.loadVideoById){
-  try{
-   player.loadVideoById(id);
-   try{player.unMute()}catch{}
-   try{player.playVideo()}catch{}
-   let attempts=0;
-   const verify=()=>{
-    if(currentPlayerVideoId(player)===id){
-     commitSingleStream(row,id);
-     return;
-    }
-    if(++attempts<12){setTimeout(verify,100);return}
-    recreateSinglePlayer(row,id);
-   };
-   setTimeout(verify,80);
-   return;
-  }catch{}
- }
+ // Single mode has exactly one player. Recreate that player from the selected
+ // live video_id instead of trying to mutate an iframe that may keep stale
+ // YouTube state. No other player can be disturbed in single mode.
  recreateSinglePlayer(row,id);
 }
 function appendMultiStream(row){
