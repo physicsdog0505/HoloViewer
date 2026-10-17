@@ -109,7 +109,7 @@ async function loadPtt(){
  }
  pttLoadInFlight=true;
  try{
-  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
   const rows=data.pushes.filter(row=>row&&typeof row.content==='string');
   const wasEmpty=!pttLastGoodCount;
@@ -125,7 +125,7 @@ async function loadPtt(){
     const key=pushKey(row);
     if(!seen.has(key)){list.append(pttRow(row));seen.add(key)}
    }
-   while(list.children.length>300)list.firstElementChild?.remove();
+   while(list.children.length>1000)list.firstElementChild?.remove();
   }
   pttLastGoodCount=list.children.length;pttLastGoodDay=today;
   const freshness=String(data.freshness?.status||'unknown');
