@@ -68,7 +68,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("carousel.checked=currentLayoutPreset()!=='equal';", js)
         self.assertIn("secondaryOffset=(secondaryOffset+Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryCount))%secondaryCount;", js)
         self.assertIn("viewerModeStatus.textContent='↻ '+carouselInterval.value+'s';", js)
-        self.assertIn("viewerModeStatus.textContent='● 鎖定';", js)
+        self.assertIn("viewerModeStatus.textContent='鎖定';", js)
+        self.assertIn("viewerModeStatus.dataset.mode='lock';", js)
         self.assertIn(".player-card.viewer-hidden{display:none!important}", css)
         self.assertIn(".transport-button.is-feedback", css)
 
