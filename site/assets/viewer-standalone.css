@@ -62,8 +62,23 @@ body:has(.viewer-live-rail:hover) .viewer-shell,body:has(.viewer-live-rail:focus
 }
 .viewer-controls[hidden]{display:none}
 .control-group,.control-check{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.choice-row{display:flex;gap:4px}
+.choice-row{display:flex;gap:6px}
 .choice-row button{min-width:32px;padding:0 8px}
+.focus-avatar-button{
+ position:relative;width:34px;height:34px;min-width:34px!important;padding:2px!important;border-radius:50%!important;
+ display:grid;place-items:center;overflow:visible
+}
+.focus-avatar-button img,.focus-avatar-fallback{
+ width:28px;height:28px;border-radius:50%;display:grid;place-items:center;object-fit:cover;
+ background:#fff;border:1px solid var(--line);font-size:11px;font-weight:800
+}
+.focus-avatar-button.active{
+ border-color:#242321!important;box-shadow:0 0 0 2px rgba(36,35,33,.16)
+}
+.focus-avatar-button.active::after{
+ content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;
+ background:#242321;border:2px solid var(--surface)
+}
 .viewer-controls select{height:34px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}
 .viewer-controls input[type="range"]{width:92px}
 
