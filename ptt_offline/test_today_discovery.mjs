@@ -51,6 +51,7 @@ function discoveryDb({seedAll=true,omitVideoIndex=null}={}){
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('./worker_host/today/0002_today_canonical.sql',import.meta.url),'utf8'));
   sqlite.exec(readFileSync(new URL('./worker_host/today/discovery-only.sql',import.meta.url),'utf8'));
+  sqlite.exec(readFileSync(new URL('./worker_host/today/websub-leases-only.PROPOSED.sql',import.meta.url),'utf8'));
   sqlite.prepare('INSERT INTO public_today_catalog_meta(singleton,roster_version,last_success_at,expected_channels,scanned_channels,gap) VALUES(1,?,NULL,66,0,1)').run('fixture-v1');
   for(const c of CHANNELS)sqlite.prepare('INSERT INTO public_today_approved_channels(channel_id,roster_version,activated_at,channel_group) VALUES(?,?,?,?)')
     .run(c.id,'fixture-v1','2026-10-17T00:00:00Z',c.group);
@@ -177,8 +178,8 @@ test('one new livestream candidate: bounded end-to-end budget is six changed row
  assert.equal(out.discovered,1);
  assert.equal(out.updated,1);
  assert.equal(db.rowWrites-before,6,'queue insert + cursor + claim + evidence + canonical + finish claim');
- assert.equal(db.queries,71);
- assert.equal(db.readQueries,6);
+ assert.equal(db.queries,72);
+ assert.equal(db.readQueries,7);
  assert.equal(db.writeQueries,65);
  assert.equal(db.returnedReadRows,68,'result rows in the test double, not Cloudflare billed Rows Read');
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical").get().n,1);
@@ -198,8 +199,8 @@ test('full 30-channel / 60-entry minute remains bounded while discovery stays mi
  assert.equal(net.videoCalls,1,'pending IDs are batched into one videos.list request of at most 50');
  assert.equal(out.updated,50);
  assert.equal(db.rowWrites-before,261,'60 queue inserts + 1 cursor + 50 claims + 100 evidence/canonical + 50 finishes');
- assert.equal(db.queries,365);
- assert.equal(db.readQueries,104);
+ assert.equal(db.queries,366);
+ assert.equal(db.readQueries,105);
  assert.equal(db.writeQueries,261);
  assert.equal(db.returnedReadRows,117,'result rows in the test double, not Cloudflare billed Rows Read');
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_websub_events WHERE status='pending'").get().n,10);
@@ -244,5 +245,40 @@ test('ordinary uploads and Shorts without livestream evidence never enter canoni
  assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,0);
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_websub_events WHERE status='processed'").get().n,2);
  assert.equal(db.rowWrites,4,'two queue claims and two final acknowledgements only');
+ db.raw.close();
+});
+
+
+test('WebSub primary mode only suppresses Atom after complete active lease coverage',async()=>{
+ let calls=0;
+ const db=discoveryDb({seedAll:true});
+ const baseEnv={
+  TODAY_DISCOVERY_ENABLED:'true',TODAY_WEBSUB_PRIMARY_ENABLED:'true',TODAY_WEBSUB_RECEIVER_ENABLED:'true',
+  TODAY_WEBSUB_PROCESS_ENABLED:'true',TODAY_WEBSUB_RENEW_ENABLED:'true',
+  TODAY_WEBSUB_CALLBACK_URL:'https://api.example/internal/today/websub',
+  TODAY_WEBSUB_SECRET:'fixture-secret-012345678901234567890123',
+  DB:db,YOUTUBE_API_KEY:'fixture'
+ };
+ const incomplete=await refreshTodayDiscovery(baseEnv,{now:fixedNow,fetchImpl:async()=>{calls++;throw Error('no polling')}});
+ assert.equal(incomplete.status,'blocked_websub_primary_incomplete_coverage');
+ assert.equal(incomplete.coverage.expected_channels,66);
+ assert.equal(incomplete.coverage.active_leases,0);
+ for(const channel of CHANNELS){
+  db.raw.prepare(`INSERT INTO public_today_websub_leases
+   (channel_id,roster_version,topic,requested_mode,state,requested_at,verified_at,expires_at,lease_seconds,last_error)
+   VALUES(?,?,?,'subscribe','active',?,?,?,?,NULL)`)
+   .run(channel.id,'fixture-v1','https://www.youtube.com/xml/feeds/videos.xml?channel_id='+channel.id,
+     '2026-10-16T23:00:00Z','2026-10-16T23:01:00Z','2026-10-22T23:01:00Z',432000);
+ }
+ const ready=await refreshTodayDiscovery(baseEnv,{now:fixedNow,fetchImpl:async()=>{calls++;throw Error('no polling')}});
+ assert.equal(ready.status,'disabled_websub_primary');
+ assert.equal(ready.coverage.status,'PASS');
+ assert.equal(ready.coverage.active_leases,66);
+ db.raw.prepare('UPDATE public_today_websub_leases SET expires_at=? WHERE channel_id=?')
+  .run('2026-10-16T23:00:00Z',CHANNELS[0].id);
+ const expired=await refreshTodayDiscovery(baseEnv,{now:fixedNow,fetchImpl:async()=>{calls++;throw Error('no polling')}});
+ assert.equal(expired.status,'blocked_websub_primary_incomplete_coverage');
+ assert.equal(expired.coverage.active_leases,65);
+ assert.equal(calls,0);
  db.raw.close();
 });
