@@ -10,6 +10,39 @@ from ptt_offline.ptt_aid_identity import aid_from_article_url
 from ptt_offline.public_today_contract import ContractError
 
 class LiveCapturePublisherTests(unittest.TestCase):
+    def test_ack_preserves_reconciled_remote_commit_marker(self):
+        from unittest.mock import patch
+        import json, tempfile
+        from pathlib import Path
+
+        row={
+            "push_id":"p1","aid":"#1abc","day":"2026-10-17","source_line":1,
+            "kind":"push","author":"u","content":"x","occurred_at":"2026-10-17T07:00:00Z",
+            "floor":1,"source_url":"https://www.ptt.cc/bbs/C_Chat/M.1.A.1.html",
+            "source_record_key":"#1abc:1",
+        }
+        plan={
+            "status":"READY","aid":"#1abc","source_identity":"a"*64,
+            "candidate_rows":[row],"pending_source_lines":[],"scan_truncated":False,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/"state.json"
+            path.write_text(json.dumps({
+                "status":"ACKED","source_identity":"a"*64,"accepted":{},
+                "legacy_backlog_fence_v2":True,
+                "reconciled_from_remote_commit":True,
+            }),encoding="utf-8")
+            ack={"batch_id":"dummy","accepted":1}
+            with patch("ptt_offline.live_capture_publisher.inspect_latest_article",return_value=plan), \
+                 patch("ptt_offline.live_capture_publisher.sign_time_proof",return_value="proof"), \
+                 patch("ptt_offline.live_capture_publisher.execute_once",return_value=ack), \
+                 patch("ptt_offline.live_capture_publisher.apply_ack",return_value=None):
+                result=run_live_once(object(),state_path=path,secret="s"*32,executor=lambda *_: None,send=True,batch_cap=1)
+            self.assertEqual(result["status"],"ACK")
+            saved=json.loads(path.read_text(encoding="utf-8"))
+            self.assertTrue(saved["reconciled_from_remote_commit"])
+
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
