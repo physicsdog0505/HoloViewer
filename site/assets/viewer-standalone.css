@@ -125,7 +125,8 @@ body.settings-open .viewer-main{height:calc(100vh - 109px)}
 .ptt-font-control{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#c8c8c8;white-space:nowrap}
 .ptt-font-control input{width:74px}
 .ptt-font-control output{min-width:30px;font-variant-numeric:tabular-nums}
-.ptt-feed{flex:1;min-height:0;overflow:auto;padding:6px 8px;font-size:var(--ptt-font-size,14px);line-height:1.45;scrollbar-width:thin}
+.ptt-feed{flex:1;min-height:0;overflow:auto;padding:6px 8px;font-size:var(--ptt-font-size,14px);line-height:1.45;scrollbar-width:none}
+.ptt-feed::-webkit-scrollbar{width:0;height:0;display:none}
 .ptt-row{display:grid;grid-template-columns:1.3em max-content minmax(0,1fr);column-gap:4px;align-items:start;padding:4px 2px;border-bottom:1px solid #25282a;overflow-wrap:anywhere}
 .ptt-kind{text-align:center;font-weight:800;color:#f4f4f4}.ptt-kind.boo{color:#ff4b4b}.ptt-kind.arrow{color:#ff3030}
 .ptt-time{color:#dedede;font-size:.72em;white-space:nowrap;padding-top:.25em}
@@ -139,6 +140,15 @@ body.immersive .viewer-shell{margin-left:0!important}
 body.immersive .viewer-main{height:100vh!important;padding:0}
 body.immersive .viewer-workspace{gap:2px}
 body.immersive .player-card,body.immersive .viewer-ptt{border-radius:0;border:0}
+body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.primary{
+ align-self:start;
+ aspect-ratio:16/9;
+ height:auto;
+ width:100%;
+}
+body.immersive .viewer-workspace.workspace-focus.layout-primary{
+ align-items:start;
+}
 
 @media(max-width:900px){
  body{overflow:auto}
@@ -185,3 +195,5 @@ body.mode-single .viewer-controls{display:none!important}
 }
 .viewer-drag-drop-overlay.is-active{border-color:rgba(111,174,201,.95);background:rgba(8,10,13,.68)}
 .viewer-drag-drop-overlay[hidden]{display:none!important}
+
+body.immersive .viewer-stage{align-content:start}
