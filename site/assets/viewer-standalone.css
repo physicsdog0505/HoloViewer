@@ -90,10 +90,14 @@ body.settings-open .viewer-main{height:calc(100vh - 109px)}
 .viewer-ptt{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:#0c0d0f;border:1px solid #303238;border-radius:10px;overflow:hidden;color:#eee}
 .viewer-ptt[hidden]{display:none}
 .ptt-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-bottom:1px solid #292c31;background:#111317}
-.ptt-heading>div{min-width:0}.ptt-heading strong{display:block;font-size:13px}.ptt-heading small{display:block;margin-top:2px;color:#9ca4aa;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptt-heading>div:first-child{min-width:0}.ptt-heading strong{display:block;font-size:13px}.ptt-heading small{display:block;margin-top:2px;color:#9ca4aa;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptt-heading-actions{display:flex;align-items:center;gap:8px;white-space:nowrap}
 .ptt-heading a{font-size:10px;color:#b5d7e5;white-space:nowrap;text-decoration:none}
+.ptt-font-control{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#c8c8c8}
+.ptt-font-control input{width:74px}
+.ptt-font-control output{min-width:30px;font-variant-numeric:tabular-nums}
 .ptt-feed{flex:1;min-height:0;overflow:auto;padding:6px 8px;font-size:var(--ptt-font-size,14px);line-height:1.45;scrollbar-width:thin}
-.ptt-row{display:grid;grid-template-columns:1.3em 4.1em minmax(0,1fr);column-gap:4px;align-items:start;padding:3px 1px;border-bottom:1px solid #202328;overflow-wrap:anywhere}
+.ptt-row{display:grid;grid-template-columns:1.3em max-content minmax(0,1fr);column-gap:3px;align-items:start;padding:3px 1px;border-bottom:1px solid #202328;overflow-wrap:anywhere}
 .ptt-kind{text-align:center;font-weight:800;color:#f4f4f4}.ptt-kind.boo{color:#ff4b4b}.ptt-kind.arrow{color:#ff3030}
 .ptt-time{font-size:.72em;color:#8c949a;white-space:nowrap;padding-top:.22em}
 .ptt-body{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -121,3 +125,6 @@ body.immersive .player-card,body.immersive .viewer-ptt{border-radius:0;border:0}
 @media(max-width:760px){
  .viewer-shell{margin-left:0}
 }
+
+body.mode-single #viewerSettings{display:none}
+body.mode-single .viewer-controls{display:none!important}
