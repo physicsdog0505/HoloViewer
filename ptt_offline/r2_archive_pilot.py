@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 from .ptt_aid_identity import verify_aid_url
 from .public_today_contract import ContractError
-from .r2_archive_export import _write_deterministic_gzip, write_archive_rows
+from .r2_archive_export import _per_thread_floors, _write_deterministic_gzip, write_archive_rows
 from .url_epoch_authority import reconstruct_events
 
 TPE=ZoneInfo("Asia/Taipei")
@@ -22,7 +22,7 @@ TITLE_DAY=re.compile(r"\(115(\d{2})(\d{2})\)")
 REQUIRED_STAGING={"aid","source_line","source_page","kind","author","content",
                   "ptt_date","ptt_time","occurred_at","source_url","source_path",
                   "source_record_key","coverage_day","coverage_status","finalized",
-                  "time_quality"}
+                  "time_quality","floor","floor_quality"}
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -58,6 +58,7 @@ def _load_source(path: Path, *, provenance: str, title_day_min: str | None,
                 "SELECT source_line,source_page,kind,author,content,ptt_date,ptt_time,collected_at "
                 "FROM pushes WHERE article_id=? ORDER BY source_line",(article["id"],)
             )]
+            floors,floor_quality=_per_thread_floors(db,article["id"],raw)
             events=reconstruct_events(
                 board=article["board"],aid=article["aid"],url=article["url"],
                 pushes=raw,identity_verifier=verify_aid_url,
@@ -66,8 +67,10 @@ def _load_source(path: Path, *, provenance: str, title_day_min: str | None,
             exception_lines=[e["source_line"] for e in events if e["time_quality"] == "source-minute-regression"]
             articles.append({"aid":article["aid"],"thread_day":thread_day,
                              "source_path":provenance,"pushes":len(events),
+                             "floor_quality":floor_quality,
                              "chronology_exception_lines":exception_lines})
             for event in events:
+                floor=floors.get(event["source_line"])
                 staged.append({
                     "aid":event["aid"],"source_line":event["source_line"],
                     "source_page":event.get("source_page"),"kind":event.get("kind"),
@@ -76,6 +79,8 @@ def _load_source(path: Path, *, provenance: str, title_day_min: str | None,
                     "occurred_at":event["occurred_at"],"source_url":article["url"],
                     "source_path":provenance,"source_record_key":event["source_record_key"],
                     "time_quality":event["time_quality"],
+                    "floor":floor,
+                    "floor_quality":floor_quality if floor is not None else "unknown",
                     **({"chronology_note":event["chronology_note"]} if "chronology_note" in event else {}),
                 })
     return staged,articles
@@ -87,6 +92,9 @@ def _audit(out_dir: Path, manifest: dict, staging_rows: list[dict],
     seen=set()
     duplicates=[]
     invalid_timestamps=0
+    floor_known_rows=0
+    floor_unknown_rows=0
+    floors_by_aid={}
     chunk_pushes=0
     first=None
     last=None
@@ -142,6 +150,20 @@ def _audit(out_dir: Path, manifest: dict, staging_rows: list[dict],
                 errors.append(f"row finalized mismatch {record}")
             if not row.get("source_path"):
                 errors.append(f"missing provenance {record}")
+            floor=row.get("floor")
+            floor_quality=row.get("floor_quality")
+            if floor is None:
+                floor_unknown_rows+=1
+                if floor_quality != "unknown":
+                    errors.append(f"unknown floor quality mismatch {record}")
+            else:
+                floor_known_rows+=1
+                if type(floor) is not int or floor<1 or floor_quality != "per-thread-ordinal":
+                    errors.append(f"invalid floor evidence {record}")
+                prior_floor=floors_by_aid.setdefault(row["aid"],{}).get(floor)
+                if prior_floor is not None and prior_floor != record:
+                    errors.append(f"duplicate floor within AID {row['aid']}:{floor}")
+                floors_by_aid[row["aid"]][floor]=record
         expected_status=max(row_statuses,key=priority.get)
         if item["coverage_status"] != expected_status:
             errors.append(f"object status is not conservative {item['key']}")
@@ -177,6 +199,7 @@ def _audit(out_dir: Path, manifest: dict, staging_rows: list[dict],
         "replaceable_objects":sum(not item["finalized"] for item in manifest["objects"]),
         "duplicate_source_record_keys":len(duplicates),"duplicate_keys":duplicates,
         "invalid_timestamps":invalid_timestamps,"chronology_exceptions":chronology,
+        "floor_known_rows":floor_known_rows,"floor_unknown_rows":floor_unknown_rows,
         "rejected_articles":0,"rejected_rows":0,
         "first_occurred_at":first.isoformat().replace("+00:00","Z") if first else None,
         "last_occurred_at":last.isoformat().replace("+00:00","Z") if last else None,

@@ -59,6 +59,11 @@ class R2ArchiveExportTests(unittest.TestCase):
             self.assertEqual(payload["precision"],"minute")
             self.assertEqual(payload["pushes"][0]["occurred_at"],"2026-10-01T04:01:00Z")
             self.assertEqual(payload["pushes"][1]["occurred_at"],"2026-10-01T04:02:00Z")
+            self.assertEqual([row["floor"] for row in payload["pushes"]],[1,2])
+            self.assertEqual({row["floor_quality"] for row in payload["pushes"]},
+                             {"per-thread-ordinal"})
+            self.assertNotEqual(payload["pushes"][0]["floor"],
+                                payload["pushes"][0]["source_line"])
             self.assertEqual(
                 payload["pushes"][1]["minute_epoch"]-payload["pushes"][0]["minute_epoch"],1
             )
@@ -105,6 +110,47 @@ class R2ArchiveExportTests(unittest.TestCase):
     def test_vod_minute_rejects_naive_timestamp(self):
         with self.assertRaisesRegex(ContractError,"timezone-aware timestamp required"):
             vod_minute("2026-10-09T10:43:00Z","2026-10-09T18:00:00")
+
+    def test_floor_is_per_thread_and_survives_hour_and_source_line_gaps(self):
+        db=self.make_db()
+        db.execute("UPDATE pushes SET source_line=30,ptt_time='12:59' WHERE id=1")
+        db.execute("UPDATE pushes SET source_line=80,ptt_time='13:00' WHERE id=2")
+        posted=datetime(2026,10,1,12,30,tzinfo=TPE)
+        url=f"https://www.ptt.cc/bbs/C_Chat/M.{int(posted.timestamp())}.A.002.html"
+        board,aid=aid_from_article_url(url)
+        db.execute("INSERT INTO articles VALUES(2,?,?,?,?,?,?)",
+                   (board,aid,url,"second",posted.isoformat(),posted.isoformat()))
+        db.execute("INSERT INTO pushes VALUES(3,2,500,1,'push','c','new thread','10/01','13:01',?)",
+                   (posted.isoformat(),))
+        db.commit()
+        with tempfile.TemporaryDirectory() as td:
+            receipt=export_archive(db,from_day="2026-10-01",through_day="2026-10-01",
+                                   out_dir=Path(td))
+            rows=[]
+            for item in receipt["objects"]:
+                with gzip.open(Path(td)/item["key"],"rt",encoding="utf-8") as handle:
+                    rows.extend(json.load(handle)["pushes"])
+        by_aid={}
+        for row in rows:
+            by_aid.setdefault(row["aid"],[]).append(row)
+        first=next(value for value in by_aid.values() if len(value)==2)
+        second=next(value for value in by_aid.values() if len(value)==1)
+        self.assertEqual([row["source_line"] for row in first],[30,80])
+        self.assertEqual([row["floor"] for row in first],[1,2])
+        self.assertEqual(second[0]["source_line"],500)
+        self.assertEqual(second[0]["floor"],1)
+
+    def test_floor_is_unknown_without_thread_start_evidence(self):
+        db=self.make_db()
+        db.execute("UPDATE pushes SET source_page=5")
+        db.commit()
+        with tempfile.TemporaryDirectory() as td:
+            receipt=export_archive(db,from_day="2026-10-01",through_day="2026-10-01",
+                                   out_dir=Path(td))
+            with gzip.open(Path(td)/receipt["objects"][0]["key"],"rt",encoding="utf-8") as handle:
+                rows=json.load(handle)["pushes"]
+        self.assertEqual([row["floor"] for row in rows],[None,None])
+        self.assertEqual({row["floor_quality"] for row in rows},{"unknown"})
 
 
 if __name__=="__main__":

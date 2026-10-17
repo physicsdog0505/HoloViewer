@@ -40,6 +40,32 @@ def vod_minute(push_occurred_at: str, actual_start: str) -> int:
 def _key(start: datetime) -> str:
     return start.strftime("ptt/v1/chunks/%Y/%m/%d/%H00.json.gz")
 
+def _per_thread_floors(db: sqlite3.Connection, article_id: int,
+                       raw_pushes: list[dict]) -> tuple[dict[int,int],str]:
+    """Return proven AID-local ordinals, never source-line aliases.
+
+    Collector source_line counts source HTML lines, not pushes.  A floor can
+    only be derived when the stored capture proves that this article includes
+    its beginning.  This mirrors the accepted read-only 8501 floor contract.
+    """
+    starts_at_thread_beginning=any(
+        isinstance(row.get("source_page"),int) and row["source_page"]<=1
+        for row in raw_pushes
+    )
+    has_screens=db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='article_screens'"
+    ).fetchone()
+    if has_screens and not starts_at_thread_beginning:
+        starts_at_thread_beginning=bool(db.execute(
+            "SELECT 1 FROM article_screens WHERE article_id=? AND start_line<=1 LIMIT 1",
+            (article_id,),
+        ).fetchone())
+    if not starts_at_thread_beginning:
+        return {},"unknown"
+    ordered=sorted(raw_pushes,key=lambda row:row["source_line"])
+    return ({row["source_line"]:index for index,row in enumerate(ordered,start=1)},
+            "per-thread-ordinal")
+
 def _event_row(event: dict, *, url: str) -> dict:
     occurred=_utc(event["occurred_at"]).replace(second=0,microsecond=0)
     row={
@@ -53,6 +79,8 @@ def _event_row(event: dict, *, url: str) -> dict:
         "content":event.get("content") or "",
         "source_url":url,
         "source_record_key":event["source_record_key"],
+        "floor":event.get("floor"),
+        "floor_quality":event.get("floor_quality","unknown"),
     }
     for name in ("coverage_day","coverage_status","finalized","source_path",
                  "time_quality","chronology_note"):
@@ -91,6 +119,16 @@ def write_archive_rows(rows: list[dict], *, from_day: str, through_day: str,
         if not isinstance(key,str) or not key or key in seen:
             raise ContractError("duplicate or invalid source_record_key")
         seen.add(key)
+        floor=row.get("floor")
+        quality=row.get("floor_quality","unknown")
+        if floor is not None and (type(floor) is not int or floor<1):
+            raise ContractError("invalid per-thread floor")
+        if quality not in {"per-thread-ordinal","unknown"}:
+            raise ContractError("invalid floor quality")
+        if (floor is None) != (quality == "unknown"):
+            raise ContractError("floor value contradicts floor quality")
+        row["floor"]=floor
+        row["floor_quality"]=quality
         coverage_day=row.get("coverage_day")
         if coverage_day not in day_map:
             raise ContractError("row coverage day missing from manifest")
@@ -187,16 +225,20 @@ def export_archive(db, *, from_day: str, through_day: str, out_dir: Path) -> dic
         ).fetchall()
         if not raw:
             continue
+        raw_pushes=[dict(zip(keys,row)) for row in raw]
+        floors,floor_quality=_per_thread_floors(db,article_id,raw_pushes)
         articles_scanned+=1
         try:
             events=reconstruct_events(
                 board=board,aid=raw_aid,url=url,identity_verifier=verify_aid_url,
-                pushes=[dict(zip(keys,row)) for row in raw],
+                pushes=raw_pushes,
             )
         except ContractError as exc:
             rejected.append({"aid":raw_aid,"url":url,"reason":str(exc)})
             continue
         for event in events:
+            event["floor"]=floors.get(event["source_line"])
+            event["floor_quality"]=(floor_quality if event["floor"] is not None else "unknown")
             when=_utc(event["occurred_at"])
             if not start_utc<=when<end_utc:
                 continue

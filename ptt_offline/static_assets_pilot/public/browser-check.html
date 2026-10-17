@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PTT Static Assets offline browser check</title>
+<body data-status="running">running</body>
+<script>
+(async()=>{
+  try {
+    const manifestResponse=await fetch('/ptt/v1/manifests/static-assets-pilot.json');
+    if(!manifestResponse.ok) throw new Error('manifest HTTP '+manifestResponse.status);
+    const manifest=await manifestResponse.json();
+    const objectResponse=await fetch('/'+manifest.objects[0].key);
+    if(!objectResponse.ok) throw new Error('object HTTP '+objectResponse.status);
+    if(objectResponse.headers.get('content-type')!=='application/json') throw new Error('content-type');
+    if(objectResponse.headers.get('content-encoding')!=='gzip') throw new Error('content-encoding');
+    const payload=await objectResponse.json();
+    if(!Array.isArray(payload.pushes)||payload.pushes.length!==manifest.objects[0].pushes) throw new Error('push count');
+    document.body.dataset.status='pass';
+    document.body.textContent=JSON.stringify({status:'PASS',pushes:payload.pushes.length});
+  } catch(error) {
+    document.body.dataset.status='fail';
+    document.body.textContent=String(error);
+  }
+})();
+</script>

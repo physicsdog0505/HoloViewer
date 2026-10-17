@@ -1,0 +1,8 @@
+{
+  "name": "holoviewer-ptt-static-assets-pilot",
+  "compatibility_date": "2026-10-18",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page"
+  }
+}
