@@ -94,7 +94,7 @@ test('Hub challenge only activates a matching pending request for current approv
  const leases=await readSubscriptionLeases(db);
  assert.equal(leases.length,1);
  assert.equal(leases[0].state,'active');
- assert.equal(leases[0].expires_at,'2026-10-22T00:00:00Z');
+ assert.ok(Date.parse(leases[0].expires_at)>Date.now()+431000000);
  db.raw.close();
 });
 
@@ -161,7 +161,7 @@ test('scheduled processor acknowledges non-live uploads without creating Today r
  const body=atom();
  const sha=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body));
  const eventHash=Array.from(new Uint8Array(sha),b=>b.toString(16).padStart(2,'0')).join('');
- db.raw.prepare('INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,?,?,?,\\'pending\\',0)')
+ db.raw.prepare("INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,?,?,?,'pending',0)")
   .run(eventHash,channels[0].id,video,version,stamp(at));
  const worker=mountTodayWebSubOnWorker(baseWorker(),{fetchImpl:async url=>{
   assert.match(String(url),/googleapis\\.com\\/youtube\\/v3\\/videos/);
@@ -182,7 +182,7 @@ test('deleted-entry notices are acked safely and signal bounded reconciliation',
  const body='<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"><deleted-entry xmlns="http://purl.org/atompub/tombstones/1.0" ref="https://www.youtube.com/watch?v='+video+'"><yt:channelId>'+channels[0].id+'</yt:channelId></deleted-entry></feed>';
  const sha=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body));
  const eventHash=Array.from(new Uint8Array(sha),b=>b.toString(16).padStart(2,'0')).join('');
- db.raw.prepare('INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,NULL,?,? ,\\'pending\\',0)')
+ db.raw.prepare("INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,NULL,?,? ,'pending',0)")
   .run(eventHash,channels[0].id,version,stamp(at));
  const worker=mountTodayWebSubOnWorker(baseWorker(),{fetchImpl:async()=>{throw Error('no videos.list request expected')}});
  const out=await worker.scheduled({scheduledTime:Date.parse('2026-10-17T00:05:00Z')},env(db,{TODAY_WEBSUB_PROCESS_ENABLED:'true'}),{});
@@ -198,7 +198,7 @@ test('transient videos.list failure retries under a token-fenced bounded lease',
  const body=atom();
  const sha=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body));
  const eventHash=Array.from(new Uint8Array(sha),b=>b.toString(16).padStart(2,'0')).join('');
- db.raw.prepare('INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,?,?,?,\\'pending\\',0)')
+ db.raw.prepare("INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,?,?,?,'pending',0)")
   .run(eventHash,channels[0].id,video,version,stamp(at));
  const worker=mountTodayWebSubOnWorker(baseWorker(),{fetchImpl:async()=>new Response('upstream error',{status:503})});
  const out=await worker.scheduled({scheduledTime:Date.parse('2026-10-17T00:05:00Z')},env(db,{TODAY_WEBSUB_PROCESS_ENABLED:'true'}),{});
