@@ -40,6 +40,7 @@ let pttFollowing=true;
 let pttLoaded=false;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
+let confirmedLiveIds=new Set();
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
@@ -64,6 +65,15 @@ function catalogName(row){return String(row?.channel_title||row?.channel_name||r
 function accentFor(row){
  const audited=String(row?.member_accent||'');
  return /^#[0-9a-fA-F]{6}$/.test(audited)?audited:'#9ab8c4';
+}
+function applyModeClass(){
+ document.body.classList.toggle('mode-single',watchMode==='single');
+ document.body.classList.toggle('mode-multi',watchMode==='multi');
+ if(watchMode==='single'){
+  document.body.classList.remove('settings-open');
+  controls.hidden=true;
+  settingsButton.setAttribute('aria-expanded','false');
+ }
 }
 function updateUrl(){
  const q=new URLSearchParams();
@@ -118,6 +128,7 @@ function renderControls(){
  carousel.parentElement.hidden=!multi;
  carouselInterval.parentElement.hidden=!multi;
  multiModeSwitch.checked=watchMode==='multi';
+ applyModeClass();
  refreshControlState();
 }
 function refreshControlState(){
@@ -194,7 +205,7 @@ function mountPlayerAt(index,autoplay=false){
   }
  });
 }
-function mountPlayers(){streams.forEach((_,index)=>mountPlayerAt(index,false))}
+function mountPlayers(){streams.forEach((stream,index)=>mountPlayerAt(index,confirmedLiveIds.has(stream.videoId)))}
 function destroyPlayers(){
  players.forEach(player=>{try{player?.destroy()}catch{}});
  players.splice(0,players.length);
@@ -203,6 +214,7 @@ function destroyPlayers(){
 function switchWatchMode(nextMode){
  if(nextMode===watchMode)return;
  watchMode=nextMode;
+ applyModeClass();
  clearInterval(carouselTimer);
  carouselTimer=null;
  carousel.checked=false;
@@ -512,6 +524,7 @@ function readSettings(){
 }
 
 settingsButton.addEventListener('click',()=>{
+ if(watchMode==='single')return;
  const open=document.body.classList.toggle('settings-open');
  controls.hidden=!open;
  settingsButton.setAttribute('aria-expanded',String(open));
@@ -554,9 +567,20 @@ document.addEventListener('fullscreenchange',()=>{
 
 readSettings();
 renderShell();
-loadCatalog();
-resolvePrimaryPtt();
+applyModeClass();
+
+let viewerReadyForPlayers=false;
+function tryMountPlayers(){
+ if(!viewerReadyForPlayers||!window.YT?.Player)return;
+ mountPlayers();
+}
+(async()=>{
+ await loadCatalog();
+ viewerReadyForPlayers=true;
+ tryMountPlayers();
+ resolvePrimaryPtt();
+})();
 setInterval(loadPtt,10000);
 
-if(window.YT?.Player)mountPlayers();
-else window.onYouTubeIframeAPIReady=mountPlayers;
+if(window.YT?.Player)tryMountPlayers();
+else window.onYouTubeIframeAPIReady=tryMountPlayers;
