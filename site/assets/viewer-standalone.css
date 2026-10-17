@@ -335,3 +335,68 @@ body.immersive .viewer-stage{align-content:start}
 }
 .carousel-interval input[type="range"],
 .ptt-font-control input[type="range"]{accent-color:var(--brand-main)}
+
+/* Refinement: keep the top bar calm and make related controls read as groups. */
+.viewer-mode-switch{
+ padding-right:10px;
+ margin-right:2px;
+ border-right:1px solid color-mix(in srgb,var(--brand-main) 14%,var(--line));
+}
+.viewer-mode-switch > span{font-weight:650}
+
+.persistent-playback-controls{
+ gap:4px;
+ padding:2px 6px 2px 0;
+}
+.persistent-playback-controls .compact-toggle{
+ padding:0 6px 0 0;
+ color:color-mix(in srgb,var(--text) 78%,var(--muted));
+ font-weight:650;
+}
+.persistent-playback-controls .toggle-ui{
+ width:28px;height:17px;
+}
+.persistent-playback-controls .toggle-ui::after{
+ width:13px;height:13px;
+}
+.persistent-playback-controls .control-toggle input:checked + .toggle-ui::after{
+ transform:translateX(11px)
+}
+
+.transport-button{
+ width:34px!important;
+ min-width:34px!important;
+ height:34px!important;
+ min-height:34px!important;
+ border-radius:50%!important;
+ border:0!important;
+ background:transparent!important;
+ color:var(--brand-main)!important;
+ box-shadow:none!important;
+ font-size:22px!important;
+}
+.transport-button:hover,
+.transport-button:focus-visible{
+ background:color-mix(in srgb,var(--brand-soft) 20%,#fff)!important;
+ color:var(--brand-main)!important;
+}
+#pauseAll{font-size:20px!important;letter-spacing:-2px}
+
+/* Main-focus marker uses the same live red as the live rail. */
+.focus-avatar-button.active::after{
+ background:#e6213c!important;
+ border-color:#fff!important;
+ box-shadow:0 0 0 1px rgba(0,0,0,.08)
+}
+
+/* Tone down the layout pills slightly so only the selected state carries strong brand color. */
+.layout-segment{
+ background:rgba(255,255,255,.42);
+ border-color:color-mix(in srgb,var(--brand-main) 14%,var(--line));
+}
+.layout-segment button{
+ color:color-mix(in srgb,var(--text) 86%,var(--muted));
+}
+.layout-segment button.active{
+ background:color-mix(in srgb,var(--brand-main) 92%,#fff)!important;
+}
