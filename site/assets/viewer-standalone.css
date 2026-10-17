@@ -403,3 +403,27 @@ body.immersive .viewer-stage{align-content:start}
 
 /* Immediate feedback for the shared playback transport controls. */
 .transport-button.is-feedback{background:#A65788!important;color:#fff!important;box-shadow:0 0 0 3px rgba(184,166,216,.35);transform:scale(.93);transition:background .12s,transform .12s,box-shadow .12s}
+
+/* Viewer mode model: 預設 / 輪播 / 鎖定.
+   Focus modes keep at most four visible players without moving iframe DOM nodes. */
+.viewer-stage.layout-primary{
+ grid-template-rows:repeat(var(--focus-rows,3),minmax(0,1fr));
+}
+.viewer-stage.layout-primary .player-card.primary{
+ grid-column:1;
+ grid-row:1 / -1;
+}
+.viewer-stage.layout-primary .player-card.secondary-1{grid-column:2;grid-row:1}
+.viewer-stage.layout-primary .player-card.secondary-2{grid-column:2;grid-row:2}
+.viewer-stage.layout-primary .player-card.secondary-3{grid-column:2;grid-row:3}
+.player-card.viewer-hidden{display:none!important}
+
+.viewer-workspace.workspace-focus.layout-primary{
+ grid-template-rows:repeat(var(--focus-secondary-count,3),minmax(0,22fr)) minmax(0,34fr);
+}
+.viewer-workspace.workspace-focus.layout-primary .viewer-ptt{
+ grid-row:var(--ptt-grid-row,4);
+}
+body.immersive .viewer-workspace.workspace-focus.layout-primary{
+ grid-template-rows:repeat(var(--focus-secondary-count,3),auto) minmax(0,1fr);
+}
