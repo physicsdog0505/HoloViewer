@@ -100,6 +100,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("pttLastGoodDay&&pttLastGoodDay!==today", js)
         self.assertIn("setInterval(()=>{if(!document.hidden)loadPtt()},10000)", js)
         self.assertIn("body.ptt-focus-mode", css)
+        self.assertIn(".ptt-empty[hidden]{display:none!important}", css)
         self.assertIn('href="/ptt-today/"', shell)
         self.assertIn('data-route="ptt" href="/ptt-today/"', shell)
         self.assertNotIn('data-page-link="ptt"', shell)
