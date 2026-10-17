@@ -427,3 +427,17 @@ body.immersive .viewer-stage{align-content:start}
 body.immersive .viewer-workspace.workspace-focus.layout-primary{
  grid-template-rows:repeat(var(--focus-secondary-count,3),auto) minmax(0,1fr);
 }
+
+@media(max-width:900px){
+ .viewer-workspace.workspace-focus.layout-primary{grid-template-rows:none}
+ .viewer-workspace.workspace-focus.layout-primary .viewer-ptt{grid-row:auto}
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.primary,
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-1,
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-2,
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-3,
+ .viewer-stage.layout-primary .player-card.primary,
+ .viewer-stage.layout-primary .player-card.secondary-1,
+ .viewer-stage.layout-primary .player-card.secondary-2,
+ .viewer-stage.layout-primary .player-card.secondary-3{grid-column:1;grid-row:auto}
+ .viewer-stage.layout-primary{grid-template-rows:none}
+}
