@@ -805,7 +805,7 @@ carousel.addEventListener('change',()=>{
 });
 carouselInterval.addEventListener('input',()=>{
  carouselOutput.textContent=carouselInterval.value+'s';
- if(watchMode==='multi'&&currentLayoutPreset()==='primary')viewerModeStatus.textContent='↻ '+carouselInterval.value+'s';
+ if(focusCarouselStatus&&!focusCarouselStatus.hidden)focusCarouselStatus.textContent='↻ '+carouselInterval.value+'s';
  startCarousel();
 });
 pttFontSize.addEventListener('input',()=>{
