@@ -86,14 +86,23 @@ function updateUrl(){
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
 
+function playerHostId(stream){return 'viewer-player-'+String(stream?.videoId||'').replace(/[^A-Za-z0-9_-]/g,'')}
 function createPlayerCard(index){
  const stream=streams[index];
  const card=node('section',undefined,'player-card');
  card.dataset.index=String(index);
  const label=node('div',stream.label,'player-label');
+ const remove=node('button','×','player-remove');
+ remove.type='button';
+ remove.title='移除此直播';
+ remove.setAttribute('aria-label','移除此直播');
+ remove.addEventListener('click',event=>{
+  event.stopPropagation();
+  removeMultiStream(Number(card.dataset.index));
+ });
  const host=node('div',undefined,'player-host');
- host.id='viewer-player-'+index;
- card.append(label,host);
+ host.id=playerHostId(stream);
+ card.append(label,remove,host);
  playerCards[index]=card;
  return card;
 }
@@ -120,6 +129,7 @@ function renderControls(){
   focusChoices.append(button);
  });
  const multi=watchMode==='multi'&&streams.length>1;
+ playerCards.forEach(card=>{const remove=card?.querySelector('.player-remove');if(remove)remove.hidden=!multi});
  document.getElementById('layoutGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!multi;
  syncPlayback.parentElement.hidden=!multi;
@@ -189,7 +199,7 @@ function syncPlayers(state,sourceIndex){
 }
 function mountPlayerAt(index,autoplay=false){
  if(!window.YT?.Player||players[index]||!streams[index])return;
- const host=document.getElementById('viewer-player-'+index);
+ const host=document.getElementById(playerHostId(streams[index]));
  if(!host)return;
  players[index]=new YT.Player(host,{
   videoId:streams[index].videoId,
@@ -204,7 +214,8 @@ function mountPlayerAt(index,autoplay=false){
     }
    },
    onStateChange:event=>{
-    if(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED)syncPlayers(event.data,index);
+    const sourceIndex=players.indexOf(event.target);
+    if(sourceIndex>=0&&(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED))syncPlayers(event.data,sourceIndex);
    }
   }
  });
@@ -229,7 +240,7 @@ function switchWatchMode(nextMode){
   primaryIndex=0;
   audioMaster=0;
   renderShell();
-  if(window.YT?.Player)mountPlayers();
+  if(window.YT?.Player)mountPlayerAt(0,false);
   resolvePrimaryPtt();
  }else{
   renderControls();
@@ -247,109 +258,45 @@ function commitSingleStream(row,id){
  }
  primaryIndex=0;
  audioMaster=0;
- const label=playerCards[0]?.querySelector('.player-label');
- if(label)label.textContent=streams[0].label;
  renderControls();
  applyLayout();
  renderLiveRail(catalogRows);
  resolvePrimaryPtt();
 }
-function recreateSinglePlayer(row,id,playback){
+function replaceSingleStream(row){
+ const id=String(row?.video_id||'');
+ if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
+ if(streams[0]?.videoId===id)return;
+
  const card=playerCards[0];
  if(!card||!window.YT?.Player)return;
 
+ let wasMuted=false;
+ try{wasMuted=Boolean(players[0]?.isMuted?.())}catch{}
  try{players[0]?.destroy()}catch{}
  players[0]=null;
+ card.querySelector('iframe')?.remove();
  card.querySelector('.player-host')?.remove();
 
+ // Commit the selected live first, then create one fresh, paused player.
+ // No autoplay fallback and no surprise mute: the user presses Play once.
+ commitSingleStream(row,id);
  const host=node('div',undefined,'player-host');
- host.id='viewer-player-0';
+ host.id=playerHostId(streams[0]);
  card.append(host);
-
- let committed=false;
  players[0]=new YT.Player(host,{
   videoId:id,
   playerVars:{playsinline:1,rel:0,enablejsapi:1,autoplay:0,origin:location.origin},
   events:{
    onReady:event=>{
-    try{
-     if(playback?.muted)event.target.mute();
-     else event.target.unMute();
-    }catch{}
-    if(playback?.playing){
-     try{event.target.playVideo()}catch{}
-     setTimeout(()=>{
-      try{
-       // Never trade sound for autoplay. If audible start is blocked,
-       // leave the selected live paused but unmuted for one-click playback.
-       if(event.target.getPlayerState()!==YT.PlayerState.PLAYING&&!playback?.muted){
-        event.target.pauseVideo();
-        event.target.unMute();
-       }
-      }catch{}
-     },500);
-    }
-    if(!committed){
-     committed=true;
-     commitSingleStream(row,id);
-    }
+    try{if(wasMuted)event.target.mute();else event.target.unMute()}catch{}
    },
    onStateChange:event=>{
-    if(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED)syncPlayers(event.data,0);
+    const sourceIndex=players.indexOf(event.target);
+    if(sourceIndex>=0&&(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED))syncPlayers(event.data,sourceIndex);
    }
   }
  });
-}
-function replaceSingleStream(row){
- const id=String(row?.video_id||'');
- if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
-
- const player=players[0];
- if(streams[0]?.videoId===id){
-  try{player?.playVideo()}catch{}
-  return;
- }
-
- const playback={playing:false,muted:false};
- try{playback.playing=player?.getPlayerState()===YT.PlayerState.PLAYING}catch{}
- try{playback.muted=Boolean(player?.isMuted?.())}catch{}
-
- // First try a true same-player channel switch. This preserves the current
- // playback/audio session and avoids the black-frame risk of rebuilding.
- if(player?.loadVideoById){
-  try{
-   if(playback.muted)player.mute();
-   else player.unMute();
-   player.loadVideoById({videoId:id,startSeconds:0});
-   if(playback.playing)player.playVideo();
-
-   const started=performance.now();
-   const verify=()=>{
-    let actual='';
-    try{actual=String(player.getVideoData?.()?.video_id||'')}catch{}
-    if(actual===id){
-     commitSingleStream(row,id);
-     try{
-      if(playback.muted)player.mute();
-      else player.unMute();
-      if(playback.playing)player.playVideo();
-    }catch{}
-    return;
-    }
-    if(performance.now()-started<1800){
-     setTimeout(verify,120);
-     return;
-    }
-    // The iframe did not actually switch. Rebuild only now, with the same
-    // playing/muted intent captured from the old live.
-    recreateSinglePlayer(row,id,playback);
-   };
-   setTimeout(verify,120);
-   return;
-  }catch{}
- }
-
- recreateSinglePlayer(row,id,playback);
 }
 function appendMultiStream(row){
  const id=String(row?.video_id||'');
@@ -366,8 +313,35 @@ function appendMultiStream(row){
  applyLayout();
  let shouldPlay=false;
  try{shouldPlay=players[primaryIndex]?.getPlayerState()===YT.PlayerState.PLAYING}catch{}
- if(window.YT?.Player)mountPlayerAt(index,Boolean(syncPlayback.checked&&shouldPlay));
+ if(window.YT?.Player)mountPlayerAt(index,shouldPlay);
  renderLiveRail(catalogRows);
+}
+function removeMultiStream(index){
+ if(watchMode!=='multi'||streams.length<=1||index<0||index>=streams.length)return;
+ const removedWasPrimary=index===primaryIndex;
+ try{players[index]?.destroy()}catch{}
+ playerCards[index]?.remove();
+ streams.splice(index,1);
+ players.splice(index,1);
+ playerCards.splice(index,1);
+
+ if(index<primaryIndex)primaryIndex-=1;
+ else if(removedWasPrimary)primaryIndex=Math.min(index,streams.length-1);
+ audioMaster=primaryIndex;
+
+ playerCards.forEach((card,i)=>{if(card)card.dataset.index=String(i)});
+ renderControls();
+ applyLayout();
+ setAudioMaster(primaryIndex);
+ renderLiveRail(catalogRows);
+ resolvePrimaryPtt();
+}
+function addDraggedLive(row){
+ const id=String(row?.video_id||'');
+ if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
+ if(streams.some(stream=>stream.videoId===id))return;
+ if(watchMode==='single')switchWatchMode('multi');
+ appendMultiStream(row);
 }
 function handleLiveRailClick(row){
  if(watchMode==='multi')appendMultiStream(row);
@@ -383,11 +357,17 @@ function supportStyle(button,row){
  }
 }
 function renderLiveRail(rows){
- const live=rows.filter(row=>String(row?.lifecycle_state||row?.state||'').toLowerCase()==='live'&&/^[A-Za-z0-9_-]{11}$/.test(String(row?.video_id||'')));
+ const activeIds=new Set(streams.map(stream=>stream.videoId));
+ const live=rows.filter(row=>{
+  const id=String(row?.video_id||'');
+  if(String(row?.lifecycle_state||row?.state||'').toLowerCase()!=='live'||!/^[A-Za-z0-9_-]{11}$/.test(id))return false;
+  return watchMode!=='multi'||!activeIds.has(id);
+ });
  liveList.replaceChildren();
  live.forEach(row=>{
   const button=node('button',undefined,'viewer-live-item');
   button.type='button';
+  button.draggable=true;
   button.dataset.videoId=String(row.video_id);
   button.title=catalogName(row);
   supportStyle(button,row);
@@ -406,6 +386,12 @@ function renderLiveRail(rows){
   avatar.append(node('i'));
   button.append(avatar,node('strong',catalogName(row)));
   button.addEventListener('click',()=>handleLiveRailClick(row));
+  button.addEventListener('dragstart',event=>{
+   event.dataTransfer?.setData('text/plain',String(row.video_id));
+   if(event.dataTransfer)event.dataTransfer.effectAllowed='copy';
+   button.classList.add('is-dragging');
+  });
+  button.addEventListener('dragend',()=>button.classList.remove('is-dragging'));
   liveList.append(button);
  });
  liveRail.hidden=!liveList.childElementCount;
@@ -610,6 +596,24 @@ function readSettings(){
   document.documentElement.style.setProperty('--ptt-font-size',font+'px');
  }catch{}
 }
+
+stage.addEventListener('dragover',event=>{
+ const id=event.dataTransfer?.getData('text/plain')||'';
+ if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
+ event.preventDefault();
+ if(event.dataTransfer)event.dataTransfer.dropEffect='copy';
+ stage.classList.add('drag-target');
+});
+stage.addEventListener('dragleave',event=>{
+ if(!stage.contains(event.relatedTarget))stage.classList.remove('drag-target');
+});
+stage.addEventListener('drop',event=>{
+ event.preventDefault();
+ stage.classList.remove('drag-target');
+ const id=event.dataTransfer?.getData('text/plain')||'';
+ const row=catalogRows.find(item=>String(item?.video_id||'')===id);
+ if(row)addDraggedLive(row);
+});
 
 settingsButton.addEventListener('click',()=>{
  if(watchMode==='single')return;
