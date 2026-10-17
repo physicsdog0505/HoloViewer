@@ -254,12 +254,10 @@ function commitSingleStream(row,id){
  renderLiveRail(catalogRows);
  resolvePrimaryPtt();
 }
-function recreateSinglePlayer(row,id){
+function recreateSinglePlayer(row,id,playback){
  const card=playerCards[0];
  if(!card||!window.YT?.Player)return;
 
- let wasPlaying=false;
- try{wasPlaying=players[0]?.getPlayerState()===YT.PlayerState.PLAYING}catch{}
  try{players[0]?.destroy()}catch{}
  players[0]=null;
  card.querySelector('.player-host')?.remove();
@@ -274,21 +272,22 @@ function recreateSinglePlayer(row,id){
   playerVars:{playsinline:1,rel:0,enablejsapi:1,autoplay:0,origin:location.origin},
   events:{
    onReady:event=>{
-    // Preserve the user's playback intent. If the previous live was already
-    // playing, try to continue the newly selected live with sound.
-    try{event.target.unMute()}catch{}
-    if(wasPlaying){
+    try{
+     if(playback?.muted)event.target.mute();
+     else event.target.unMute();
+    }catch{}
+    if(playback?.playing){
      try{event.target.playVideo()}catch{}
      setTimeout(()=>{
       try{
-       // Never fall back to muted autoplay. If audible autoplay is blocked,
-       // leave the new live ready and unmuted so one click starts it with sound.
-       if(event.target.getPlayerState()!==YT.PlayerState.PLAYING){
+       // Never trade sound for autoplay. If audible start is blocked,
+       // leave the selected live paused but unmuted for one-click playback.
+       if(event.target.getPlayerState()!==YT.PlayerState.PLAYING&&!playback?.muted){
         event.target.pauseVideo();
         event.target.unMute();
        }
       }catch{}
-     },350);
+     },500);
     }
     if(!committed){
      committed=true;
@@ -305,15 +304,52 @@ function replaceSingleStream(row){
  const id=String(row?.video_id||'');
  if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
 
+ const player=players[0];
  if(streams[0]?.videoId===id){
-  try{players[0]?.playVideo()}catch{}
+  try{player?.playVideo()}catch{}
   return;
  }
 
- // Single mode has exactly one player. Recreate that player from the selected
- // live video_id instead of trying to mutate an iframe that may keep stale
- // YouTube state. No other player can be disturbed in single mode.
- recreateSinglePlayer(row,id);
+ const playback={playing:false,muted:false};
+ try{playback.playing=player?.getPlayerState()===YT.PlayerState.PLAYING}catch{}
+ try{playback.muted=Boolean(player?.isMuted?.())}catch{}
+
+ // First try a true same-player channel switch. This preserves the current
+ // playback/audio session and avoids the black-frame risk of rebuilding.
+ if(player?.loadVideoById){
+  try{
+   if(playback.muted)player.mute();
+   else player.unMute();
+   player.loadVideoById({videoId:id,startSeconds:0});
+   if(playback.playing)player.playVideo();
+
+   const started=performance.now();
+   const verify=()=>{
+    let actual='';
+    try{actual=String(player.getVideoData?.()?.video_id||'')}catch{}
+    if(actual===id){
+     commitSingleStream(row,id);
+     try{
+      if(playback.muted)player.mute();
+      else player.unMute();
+      if(playback.playing)player.playVideo();
+    }catch{}
+    return;
+    }
+    if(performance.now()-started<1800){
+     setTimeout(verify,120);
+     return;
+    }
+    // The iframe did not actually switch. Rebuild only now, with the same
+    // playing/muted intent captured from the old live.
+    recreateSinglePlayer(row,id,playback);
+   };
+   setTimeout(verify,120);
+   return;
+  }catch{}
+ }
+
+ recreateSinglePlayer(row,id,playback);
 }
 function appendMultiStream(row){
  const id=String(row?.video_id||'');
