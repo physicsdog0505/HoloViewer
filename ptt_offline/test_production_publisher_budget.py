@@ -7,6 +7,7 @@ class ProductionPublisherBudgetTests(unittest.TestCase):
         p=PRODUCTION_PROFILE
         self.assertEqual(p["rows"],10)
         self.assertEqual(p["max_batches"],1)
+        self.assertEqual(p["burst_max_batches"],3)
         self.assertEqual(p["max_articles"],4)
         self.assertEqual(p["queries"],60)
         self.assertEqual(p["writes"],24)
@@ -17,6 +18,7 @@ class ProductionPublisherBudgetTests(unittest.TestCase):
         self.assertLessEqual(worst_writes,p["writes"])
         self.assertLessEqual(worst_queries,p["queries"])
         self.assertLessEqual(p["rows"]*p["max_batches"],10)
+        self.assertLessEqual(p["rows"]*p["burst_max_batches"],30)
 
     def test_worker_caps_are_derived_from_same_profile(self):
         self.assertEqual(BINDINGS["PTT_PUBLISH_MAX_ROWS"],str(PRODUCTION_PROFILE["rows"]))
