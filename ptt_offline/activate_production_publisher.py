@@ -25,6 +25,7 @@ PRODUCTION_PROFILE={
     "queries":60,
     "writes":24,
     "max_batches":1,
+    "burst_max_batches":3,
     "max_articles":4,
 }
 BINDINGS={
@@ -176,6 +177,7 @@ def start_publisher(repo_root, source, state_root, secrets_path):
          "--metrics",str(metrics),"--iterations","1440",
          "--batch-cap",str(PRODUCTION_PROFILE["rows"]),
          "--max-batches",str(PRODUCTION_PROFILE["max_batches"]),
+         "--burst-max-batches",str(PRODUCTION_PROFILE["burst_max_batches"]),
          "--max-articles",str(PRODUCTION_PROFILE["max_articles"]),
          "--send","--approve-live-capture-policy"]
     with log.open("ab",buffering=0) as handle:
