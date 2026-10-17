@@ -194,9 +194,9 @@ function renderControls(){
  document.getElementById('layoutGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!focusMode;
  persistentPlaybackControls.hidden=!multi;
- const carouselUnlocked=multi&&currentLayoutPreset()==='primary';
- focusCarouselStatus.hidden=!carouselUnlocked;
- focusCarouselStatus.textContent=carouselUnlocked?'↻ '+carouselInterval.value+'s':'';
+ const carouselVisible=multi&&currentLayoutPreset()!=='equal';
+ focusCarouselStatus.hidden=!carouselVisible;
+ focusCarouselStatus.textContent=currentLayoutPreset()==='focus'?'鎖定':carouselVisible?'↻ '+carouselInterval.value+'s':'';
  carouselControl.hidden=true;
  carouselIntervalGroup.hidden=!focusMode;
  multiModeSwitch.checked=watchMode==='multi';
@@ -805,7 +805,7 @@ carousel.addEventListener('change',()=>{
 });
 carouselInterval.addEventListener('input',()=>{
  carouselOutput.textContent=carouselInterval.value+'s';
- if(focusCarouselStatus&&!focusCarouselStatus.hidden)focusCarouselStatus.textContent='↻ '+carouselInterval.value+'s';
+ if(focusCarouselStatus&&!focusCarouselStatus.hidden&&currentLayoutPreset()==='primary')focusCarouselStatus.textContent='↻ '+carouselInterval.value+'s';
  startCarousel();
 });
 pttFontSize.addEventListener('input',()=>{
