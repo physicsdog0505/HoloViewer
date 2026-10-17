@@ -65,17 +65,14 @@
       <div id="stage" class="viewer-stage"></div>
       <aside id="pttPanel" class="viewer-ptt" hidden>
         <div class="ptt-heading">
-          <div>
+          <div class="ptt-title-line">
             <strong id="pttTitle">PTT 專串</strong>
             <small id="pttMeta">讀取中</small>
           </div>
-          <div class="ptt-heading-actions">
-            <label class="ptt-font-control">字體
-              <input id="pttFontSize" type="range" min="12" max="26" step="1" value="14">
-              <output id="pttFontValue">14px</output>
-            </label>
-            <a href="/ptt-today">開啟完整專串</a>
-          </div>
+          <label class="ptt-font-control">字體
+            <input id="pttFontSize" type="range" min="12" max="26" step="1" value="14">
+            <output id="pttFontValue">14px</output>
+          </label>
         </div>
         <div id="pttFeed" class="ptt-feed"></div>
         <button id="pttNewest" class="ptt-newest" type="button" hidden>最新</button>
