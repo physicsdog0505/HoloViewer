@@ -220,6 +220,9 @@ function refreshControlState(){
   const locked=currentLayoutPreset()==='focus'&&index===lockedIndex;
   button.classList.toggle('active',locked);
   button.setAttribute('aria-pressed',String(locked));
+  const label=streams[index]?.label||'Hololive';
+  button.title=(locked?'解除鎖定並回到輪播：':currentLayoutPreset()==='focus'?'改鎖定主視角：':'鎖定主視角：')+label;
+  button.setAttribute('aria-label',button.title);
  });
  const preset=currentLayoutPreset();
  playerCards.forEach((card,index)=>{
