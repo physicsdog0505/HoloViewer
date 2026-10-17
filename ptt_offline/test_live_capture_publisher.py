@@ -1,7 +1,9 @@
+import json
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from datetime import datetime
 from ptt_offline.live_capture_publisher import active_article_ids,inspect_latest_article,run_live_once,state_for_source
 from ptt_offline.audit_live_line import audit
 from ptt_offline.ptt_aid_identity import aid_from_article_url
@@ -143,6 +145,57 @@ class LiveCapturePublisherTests(unittest.TestCase):
         second=run_live_once(self.db,state_path=self.state,secret="k"*40,
                               executor=lambda _:self.fail("must not replay"),send=True)
         self.assertEqual(second["status"],"NO_NEW_ROWS")
+
+    def test_legacy_state_quarantines_only_rows_older_than_two_hours(self):
+        plan=inspect_latest_article(self.db)
+        accepted={plan["candidate_rows"][0]["source_record_key"]:"x"}
+        # Use a syntactically valid legacy state with no fence marker and no
+        # accepted rows, matching pre-upgrade production shape.
+        Path(self.state).write_text(json.dumps({
+            "status":"ACKED",
+            "source_identity":plan["source_identity"],
+            "accepted":{},
+        }),encoding="utf-8")
+        seen=[]
+        def approve(batch):
+            seen.extend(batch["rows"])
+            return {"status":"ACK","batch_id":batch["batch_id"],"digest":batch["digest"],
+              "logical_rows_acked":len(batch["rows"]),"d1_query_count":2+5*len(batch["rows"]),
+              "d1_rows_written":2+2*len(batch["rows"]),"http_requests":1}
+        result=run_live_once(
+            self.db,state_path=self.state,secret="k"*40,executor=approve,send=True,
+            now=datetime.fromisoformat("2026-10-15T10:02:30+00:00")
+        )
+        self.assertEqual(result["legacy_baselined"],0)
+        self.assertEqual(result["sent"],2)
+        body=json.loads(Path(self.state).read_text(encoding="utf-8"))
+        self.assertTrue(body["legacy_backlog_fence_v2"])
+
+        # A separate legacy state observed much later must baseline the same old
+        # rows locally instead of sending them as historical catch-up.
+        late=str(Path(self.tmp.name)/"legacy-late.json")
+        Path(late).write_text(json.dumps({
+            "status":"ACKED",
+            "source_identity":plan["source_identity"],
+            "accepted":{},
+        }),encoding="utf-8")
+        result=run_live_once(
+            self.db,state_path=late,secret="k"*40,
+            executor=lambda _:self.fail("old legacy backlog must not post"),send=True,
+            now=datetime.fromisoformat("2026-10-15T13:00:00+00:00")
+        )
+        self.assertEqual(result["legacy_baselined"],2)
+        self.assertEqual(result["sent"],0)
+        self.assertEqual(result["status"],"NO_NEW_ROWS")
+        body=json.loads(Path(late).read_text(encoding="utf-8"))
+        self.assertTrue(body["legacy_backlog_fence_v2"])
+
+    def test_new_baseline_keeps_delayed_recovery_path_enabled(self):
+        baseline=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=lambda _:self.fail("baseline must not post"),send=True)
+        self.assertEqual(baseline["status"],"BASELINED")
+        body=json.loads(Path(self.state).read_text(encoding="utf-8"))
+        self.assertTrue(body["legacy_backlog_fence_v2"])
 
     def test_unknown_remote_stop_latch_after_baseline(self):
         alt=str(Path(self.tmp.name)/"uncertain.json")
