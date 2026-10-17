@@ -3,9 +3,10 @@
 const API_BASE=String(window.HOLOVIEWER_CONFIG?.apiBase||'').replace(/\/$/,'');
 const params=new URLSearchParams(location.search);
 const streams=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))].slice(0,3).map(id=>({videoId:id,label:id,channelId:''}));
-let layout=['equal','primary'].includes(params.get('layout'))?params.get('layout'):(streams.length>1?'equal':'equal');
-let primaryIndex=Math.max(0,Math.min(streams.length-1,Number(params.get('primary'))||0));
-let audioMaster=Math.max(0,Math.min(streams.length-1,Number(params.get('audio'))||0));
+let layout=['equal','primary'].includes(params.get('layout'))?params.get('layout'):'equal';
+let primaryIndex=Math.max(0,Math.min(Math.max(0,streams.length-1),Number(params.get('primary'))||0));
+let audioMaster=primaryIndex;
+let watchMode=params.get('mode')==='multi'||streams.length>1?'multi':'single';
 const requestedPttMode=params.get('ptt')||'live';
 
 const stage=document.getElementById('stage');
@@ -14,9 +15,8 @@ const liveList=document.getElementById('viewerLiveList');
 const controls=document.getElementById('viewerControls');
 const settingsButton=document.getElementById('viewerSettings');
 const fullscreenButton=document.getElementById('viewerFullscreen');
+const multiModeSwitch=document.getElementById('multiModeSwitch');
 const focusChoices=document.getElementById('focusChoices');
-const audioSelect=document.getElementById('audioMaster');
-const audioFollow=document.getElementById('audioFollowFocus');
 const syncPlayback=document.getElementById('syncPlayback');
 const playAll=document.getElementById('playAll');
 const pauseAll=document.getElementById('pauseAll');
@@ -30,9 +30,8 @@ const pttTitle=document.getElementById('pttTitle');
 const pttNewest=document.getElementById('pttNewest');
 const pttFontSize=document.getElementById('pttFontSize');
 const pttFontValue=document.getElementById('pttFontValue');
-const pttShowFloor=document.getElementById('pttShowFloor');
 
-const players=Array(streams.length).fill(null);
+const players=[];
 const playerCards=[];
 let catalogRows=[];
 let syncGuard=false;
@@ -44,9 +43,9 @@ let pttResolveToken=0;
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
- return fetch(API_BASE+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}}).then(r=>{
-  if(!r.ok)throw new Error('API HTTP '+r.status);
-  return r.json();
+ return fetch(API_BASE+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}}).then(response=>{
+  if(!response.ok)throw new Error('API HTTP '+response.status);
+  return response.json();
  });
 }
 function node(tag,text,className){
@@ -64,109 +63,109 @@ function safeAvatar(raw){
 function catalogName(row){return String(row?.channel_title||row?.channel_name||row?.title||row?.video_id||'Hololive')}
 function accentFor(row){
  const audited=String(row?.member_accent||'');
- if(/^#[0-9a-fA-F]{6}$/.test(audited))return audited;
- return '#9ab8c4';
+ return /^#[0-9a-fA-F]{6}$/.test(audited)?audited:'#9ab8c4';
 }
 function updateUrl(){
  const q=new URLSearchParams();
- streams.forEach(s=>q.append('stream',s.videoId));
+ streams.forEach(stream=>q.append('stream',stream.videoId));
  q.set('layout',layout);
  q.set('ptt',pttContext.mode==='live'?'live':requestedPttMode);
  q.set('primary',String(primaryIndex));
- q.set('audio',String(audioMaster));
+ q.set('audio',String(primaryIndex));
+ q.set('mode',watchMode);
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
+
+function createPlayerCard(index){
+ const stream=streams[index];
+ const card=node('section',undefined,'player-card');
+ card.dataset.index=String(index);
+ const label=node('div',stream.label,'player-label');
+ const host=node('div',undefined,'player-host');
+ host.id='viewer-player-'+index;
+ card.append(label,host);
+ playerCards[index]=card;
+ return card;
+}
 function renderShell(){
+ stage.replaceChildren();
+ playerCards.splice(0,playerCards.length);
  if(!streams.length){
-  stage.replaceChildren(node('div','沒有可播放的 YouTube 影片。','ptt-empty'));
+  stage.append(node('div','沒有可播放的 YouTube 影片。','ptt-empty'));
   controls.hidden=true;
   return;
  }
- stage.replaceChildren();
- playerCards.length=0;
- streams.forEach((stream,index)=>{
-  const card=node('section',undefined,'player-card');
-  card.dataset.index=String(index);
-  const label=node('div',stream.label,'player-label');
-  const host=node('div',undefined,'player-host');
-  host.id='viewer-player-'+index;
-  card.append(label,host);
-  stage.append(card);
-  playerCards.push(card);
- });
+ streams.forEach((_,index)=>stage.append(createPlayerCard(index)));
  renderControls();
  applyLayout();
 }
 function renderControls(){
  focusChoices.replaceChildren();
- audioSelect.replaceChildren();
  streams.forEach((stream,index)=>{
-  const b=node('button',String.fromCharCode(65+index));
-  b.type='button';b.dataset.focusIndex=String(index);b.title=stream.label;
-  b.addEventListener('click',()=>setPrimary(index));
-  focusChoices.append(b);
-  const option=document.createElement('option');
-  option.value=String(index);option.textContent=String.fromCharCode(65+index)+' · '+stream.label;
-  audioSelect.append(option);
+  const button=node('button',String.fromCharCode(65+index));
+  button.type='button';
+  button.dataset.focusIndex=String(index);
+  button.title=stream.label;
+  button.addEventListener('click',()=>setPrimary(index));
+  focusChoices.append(button);
  });
- audioSelect.value=String(audioMaster);
- const multi=streams.length>1;
+ const multi=watchMode==='multi'&&streams.length>1;
  document.getElementById('layoutGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!multi;
- audioFollow.parentElement.hidden=!multi;
  syncPlayback.parentElement.hidden=!multi;
- playAll.hidden=!multi;pauseAll.hidden=!multi;
+ playAll.hidden=!multi;
+ pauseAll.hidden=!multi;
  carousel.parentElement.hidden=!multi;
  carouselInterval.parentElement.hidden=!multi;
+ multiModeSwitch.checked=watchMode==='multi';
  refreshControlState();
 }
 function refreshControlState(){
- document.querySelectorAll('[data-layout]').forEach(b=>b.classList.toggle('active',b.dataset.layout===layout));
- [...focusChoices.children].forEach((b,i)=>b.classList.toggle('active',i===primaryIndex));
- audioSelect.value=String(audioMaster);
+ document.querySelectorAll('[data-layout]').forEach(button=>button.classList.toggle('active',button.dataset.layout===layout));
+ [...focusChoices.children].forEach((button,index)=>button.classList.toggle('active',index===primaryIndex));
  playerCards.forEach((card,index)=>{
+  if(!card)return;
   card.classList.toggle('primary',index===primaryIndex);
   card.classList.remove('secondary-1','secondary-2');
  });
- const secondary=playerCards.filter((_,index)=>index!==primaryIndex);
+ const secondary=playerCards.filter((card,index)=>card&&index!==primaryIndex);
  secondary[0]?.classList.add('secondary-1');
  secondary[1]?.classList.add('secondary-2');
 }
 function applyLayout(){
- const effective=streams.length===1?'equal':layout;
+ const effective=watchMode==='multi'&&streams.length>1?layout:'equal';
  stage.className='viewer-stage layout-'+effective;
  const cols=streams.length<=1?1:2;
  const rows=Math.max(1,Math.ceil(streams.length/cols));
  stage.style.setProperty('--viewer-cols',String(cols));
  stage.style.setProperty('--viewer-rows',String(rows));
  if(effective==='primary'){
-  const ordered=[playerCards[primaryIndex],...playerCards.filter((_,i)=>i!==primaryIndex)];
+  const ordered=[playerCards[primaryIndex],...playerCards.filter((card,index)=>card&&index!==primaryIndex)].filter(Boolean);
   ordered.forEach(card=>stage.append(card));
  }else{
-  playerCards.sort((a,b)=>Number(a.dataset.index)-Number(b.dataset.index)).forEach(card=>stage.append(card));
+  playerCards.filter(Boolean).sort((a,b)=>Number(a.dataset.index)-Number(b.dataset.index)).forEach(card=>stage.append(card));
  }
  refreshControlState();
  updateUrl();
 }
-function setPrimary(index){
- if(index<0||index>=streams.length)return;
- primaryIndex=index;
- if(audioFollow.checked)setAudioMaster(index);
- applyLayout();
- resolvePrimaryPtt();
-}
 function setAudioMaster(index){
  if(index<0||index>=streams.length)return;
  audioMaster=index;
- audioSelect.value=String(index);
  players.forEach((player,i)=>{
   if(!player)return;
   try{if(i===audioMaster)player.unMute();else player.mute();}catch{}
  });
  updateUrl();
 }
+function setPrimary(index){
+ if(index<0||index>=streams.length)return;
+ primaryIndex=index;
+ setAudioMaster(index);
+ applyLayout();
+ resolvePrimaryPtt();
+}
 function syncPlayers(state,sourceIndex){
- if(!syncPlayback.checked||syncGuard||streams.length<2)return;
+ if(watchMode!=='multi'||!syncPlayback.checked||syncGuard||streams.length<2)return;
  syncGuard=true;
  players.forEach((player,index)=>{
   if(!player||index===sourceIndex)return;
@@ -177,43 +176,107 @@ function syncPlayers(state,sourceIndex){
  });
  setTimeout(()=>{syncGuard=false},350);
 }
-function mountPlayers(){
- if(!window.YT?.Player)return;
- streams.forEach((stream,index)=>{
-  if(players[index])return;
-  players[index]=new YT.Player('viewer-player-'+index,{
-   videoId:stream.videoId,
-   playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
-   events:{
-    onReady:()=>{setAudioMaster(audioMaster)},
-    onStateChange:event=>{
-     if(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED)syncPlayers(event.data,index);
-    }
+function mountPlayerAt(index,autoplay=false){
+ if(!window.YT?.Player||players[index]||!streams[index])return;
+ const host=document.getElementById('viewer-player-'+index);
+ if(!host)return;
+ players[index]=new YT.Player(host,{
+  videoId:streams[index].videoId,
+  playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
+  events:{
+   onReady:event=>{
+    setAudioMaster(primaryIndex);
+    if(autoplay){try{event.target.playVideo()}catch{}}
+   },
+   onStateChange:event=>{
+    if(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED)syncPlayers(event.data,index);
    }
-  });
+  }
  });
 }
-function replacePrimaryStream(row){
+function mountPlayers(){streams.forEach((_,index)=>mountPlayerAt(index,false))}
+function destroyPlayers(){
+ players.forEach(player=>{try{player?.destroy()}catch{}});
+ players.splice(0,players.length);
+}
+
+function switchWatchMode(nextMode){
+ if(nextMode===watchMode)return;
+ watchMode=nextMode;
+ clearInterval(carouselTimer);
+ carouselTimer=null;
+ carousel.checked=false;
+ if(watchMode==='single'&&streams.length>1){
+  const selected={...(streams[primaryIndex]||streams[0])};
+  destroyPlayers();
+  streams.splice(0,streams.length,selected);
+  primaryIndex=0;
+  audioMaster=0;
+  renderShell();
+  if(window.YT?.Player)mountPlayers();
+  resolvePrimaryPtt();
+ }else{
+  renderControls();
+  applyLayout();
+ }
+ renderLiveRail(catalogRows);
+ updateUrl();
+}
+function replaceSingleStream(row){
  const id=String(row?.video_id||'');
- if(!/^[A-Za-z0-9_-]{11}$/.test(id)||!streams.length)return;
- const existing=streams.findIndex(s=>s.videoId===id);
- if(existing>=0){setPrimary(existing);return}
- const index=primaryIndex;
- streams[index]={videoId:id,label:catalogName(row),channelId:String(row?.channel_id||'')};
- const player=players[index];
- if(player?.loadVideoById)player.loadVideoById(id);
- const label=playerCards[index]?.querySelector('.player-label');
- if(label)label.textContent=streams[index].label;
+ if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
+ if(!streams.length){
+  streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||'')});
+  primaryIndex=0;
+  audioMaster=0;
+  renderShell();
+  if(window.YT?.Player)mountPlayerAt(0,true);
+ }else{
+  const stream=streams[0];
+  stream.videoId=id;
+  stream.label=catalogName(row);
+  stream.channelId=String(row?.channel_id||'');
+  primaryIndex=0;
+  audioMaster=0;
+  const label=playerCards[0]?.querySelector('.player-label');
+  if(label)label.textContent=stream.label;
+  const player=players[0];
+  if(player?.loadVideoById)player.loadVideoById(id);
+  else if(window.YT?.Player)mountPlayerAt(0,true);
+  setAudioMaster(0);
+ }
  renderControls();
  applyLayout();
  renderLiveRail(catalogRows);
  resolvePrimaryPtt();
 }
+function appendMultiStream(row){
+ const id=String(row?.video_id||'');
+ if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
+ const existing=streams.findIndex(stream=>stream.videoId===id);
+ if(existing>=0){setPrimary(existing);return}
+ if(streams.length>=3)return;
+ const index=streams.length;
+ streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||'')});
+ const card=createPlayerCard(index);
+ stage.append(card);
+ players[index]=null;
+ renderControls();
+ applyLayout();
+ let shouldPlay=false;
+ try{shouldPlay=players[primaryIndex]?.getPlayerState()===YT.PlayerState.PLAYING}catch{}
+ if(window.YT?.Player)mountPlayerAt(index,Boolean(syncPlayback.checked&&shouldPlay));
+ renderLiveRail(catalogRows);
+}
+function handleLiveRailClick(row){
+ if(watchMode==='multi')appendMultiStream(row);
+ else replaceSingleStream(row);
+}
 function supportStyle(button,row){
  const accent=accentFor(row);
  button.style.setProperty('--member-accent',accent);
  const dual=Array.isArray(row?.member_accent_dual)?row.member_accent_dual:[];
- if(String(row?.support_mode||'')==='dual_color'&&dual.length===2&&dual.every(x=>/^#[0-9a-fA-F]{6}$/.test(String(x)))){
+ if(String(row?.support_mode||'')==='dual_color'&&dual.length===2&&dual.every(value=>/^#[0-9a-fA-F]{6}$/.test(String(value)))){
   button.dataset.supportMode='dual_color';
   button.style.setProperty('--member-accent-dual','linear-gradient(135deg,'+dual[0]+' 0 50%,'+dual[1]+' 50% 100%)');
  }
@@ -223,16 +286,25 @@ function renderLiveRail(rows){
  liveList.replaceChildren();
  live.forEach(row=>{
   const button=node('button',undefined,'viewer-live-item');
-  button.type='button';button.dataset.videoId=String(row.video_id);
-  button.title=catalogName(row);supportStyle(button,row);
-  button.classList.toggle('is-active',streams.some(s=>s.videoId===row.video_id));
+  button.type='button';
+  button.dataset.videoId=String(row.video_id);
+  button.title=catalogName(row);
+  supportStyle(button,row);
+  button.classList.toggle('is-active',streams.some(stream=>stream.videoId===row.video_id));
   const avatar=node('span',undefined,'viewer-live-avatar');
   const url=safeAvatar(row.avatar_url);
-  if(url){const img=document.createElement('img');img.src=url;img.alt='';img.loading='lazy';avatar.append(img)}
-  else avatar.append(node('span',[...catalogName(row)][0]||'H'));
+  if(url){
+   const img=document.createElement('img');
+   img.src=url;
+   img.alt='';
+   img.loading='lazy';
+   avatar.append(img);
+  }else{
+   avatar.append(node('span',[...catalogName(row)][0]||'H'));
+  }
   avatar.append(node('i'));
   button.append(avatar,node('strong',catalogName(row)));
-  button.addEventListener('click',()=>replacePrimaryStream(row));
+  button.addEventListener('click',()=>handleLiveRailClick(row));
   liveList.append(button);
  });
  liveRail.hidden=!liveList.childElementCount;
@@ -258,9 +330,17 @@ async function loadCatalog(){
   liveRail.hidden=true;
  }
 }
+
 function taipeiDay(){
  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
- const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ const out=Object.fromEntries(parts.filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
+ return out.year+'-'+out.month+'-'+out.day;
+}
+function taipeiDayForDate(value){
+ const date=value instanceof Date?value:new Date(value);
+ if(!Number.isFinite(date.getTime()))return '';
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+ const out=Object.fromEntries(parts.filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
  return out.year+'-'+out.month+'-'+out.day;
 }
 function pttKey(row){return String(row?.push_id||row?.aid+':'+row?.source_line)}
@@ -273,24 +353,14 @@ function pttRow(row){
  let clock='';
  if(Number.isFinite(when.getTime()))clock=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(when);
  const time=node('span',clock,'ptt-time');
- const floorNumber=Number(row?.floor);
- const floor=node('span',Number.isFinite(floorNumber)&&floorNumber>0?Math.trunc(floorNumber)+'樓':'','ptt-floor');
  const body=node('span',undefined,'ptt-body');
  body.append(node('span',String(row?.author||'unknown')+':','ptt-author'),node('span',String(row?.content||''),'ptt-content'));
- el.append(kindEl,time,floor,body);
- el.classList.toggle('hide-floor',!pttShowFloor.checked);
+ el.append(kindEl,time,body);
  if(row?.source_url)el.addEventListener('dblclick',()=>window.open(String(row.source_url),'_blank','noopener,noreferrer'));
  return el;
 }
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
 function pttToLatest(){pttFeed.scrollTop=pttFeed.scrollHeight;pttNewest.hidden=true;pttFollowing=true}
-function taipeiDayForDate(value){
- const date=value instanceof Date?value:new Date(value);
- if(!Number.isFinite(date.getTime()))return '';
- const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
- const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
- return out.year+'-'+out.month+'-'+out.day;
-}
 function resetPttFeed(){
  pttLoaded=false;
  pttFollowing=true;
@@ -318,13 +388,16 @@ async function loadLivePtt(){
    pttLoaded=true;
   }else{
    const seen=new Set([...pttFeed.children].map(el=>el.dataset.pushId));
-   rows.forEach(row=>{const key=pttKey(row);if(!seen.has(key)){pttFeed.append(pttRow(row));seen.add(key)}});
+   rows.forEach(row=>{
+    const key=pttKey(row);
+    if(!seen.has(key)){pttFeed.append(pttRow(row));seen.add(key)}
+   });
    while(pttFeed.children.length>300)pttFeed.firstElementChild?.remove();
   }
   const freshness=String(data.freshness?.status||'unknown');
   pttMeta.textContent=day.replaceAll('-','/')+' · '+pttFeed.children.length+' 則 · '+(freshness==='fresh'?'即時':freshness==='stale'?'資料稍舊':'狀態未知');
   if(beforeAtBottom)requestAnimationFrame(pttToLatest);
- }catch(_e){
+ }catch{
   pttMeta.textContent=day.replaceAll('-','/')+' · 讀取失敗';
   if(!pttLoaded)pttFeed.replaceChildren(node('div','PTT 暫時無法讀取，稍後會自動重試。','ptt-empty'));
  }
@@ -362,7 +435,7 @@ async function loadArchivePtt(context,token){
   pttFeed.scrollTop=0;
   pttMeta.textContent=context.day.replaceAll('-','/')+' · '+rows.length+' 則 · VOD';
   if(!rows.length)pttFeed.replaceChildren(node('div','這段 VOD 時間範圍內沒有找到 PTT 推文。','ptt-empty'));
- }catch(_e){
+ }catch{
   if(token!==pttResolveToken)return;
   pttMeta.textContent=(context.day||'')+' · 讀取失敗';
   pttFeed.replaceChildren(node('div','歷史 PTT 暫時無法讀取。','ptt-empty'));
@@ -405,7 +478,7 @@ async function resolvePrimaryPtt(){
    return;
   }
   throw new Error('無法由 catalog 判定');
- }catch(_e){
+ }catch{
   if(token!==pttResolveToken)return;
   if(requestedPttMode==='live'){
    pttContext={mode:'live',videoId:id,start:'',end:'',day:taipeiDay()};
@@ -423,45 +496,47 @@ async function loadPtt(){
 }
 
 function startCarousel(){
- clearInterval(carouselTimer);carouselTimer=null;
- if(!carousel.checked||streams.length<2)return;
+ clearInterval(carouselTimer);
+ carouselTimer=null;
+ if(!carousel.checked||watchMode!=='multi'||streams.length<2)return;
  const ms=Math.max(5,Math.min(30,Number(carouselInterval.value)||10))*1000;
  carouselTimer=setInterval(()=>setPrimary((primaryIndex+1)%streams.length),ms);
 }
 function readSettings(){
  try{
   const font=Math.max(12,Math.min(26,Number(localStorage.getItem('holoviewer-viewer-ptt-font'))||14));
-  pttFontSize.value=String(font);pttFontValue.textContent=font+'px';
+  pttFontSize.value=String(font);
+  pttFontValue.textContent=font+'px';
   document.documentElement.style.setProperty('--ptt-font-size',font+'px');
-  pttShowFloor.checked=localStorage.getItem('holoviewer-viewer-ptt-show-floor')!=='false';
  }catch{}
-}
-function applyFloor(){
- pttFeed.querySelectorAll('.ptt-row').forEach(row=>row.classList.toggle('hide-floor',!pttShowFloor.checked));
- try{localStorage.setItem('holoviewer-viewer-ptt-show-floor',String(pttShowFloor.checked))}catch{}
 }
 
 settingsButton.addEventListener('click',()=>{
  const open=document.body.classList.toggle('settings-open');
- controls.hidden=!open;settingsButton.setAttribute('aria-expanded',String(open));
+ controls.hidden=!open;
+ settingsButton.setAttribute('aria-expanded',String(open));
 });
+multiModeSwitch.addEventListener('change',()=>switchWatchMode(multiModeSwitch.checked?'multi':'single'));
 document.querySelectorAll('[data-layout]').forEach(button=>button.addEventListener('click',()=>{
- layout=button.dataset.layout;applyLayout();
+ layout=button.dataset.layout;
+ applyLayout();
 }));
-audioSelect.addEventListener('change',()=>setAudioMaster(Number(audioSelect.value)));
-audioFollow.addEventListener('change',()=>{if(audioFollow.checked)setAudioMaster(primaryIndex)});
 playAll.addEventListener('click',()=>players.forEach(player=>{try{player?.playVideo()}catch{}}));
 pauseAll.addEventListener('click',()=>players.forEach(player=>{try{player?.pauseVideo()}catch{}}));
 carousel.addEventListener('change',startCarousel);
-carouselInterval.addEventListener('input',()=>{carouselOutput.textContent=carouselInterval.value+'s';startCarousel()});
+carouselInterval.addEventListener('input',()=>{
+ carouselOutput.textContent=carouselInterval.value+'s';
+ startCarousel();
+});
 pttFontSize.addEventListener('input',()=>{
  const size=Math.max(12,Math.min(26,Number(pttFontSize.value)||14));
- pttFontValue.textContent=size+'px';document.documentElement.style.setProperty('--ptt-font-size',size+'px');
+ pttFontValue.textContent=size+'px';
+ document.documentElement.style.setProperty('--ptt-font-size',size+'px');
  try{localStorage.setItem('holoviewer-viewer-ptt-font',String(size))}catch{}
 });
-pttShowFloor.addEventListener('change',applyFloor);
 pttFeed.addEventListener('scroll',()=>{
- pttFollowing=pttAtBottom();pttNewest.hidden=pttFollowing;
+ pttFollowing=pttAtBottom();
+ pttNewest.hidden=pttFollowing;
 },{passive:true});
 pttFeed.addEventListener('wheel',event=>{if(event.deltaY<0)pttFollowing=false},{passive:true});
 pttNewest.addEventListener('click',pttToLatest);
