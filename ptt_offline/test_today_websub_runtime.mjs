@@ -187,11 +187,26 @@ test('deleted-entry notices are acked safely and signal bounded reconciliation',
  const eventHash=Array.from(new Uint8Array(sha),b=>b.toString(16).padStart(2,'0')).join('');
  db.raw.prepare("INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,NULL,?,? ,'pending',0)")
   .run(eventHash,channels[0].id,version,stamp(at));
- const worker=mountTodayWebSubOnWorker(baseWorker(),{fetchImpl:async()=>{throw Error('no videos.list request expected')}});
+ let atomCalls=0,videoCalls=0;
+ const worker=mountTodayWebSubOnWorker(baseWorker(),{fetchImpl:async url=>{
+  const u=String(url);
+  if(u.includes('youtube.com/feeds/videos.xml')){
+   atomCalls++;
+   return new Response(atom(channels[0].id),{status:200,headers:{'content-type':'application/atom+xml'}});
+  }
+  if(u.includes('googleapis.com/youtube/v3/videos')){videoCalls++;throw Error('videos.list not expected in deleted-notice recovery cycle');}
+  throw Error('unexpected recovery request '+u);
+ }});
  const out=await worker.scheduled({scheduledTime:Date.parse('2026-10-17T00:05:00Z')},env(db,{TODAY_WEBSUB_PROCESS_ENABLED:'true'}),{});
  assert.equal(out.websub.processing.deleted_notices,1);
  assert.equal(out.websub.processing.reconcile_required,true);
+ assert.deepEqual(out.websub.processing.reconcile_channels,[channels[0].id]);
+ assert.equal(out.websub.recovery.status,'bounded_atom_reconcile');
+ assert.equal(out.websub.recovery.channels,1);
+ assert.equal(atomCalls,1);
+ assert.equal(videoCalls,0);
  assert.equal(db.raw.prepare('SELECT status FROM public_today_websub_events WHERE event_hash=?').get(eventHash).status,'processed');
+ assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_websub_events WHERE status='pending'").get().n,1);
  db.raw.close();
 });
 
