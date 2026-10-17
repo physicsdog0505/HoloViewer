@@ -39,10 +39,9 @@ body:has(.viewer-live-rail:hover) .viewer-shell,body:has(.viewer-live-rail:focus
  margin-left:calc(var(--rail-collapsed) + 222px)
 }
 .viewer-topbar{
- height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 16px;
+ height:58px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px;
  background:rgba(247,245,242,.96);border-bottom:1px solid var(--line);color:var(--text)
 }
-.viewer-topbar strong{font-size:14px}
 .viewer-watch-actions{display:flex;align-items:center;gap:6px}
 .viewer-watch-actions button,.viewer-controls button{
  min-height:34px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);cursor:pointer
