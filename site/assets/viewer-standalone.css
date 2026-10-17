@@ -39,7 +39,7 @@ body:has(.viewer-live-rail:hover) .viewer-shell,body:has(.viewer-live-rail:focus
  margin-left:calc(var(--rail-collapsed) + 222px)
 }
 .viewer-topbar{
- height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;
+ min-height:58px;display:flex;align-items:center;gap:10px;padding:6px 12px;
  background:rgba(247,245,242,.96);border-bottom:1px solid var(--line);color:var(--text)
 }
 .viewer-mode-switch{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--muted)}
@@ -50,26 +50,26 @@ body:has(.viewer-live-rail:hover) .viewer-shell,body:has(.viewer-live-rail:focus
 .mode-switch input:checked + .mode-switch-track{background:#242321}
 .mode-switch input:checked + .mode-switch-track::after{transform:translateX(18px)}
 .mode-switch input:focus-visible + .mode-switch-track{outline:2px solid #6faec9;outline-offset:2px}
-.viewer-watch-actions{display:flex;align-items:center;gap:6px}
+.viewer-watch-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
 .viewer-watch-actions button,.viewer-controls button{
  min-height:34px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);cursor:pointer
 }
 .viewer-watch-actions button:hover,.viewer-controls button:hover,.viewer-controls button.active{background:var(--surface-2)}
 
 .viewer-controls{
- display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);
- border-bottom:1px solid var(--line);color:var(--text);font-size:12px
+ display:flex;flex:1 1 auto;min-width:0;flex-wrap:wrap;align-items:center;gap:8px;padding:0;
+ background:transparent;color:var(--text);font-size:12px
 }
 .viewer-controls[hidden]{display:none}
 .control-group,.control-check{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .choice-row{display:flex;gap:6px}
 .choice-row button{min-width:32px;padding:0 8px}
 .focus-avatar-button{
- position:relative;width:34px;height:34px;min-width:34px!important;padding:2px!important;border-radius:50%!important;
+ position:relative;width:40px;height:40px;min-width:40px!important;padding:2px!important;border-radius:50%!important;
  display:grid;place-items:center;overflow:visible
 }
 .focus-avatar-button img,.focus-avatar-fallback{
- width:28px;height:28px;border-radius:50%;display:grid;place-items:center;object-fit:cover;
+ width:34px;height:34px;border-radius:50%;display:grid;place-items:center;object-fit:cover;
  background:#fff;border:1px solid var(--line);font-size:11px;font-weight:800
 }
 .focus-avatar-button.active{
@@ -83,7 +83,7 @@ body:has(.viewer-live-rail:hover) .viewer-shell,body:has(.viewer-live-rail:focus
 .viewer-controls input[type="range"]{width:92px}
 
 .viewer-main{height:calc(100vh - 58px);padding:6px;background:#080a0d}
-body.settings-open .viewer-main{height:calc(100vh - 109px)}
+body.settings-open .viewer-main{height:calc(100vh - 58px)}
 .viewer-workspace{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 312px;gap:6px;width:100%;height:100%}
 .viewer-workspace.video-only{grid-template-columns:1fr}
 .viewer-stage{display:grid;gap:6px;width:100%;height:100%;min-width:0;min-height:0}
@@ -179,6 +179,9 @@ body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .p
 
 @media(max-width:900px){
  body{overflow:auto}
+ .viewer-topbar{flex-wrap:wrap}
+ .viewer-controls{order:3;flex-basis:100%}
+ .viewer-watch-actions{margin-left:auto}
  .viewer-live-rail{display:none}
  .viewer-shell{margin-left:var(--rail-collapsed)}
  .viewer-main,body.settings-open .viewer-main{height:auto;min-height:calc(100vh - 58px)}
@@ -224,3 +227,8 @@ body.mode-single .viewer-controls{display:none!important}
 .viewer-drag-drop-overlay[hidden]{display:none!important}
 
 body.immersive .viewer-stage{align-content:start}
+
+.transport-button{
+ width:34px;min-width:34px!important;padding:0!important;
+ font-size:16px;font-weight:800;line-height:1
+}
