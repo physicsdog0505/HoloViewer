@@ -23,7 +23,7 @@ export function parseAtomEnvelope(xml){
  // raw and require a separate parser/reconciliation before publishing lifecycle.
  return {channel_id:channel,video_id:video??null};
 }
-export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrigin,confirmChallenge}={}){
+export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrigin,confirmChallenge,authorizeDelivery}={}){
  const url=new URL(request.url);
  if(url.pathname!=='/internal/today/websub')return json({error:'not_found'},404);
  if(!secret||!roster||typeof saveEvent!=='function')return json({error:'receiver_disabled'},503);
@@ -53,6 +53,9 @@ export async function handleWebSub(request,{roster,secret,saveEvent,callbackOrig
  let event;
  try{event=parseAtomEnvelope(dec.decode(raw))}catch{return json({error:'invalid_atom'},400)}
  if(!approved(roster,event.channel_id))return json({error:'channel_not_approved'},403);
+ if(authorizeDelivery){
+  try{await authorizeDelivery(event.channel_id,roster.version)}catch{return json({error:'subscription_not_active'},403)}
+ }
  try{
   await saveEvent({roster_version:roster.version,channel_id:event.channel_id,video_id:event.video_id,
    raw_xml:dec.decode(raw),raw_sha256:hex(await crypto.subtle.digest('SHA-256',raw))});
