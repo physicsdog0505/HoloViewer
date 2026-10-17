@@ -124,6 +124,30 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(result["burst_batches"],0)
         self.assertEqual(publisher.call_count,1)
 
+    def test_dry_run_aggregates_fence_preview_counts(self):
+        source="9"*64
+        responses=[
+            {"status":"READ_ONLY","eligible":12,"fresh_eligible":3,
+             "legacy_baseline_candidates":7,"retained_recovery_candidates":5,"sent":0},
+            {"status":"READ_ONLY","eligible":8,"fresh_eligible":2,
+             "legacy_baseline_candidates":6,"retained_recovery_candidates":2,"sent":0},
+        ]
+        def plan(_,article_id=None):
+            return {"status":"READY","source_identity":str(article_id)*64}
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1,2]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",side_effect=plan), \
+             patch("ptt_offline.recurring_publisher.run_live_once",side_effect=responses):
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=False,batch_cap=10,max_batches=1,
+                                burst_max_batches=3,max_articles=4)
+        self.assertEqual(result["eligible"],20)
+        self.assertEqual(result["fresh_eligible"],5)
+        self.assertEqual(result["legacy_baseline_candidates"],13)
+        self.assertEqual(result["retained_recovery_candidates"],7)
+        self.assertEqual(result["sent"],0)
+        self.assertEqual(result["http_posts"],0)
+
     def test_fresh_state_baseline_is_zero_remote_posts(self):
         source="d"*64
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
