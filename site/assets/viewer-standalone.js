@@ -2,7 +2,9 @@
 
 const API_BASE=String(window.HOLOVIEWER_CONFIG?.apiBase||'').replace(/\/$/,'');
 const params=new URLSearchParams(location.search);
-const streams=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))].slice(0,4).map(id=>({videoId:id,label:id,channelId:''}));
+const MAX_STREAMS=16;
+const FOCUS_VISIBLE_SLOTS=4;
+const streams=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))].slice(0,MAX_STREAMS).map(id=>({videoId:id,label:id,channelId:''}));
 let layout=['equal','primary'].includes(params.get('layout'))?params.get('layout'):'equal';
 let workspaceLayout=['sidebar','focus'].includes(params.get('workspace'))?params.get('workspace'):'sidebar';
 let primaryIndex=Math.max(0,Math.min(Math.max(0,streams.length-1),Number(params.get('primary'))||0));
@@ -42,6 +44,7 @@ let catalogRows=[];
 const syncExpected=new WeakMap();
 let carouselTimer=null;
 let lockedIndex=null;
+let secondaryOffset=0;
 let pttFollowing=true;
 let pttLoaded=false;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
@@ -98,8 +101,8 @@ function setLayoutPreset(preset){
  else if(preset==='focus'){layout='primary';workspaceLayout='focus'}
  else{layout='primary';workspaceLayout='sidebar'}
  carousel.checked=preset!=='equal';
- if(preset==='focus')lockedIndex=primaryIndex;
- else lockedIndex=null;
+ lockedIndex=preset==='focus'?primaryIndex:null;
+ secondaryOffset=0;
  renderControls();
  applyLayout();
  startCarousel();
@@ -207,24 +210,34 @@ function refreshControlState(){
   button.classList.toggle('active',locked);
   button.setAttribute('aria-pressed',String(locked));
  });
+ const preset=currentLayoutPreset();
  playerCards.forEach((card,index)=>{
   if(!card)return;
-  card.classList.toggle('primary',index===primaryIndex);
-  card.classList.remove('secondary-1','secondary-2','secondary-3');
+  card.classList.remove('primary','secondary-1','secondary-2','secondary-3','viewer-hidden');
+  if(preset!=='equal')card.classList.toggle('primary',index===primaryIndex);
  });
- const secondary=playerCards.filter((card,index)=>card&&index!==primaryIndex);
- secondary[0]?.classList.add('secondary-1');
- secondary[1]?.classList.add('secondary-2');
- secondary[2]?.classList.add('secondary-3');
+ if(preset!=='equal'){
+  const secondaryIndexes=playerCards.map((card,index)=>card&&index!==primaryIndex?index:-1).filter(index=>index>=0);
+  const visibleCount=Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryIndexes.length);
+  const offset=secondaryIndexes.length?secondaryOffset%secondaryIndexes.length:0;
+  const visible=new Set(Array.from({length:visibleCount},(_,slot)=>secondaryIndexes[(offset+slot)%secondaryIndexes.length]));
+  secondaryIndexes.forEach(index=>playerCards[index]?.classList.toggle('viewer-hidden',!visible.has(index)));
+  [...visible].forEach((index,slot)=>playerCards[index]?.classList.add('secondary-'+(slot+1)));
+ }
 }
 function applyLayout(){
  const effective=watchMode==='multi'&&streams.length>1?layout:'equal';
  stage.className='viewer-stage layout-'+effective+' count-'+streams.length;
  workspace.className='viewer-workspace workspace-'+workspaceLayout+' layout-'+effective+' count-'+streams.length;
- const cols=streams.length<=1?1:2;
- const rows=Math.max(1,Math.ceil(streams.length/cols));
+ const count=streams.length;
+ const cols=count<=1?1:count<=4?2:count<=9?3:4;
+ const rows=Math.max(1,Math.ceil(count/cols));
+ const focusSecondaryCount=Math.min(FOCUS_VISIBLE_SLOTS-1,Math.max(0,count-1));
  stage.style.setProperty('--viewer-cols',String(cols));
  stage.style.setProperty('--viewer-rows',String(rows));
+ stage.style.setProperty('--focus-rows',String(Math.max(1,focusSecondaryCount)));
+ workspace.style.setProperty('--focus-secondary-count',String(Math.max(1,focusSecondaryCount)));
+ workspace.style.setProperty('--ptt-grid-row',String(focusSecondaryCount+1));
  // Layout changes are CSS-only. Never re-append live iframe cards: moving
  // YouTube iframe DOM nodes can interrupt active playback.
  refreshControlState();
@@ -242,6 +255,7 @@ function setAudioMaster(index){
 function setPrimary(index){
  if(index<0||index>=streams.length)return;
  primaryIndex=index;
+ secondaryOffset=0;
  if(currentLayoutPreset()==='focus')lockedIndex=index;
  setAudioMaster(index);
  applyLayout();
@@ -302,6 +316,7 @@ function switchWatchMode(nextMode){
  carouselTimer=null;
  carousel.checked=false;
  lockedIndex=null;
+ secondaryOffset=0;
  if(watchMode==='single'&&streams.length>1){
   const selected={...(streams[primaryIndex]||streams[0])};
   destroyPlayers();
@@ -372,7 +387,7 @@ function appendMultiStream(row){
  if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
  const existing=streams.findIndex(stream=>stream.videoId===id);
  if(existing>=0){setPrimary(existing);return}
- if(streams.length>=4)return;
+ if(streams.length>=MAX_STREAMS)return;
  const index=streams.length;
  streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||''),avatarUrl:safeAvatar(row?.avatar_url)});
  const card=createPlayerCard(index);
@@ -402,6 +417,8 @@ function removeMultiStream(index){
  if(index<primaryIndex)primaryIndex-=1;
  else if(removedWasPrimary)primaryIndex=Math.min(index,streams.length-1);
  audioMaster=primaryIndex;
+ if(currentLayoutPreset()==='focus')lockedIndex=primaryIndex;
+ secondaryOffset=0;
 
  playerCards.forEach((card,i)=>{if(card)card.dataset.index=String(i)});
  renderControls();
@@ -704,7 +721,16 @@ function startCarousel(){
  carouselTimer=null;
  if(currentLayoutPreset()==='equal'||watchMode!=='multi'||streams.length<2)return;
  const ms=Math.max(30,Math.min(60,Number(carouselInterval.value)||30))*1000;
- if(currentLayoutPreset()==='primary')carouselTimer=setInterval(()=>setPrimary((primaryIndex+1)%streams.length),ms);
+ if(currentLayoutPreset()==='primary'){
+  carouselTimer=setInterval(()=>setPrimary((primaryIndex+1)%streams.length),ms);
+ }else{
+  carouselTimer=setInterval(()=>{
+   const secondaryCount=Math.max(0,streams.length-1);
+   if(!secondaryCount)return;
+   secondaryOffset=(secondaryOffset+Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryCount))%secondaryCount;
+   refreshControlState();
+  },ms);
+ }
 }
 function readSettings(){
  try{
@@ -788,8 +814,11 @@ document.addEventListener('fullscreenchange',()=>{
 });
 
 readSettings();
+carousel.checked=currentLayoutPreset()!=='equal';
+if(currentLayoutPreset()==='focus')lockedIndex=primaryIndex;
 renderShell();
 applyModeClass();
+startCarousel();
 
 let viewerReadyForPlayers=false;
 function tryMountPlayers(){
