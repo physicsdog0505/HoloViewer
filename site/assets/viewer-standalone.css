@@ -140,14 +140,20 @@ body.immersive .viewer-shell{margin-left:0!important}
 body.immersive .viewer-main{height:100vh!important;padding:0}
 body.immersive .viewer-workspace{gap:2px}
 body.immersive .player-card,body.immersive .viewer-ptt{border-radius:0;border:0}
-body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.primary{
+body.immersive .viewer-workspace.workspace-focus.layout-primary{
+ align-items:start;
+}
+body.immersive .viewer-workspace.workspace-focus.layout-primary.count-2{grid-template-rows:auto minmax(0,1fr)}
+body.immersive .viewer-workspace.workspace-focus.layout-primary.count-3{grid-template-rows:auto auto minmax(0,1fr)}
+body.immersive .viewer-workspace.workspace-focus.layout-primary.count-4{grid-template-rows:auto auto auto minmax(0,1fr)}
+body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card{
  align-self:start;
  aspect-ratio:16/9;
  height:auto;
  width:100%;
 }
-body.immersive .viewer-workspace.workspace-focus.layout-primary{
- align-items:start;
+body.immersive .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.primary{
+ grid-row:1 / -1;
 }
 
 @media(max-width:900px){
