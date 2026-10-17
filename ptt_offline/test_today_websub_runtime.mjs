@@ -6,6 +6,7 @@ import {mountTodayWebSubOnWorker,loadApprovedTodayRoster,shouldRunRenewal} from 
 import {recordSubscriptionRequest,confirmSubscriptionChallenge,readSubscriptionLeases} from './worker_host/today/websub-leases.mjs';
 import {topicForChannel} from './worker_host/today/websub-receiver.mjs';
 import {renewSubscriptions} from './worker_host/today/websub-renewal-send.mjs';
+import {writeEvidence} from './worker_host/today/store.mjs';
 
 const secret='local-fixture-secret-0123456789abcdef';
 const version='today-roster-v85';
@@ -208,5 +209,35 @@ test('transient videos.list failure retries under a token-fenced bounded lease',
  assert.equal(row.attempts,1);
  assert.equal(row.claim_token,null);
  assert.equal(row.claim_until,null);
+ db.raw.close();
+});
+
+
+test('unchanged pushed livestream snapshot acknowledges without another evidence/canonical write',async()=>{
+ const db=makeDb(),channel=channels[0].id;
+ const current={video_id:video,channel_id:channel,roster_version:version,group:'hololive',
+  title:'Same live stream',channel_name:'Test Channel',lifecycle_state:'live',
+  observed_at:'2026-10-17T00:00:00Z',scheduled_start:null,
+  actual_start:'2026-10-16T23:55:00Z',actual_end:null,source_label:'YouTube'};
+ await writeEvidence(db,current);
+ const beforeEvidence=db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n;
+ const body=atom(channel);
+ const sha=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body));
+ const eventHash=Array.from(new Uint8Array(sha),b=>b.toString(16).padStart(2,'0')).join('');
+ db.raw.prepare("INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,?,?,?,'pending',0)")
+  .run(eventHash,channel,video,version,stamp(at));
+ const worker=mountTodayWebSubOnWorker(baseWorker(),{fetchImpl:async url=>{
+  assert.ok(String(url).includes('googleapis.com/youtube/v3/videos'));
+  return new Response(JSON.stringify({items:[{id:video,
+   snippet:{channelId:channel,title:current.title,channelTitle:current.channel_name,liveBroadcastContent:'live'},
+   liveStreamingDetails:{actualStartTime:current.actual_start}}]}),{status:200});
+ }});
+ const out=await worker.scheduled({scheduledTime:Date.parse('2026-10-17T00:05:00Z')},
+  env(db,{TODAY_WEBSUB_PROCESS_ENABLED:'true'}),{});
+ assert.equal(out.websub.processing.unchanged,1);
+ assert.equal(out.websub.processing.updated,0);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,beforeEvidence);
+ assert.equal(db.raw.prepare('SELECT lifecycle_observed_at FROM public_today_canonical WHERE video_id=?').get(video).lifecycle_observed_at,current.observed_at);
+ assert.equal(db.raw.prepare('SELECT status FROM public_today_websub_events WHERE event_hash=?').get(eventHash).status,'processed');
  db.raw.close();
 });
