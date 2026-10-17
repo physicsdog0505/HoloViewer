@@ -69,7 +69,7 @@ body:has(.viewer-live-rail:hover) .viewer-shell,body:has(.viewer-live-rail:focus
 
 .viewer-main{height:calc(100vh - 58px);padding:6px;background:#080a0d}
 body.settings-open .viewer-main{height:calc(100vh - 109px)}
-.viewer-workspace{display:grid;grid-template-columns:minmax(0,1fr) 312px;gap:6px;width:100%;height:100%}
+.viewer-workspace{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 312px;gap:6px;width:100%;height:100%}
 .viewer-workspace.video-only{grid-template-columns:1fr}
 .viewer-stage{display:grid;gap:6px;width:100%;height:100%;min-width:0;min-height:0}
 .viewer-stage.layout-equal{grid-template-columns:repeat(var(--viewer-cols,1),minmax(0,1fr));grid-template-rows:repeat(var(--viewer-rows,1),minmax(0,1fr))}
@@ -84,6 +84,29 @@ body.settings-open .viewer-main{height:calc(100vh - 109px)}
 .viewer-stage.layout-primary .player-card.secondary-1{grid-column:2;grid-row:1}
 .viewer-stage.layout-primary .player-card.secondary-2{grid-column:2;grid-row:2}
 .viewer-stage.layout-primary .player-card.secondary-3{grid-column:2;grid-row:3}
+
+/* Overall workspace switch.
+   sidebar = current production layout with full-height PTT column.
+   focus   = old 4174-inspired stream-first layout. No iframe DOM movement. */
+.viewer-workspace.workspace-focus:not(.layout-primary){grid-template-columns:minmax(0,1fr) 260px}
+.viewer-workspace.workspace-focus.layout-primary{
+ grid-template-columns:minmax(0,2.55fr) minmax(280px,.95fr);
+ gap:6px;
+}
+.viewer-workspace.workspace-focus.layout-primary .viewer-stage{display:contents}
+.viewer-workspace.workspace-focus.layout-primary.count-2{grid-template-rows:minmax(0,44fr) minmax(0,56fr)}
+.viewer-workspace.workspace-focus.layout-primary.count-3{grid-template-rows:minmax(0,30fr) minmax(0,30fr) minmax(0,40fr)}
+.viewer-workspace.workspace-focus.layout-primary.count-4{grid-template-rows:minmax(0,22fr) minmax(0,22fr) minmax(0,22fr) minmax(0,34fr)}
+
+.viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.primary{grid-column:1;grid-row:1 / -1}
+.viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-1{grid-column:2;grid-row:1}
+.viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-2{grid-column:2;grid-row:2}
+.viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-3{grid-column:2;grid-row:3}
+.viewer-workspace.workspace-focus.layout-primary .viewer-ptt{grid-column:2;min-height:0}
+.viewer-workspace.workspace-focus.layout-primary.count-2 .viewer-ptt{grid-row:2}
+.viewer-workspace.workspace-focus.layout-primary.count-3 .viewer-ptt{grid-row:3}
+.viewer-workspace.workspace-focus.layout-primary.count-4 .viewer-ptt{grid-row:4}
+
 .player-card{
  position:relative;min-width:0;min-height:0;background:#000;border:1px solid #252a33;border-radius:10px;overflow:hidden
 }
