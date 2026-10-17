@@ -6,6 +6,7 @@ import {mountTodayWebSubOnWorker,loadApprovedTodayRoster,shouldRunRenewal} from 
 import {recordSubscriptionRequest,confirmSubscriptionChallenge,readSubscriptionLeases} from './worker_host/today/websub-leases.mjs';
 import {topicForChannel} from './worker_host/today/websub-receiver.mjs';
 import {renewSubscriptions} from './worker_host/today/websub-renewal-send.mjs';
+import {planSubscriptions} from './worker_host/today/websub-renewal.mjs';
 import {writeEvidence} from './worker_host/today/store.mjs';
 import {auditWebSubSchema} from './worker_host/today/websub-schema-preflight.mjs';
 
@@ -292,4 +293,14 @@ test('read-only schema preflight passes proposed fixture and fails closed when l
  assert.deepEqual(missing.tables.public_today_websub_leases.missing_columns,
   ['channel_id','roster_version','topic','requested_mode','state','requested_at','verified_at','expires_at','lease_seconds','last_error']);
  db.raw.close();
+});
+
+ 
+test('lease with old approved roster version is due even when its expiry is far away',()=>{
+ const a=channels[0].id;
+ const plan=planSubscriptions({version,channels:[{id:a}]},[
+  {channel_id:a,roster_version:'old-version',state:'active',expires_at:'2026-10-25T00:00:00Z'}
+ ],{now:at,limit:10});
+ assert.deepEqual(plan.due.map(x=>x.channel_id),[a]);
+ assert.equal(plan.due[0].roster_version,version);
 });
