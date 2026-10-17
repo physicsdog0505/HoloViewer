@@ -286,7 +286,15 @@ function recreateSinglePlayer(row,id){
       }
      }catch{}
     },350);
-    if(!committed){committed=true;commitSingleStream(row,id)}
+    let attempts=0;
+    const confirm=()=>{
+     if(currentPlayerVideoId(event.target)===id){
+      if(!committed){committed=true;commitSingleStream(row,id)}
+      return;
+     }
+     if(++attempts<20)setTimeout(confirm,100);
+    };
+    confirm();
    },
    onStateChange:event=>{
     if(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED)syncPlayers(event.data,0);
