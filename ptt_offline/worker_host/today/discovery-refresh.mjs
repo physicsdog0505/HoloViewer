@@ -105,6 +105,8 @@ function videoFetcher(env,fetchImpl){
 }
 
 export async function refreshTodayDiscovery(env,{fetchImpl=fetch,now=new Date()}={}){
+  if(env?.TODAY_WEBSUB_PRIMARY_ENABLED==='true'&&env?.TODAY_ATOM_FALLBACK_ENABLED!=='true')
+    return {status:'disabled_websub_primary',feed_requests:0,channels:0,discovered:0,updated:0};
   if(env?.TODAY_DISCOVERY_ENABLED!=='true')
     return {status:'disabled',feed_requests:0,channels:0,discovered:0,updated:0};
   if(!env?.DB?.prepare||!env?.YOUTUBE_API_KEY)throw Error('Today discovery configuration missing');
