@@ -116,6 +116,7 @@ function renderShell(){
   return;
  }
  streams.forEach((_,index)=>stage.append(createPlayerCard(index)));
+ ensureDragDropOverlay();
  renderControls();
  applyLayout();
 }
@@ -346,6 +347,43 @@ function addDraggedLive(row){
  if(watchMode==='single')switchWatchMode('multi');
  appendMultiStream(row);
 }
+
+function ensureDragDropOverlay(){
+ let overlay=document.getElementById('viewerDragDropOverlay');
+ if(overlay)return overlay;
+ overlay=node('div','放開以加入多人觀看','viewer-drag-drop-overlay');
+ overlay.id='viewerDragDropOverlay';
+ overlay.hidden=true;
+ overlay.addEventListener('dragover',event=>{
+  if(!/^[A-Za-z0-9_-]{11}$/.test(draggedLiveId))return;
+  event.preventDefault();
+  if(event.dataTransfer)event.dataTransfer.dropEffect='copy';
+  overlay.classList.add('is-active');
+ });
+ overlay.addEventListener('dragleave',()=>overlay.classList.remove('is-active'));
+ overlay.addEventListener('drop',event=>{
+  event.preventDefault();
+  const id=String(event.dataTransfer?.getData('text/plain')||draggedLiveId||'');
+  draggedLiveId='';
+  overlay.classList.remove('is-active');
+  overlay.hidden=true;
+  const row=catalogRows.find(item=>String(item?.video_id||'')===id);
+  if(row)addDraggedLive(row);
+ });
+ stage.append(overlay);
+ return overlay;
+}
+function showDragDropOverlay(){
+ const overlay=ensureDragDropOverlay();
+ overlay.hidden=false;
+ overlay.classList.add('is-active');
+}
+function hideDragDropOverlay(){
+ const overlay=document.getElementById('viewerDragDropOverlay');
+ if(!overlay)return;
+ overlay.classList.remove('is-active');
+ overlay.hidden=true;
+}
 function handleLiveRailClick(row){
  if(watchMode==='multi')appendMultiStream(row);
  else replaceSingleStream(row);
@@ -394,11 +432,12 @@ function renderLiveRail(rows){
    event.dataTransfer?.setData('text/plain',draggedLiveId);
    if(event.dataTransfer)event.dataTransfer.effectAllowed='copy';
    button.classList.add('is-dragging');
+   showDragDropOverlay();
   });
   button.addEventListener('dragend',()=>{
    draggedLiveId='';
    button.classList.remove('is-dragging');
-   stage.classList.remove('drag-target');
+   hideDragDropOverlay();
   });
   liveList.append(button);
  });
@@ -605,20 +644,13 @@ function readSettings(){
  }catch{}
 }
 
-stage.addEventListener('dragover',event=>{
+stage.addEventListener('drop',event=>{
+ // Fallback for drops that land outside the overlay.
  if(!/^[A-Za-z0-9_-]{11}$/.test(draggedLiveId))return;
  event.preventDefault();
- if(event.dataTransfer)event.dataTransfer.dropEffect='copy';
- stage.classList.add('drag-target');
-});
-stage.addEventListener('dragleave',event=>{
- if(!stage.contains(event.relatedTarget))stage.classList.remove('drag-target');
-});
-stage.addEventListener('drop',event=>{
- event.preventDefault();
- stage.classList.remove('drag-target');
  const id=String(event.dataTransfer?.getData('text/plain')||draggedLiveId||'');
  draggedLiveId='';
+ hideDragDropOverlay();
  const row=catalogRows.find(item=>String(item?.video_id||'')===id);
  if(row)addDraggedLive(row);
 });
