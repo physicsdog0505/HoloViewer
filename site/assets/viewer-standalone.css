@@ -127,3 +127,14 @@ body.immersive .player-card,body.immersive .viewer-ptt{border-radius:0;border:0}
 
 body.mode-single #viewerSettings{display:none}
 body.mode-single .viewer-controls{display:none!important}
+
+.viewer-live-item[draggable="true"]{user-select:none}
+.viewer-live-item.is-dragging{opacity:.45}
+.viewer-stage.drag-target{outline:2px dashed rgba(111,174,201,.9);outline-offset:-4px;border-radius:10px}
+.player-remove{
+ position:absolute;right:8px;top:8px;z-index:5;width:26px;height:26px;padding:0;border:1px solid rgba(255,255,255,.28);
+ border-radius:50%;background:rgba(0,0,0,.62);color:#fff;font-size:18px;line-height:22px;cursor:pointer
+}
+.player-remove:hover,.player-remove:focus-visible{background:rgba(0,0,0,.82);outline:2px solid rgba(255,255,255,.55);outline-offset:1px}
+.player-remove[hidden]{display:none!important}
+.mode-multi .player-label{max-width:calc(100% - 52px)}
