@@ -110,6 +110,11 @@ class StaticAssetsPilotTests(unittest.TestCase):
                     self.assertEqual(response.headers["Access-Control-Allow-Origin"],"*")
                     payload=json.loads(gzip.decompress(response.read()))
                 self.assertGreater(len(payload["pushes"]),0)
+                with urlopen(
+                    f"http://127.0.0.1:{server.server_port}/ptt/v1/manifests/2026-10-pilot.json"
+                ) as response:
+                    self.assertEqual(response.headers["Cache-Control"],"no-cache")
+                    self.assertEqual(response.headers["Access-Control-Allow-Origin"],"*")
             finally:
                 server.shutdown()
                 thread.join()
@@ -139,6 +144,41 @@ class StaticAssetsPilotTests(unittest.TestCase):
                 anchor_source="youtube-liveStreamingDetails-actualStartTime")
             self.assertEqual(result["coverage_status"],"PARTIAL")
             self.assertFalse(result["strict_complete"])
+
+    def test_complete_cross_date_window_tolerates_manifest_absent_empty_hour(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            rows=[
+                {"occurred_at":"2026-10-01T23:59:00Z","aid":"A","source_line":10,
+                 "source_page":1,"kind":"push","author":"u","content":"before",
+                 "source_url":"https://example.invalid","source_path":"fixture",
+                 "source_record_key":"A:10","coverage_day":"2026-10-02",
+                 "time_quality":"source-minute","floor":1,
+                 "floor_quality":"per-thread-ordinal"},
+                {"occurred_at":"2026-10-02T02:01:00Z","aid":"A","source_line":30,
+                 "source_page":1,"kind":"push","author":"u","content":"after",
+                 "source_url":"https://example.invalid","source_path":"fixture",
+                 "source_record_key":"A:30","coverage_day":"2026-10-02",
+                 "time_quality":"source-minute","floor":2,
+                 "floor_quality":"per-thread-ordinal"},
+            ]
+            days=[{"day":"2026-10-02","coverage_status":"COMPLETE",
+                   "finalized":True,"reason":"fixture"}]
+            write_archive_rows(rows,from_day="2026-10-02",through_day="2026-10-02",
+                out_dir=root,days=days,manifest_name="2026-10-pilot.json",
+                generated_at="2026-10-03T00:00:00Z")
+            result=resolve_vod(archive_root=root,
+                manifest_path=root/"ptt/v1/manifests/2026-10-pilot.json",
+                actual_start="2026-10-01T23:58:00Z",actual_end="2026-10-02T02:02:00Z",
+                anchor_source="youtube-liveStreamingDetails-actualStartTime")
+            self.assertTrue(result["strict_complete"])
+            self.assertEqual(result["push_count"],2)
+            self.assertEqual(len(result["object_keys"]),2)
+            self.assertEqual(result["absent_hour_objects"],[
+                "ptt/v1/chunks/2026/10/02/0000.json.gz",
+                "ptt/v1/chunks/2026/10/02/0100.json.gz",
+            ])
+            self.assertEqual(result["duplicate_source_record_keys"],[])
 
     def test_resolver_rejects_untrusted_anchor(self):
         with tempfile.TemporaryDirectory() as td:
@@ -188,6 +228,13 @@ class StaticAssetsPilotTests(unittest.TestCase):
             self.assertEqual(audit["floor_unknown_rows"],0)
             self.assertTrue(audit["identity_set_preserved"])
             self.assertEqual(audit["duplicate_aid_floors"],0)
+
+    def test_browser_harness_verifies_decoded_sha256(self):
+        harness=(Path(__file__).with_name("static_assets_pilot")/
+                 "public/browser-check.html").read_text(encoding="utf-8")
+        self.assertIn("crypto.subtle.digest('SHA-256',raw)",harness)
+        self.assertIn("object SHA-256 mismatch",harness)
+        self.assertIn("await objectResponse.arrayBuffer()",harness)
 
 
 if __name__=="__main__":

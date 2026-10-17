@@ -5,17 +5,24 @@
 <script>
 (async()=>{
   try {
-    const manifestResponse=await fetch('/ptt/v1/manifests/static-assets-pilot.json');
+    const manifestResponse=await fetch('/ptt/v1/manifests/static-assets-pilot.json',{cache:'no-cache'});
     if(!manifestResponse.ok) throw new Error('manifest HTTP '+manifestResponse.status);
     const manifest=await manifestResponse.json();
-    const objectResponse=await fetch('/'+manifest.objects[0].key);
+    const item=manifest.objects[0];
+    const objectResponse=await fetch('/'+item.key,{cache:'no-cache'});
     if(!objectResponse.ok) throw new Error('object HTTP '+objectResponse.status);
-    if(objectResponse.headers.get('content-type')!=='application/json') throw new Error('content-type');
+    if(!objectResponse.headers.get('content-type')?.startsWith('application/json')) throw new Error('content-type');
     if(objectResponse.headers.get('content-encoding')!=='gzip') throw new Error('content-encoding');
-    const payload=await objectResponse.json();
-    if(!Array.isArray(payload.pushes)||payload.pushes.length!==manifest.objects[0].pushes) throw new Error('push count');
+    // Fetch exposes decoded response bytes while retaining the HTTP content
+    // encoding header. The manifest digest is over these canonical JSON bytes.
+    const raw=new Uint8Array(await objectResponse.arrayBuffer());
+    const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',raw));
+    const actualSha=Array.from(hash,byte=>byte.toString(16).padStart(2,'0')).join('');
+    if(actualSha!==item.sha256) throw new Error('object SHA-256 mismatch');
+    const payload=JSON.parse(new TextDecoder().decode(raw));
+    if(!Array.isArray(payload.pushes)||payload.pushes.length!==item.pushes) throw new Error('push count');
     document.body.dataset.status='pass';
-    document.body.textContent=JSON.stringify({status:'PASS',pushes:payload.pushes.length});
+    document.body.textContent=JSON.stringify({status:'PASS',pushes:payload.pushes.length,sha256:actualSha});
   } catch(error) {
     document.body.dataset.status='fail';
     document.body.textContent=String(error);

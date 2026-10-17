@@ -131,7 +131,9 @@ Local integration results:
 
 - HTTP header, gzip, JSON and row-count readback: PASS.
 - Headless Google Chrome `fetch()` auto-decompression and `response.json()`:
-  PASS (`data-status=pass`, 17 rows).
+  PASS (`data-status=pass`, 17 rows). The checked-in harness now hashes the
+  browser-decoded raw JSON bytes with Web Crypto and compares them to the
+  manifest before parsing or rendering.
 - Static route bypass: PASS by construction and configuration; there is no
   executable Worker or database binding. Remote Cloudflare routing remains NOT
   VERIFIED until a separately approved test deploy.
@@ -262,6 +264,17 @@ approved storage design after real byte measurements.
 10. On SHA mismatch, discard the response, refetch the manifest once, then fail
     closed with a retryable archive-version error.
 
+### Relationship to Issue #47 Public Today
+
+Issue #47's `/v1/catalog/today` and WebSub/discovery path remains a separate
+backend-owned live catalog. Historical PTT playback must not call that
+ingestion path, trigger provider refresh, or query its D1 tables. A future
+Public Viewer integration may use the already-rendered VOD card's verified
+YouTube `actual_start` as an input, then fetch this static manifest and chunks
+directly. If the card lacks the authoritative anchor, historical PTT stays
+unavailable rather than falling back to `scheduled_start`, publish time, or a
+Live Worker query. No #47 source or frontend is modified by this pilot.
+
 ## Tests
 
 Command:
@@ -272,7 +285,7 @@ python3 -B -m unittest -v \
   ptt_offline.test_static_assets_pilot
 ```
 
-Result: 14 tests PASS. Coverage includes floor provenance/reset/gaps/hour
+Result: 16 tests PASS. Coverage includes floor provenance/reset/gaps/hour
 boundaries, unknown floor behavior, deterministic gzip, timezone rejection,
 asset-only configuration, headers, gzip/JSON readback, fixed identity floor
 enrichment, cross-hour/date resolver behavior, duplicate suppression and
