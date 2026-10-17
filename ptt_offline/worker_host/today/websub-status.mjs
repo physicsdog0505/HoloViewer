@@ -13,6 +13,7 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
   if(await claimEvent(db,event.event_hash,token,{now}))owned.push({...event,claimToken:token});
  }
  let ignored_stale_roster=0,deleted_notices=0,reconcile_required=false;
+ const reconcileChannels=[];
  const events=[];
  for(const event of owned){
   if(event.roster_version!==roster.version||!approved.has(event.channel_id)){
@@ -26,6 +27,7 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
    await finishClaim(db,event.event_hash,event.claimToken,{now});
    deleted_notices++;
    reconcile_required=true;
+   if(!reconcileChannels.includes(event.channel_id)&&reconcileChannels.length<10)reconcileChannels.push(event.channel_id);
    continue;
   }
   if(!/^[A-Za-z0-9_-]{11}$/.test(event.video_id)){
