@@ -441,3 +441,16 @@ body.immersive .viewer-workspace.workspace-focus.layout-primary{
  .viewer-stage.layout-primary .player-card.secondary-3{grid-column:1;grid-row:auto}
  .viewer-stage.layout-primary{grid-template-rows:none}
 }
+
+.viewer-mode-status{
+ flex:0 0 auto;
+ font-size:12px;
+ font-weight:700;
+ letter-spacing:.01em;
+ color:var(--brand-main);
+ background:color-mix(in srgb,var(--brand-soft) 18%,#fff);
+ border:1px solid color-mix(in srgb,var(--brand-main) 20%,var(--line));
+ border-radius:999px;
+ padding:4px 8px;
+ line-height:1;
+}
