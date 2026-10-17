@@ -3,7 +3,7 @@ import {topicForChannel} from './websub-receiver.mjs';
 const CID=/^UC[A-Za-z0-9_-]{22}$/;
 const stamp=x=>{
  if(!(x instanceof Date)||!Number.isFinite(x.valueOf()))throw Error('invalid time');
- return x.toISOString().replace(/\\.\\d{3}Z$/,'Z');
+ return x.toISOString().replace(/\.\d{3}Z$/,'Z');
 };
 export async function recordSubscriptionRequest(db,{channelId,rosterVersion,mode='subscribe',now=new Date()}={}){
  if(!CID.test(channelId??'')||typeof rosterVersion!=='string'||!rosterVersion||
