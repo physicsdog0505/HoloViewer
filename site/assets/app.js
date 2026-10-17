@@ -893,6 +893,12 @@ window.hvOpenCustomSession=function(ids,opts={}){
 $('session-audio').onchange=()=>{viewing.audio=Number($('session-audio').value)||0;sessionAudio()};
 document.querySelectorAll('[data-session-layout]').forEach(btn=>btn.onclick=()=>{viewing.layout=btn.dataset.sessionLayout;sessionLayout()});
 function navigateSidebarLink(event,destination){
+ if(destination==='ptt'){
+  // PTT is a standalone route. Keep the accepted sidebar marker, but allow
+  // the browser to navigate normally so the SPA does not mount legacy PTT.
+  if(event.detail>0)event.currentTarget.blur();
+  return;
+ }
  event.preventDefault();route(destination);
  // Pointer clicks must not leave :focus-within latched after SPA navigation.
  // Keep keyboard focus for accessible navigation and rail expansion.
