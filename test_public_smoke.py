@@ -56,15 +56,16 @@ class PublicSmokeTests(unittest.TestCase):
         js = (ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/viewer-standalone.css").read_text(encoding="utf-8")
         app = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
-        for label in (">預設<", ">輪播<", ">鎖定<"):
+        for label in (">預設<", ">輪播<"):
             self.assertIn(label, html)
-        for old in (">平均<", ">主視角<", ">直播優先<"):
+        for old in (">鎖定<", ">平均<", ">主視角<", ">直播優先<"):
             self.assertNotIn(old, html)
         self.assertIn("const MAX_STREAMS=16;", js)
         self.assertIn("const FOCUS_VISIBLE_SLOTS=4;", js)
         self.assertIn("carousel.checked=currentLayoutPreset()!=='equal';", js)
         self.assertIn("secondaryOffset=(secondaryOffset+Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryCount))%secondaryCount;", js)
         self.assertIn("viewerModeStatus.dataset.mode='lock';", js)
+        self.assertIn("button.dataset.layoutPreset===\'primary\'&&preset===\'focus\'", js)
         self.assertIn("function handleFocusAvatarClick(index)", js)
         self.assertIn("currentLayoutPreset()==='focus'&&lockedIndex===index", js)
         self.assertIn("setLayoutPreset('primary');", js)
