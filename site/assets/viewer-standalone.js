@@ -34,7 +34,7 @@ const pttFontValue=document.getElementById('pttFontValue');
 const players=[];
 const playerCards=[];
 let catalogRows=[];
-let syncGuard=false;
+const syncExpected=new WeakMap();
 let carouselTimer=null;
 let pttFollowing=true;
 let pttLoaded=false;
@@ -149,25 +149,22 @@ function refreshControlState(){
  playerCards.forEach((card,index)=>{
   if(!card)return;
   card.classList.toggle('primary',index===primaryIndex);
-  card.classList.remove('secondary-1','secondary-2');
+  card.classList.remove('secondary-1','secondary-2','secondary-3');
  });
  const secondary=playerCards.filter((card,index)=>card&&index!==primaryIndex);
  secondary[0]?.classList.add('secondary-1');
  secondary[1]?.classList.add('secondary-2');
+ secondary[2]?.classList.add('secondary-3');
 }
 function applyLayout(){
  const effective=watchMode==='multi'&&streams.length>1?layout:'equal';
- stage.className='viewer-stage layout-'+effective;
+ stage.className='viewer-stage layout-'+effective+' count-'+streams.length;
  const cols=streams.length<=1?1:2;
  const rows=Math.max(1,Math.ceil(streams.length/cols));
  stage.style.setProperty('--viewer-cols',String(cols));
  stage.style.setProperty('--viewer-rows',String(rows));
- if(effective==='primary'){
-  const ordered=[playerCards[primaryIndex],...playerCards.filter((card,index)=>card&&index!==primaryIndex)].filter(Boolean);
-  ordered.forEach(card=>stage.append(card));
- }else{
-  playerCards.filter(Boolean).sort((a,b)=>Number(a.dataset.index)-Number(b.dataset.index)).forEach(card=>stage.append(card));
- }
+ // Layout changes are CSS-only. Never re-append live iframe cards: moving
+ // YouTube iframe DOM nodes can interrupt active playback.
  refreshControlState();
  updateUrl();
 }
@@ -188,16 +185,25 @@ function setPrimary(index){
  resolvePrimaryPtt();
 }
 function syncPlayers(state,sourceIndex){
- if(watchMode!=='multi'||!syncPlayback.checked||syncGuard||streams.length<2)return;
- syncGuard=true;
+ if(watchMode!=='multi'||!syncPlayback.checked||streams.length<2)return;
  players.forEach((player,index)=>{
   if(!player||index===sourceIndex)return;
   try{
+   syncExpected.set(player,{state,until:Date.now()+900});
    if(state===YT.PlayerState.PLAYING)player.playVideo();
    else if(state===YT.PlayerState.PAUSED)player.pauseVideo();
   }catch{}
  });
- setTimeout(()=>{syncGuard=false},350);
+}
+function handlePlayerStateChange(player,state){
+ if(state!==YT.PlayerState.PLAYING&&state!==YT.PlayerState.PAUSED)return;
+ const expected=syncExpected.get(player);
+ if(expected&&Date.now()<expected.until&&expected.state===state){
+  syncExpected.delete(player);
+  return;
+ }
+ const sourceIndex=players.indexOf(player);
+ if(sourceIndex>=0)syncPlayers(state,sourceIndex);
 }
 function mountPlayerAt(index,autoplay=false){
  if(!window.YT?.Player||players[index]||!streams[index])return;
@@ -215,10 +221,7 @@ function mountPlayerAt(index,autoplay=false){
      setAudioMaster(primaryIndex);
     }
    },
-   onStateChange:event=>{
-    const sourceIndex=players.indexOf(event.target);
-    if(sourceIndex>=0&&(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED))syncPlayers(event.data,sourceIndex);
-   }
+   onStateChange:event=>handlePlayerStateChange(event.target,event.data)
   }
  });
 }
@@ -295,10 +298,7 @@ function replaceSingleStream(row){
    onReady:event=>{
     try{if(wasMuted)event.target.mute();else event.target.unMute()}catch{}
    },
-   onStateChange:event=>{
-    const sourceIndex=players.indexOf(event.target);
-    if(sourceIndex>=0&&(event.data===YT.PlayerState.PLAYING||event.data===YT.PlayerState.PAUSED))syncPlayers(event.data,sourceIndex);
-   }
+   onStateChange:event=>handlePlayerStateChange(event.target,event.data)
   }
  });
 }
@@ -307,7 +307,7 @@ function appendMultiStream(row){
  if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
  const existing=streams.findIndex(stream=>stream.videoId===id);
  if(existing>=0){setPrimary(existing);return}
- if(streams.length>=3)return;
+ if(streams.length>=4)return;
  const index=streams.length;
  streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||'')});
  const card=createPlayerCard(index);
@@ -323,11 +323,16 @@ function appendMultiStream(row){
 function removeMultiStream(index){
  if(watchMode!=='multi'||streams.length<=1||index<0||index>=streams.length)return;
  const removedWasPrimary=index===primaryIndex;
- try{players[index]?.destroy()}catch{}
- playerCards[index]?.remove();
+ const removedPlayer=players[index];
+ const removedCard=playerCards[index];
+
+ // Detach first. Any late PAUSED event from destroy() then has no source index
+ // and cannot propagate to the surviving players.
  streams.splice(index,1);
  players.splice(index,1);
  playerCards.splice(index,1);
+ removedCard?.remove();
+ try{removedPlayer?.destroy()}catch{}
 
  if(index<primaryIndex)primaryIndex-=1;
  else if(removedWasPrimary)primaryIndex=Math.min(index,streams.length-1);
@@ -338,7 +343,7 @@ function removeMultiStream(index){
  applyLayout();
  setAudioMaster(primaryIndex);
  renderLiveRail(catalogRows);
- resolvePrimaryPtt();
+ if(removedWasPrimary)resolvePrimaryPtt();
 }
 function addDraggedLive(row){
  const id=String(row?.video_id||'');
@@ -662,6 +667,12 @@ settingsButton.addEventListener('click',()=>{
  settingsButton.setAttribute('aria-expanded',String(open));
 });
 multiModeSwitch.addEventListener('change',()=>switchWatchMode(multiModeSwitch.checked?'multi':'single'));
+syncPlayback.addEventListener('change',()=>{
+ if(!syncPlayback.checked||watchMode!=='multi'||streams.length<2)return;
+ let state=null;
+ try{state=players[primaryIndex]?.getPlayerState()}catch{}
+ if(state===YT.PlayerState.PLAYING||state===YT.PlayerState.PAUSED)syncPlayers(state,primaryIndex);
+});
 document.querySelectorAll('[data-layout]').forEach(button=>button.addEventListener('click',()=>{
  layout=button.dataset.layout;
  applyLayout();
