@@ -164,7 +164,7 @@ test('scheduled processor acknowledges non-live uploads without creating Today r
  db.raw.prepare("INSERT INTO public_today_websub_events(event_hash,channel_id,video_id,roster_version,received_at,status,attempts) VALUES(?,?,?,?,?,'pending',0)")
   .run(eventHash,channels[0].id,video,version,stamp(at));
  const worker=mountTodayWebSubOnWorker(baseWorker(),{fetchImpl:async url=>{
-  assert.match(String(url),/googleapis\\.com\\/youtube\\/v3\\/videos/);
+  assert.ok(String(url).includes('googleapis.com/youtube/v3/videos'));
   return new Response(JSON.stringify({items:[{id:video,snippet:{channelId:channels[0].id,title:'ordinary upload',channelTitle:'Test',liveBroadcastContent:'none'}}]}),{status:200});
  }});
  const out=await worker.scheduled({scheduledTime:Date.parse('2026-10-17T00:05:00Z')},env(db,{TODAY_WEBSUB_PROCESS_ENABLED:'true'}),{});
