@@ -40,11 +40,11 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
  if(ids.length){
   try{results=await fetchVideos(ids)}catch(error){
    for(const e of targets)await failClaim(db,e.event_hash,e.claimToken,error.message);
-   return {updated:0,failed:targets.length,ignored_stale_roster,deleted_notices,reconcile_required,quota_units:1};
+   return {updated:0,failed:targets.length,ignored_stale_roster,deleted_notices,reconcile_required,reconcile_channels:reconcileChannels,quota_units:1};
   }
   if(!Array.isArray(results)){
    for(const e of targets)await failClaim(db,e.event_hash,e.claimToken,'malformed videos.list result');
-   return {updated:0,failed:targets.length,ignored_stale_roster,deleted_notices,reconcile_required,quota_units:1};
+   return {updated:0,failed:targets.length,ignored_stale_roster,deleted_notices,reconcile_required,reconcile_channels:reconcileChannels,quota_units:1};
   }
  }
  const byId=new Map(results.map(v=>[v.id,v]));
@@ -99,5 +99,5 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
    failed++
   }
  }
- return {updated,failed,ignored_non_live,unchanged,ignored_terminal_regression,ignored_stale_roster,deleted_notices,reconcile_required,quota_units:ids.length?1:0,complete:false};
+ return {updated,failed,ignored_non_live,unchanged,ignored_terminal_regression,ignored_stale_roster,deleted_notices,reconcile_required,reconcile_channels:reconcileChannels,quota_units:ids.length?1:0,complete:false};
 }
