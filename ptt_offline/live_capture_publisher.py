@@ -171,6 +171,8 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
                 "source_identity":plan["source_identity"],
                 "accepted":baseline,
                 "baseline_source_line":max(row["source_line"] for row in plan["candidate_rows"]),
+                "legacy_backlog_fence_v2":True,
+                "legacy_baselined":0,
                 "pending_count":len(plan["pending_source_lines"])})
             return {"status":"BASELINED","aid":plan["aid"],"eligible":0,
                     "baselined":len(baseline),"pending":len(plan["pending_source_lines"]),
