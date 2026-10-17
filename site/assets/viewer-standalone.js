@@ -18,6 +18,7 @@ const liveRail=document.getElementById('viewerLiveRail');
 const liveList=document.getElementById('viewerLiveList');
 const controls=document.getElementById('viewerControls');
 const persistentPlaybackControls=document.getElementById('persistentPlaybackControls');
+const viewerModeStatus=document.getElementById('viewerModeStatus');
 const settingsButton=document.getElementById('viewerSettings');
 const fullscreenButton=document.getElementById('viewerFullscreen');
 const multiModeSwitch=document.getElementById('multiModeSwitch');
@@ -192,6 +193,10 @@ function renderControls(){
  document.getElementById('layoutGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!multi;
  persistentPlaybackControls.hidden=!multi;
+ viewerModeStatus.hidden=!multi||currentLayoutPreset()==='equal';
+ if(multi&&currentLayoutPreset()==='primary')viewerModeStatus.textContent='↻ '+carouselInterval.value+'s';
+ else if(multi&&currentLayoutPreset()==='focus')viewerModeStatus.textContent='● 鎖定';
+ else viewerModeStatus.textContent='';
  carouselControl.hidden=true;
  carouselIntervalGroup.hidden=!focusMode;
  multiModeSwitch.checked=watchMode==='multi';
@@ -783,6 +788,7 @@ carousel.addEventListener('change',()=>{
 });
 carouselInterval.addEventListener('input',()=>{
  carouselOutput.textContent=carouselInterval.value+'s';
+ if(watchMode==='multi'&&currentLayoutPreset()==='primary')viewerModeStatus.textContent='↻ '+carouselInterval.value+'s';
  startCarousel();
 });
 pttFontSize.addEventListener('input',()=>{
