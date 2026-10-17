@@ -197,6 +197,23 @@ class LiveCapturePublisherTests(unittest.TestCase):
         body=json.loads(Path(self.state).read_text(encoding="utf-8"))
         self.assertTrue(body["legacy_backlog_fence_v2"])
 
+    def test_read_only_reports_legacy_fence_candidates_without_mutation(self):
+        plan=inspect_latest_article(self.db)
+        Path(self.state).write_text(json.dumps({
+            "status":"ACKED",
+            "source_identity":plan["source_identity"],
+            "accepted":{},
+        }),encoding="utf-8")
+        before=Path(self.state).read_text(encoding="utf-8")
+        result=run_live_once(
+            self.db,state_path=self.state,send=False,
+            now=datetime.fromisoformat("2026-10-15T13:00:00+00:00")
+        )
+        self.assertEqual(result["legacy_baseline_candidates"],2)
+        self.assertEqual(result["retained_recovery_candidates"],0)
+        self.assertEqual(result["sent"],0)
+        self.assertEqual(Path(self.state).read_text(encoding="utf-8"),before)
+
     def test_unknown_remote_stop_latch_after_baseline(self):
         alt=str(Path(self.tmp.name)/"uncertain.json")
         baseline=run_live_once(self.db,state_path=alt,secret="k"*40,
