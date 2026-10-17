@@ -884,7 +884,8 @@ document.getElementById('displayMode').onclick=()=>{
   gallery.classList.toggle('compact');document.getElementById('displayMode').textContent=gallery.classList.contains('compact')?'詳細卡片':'精簡列表';
 };
 audio.addEventListener('change',()=>{audioId=items[Number(audio.value)]||null;});
-document.getElementById('add').onclick=()=>{const value=input.value.trim();if(!value){document.getElementById('custom-error').textContent='請先貼上 YouTube 網址或影片 ID。';document.getElementById('custom-error').hidden=false;return;}if(addStream(value))input.value='';input.focus();};
+function handleCustomAdd(){const value=input.value.trim();if(!value){document.getElementById('custom-error').textContent='請先貼上 YouTube 網址或影片 ID。';document.getElementById('custom-error').hidden=false;return;}if(addStream(value))input.value='';input.focus();}
+document.getElementById('add').addEventListener('click',handleCustomAdd);
 input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();document.getElementById('add').click();}});
 document.getElementById('start').onclick=()=>{
   if(!items.length){alert('請先加入至少一個影片。');return;}
