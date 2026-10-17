@@ -146,6 +146,13 @@ body.immersive .player-card,body.immersive .viewer-ptt{border-radius:0;border:0}
  .viewer-shell{margin-left:var(--rail-collapsed)}
  .viewer-main,body.settings-open .viewer-main{height:auto;min-height:calc(100vh - 58px)}
  .viewer-workspace{grid-template-columns:1fr;height:auto}
+ .viewer-workspace.workspace-focus.layout-primary{grid-template-columns:1fr;grid-template-rows:none}
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage{display:grid}
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.primary,
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-1,
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-2,
+ .viewer-workspace.workspace-focus.layout-primary .viewer-stage .player-card.secondary-3{grid-column:1;grid-row:auto}
+ .viewer-workspace.workspace-focus.layout-primary .viewer-ptt{grid-column:1;grid-row:auto}
  .viewer-stage,.viewer-stage.layout-primary,.viewer-stage.layout-equal{grid-template-columns:1fr;grid-template-rows:none;height:auto}
  .viewer-stage.layout-primary .player-card.primary,.viewer-stage.layout-primary .player-card.secondary-1,.viewer-stage.layout-primary .player-card.secondary-2{grid-column:1;grid-row:auto}
  .player-card{aspect-ratio:16/9}
