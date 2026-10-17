@@ -8,7 +8,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from ptt_offline.ptt_aid_identity import aid_from_article_url
-from ptt_offline.r2_archive_export import export_archive
+from ptt_offline.public_today_contract import ContractError
+from ptt_offline.r2_archive_export import export_archive, vod_minute, write_archive_rows
 
 TPE=ZoneInfo("Asia/Taipei")
 
@@ -72,6 +73,38 @@ class R2ArchiveExportTests(unittest.TestCase):
             self.assertEqual(receipt["schema_version"],"ptt-r2-archive-v1")
             self.assertEqual(receipt["chunk_minutes"],60)
             self.assertIn("actual_start",receipt["vod_mapping"])
+
+    def test_gzip_output_is_deterministic(self):
+        with tempfile.TemporaryDirectory() as left, tempfile.TemporaryDirectory() as right:
+            first=export_archive(self.make_db(),from_day="2026-10-01",through_day="2026-10-01",out_dir=Path(left))
+            second=export_archive(self.make_db(),from_day="2026-10-01",through_day="2026-10-01",out_dir=Path(right))
+            key=first["objects"][0]["key"]
+            self.assertEqual((Path(left)/key).read_bytes(),(Path(right)/key).read_bytes())
+            self.assertEqual(first["objects"][0]["sha256"],second["objects"][0]["sha256"])
+
+    def test_replaceable_chunk_uses_most_conservative_status(self):
+        base={"occurred_at":"2026-10-01T04:01:00Z","aid":"A1","source_page":1,
+              "kind":"push","author":"u","content":"x","source_url":"https://example.invalid",
+              "source_path":"/tmp/source.sqlite3","time_quality":"source-minute"}
+        rows=[dict(base,source_line=1,source_record_key="A1:1",coverage_day="2026-10-01"),
+              dict(base,source_line=2,source_record_key="A1:2",coverage_day="2026-10-02")]
+        days=[{"day":"2026-10-01","coverage_status":"COMPLETE","finalized":True,"reason":"verified"},
+              {"day":"2026-10-02","coverage_status":"PARTIAL","finalized":False,"reason":"open"}]
+        with tempfile.TemporaryDirectory() as td:
+            receipt=write_archive_rows(rows,from_day="2026-10-01",through_day="2026-10-02",
+                                       out_dir=Path(td),days=days,manifest_name="pilot.json")
+            self.assertEqual(receipt["objects"][0]["coverage_status"],"PARTIAL")
+            self.assertFalse(receipt["objects"][0]["finalized"])
+
+    def test_vod_minute_uses_absolute_timezone_aware_timeline(self):
+        self.assertEqual(
+            vod_minute("2026-10-09T10:43:00Z","2026-10-09T18:00:00+08:00"),
+            43,
+        )
+
+    def test_vod_minute_rejects_naive_timestamp(self):
+        with self.assertRaisesRegex(ContractError,"timezone-aware timestamp required"):
+            vod_minute("2026-10-09T10:43:00Z","2026-10-09T18:00:00")
 
 
 if __name__=="__main__":

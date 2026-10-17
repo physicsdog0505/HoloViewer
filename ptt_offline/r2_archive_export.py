@@ -32,12 +32,17 @@ def _hour_start(occurred_at: str) -> datetime:
     dt=_utc(occurred_at)
     return dt.replace(minute=0,second=0,microsecond=0)
 
+def vod_minute(push_occurred_at: str, actual_start: str) -> int:
+    """Map two timezone-aware absolute timestamps onto a VOD minute."""
+    delta=_utc(push_occurred_at)-_utc(actual_start)
+    return int(delta.total_seconds()//60)
+
 def _key(start: datetime) -> str:
     return start.strftime("ptt/v1/chunks/%Y/%m/%d/%H00.json.gz")
 
 def _event_row(event: dict, *, url: str) -> dict:
     occurred=_utc(event["occurred_at"]).replace(second=0,microsecond=0)
-    return {
+    row={
         "occurred_at":occurred.isoformat(timespec="seconds").replace("+00:00","Z"),
         "minute_epoch":int(occurred.timestamp()//60),
         "aid":normalize_public_aid(event["aid"]),
@@ -49,6 +54,88 @@ def _event_row(event: dict, *, url: str) -> dict:
         "source_url":url,
         "source_record_key":event["source_record_key"],
     }
+    for name in ("coverage_day","coverage_status","finalized","source_path",
+                 "time_quality","chronology_note"):
+        if name in event:
+            row[name]=event[name]
+    return row
+
+def _write_deterministic_gzip(target: Path, raw: bytes) -> None:
+    """Write reproducible gzip bytes on Python 3.12+ without gzip.open mtime."""
+    target.parent.mkdir(parents=True,exist_ok=True)
+    with target.open("wb") as output:
+        with gzip.GzipFile(filename="",mode="wb",fileobj=output,
+                           compresslevel=9,mtime=0) as handle:
+            handle.write(raw)
+
+def write_archive_rows(rows: list[dict], *, from_day: str, through_day: str,
+                       out_dir: Path, days: list[dict],
+                       manifest_name: str | None=None,
+                       generated_at: str | None=None) -> dict:
+    """Write staged absolute-minute rows with replaceable coverage metadata."""
+    allowed={"COMPLETE","UNKNOWN","PARTIAL"}
+    priority={"COMPLETE":0,"UNKNOWN":1,"PARTIAL":2}
+    day_map={item["day"]:item for item in days}
+    if set(item["coverage_status"] for item in days) - allowed:
+        raise ContractError("invalid day coverage status")
+    if any(item["finalized"] != (item["coverage_status"] == "COMPLETE") for item in days):
+        raise ContractError("day finalized flag contradicts coverage status")
+    chunks=defaultdict(list)
+    seen=set()
+    for source in rows:
+        row=dict(source)
+        occurred=_utc(row["occurred_at"]).replace(second=0,microsecond=0)
+        row["occurred_at"]=occurred.isoformat(timespec="seconds").replace("+00:00","Z")
+        row["minute_epoch"]=int(occurred.timestamp()//60)
+        key=row.get("source_record_key")
+        if not isinstance(key,str) or not key or key in seen:
+            raise ContractError("duplicate or invalid source_record_key")
+        seen.add(key)
+        coverage_day=row.get("coverage_day")
+        if coverage_day not in day_map:
+            raise ContractError("row coverage day missing from manifest")
+        expected=day_map[coverage_day]
+        row["coverage_status"]=expected["coverage_status"]
+        row["finalized"]=expected["finalized"]
+        chunks[_key(_hour_start(row["occurred_at"]))].append(row)
+
+    out_dir.mkdir(parents=True,exist_ok=True)
+    objects=[]
+    for key in sorted(chunks):
+        chunk_rows=sorted(chunks[key],key=lambda r:(r["minute_epoch"],r["aid"],r["source_line"]))
+        start=_hour_start(chunk_rows[0]["occurred_at"])
+        status=max((r["coverage_status"] for r in chunk_rows),key=priority.get)
+        finalized=(status == "COMPLETE")
+        payload={
+            "schema_version":SCHEMA,
+            "precision":"minute",
+            "bucket_start":start.isoformat(timespec="seconds").replace("+00:00","Z"),
+            "bucket_end":(start+timedelta(hours=1)).isoformat(timespec="seconds").replace("+00:00","Z"),
+            "coverage_status":status,
+            "finalized":finalized,
+            "pushes":chunk_rows,
+        }
+        raw=json.dumps(payload,ensure_ascii=False,separators=(",",":")).encode("utf-8")
+        target=out_dir/key
+        _write_deterministic_gzip(target,raw)
+        objects.append({
+            "key":key,"bucket_start":payload["bucket_start"],
+            "bucket_end":payload["bucket_end"],"pushes":len(chunk_rows),
+            "sha256":sha256(raw).hexdigest(),"bytes_gzip":target.stat().st_size,
+            "coverage_status":status,"finalized":finalized,
+        })
+    generated=generated_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00","Z")
+    manifest={
+        "schema_version":SCHEMA,"precision":"minute","chunk_minutes":CHUNK_MINUTES,
+        "timezone":"UTC","from_day_taipei":from_day,"through_day_taipei":through_day,
+        "generated_at":generated,"total_pushes":len(rows),"pushes":len(rows),
+        "total_objects":len(objects),"days":days,"objects":objects,
+    }
+    name=manifest_name or f"{from_day}_{through_day}.json"
+    manifest_path=out_dir/f"ptt/v1/manifests/{name}"
+    manifest_path.parent.mkdir(parents=True,exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    return {**manifest,"manifest_key":str(manifest_path.relative_to(out_dir))}
 
 def export_archive(db, *, from_day: str, through_day: str, out_dir: Path) -> dict:
     verify_schema(db)
@@ -135,9 +222,7 @@ def export_archive(db, *, from_day: str, through_day: str, out_dir: Path) -> dic
         raw=json.dumps(payload,ensure_ascii=False,separators=(",",":")).encode("utf-8")
         digest=sha256(raw).hexdigest()
         target=out_dir/key
-        target.parent.mkdir(parents=True,exist_ok=True)
-        with gzip.open(target,"wb",compresslevel=9,mtime=0) as handle:
-            handle.write(raw)
+        _write_deterministic_gzip(target,raw)
         objects.append({
             "key":key,
             "bucket_start":payload["bucket_start"],

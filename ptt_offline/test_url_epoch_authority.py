@@ -62,6 +62,24 @@ class UrlEpochAuthorityTests(unittest.TestCase):
             with self.subTest(rows=rows),self.assertRaises(ContractError):
                 reconstruct_events(board="C_Chat",aid="A1",url=url,pushes=rows,identity_verifier=self.verifier)
 
+    def test_url_seconds_do_not_reject_same_source_minute(self):
+        url=url_at("2026-10-06T10:42:17Z")  # 18:42:17 Taipei
+        rows=[{"source_line":1,"ptt_date":"10/06","ptt_time":"18:42"}]
+        got=reconstruct_events(board="C_Chat",aid="A1",url=url,pushes=rows,identity_verifier=self.verifier)
+        self.assertEqual(got[0]["occurred_at"],"2026-10-06T10:42:00Z")
+        self.assertEqual(got[0]["time_quality"],"source-minute")
+
+    def test_opt_in_preserves_reviewed_minute_regression(self):
+        url=url_at("2026-10-09T10:43:00Z")
+        rows=[{"source_line":212,"ptt_date":"10/09","ptt_time":"18:46"},
+              {"source_line":235,"ptt_date":"10/09","ptt_time":"18:43"}]
+        got=reconstruct_events(board="C_Chat",aid="A1",url=url,pushes=rows,
+                               identity_verifier=self.verifier,
+                               reviewed_chronology_exceptions=True)
+        self.assertEqual(got[1]["occurred_at"],"2026-10-09T10:43:00Z")
+        self.assertEqual(got[1]["time_quality"],"source-minute-regression")
+        self.assertIn("line 235",got[1]["chronology_note"])
+
 
 if __name__=="__main__":
     unittest.main()
