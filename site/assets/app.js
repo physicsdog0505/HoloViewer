@@ -792,9 +792,6 @@ window.hvOpenCustomSession=function(ids,opts={}){
  });
 };
 document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.route)}));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.mobileRoute)}));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route('home')}));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
-const initialRoute=location.pathname==='/custom-view/session'?'custom-session':routeFromLocation();
-route(initialRoute,{syncUrl:false});
-window.addEventListener('popstate',()=>route(routeFromLocation(),{syncUrl:false}));
 
 
 
@@ -916,7 +913,13 @@ window.hvCustomCatalog=function(rows){
 };
 window.hvCustomAdd=addStream;
 
-})();
+})()
+
+// Bootstrap routing only after the custom-view controller is bound.
+const initialRoute=location.pathname==='/custom-view/session'?'custom-session':routeFromLocation();
+route(initialRoute,{syncUrl:false});
+window.addEventListener('popstate',()=>route(routeFromLocation(),{syncUrl:false}));
+;
 
 
 function playlistId(input){
