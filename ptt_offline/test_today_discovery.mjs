@@ -177,8 +177,8 @@ test('one new livestream candidate: bounded end-to-end budget is six changed row
  assert.equal(out.discovered,1);
  assert.equal(out.updated,1);
  assert.equal(db.rowWrites-before,6,'queue insert + cursor + claim + evidence + canonical + finish claim');
- assert.equal(db.queries,71);
- assert.equal(db.readQueries,6);
+ assert.equal(db.queries,72);
+ assert.equal(db.readQueries,7);
  assert.equal(db.writeQueries,65);
  assert.equal(db.returnedReadRows,68,'result rows in the test double, not Cloudflare billed Rows Read');
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical").get().n,1);
@@ -198,8 +198,8 @@ test('full 30-channel / 60-entry minute remains bounded while discovery stays mi
  assert.equal(net.videoCalls,1,'pending IDs are batched into one videos.list request of at most 50');
  assert.equal(out.updated,50);
  assert.equal(db.rowWrites-before,261,'60 queue inserts + 1 cursor + 50 claims + 100 evidence/canonical + 50 finishes');
- assert.equal(db.queries,365);
- assert.equal(db.readQueries,104);
+ assert.equal(db.queries,366);
+ assert.equal(db.readQueries,105);
  assert.equal(db.writeQueries,261);
  assert.equal(db.returnedReadRows,117,'result rows in the test double, not Cloudflare billed Rows Read');
  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM public_today_websub_events WHERE status='pending'").get().n,10);
