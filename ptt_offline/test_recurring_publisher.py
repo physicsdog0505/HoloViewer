@@ -87,6 +87,43 @@ class RecurringPublisherTests(unittest.TestCase):
             self.assertEqual(delivered,[expected_article])
             self.assertTrue(result["backlog_may_remain"])
 
+    def test_fresh_backlog_activates_three_batch_burst(self):
+        source="e"*64
+        responses=[
+            {"status":"ACK","sent":10,"eligible":30,"fresh_eligible":30},
+            {"status":"ACK","sent":10,"eligible":20,"fresh_eligible":20},
+            {"status":"ACK","sent":10,"eligible":10,"fresh_eligible":10},
+        ]
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",side_effect=responses) as publisher:
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=10,max_batches=1,burst_max_batches=3)
+        self.assertEqual(result["sent"],30)
+        self.assertEqual(result["http_posts"],3)
+        self.assertTrue(result["burst_activated"])
+        self.assertEqual(result["burst_batches"],2)
+        self.assertEqual(result["modeled_d1_writes_ceiling"],66)
+        self.assertEqual(result["modeled_d1_queries_ceiling"],156)
+        self.assertTrue(publisher.call_args_list[1].kwargs["fresh_only"])
+        self.assertTrue(publisher.call_args_list[2].kwargs["fresh_only"])
+
+    def test_delayed_recovery_backlog_never_activates_burst(self):
+        source="f"*64
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",
+                   return_value={"status":"ACK","sent":10,"eligible":30,"fresh_eligible":29}) as publisher:
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=10,max_batches=1,burst_max_batches=3)
+        self.assertEqual(result["sent"],10)
+        self.assertEqual(result["http_posts"],1)
+        self.assertFalse(result["burst_activated"])
+        self.assertEqual(result["burst_batches"],0)
+        self.assertEqual(publisher.call_count,1)
+
     def test_fresh_state_baseline_is_zero_remote_posts(self):
         source="d"*64
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
