@@ -27,6 +27,14 @@
 
 <div class="viewer-shell">
   <header class="viewer-topbar">
+    <div class="viewer-mode-switch" role="group" aria-label="觀看模式">
+      <span>單人</span>
+      <label class="mode-switch">
+        <input id="multiModeSwitch" type="checkbox" aria-label="切換單人或多人模式">
+        <span class="mode-switch-track" aria-hidden="true"></span>
+      </label>
+      <span>多人</span>
+    </div>
     <div class="viewer-watch-actions">
       <button id="viewerSettings" type="button" aria-expanded="false">觀看設定</button>
       <button id="viewerFullscreen" type="button">沉浸模式</button>
@@ -43,10 +51,6 @@
       <span>主視角</span>
       <div id="focusChoices" class="choice-row"></div>
     </div>
-    <label class="control-group">主要聲音
-      <select id="audioMaster"></select>
-    </label>
-    <label class="control-check"><input id="audioFollowFocus" type="checkbox"> 聲音跟隨主視角</label>
     <label class="control-check"><input id="syncPlayback" type="checkbox" checked> 連動播放／暫停</label>
     <button id="playAll" type="button">全部播放</button>
     <button id="pauseAll" type="button">全部暫停</button>
@@ -59,7 +63,6 @@
       <input id="pttFontSize" type="range" min="12" max="26" step="1" value="14">
       <output id="pttFontValue">14px</output>
     </label>
-    <label class="control-check"><input id="pttShowFloor" type="checkbox" checked> 顯示樓數</label>
   </section>
 
   <main class="viewer-main">
