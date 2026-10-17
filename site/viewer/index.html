@@ -35,31 +35,31 @@
       </label>
       <span>多人</span>
     </div>
+
+    <section id="viewerControls" class="viewer-controls" hidden>
+      <div class="control-group" id="layoutGroup">
+        <button type="button" data-layout-preset="equal">平均</button>
+        <button type="button" data-layout-preset="primary">主視角</button>
+        <button type="button" data-layout-preset="focus">直播優先</button>
+      </div>
+      <div class="control-group" id="focusGroup">
+        <div id="focusChoices" class="choice-row" aria-label="選擇主視角"></div>
+      </div>
+      <label class="control-check"><input id="syncPlayback" type="checkbox" checked> 連動播放／暫停</label>
+      <button id="playAll" class="transport-button" type="button" aria-label="全部播放" title="全部播放">▶</button>
+      <button id="pauseAll" class="transport-button" type="button" aria-label="全部暫停" title="全部暫停">Ⅱ</button>
+      <label class="control-check"><input id="focusCarousel" type="checkbox"> 主視角輪播</label>
+      <label class="control-group">輪播秒數
+        <input id="focusCarouselInterval" type="range" min="5" max="30" step="1" value="10">
+        <output id="focusCarouselIntervalOutput">10s</output>
+      </label>
+    </section>
+
     <div class="viewer-watch-actions">
       <button id="viewerSettings" type="button" aria-expanded="false">觀看設定</button>
       <button id="viewerFullscreen" type="button">沉浸模式</button>
     </div>
   </header>
-
-  <section id="viewerControls" class="viewer-controls" hidden>
-    <div class="control-group" id="layoutGroup">
-      <span>版型</span>
-      <button type="button" data-layout-preset="equal">平均</button>
-      <button type="button" data-layout-preset="primary">主視角</button>
-      <button type="button" data-layout-preset="focus">直播優先</button>
-    </div>
-    <div class="control-group" id="focusGroup">
-      <span>主視角</span>
-      <div id="focusChoices" class="choice-row"></div>
-    </div>
-    <label class="control-check"><input id="syncPlayback" type="checkbox" checked> 連動播放／暫停</label>
-    <button id="playAll" type="button">全部播放</button>
-    <button id="pauseAll" type="button">全部暫停</button>
-    <label class="control-check"><input id="focusCarousel" type="checkbox"> 主視角輪播</label>
-    <label class="control-group">輪播秒數
-      <input id="focusCarouselInterval" type="range" min="5" max="30" step="1" value="10">
-      <output id="focusCarouselIntervalOutput">10s</output>
-    </label>  </section>
 
   <main class="viewer-main">
     <section class="viewer-workspace">
