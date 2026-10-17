@@ -61,6 +61,14 @@ def export_archive(db, *, from_day: str, through_day: str, out_dir: Path) -> dic
     pushes_selected=0
     rejected=[]
 
+    target_dates=[]
+    cursor=start_local.date()
+    while cursor<end_local.date():
+        target_dates.append(cursor)
+        cursor+=timedelta(days=1)
+    target_md={d.strftime("%m/%d") for d in target_dates}
+    target_years={d.year for d in target_dates}
+
     articles=db.execute(
         """SELECT id,board,aid,url,last_seen_at FROM articles
            WHERE board='C_Chat' ORDER BY id"""
@@ -70,10 +78,20 @@ def export_archive(db, *, from_day: str, through_day: str, out_dir: Path) -> dic
         match=URL_EPOCH.search(url or "")
         if not match:
             continue
-        posted=datetime.fromtimestamp(int(match.group(1)),tz=timezone.utc)
-        # Daily Holo threads are short lived. Keep a two-day pre-boundary margin
-        # so a thread opened just before midnight can contribute Oct 1 pushes.
-        if posted >= end_utc or posted < start_utc-timedelta(days=2):
+        posted=datetime.fromtimestamp(int(match.group(1)),tz=timezone.utc).astimezone(TPE)
+        # MM/DD repeats every year, so URL epoch year is part of candidate
+        # selection. Include the previous year only for a January boundary.
+        allowed_years=set(target_years)
+        if any(d.month==1 for d in target_dates):
+            allowed_years|={min(target_years)-1}
+        if posted.year not in allowed_years or posted.astimezone(timezone.utc)>=end_utc:
+            continue
+        marks=",".join("?" for _ in target_md)
+        candidate=db.execute(
+            f"SELECT 1 FROM pushes WHERE article_id=? AND ptt_date IN ({marks}) LIMIT 1",
+            (article_id,*sorted(target_md)),
+        ).fetchone()
+        if candidate is None:
             continue
         raw=db.execute(
             """SELECT source_line,source_page,kind,author,content,ptt_date,ptt_time,collected_at
