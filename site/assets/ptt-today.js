@@ -36,8 +36,20 @@ async function api(path){
  if(!config.apiBase||!/^https:\/\//.test(config.apiBase))throw Error('尚未設定正式 Worker API');
  const base=config.apiBase.replace(/\/$/,'');
  const response=await fetch(base+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}});
- if(!response.ok)throw Error('API HTTP '+response.status);
+ if(!response.ok){
+  const error=new Error('API HTTP '+response.status);
+  error.status=response.status;
+  throw error;
+ }
  return response.json();
+}
+async function loadPttTodayPayload(today){
+ try{
+  return await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
+ }catch(error){
+  if(![400,413,422].includes(Number(error?.status)))throw error;
+  return api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+ }
 }
 function pushKey(row){return String(row.push_id||String(row.aid||'')+':'+String(row.source_line||''))}
 function pttRow(row){
@@ -109,7 +121,7 @@ async function loadPtt(){
  }
  pttLoadInFlight=true;
  try{
-  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
+  const data=await loadPttTodayPayload(today);
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
   const rows=data.pushes.filter(row=>row&&typeof row.content==='string');
   const wasEmpty=!pttLastGoodCount;
