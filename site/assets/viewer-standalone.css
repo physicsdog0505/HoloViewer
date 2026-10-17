@@ -1,5 +1,13 @@
 :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080a0d;color:#f5f7fa}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#080a0d}body{min-height:100vh}
+.client-rail{position:fixed;inset:0 auto 0 0;width:196px;padding:14px 10px;background:#101318;border-right:1px solid #242830;z-index:10}
+.rail-brand,.rail-nav a{display:flex;align-items:center;gap:10px;color:#aeb6c2;text-decoration:none;border-radius:8px}
+.rail-brand{height:42px;padding:0 10px;color:#f5f7fa;font-weight:700;margin-bottom:10px}
+.rail-nav{display:grid;gap:4px}.rail-nav a{min-height:40px;padding:7px 10px;font-size:13px}
+.rail-nav a:hover,.rail-nav a.active{background:#1b2028;color:#fff}
+.rail-icon{display:grid;place-items:center;width:28px;min-width:28px;height:28px;border-radius:7px;background:#1b2028;font-size:11px;font-weight:700}
+.rail-label{white-space:nowrap}
+.viewer-shell{margin-left:196px;min-height:100vh}
 header{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid #242830;background:#101318}
 header strong{font-size:14px}header span{font-size:12px;color:#9ea7b4}
 main{padding:12px;height:calc(100vh - 48px)}
@@ -10,4 +18,4 @@ main{padding:12px;height:calc(100vh - 48px)}
 .player{position:relative;min-width:0;min-height:0;background:#000;border:1px solid #252a33;border-radius:8px;overflow:hidden}
 .player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .empty{display:grid;place-items:center;height:100%;color:#aeb6c2}
-@media(max-width:760px){main{height:auto}.grid,.grid.two,.grid.three{grid-template-columns:1fr;grid-template-rows:none}.grid.three .player:first-child{grid-row:auto}.player{aspect-ratio:16/9}}
+@media(max-width:760px){.client-rail{width:58px;padding-inline:6px}.rail-label{display:none}.rail-brand{padding-inline:9px}.viewer-shell{margin-left:58px}main{height:auto}.grid,.grid.two,.grid.three{grid-template-columns:1fr;grid-template-rows:none}.grid.three .player:first-child{grid-row:auto}.player{aspect-ratio:16/9}}
