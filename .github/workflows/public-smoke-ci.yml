@@ -33,6 +33,7 @@ jobs:
         run: |
           node --check site/assets/app.js
           node --check site/assets/config.js
+          node --check site/assets/viewer-standalone.js
           ! grep -E 'location.reload|eval\(|innerHTML|document.write\(' site/assets/app.js
           test "$(grep -o 'setTimeout(' site/assets/app.js | wc -l | tr -d ' ')" = "1"
           grep -F "pttPollTimer=setTimeout(async()=>{" site/assets/app.js
