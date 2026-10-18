@@ -61,6 +61,7 @@ const pttPanel=document.getElementById('pttPanel');
 const pttFeed=document.getElementById('pttFeed');
 const pttMeta=document.getElementById('pttMeta');
 const pttTitle=document.getElementById('pttTitle');
+const pttShowFloor=document.getElementById('pttShowFloor');
 const pttNewest=document.getElementById('pttNewest');
 const pttFontSize=document.getElementById('pttFontSize');
 const pttFontValue=document.getElementById('pttFontValue');
@@ -796,6 +797,13 @@ function pttRow(row){
  el.append(kindEl,time,floorEl,body);
  return el;
 }
+function setPttFloorVisible(show){
+ pttPanel.classList.toggle('ptt-floor-hidden',!show);
+ pttShowFloor.checked=Boolean(show);
+}
+pttShowFloor.addEventListener('change',()=>setPttFloorVisible(pttShowFloor.checked));
+setPttFloorVisible(false);
+
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
 function pttToLatest(){pttFeed.scrollTop=pttFeed.scrollHeight;pttNewest.hidden=true;pttFollowing=true}
 function resetPttFeed(){
