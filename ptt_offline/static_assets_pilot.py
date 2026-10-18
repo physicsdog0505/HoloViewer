@@ -11,6 +11,7 @@ import gzip
 import json
 import shutil
 import sqlite3
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
@@ -23,6 +24,8 @@ from .r2_archive_export import (_key, _per_thread_floors, _utc, vod_minute,
 
 TPE=ZoneInfo("Asia/Taipei")
 STATUS_PRIORITY={"COMPLETE":0,"UNKNOWN":1,"PARTIAL":2,"MISSING":3}
+SOURCE_MANIFEST_KEY="ptt/v1/manifests/2026-10-pilot.json"
+FULL_MANIFEST_KEY="ptt/v1/manifests/static-assets-full-2026-10.json"
 
 
 def _manifest_digest(path: Path) -> str:
@@ -122,6 +125,185 @@ def build_static_bundle(*, archive_root: Path, out_dir: Path,
             "pushes":pilot["total_pushes"],
             "canonical_bytes":sum((out_dir/item["key"]).stat().st_size for item in selected),
             "manifest":str(pilot_path),"worker_code":False,"d1_bindings":0}
+
+
+def _full_source(archive_root: Path) -> tuple[Path,dict,list[tuple[dict,bytes,int]]]:
+    manifest_path=archive_root/SOURCE_MANIFEST_KEY
+    try:
+        manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError,UnicodeDecodeError,json.JSONDecodeError) as exc:
+        raise ContractError("invalid full source manifest") from exc
+    objects=manifest.get("objects",[])
+    keys=[item.get("key") for item in objects]
+    if len(keys)!=len(set(keys)):
+        raise ContractError("full source manifest has duplicate object key")
+    if manifest.get("total_objects")!=len(objects):
+        raise ContractError("full source manifest object count mismatch")
+    if manifest.get("total_pushes")!=sum(item.get("pushes",-1) for item in objects):
+        raise ContractError("full source manifest push count mismatch")
+    loaded=[]
+    for item in objects:
+        if not item["key"].endswith(".json.gz"):
+            raise ContractError(f"source archive object is not JSON gzip: {item['key']}")
+        payload,raw,gzip_size=_read_object_bytes(archive_root,item)
+        if item.get("bytes_gzip")!=gzip_size:
+            raise ContractError(f"source gzip byte count mismatch: {item['key']}")
+        loaded.append((payload,raw,gzip_size))
+    return manifest_path,manifest,loaded
+
+
+def audit_full_static_bundle(*, archive_root: Path, out_dir: Path,
+                             write_receipt: bool=True) -> dict:
+    """Independently reread a complete Static Assets package and its source."""
+    source_path,source,source_loaded=_full_source(archive_root)
+    manifest_path=out_dir/FULL_MANIFEST_KEY
+    try:
+        manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError,UnicodeDecodeError,json.JSONDecodeError) as exc:
+        raise ContractError("invalid full Static Assets manifest") from exc
+    source_objects=source["objects"]
+    objects=manifest.get("objects",[])
+    source_keys=[item["key"] for item in source_objects]
+    output_keys=[item.get("key") for item in objects]
+    expected_output_keys=[key.removesuffix(".gz") for key in source_keys]
+    if len(output_keys)!=len(set(output_keys)):
+        raise ContractError("full Static Assets manifest has duplicate output key")
+    if manifest.get("total_objects")!=len(objects) or output_keys!=expected_output_keys:
+        raise ContractError("full Static Assets object set differs from source manifest")
+    if manifest.get("source_manifest_sha256")!=_manifest_digest(source_path):
+        raise ContractError("full Static Assets source manifest SHA mismatch")
+    source_identities=[]
+    output_identities=[]
+    aid_floors=[]
+    canonical_bytes=0
+    for source_item,(source_payload,source_raw,source_gzip_size),item in zip(
+            source_objects,source_loaded,objects):
+        expected_key=source_item["key"].removesuffix(".gz")
+        if item.get("key")!=expected_key or item.get("source_archive_key")!=source_item["key"]:
+            raise ContractError(f"source archive mapping mismatch: {source_item['key']}")
+        target=out_dir/expected_key
+        try:
+            raw=target.read_bytes()
+            payload=json.loads(raw)
+        except (OSError,UnicodeDecodeError,json.JSONDecodeError) as exc:
+            raise ContractError(f"invalid canonical JSON asset: {expected_key}") from exc
+        digest=sha256(raw).hexdigest()
+        if digest!=item.get("sha256") or digest!=source_item["sha256"]:
+            raise ContractError(f"canonical asset SHA mismatch: {expected_key}")
+        if len(raw)!=item.get("bytes_json"):
+            raise ContractError(f"canonical asset byte count mismatch: {expected_key}")
+        if item.get("source_gzip_bytes")!=source_gzip_size:
+            raise ContractError(f"source gzip mapping byte count mismatch: {expected_key}")
+        if len(payload.get("pushes",[]))!=item.get("pushes"):
+            raise ContractError(f"canonical asset push count mismatch: {expected_key}")
+        if raw!=source_raw:
+            raise ContractError(f"canonical asset bytes differ from source: {expected_key}")
+        canonical_bytes+=len(raw)
+        for row in source_payload["pushes"]:
+            source_identities.append(row["source_record_key"])
+        for row in payload["pushes"]:
+            output_identities.append(row["source_record_key"])
+            if row.get("floor") is None:
+                raise ContractError(f"unexpected floor=null: {row['source_record_key']}")
+            aid_floors.append((row["aid"],row["floor"]))
+    if len(source_identities)!=len(set(source_identities)):
+        raise ContractError("source archive has duplicate source_record_key")
+    if len(output_identities)!=len(set(output_identities)):
+        raise ContractError("Static Assets package has duplicate source_record_key")
+    if len(aid_floors)!=len(set(aid_floors)):
+        raise ContractError("Static Assets package has duplicate AID/floor")
+    if set(output_identities)!=set(source_identities):
+        raise ContractError("Static Assets identity set differs from source archive")
+    if manifest.get("total_pushes")!=len(output_identities):
+        raise ContractError("full Static Assets total push count mismatch")
+    if manifest.get("total_canonical_bytes")!=canonical_bytes:
+        raise ContractError("full Static Assets canonical byte total mismatch")
+    if manifest.get("days")!=source.get("days"):
+        raise ContractError("full Static Assets coverage matrix differs from source")
+    gzip_assets=sorted(str(path.relative_to(out_dir)) for path in out_dir.rglob("*.gz"))
+    if gzip_assets:
+        raise ContractError("full Static Assets package contains .gz output")
+    coverage=dict(Counter(day["coverage_status"] for day in manifest["days"]))
+    audit={
+        "status":"PASS","source_manifest_sha256":_manifest_digest(source_path),
+        "manifest_sha256":_manifest_digest(manifest_path),
+        "total_objects":len(objects),"total_pushes":len(output_identities),
+        "total_canonical_bytes":canonical_bytes,
+        "duplicate_source_record_keys":0,"duplicate_aid_floors":0,
+        "floor_unknown_rows":0,"identity_set_preserved":True,
+        "source_archive_mapping_exact":True,"asset_sha_exact":True,
+        "asset_byte_length_exact":True,"gzip_assets":0,
+        "coverage_status_counts":coverage,
+    }
+    if write_receipt:
+        receipt_path=out_dir.parent/"full-build-audit.json"
+        receipt_path.write_text(json.dumps(audit,ensure_ascii=False,indent=2)+"\n",
+                                encoding="utf-8")
+        audit["receipt"]=str(receipt_path)
+    return audit
+
+
+def build_full_static_bundle(*, archive_root: Path, out_dir: Path) -> dict:
+    """Build every object declared by the accepted source manifest."""
+    if out_dir.exists():
+        raise ContractError(f"full Static Assets output already exists: {out_dir}")
+    manifest_path,manifest,loaded=_full_source(archive_root)
+    selected=[]
+    for item,(_,raw,gzip_size) in zip(manifest["objects"],loaded):
+        asset_key=item["key"].removesuffix(".gz")
+        target=out_dir/asset_key
+        target.parent.mkdir(parents=True,exist_ok=True)
+        target.write_bytes(raw)
+        asset_item=dict(item)
+        asset_item["key"]=asset_key
+        asset_item["source_archive_key"]=item["key"]
+        asset_item["bytes_json"]=len(raw)
+        asset_item["source_gzip_bytes"]=gzip_size
+        asset_item.pop("bytes_gzip",None)
+        selected.append(asset_item)
+    full={
+        "schema_version":manifest["schema_version"],
+        "precision":manifest["precision"],
+        "chunk_minutes":manifest["chunk_minutes"],
+        "timezone":manifest["timezone"],
+        "source_manifest_sha256":_manifest_digest(manifest_path),
+        "from_day_taipei":manifest["from_day_taipei"],
+        "through_day_taipei":manifest["through_day_taipei"],
+        "days":manifest["days"],
+        "total_pushes":manifest["total_pushes"],
+        "total_objects":manifest["total_objects"],
+        "total_canonical_bytes":sum(item["bytes_json"] for item in selected),
+        "objects":selected,
+    }
+    full_path=out_dir/FULL_MANIFEST_KEY
+    full_path.parent.mkdir(parents=True,exist_ok=True)
+    full_path.write_text(json.dumps(full,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    (out_dir/"_headers").write_text(
+        "/ptt/v1/chunks/*\n"
+        "  Content-Type: application/json\n"
+        "  Cache-Control: public, max-age=0, must-revalidate\n"
+        "  Access-Control-Allow-Origin: *\n"
+        "  X-Content-Type-Options: nosniff\n\n"
+        "/ptt/v1/manifests/*\n"
+        "  Content-Type: application/json; charset=utf-8\n"
+        "  Cache-Control: no-cache\n"
+        "  Access-Control-Allow-Origin: *\n"
+        "  X-Content-Type-Options: nosniff\n",encoding="utf-8")
+    config={"name":"holoviewer-ptt-static-assets-full-offline",
+            "compatibility_date":"2026-10-18",
+            "assets":{"directory":"./public","not_found_handling":"404-page"}}
+    (out_dir.parent/"wrangler.jsonc").write_text(
+        json.dumps(config,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    browser_check=Path(__file__).with_name("static_assets_pilot")/"public/browser-check.html"
+    if browser_check.is_file():
+        harness=browser_check.read_text(encoding="utf-8").replace(
+            "/ptt/v1/manifests/static-assets-pilot.json",f"/{FULL_MANIFEST_KEY}")
+        (out_dir/"browser-check.html").write_text(harness,encoding="utf-8")
+    audit=audit_full_static_bundle(archive_root=archive_root,out_dir=out_dir)
+    return {"status":"STATIC_FULL_BUNDLE_READY","manifest":str(full_path),
+            "objects":full["total_objects"],"pushes":full["total_pushes"],
+            "canonical_bytes":full["total_canonical_bytes"],"audit":audit,
+            "worker_code":False,"d1_bindings":0}
 
 
 def _floor_indexes(source_paths: list[Path]) -> list[dict[tuple[str,int],tuple[int,str]]]:
@@ -362,6 +544,12 @@ def main(argv=None):
     bundle.add_argument("--archive-root",required=True,type=Path)
     bundle.add_argument("--out-dir",required=True,type=Path)
     bundle.add_argument("--object",required=True,action="append")
+    full_bundle=commands.add_parser("build-full-bundle")
+    full_bundle.add_argument("--archive-root",required=True,type=Path)
+    full_bundle.add_argument("--out-dir",required=True,type=Path)
+    full_audit=commands.add_parser("audit-full-bundle")
+    full_audit.add_argument("--archive-root",required=True,type=Path)
+    full_audit.add_argument("--out-dir",required=True,type=Path)
     resolve=commands.add_parser("resolve-vod")
     resolve.add_argument("--archive-root",required=True,type=Path)
     resolve.add_argument("--manifest",required=True,type=Path)
@@ -379,6 +567,10 @@ def main(argv=None):
     elif args.command=="build-bundle":
         result=build_static_bundle(archive_root=args.archive_root,out_dir=args.out_dir,
                                    object_keys=args.object)
+    elif args.command=="build-full-bundle":
+        result=build_full_static_bundle(archive_root=args.archive_root,out_dir=args.out_dir)
+    elif args.command=="audit-full-bundle":
+        result=audit_full_static_bundle(archive_root=args.archive_root,out_dir=args.out_dir)
     elif args.command=="resolve-vod":
         result=resolve_vod(archive_root=args.archive_root,manifest_path=args.manifest,
                            actual_start=args.actual_start,actual_end=args.actual_end,

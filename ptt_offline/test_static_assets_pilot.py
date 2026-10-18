@@ -13,7 +13,8 @@ from urllib.request import urlopen
 from ptt_offline.r2_archive_export import write_archive_rows
 from ptt_offline.public_today_contract import ContractError
 from ptt_offline.static_assets_pilot import (build_static_bundle,
-    enrich_archive_floors, resolve_vod)
+    audit_full_static_bundle, build_full_static_bundle, enrich_archive_floors,
+    resolve_vod)
 
 
 class _AssetHandler(SimpleHTTPRequestHandler):
@@ -100,6 +101,101 @@ class StaticAssetsPilotTests(unittest.TestCase):
             self.assertNotIn("Content-Encoding",headers)
             self.assertIn("must-revalidate",headers)
             self.assertIn("Cache-Control: no-cache",headers)
+
+    def test_pilot_bundle_keeps_one_to_three_object_cap(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            source=base/"source"
+            manifest=self.make_archive(source)
+            keys=[item["key"] for item in manifest["objects"]]
+            self.assertEqual(len(keys),4)
+            with self.assertRaisesRegex(ContractError,"1-3 distinct objects"):
+                build_static_bundle(archive_root=source,out_dir=base/"package/public",
+                                    object_keys=keys)
+
+    def test_full_bundle_uses_entire_manifest_and_audits_identity_and_floor(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            source=base/"source"
+            source_manifest=self.make_archive(source)
+            public=base/"package/public"
+            receipt=build_full_static_bundle(archive_root=source,out_dir=public)
+            manifest=json.loads(Path(receipt["manifest"]).read_text())
+            self.assertEqual(receipt["objects"],source_manifest["total_objects"])
+            self.assertEqual(receipt["pushes"],source_manifest["total_pushes"])
+            self.assertEqual([item["source_archive_key"] for item in manifest["objects"]],
+                             [item["key"] for item in source_manifest["objects"]])
+            self.assertEqual([item["key"] for item in manifest["objects"]],
+                             [item["key"].removesuffix(".gz")
+                              for item in source_manifest["objects"]])
+            self.assertFalse(list(public.rglob("*.gz")))
+            self.assertNotIn("Content-Encoding",(public/"_headers").read_text())
+            audit=audit_full_static_bundle(archive_root=source,out_dir=public,
+                                           write_receipt=False)
+            self.assertEqual(audit["status"],"PASS")
+            self.assertTrue(audit["identity_set_preserved"])
+            self.assertEqual(audit["floor_unknown_rows"],0)
+            self.assertEqual(audit["duplicate_source_record_keys"],0)
+            self.assertEqual(audit["duplicate_aid_floors"],0)
+            for item in manifest["objects"]:
+                raw=(public/item["key"]).read_bytes()
+                self.assertEqual(sha256(raw).hexdigest(),item["sha256"])
+                self.assertEqual(len(raw),item["bytes_json"])
+
+    def test_full_bundle_cannot_silently_select_manifest_subset(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            source=base/"source"
+            self.make_archive(source)
+            manifest_path=source/"ptt/v1/manifests/2026-10-pilot.json"
+            manifest=json.loads(manifest_path.read_text())
+            manifest["objects"].pop()
+            manifest_path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ContractError,"object count mismatch"):
+                build_full_static_bundle(archive_root=source,out_dir=base/"package/public")
+            self.assertFalse((base/"package").exists())
+
+    def test_full_bundle_rejects_duplicate_source_object_key(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            source=base/"source"
+            self.make_archive(source)
+            manifest_path=source/"ptt/v1/manifests/2026-10-pilot.json"
+            manifest=json.loads(manifest_path.read_text())
+            manifest["objects"].append(dict(manifest["objects"][0]))
+            manifest["total_objects"]+=1
+            manifest["total_pushes"]+=manifest["objects"][0]["pushes"]
+            manifest_path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ContractError,"duplicate object key"):
+                build_full_static_bundle(archive_root=source,out_dir=base/"package/public")
+            self.assertFalse((base/"package").exists())
+
+    def test_full_bundle_rejects_duplicate_row_identity_without_pass_receipt(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            source=base/"source"
+            self.make_archive(source)
+            manifest_path=source/"ptt/v1/manifests/2026-10-pilot.json"
+            manifest=json.loads(manifest_path.read_text())
+            first_path=source/manifest["objects"][0]["key"]
+            with gzip.open(first_path,"rt",encoding="utf-8") as handle:
+                duplicate_identity=json.load(handle)["pushes"][0]["source_record_key"]
+            item=manifest["objects"][1]
+            object_path=source/item["key"]
+            with gzip.open(object_path,"rt",encoding="utf-8") as handle:
+                payload=json.load(handle)
+            payload["pushes"][0]["source_record_key"]=duplicate_identity
+            raw=json.dumps(payload,ensure_ascii=False,separators=(",",":")).encode()
+            with object_path.open("wb") as output:
+                with gzip.GzipFile(filename="",mode="wb",fileobj=output,mtime=0) as handle:
+                    handle.write(raw)
+            item["sha256"]=sha256(raw).hexdigest()
+            item["bytes_gzip"]=object_path.stat().st_size
+            manifest_path.write_text(json.dumps(manifest))
+            package=base/"package"
+            with self.assertRaisesRegex(ContractError,"duplicate source_record_key"):
+                build_full_static_bundle(archive_root=source,out_dir=package/"public")
+            self.assertFalse((package/"full-build-audit.json").exists())
 
     def test_http_headers_and_canonical_json_readback(self):
         with tempfile.TemporaryDirectory() as td:

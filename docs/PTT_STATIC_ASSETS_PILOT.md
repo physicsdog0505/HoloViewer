@@ -137,8 +137,32 @@ Local integration results:
   browser-decoded raw JSON bytes with Web Crypto and compares them to the
   manifest before parsing or rendering.
 - Static route bypass: PASS by construction and configuration; there is no
-  executable Worker or database binding. Remote Cloudflare routing remains NOT
-  VERIFIED until a separately approved test deploy.
+  executable Worker or database binding. The three-object remote pilot passed;
+  the full package remains offline and has not been deployed.
+
+## Reproducible full offline package
+
+`build-bundle` remains limited to one through three explicitly selected
+objects. The separate `build-full-bundle` command has no object-selection
+option: it consumes every object, in order, from the accepted
+`2026-10-pilot.json` source manifest and writes
+`static-assets-full-2026-10.json`.
+
+```sh
+python3 -B -m ptt_offline.static_assets_pilot build-full-bundle \
+  --archive-root "$ARCHIVE_FLOOR_ONLY" \
+  --out-dir "$STATIC_PACKAGE_FULL/public"
+
+python3 -B -m ptt_offline.static_assets_pilot audit-full-bundle \
+  --archive-root "$ARCHIVE_FLOOR_ONLY" \
+  --out-dir "$STATIC_PACKAGE_FULL/public"
+```
+
+The independent audit rereads all source gzip objects and all generated
+canonical JSON assets. It rejects count, SHA, byte length, source mapping,
+identity, floor, coverage, JSON, or unexpected gzip-output mismatches. A PASS
+receipt is written beside `public/` only after every check succeeds. These are
+offline preparation commands and do not deploy Cloudflare resources.
 
 ## Real VOD timeline receipts
 
