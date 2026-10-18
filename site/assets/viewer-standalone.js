@@ -1157,7 +1157,10 @@ function syncVodPttTimeline({forceFollow=false}={}){
  pttNewest.textContent=clock?'最新 · '+clock:'最新';
  if(seeked){
   pttFollowing=true;
-  requestAnimationFrame(pttToLatest);
+  requestAnimationFrame(()=>{
+   pttFeed.scrollTop=pttFeed.scrollHeight;
+   pttNewest.hidden=true;
+  });
  }else if(pttFollowing||pttAtBottom()){
   requestAnimationFrame(()=>{
    pttFeed.scrollTop=pttFeed.scrollHeight;
