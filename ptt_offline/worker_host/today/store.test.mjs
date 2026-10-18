@@ -4,19 +4,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
-import {writeEvidence,setCoverage,readToday} from './store.mjs';
+import {writeEvidence,setCoverage,readToday,YOUTUBE_LIVE_SOURCE,HISTORY_SOURCE_REVISION} from './store.mjs';
 const C='UC'+'A'.repeat(22), V='abcdefghijk';
 function fixture({id=V,state='live',observed='2026-10-15T11:59:00Z',end=null,group='hololive'}={}) {
   return {video_id:id,channel_id:C,roster_version:'fixture-v1',group,
     title:'Fixture',channel_name:'Fixture channel',lifecycle_state:state,
     observed_at:observed,scheduled_start:'2026-10-16T00:00:00Z',
     actual_start:state==='upcoming'?null:'2026-10-15T11:00:00Z',
-    actual_end:end,source_label:'YouTube'};
+    actual_end:end,source_label:YOUTUBE_LIVE_SOURCE};
 }
 function db() {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8'));
   sqlite.exec('CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)');
+  sqlite.exec(`CREATE TABLE public_history(
+    video_id TEXT PRIMARY KEY NOT NULL,taipei_day TEXT NOT NULL,title TEXT NOT NULL,
+    channel_id TEXT NOT NULL,channel_name TEXT NOT NULL DEFAULT '',avatar_url TEXT NOT NULL DEFAULT '',
+    scheduled_start TEXT,actual_start TEXT,actual_end TEXT NOT NULL,source_revision TEXT NOT NULL,published_at TEXT NOT NULL
+  )`);
   function statement(sql,params=[]){
     return {
       bind(...values){return statement(sql,values)},
@@ -163,7 +168,7 @@ test('Today LIMIT explicitly reports truncation, retaining title and source for 
  const d=db();
  for(let i=0;i<201;i++){
   const video_id='v'+String(i).padStart(10,'0');
-  await writeEvidence(d,{...fixture({id:video_id,observed:'2026-10-15T11:59:00Z'}),title:i===0?'重大告知 生日':'Other',source_label:'YouTube'});
+  await writeEvidence(d,{...fixture({id:video_id,observed:'2026-10-15T11:59:00Z'}),title:i===0?'重大告知 生日':'Other',source_label:YOUTUBE_LIVE_SOURCE});
  }
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
  const x=await readToday(d,{day:'2026-10-15',limit:200,now:new Date('2026-10-15T12:00:00Z')});
@@ -326,7 +331,7 @@ test('ended Today row exposes authoritative YouTube actual bounds for same-day P
   scheduled_start:'2026-10-18T03:15:00Z',
   actual_start:'2026-10-18T03:15:53Z',
   actual_end:'2026-10-18T04:49:00Z',
-  source_label:'YouTube'
+  source_label:YOUTUBE_LIVE_SOURCE
  });
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T04:50:19Z',
   expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
@@ -359,5 +364,84 @@ test('Today projection never exposes untrusted actual bounds as authoritative',a
  assert.equal(x.streams[0].actual_end,null);
  assert.equal(x.streams[0].anchor_source,null);
  assert.equal(x.streams[0].start_at,'2026-10-18T03:15:00Z');
+ d.close();
+});
+
+
+test('trusted ended evidence is idempotently projected into recent public_history',async()=>{
+ const d=db();
+ const ended={
+  ...fixture({id:'recenthist01',state:'ended',observed:'2026-10-18T05:00:00Z',end:'2026-10-18T04:49:00Z'}),
+  scheduled_start:'2026-10-18T03:15:00Z',
+  actual_start:'2026-10-18T03:15:53Z',
+  actual_end:'2026-10-18T04:49:00Z',
+  source_label:YOUTUBE_LIVE_SOURCE
+ };
+ await writeEvidence(d,ended);
+ const row=d.raw.prepare('SELECT * FROM public_history WHERE video_id=?').get('recenthist01');
+ assert.equal(row.taipei_day,'2026-10-18');
+ assert.equal(row.actual_start,'2026-10-18T03:15:53Z');
+ assert.equal(row.actual_end,'2026-10-18T04:49:00Z');
+ assert.equal(row.source_revision,HISTORY_SOURCE_REVISION);
+ assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthist01').n,1);
+ const newer={...ended,observed_at:'2026-10-18T05:05:00Z'};
+ await writeEvidence(d,newer);
+ assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthist01').n,1);
+ assert.equal(d.raw.prepare('SELECT published_at FROM public_history WHERE video_id=?').get('recenthist01').published_at,'2026-10-18T05:05:00Z');
+ d.close();
+});
+
+test('Today 4174 rules keep yesterday ended until noon, then remove it',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'yesterday01',state:'ended',observed:'2026-10-17T15:55:00Z',end:'2026-10-17T15:50:00Z'}),
+  scheduled_start:'2026-10-17T14:00:00Z',actual_start:'2026-10-17T14:01:00Z',
+  actual_end:'2026-10-17T15:50:00Z',source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T01:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const morning=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T03:59:59Z')});
+ assert.deepEqual(morning.streams.map(x=>x.video_id),['yesterday01']);
+ const noon=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:00:00Z')});
+ assert.deepEqual(noon.streams.map(x=>x.video_id),[]);
+ d.close();
+});
+
+test('Today 4174 rules keep fresh live regardless start date and drop stale live',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'oldlive0001',state:'live',observed:'2026-10-18T03:50:00Z'}),
+  scheduled_start:'2026-10-16T03:00:00Z',actual_start:'2026-10-16T03:01:00Z',
+  actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T03:50:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const fresh=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:10:00Z')});
+ assert.equal(fresh.streams[0].video_id,'oldlive0001');
+ assert.equal(fresh.streams[0].lifecycle_state,'live');
+ const stale=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:10:01Z')});
+ assert.equal(stale.streams.length,0);
+ d.close();
+});
+
+test('Today 4174 rules keep current-day and future upcoming without observation freshness',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'todayupcom1',state:'upcoming',observed:'2026-10-17T00:00:00Z'}),
+  scheduled_start:'2026-10-18T08:00:00Z',actual_start:null,actual_end:null
+ });
+ await writeEvidence(d,{
+  ...fixture({id:'futureup001',state:'upcoming',observed:'2026-10-17T00:00:00Z'}),
+  scheduled_start:'2026-10-20T08:00:00Z',actual_start:null,actual_end:null
+ });
+ await writeEvidence(d,{
+  ...fixture({id:'pastupcom01',state:'upcoming',observed:'2026-10-17T00:00:00Z'}),
+  scheduled_start:'2026-10-17T08:00:00Z',actual_start:null,actual_end:null
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T05:00:00Z')});
+ assert.deepEqual(new Set(x.streams.map(r=>r.video_id)),new Set(['todayupcom1','futureup001']));
+ assert.ok(x.streams.every(r=>r.lifecycle_state==='upcoming'||r.lifecycle_state==='waiting'));
  d.close();
 });
