@@ -63,7 +63,11 @@
       <button type="button" role="tab" data-library-tab="history" aria-selected="false">歷史影片</button>
      </div>
      <div id="liveLibrary" role="tabpanel"><div class="library-display"><span class="empty-note">選擇想一起觀看的直播</span><button id="displayMode" type="button">精簡列表</button></div><div id="custom-live-picker" class="live-picker-list"></div><p id="custom-live-empty" class="empty-note">目前沒有可用的直播，仍可貼上影片網址。</p></div>
-     <div id="historyLibrary" role="tabpanel" hidden><p class="library-empty">歷史影片搜尋功能準備中。目前可直接貼上 YouTube 影片網址加入觀看清單。</p></div>
+     <div id="historyLibrary" role="tabpanel" hidden>
+      <div class="library-display"><label>日期 <input id="customHistoryDate" type="date" aria-label="歷史影片日期"></label></div>
+      <div id="custom-history-picker" class="live-picker-list"></div>
+      <p id="custom-history-empty" class="empty-note">選擇日期後載入歷史影片。</p>
+     </div>
     </div>
    </section>
    <aside class="selection-panel">
