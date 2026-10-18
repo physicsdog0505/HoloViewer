@@ -99,7 +99,7 @@ function trustedArchiveWindow(item){
 function archiveScheduledStart(item,window){
  const scheduledStart=String(item?.scheduled_start||'');
  const scheduledMs=Date.parse(scheduledStart),actualMs=Date.parse(String(window?.start||''));
- return Number.isFinite(scheduledMs)&&Number.isFinite(actualMs)&&scheduledMs<=actualMs?scheduledStart:'';
+ return Number.isFinite(scheduledMs)&&Number.isFinite(actualMs)&&Math.abs(scheduledMs-actualMs)<=43200000?scheduledStart:'';
 }
 function appendArchiveWindow(query,window){
  if(!window)return;
