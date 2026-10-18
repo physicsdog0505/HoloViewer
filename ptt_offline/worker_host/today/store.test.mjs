@@ -317,3 +317,47 @@ test('Today membership uses actual/scheduled starts, not later refresh or end ti
  assert.equal(d.raw.prepare('SELECT COUNT(*) AS n FROM public_today_canonical').get().n,cases.length);
  d.close();
 });
+
+
+test('ended Today row exposes authoritative YouTube actual bounds for same-day PTT bridge',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'zPCcFbCONek',state:'ended',observed:'2026-10-18T04:50:19Z',end:'2026-10-18T04:49:00Z'}),
+  scheduled_start:'2026-10-18T03:15:00Z',
+  actual_start:'2026-10-18T03:15:53Z',
+  actual_end:'2026-10-18T04:49:00Z',
+  source_label:'YouTube'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T04:50:19Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:51:00Z')});
+ assert.equal(x.streams.length,1);
+ const row=x.streams[0];
+ assert.equal(row.video_id,'zPCcFbCONek');
+ assert.equal(row.lifecycle_state,'ended');
+ assert.equal(row.actual_start,'2026-10-18T03:15:53Z');
+ assert.equal(row.actual_end,'2026-10-18T04:49:00Z');
+ assert.equal(row.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+ assert.equal(row.start_at,row.actual_start);
+ d.close();
+});
+
+test('Today projection never exposes untrusted actual bounds as authoritative',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'untrusted01',state:'ended',observed:'2026-10-18T04:50:19Z',end:'2026-10-18T04:49:00Z'}),
+  scheduled_start:'2026-10-18T03:15:00Z',
+  actual_start:'2026-10-18T03:15:53Z',
+  actual_end:'2026-10-18T04:49:00Z',
+  source_label:'legacy-import'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T04:50:19Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:51:00Z')});
+ assert.equal(x.streams.length,1);
+ assert.equal(x.streams[0].actual_start,null);
+ assert.equal(x.streams[0].actual_end,null);
+ assert.equal(x.streams[0].anchor_source,null);
+ assert.equal(x.streams[0].start_at,'2026-10-18T03:15:00Z');
+ d.close();
+});
