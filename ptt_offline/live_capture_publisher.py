@@ -120,7 +120,8 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
             "source_identity":source_identity,"candidate_rows":ready,
             "pending_source_lines":pending,"checked_source_rows":len(raw),
             "scan_truncated":truncated,
-            "earliest_scanned_source_line":min((r[0] for r in raw[:max_rows]),default=None)}
+            "earliest_scanned_source_line":min((r[0] for r in raw[:max_rows]),default=None),
+            "latest_scanned_source_line":max((r[0] for r in raw[:max_rows]),default=None)}
 
 def content_digest(row):
     return sha256(json.dumps([row.get(k) for k in OUTPUT_KEYS if k!="time_proof"],
@@ -155,6 +156,9 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             if current.get("source_identity")!=plan["source_identity"]:
                 raise ContractError("live source identity changed; separate state needed")
         accepted=dict(current.get("accepted",{}))
+        baseline_source_line=current.get("baseline_source_line")
+        if baseline_source_line is not None and (type(baseline_source_line) is not int or baseline_source_line<0):
+            raise ContractError("invalid baseline source-line frontier")
         # Last-N scanning cannot establish that older source rows were ever
         # inspected. Refuse first-time live publication from a truncated scan;
         # otherwise an old backlog could disappear without gap evidence.
@@ -164,20 +168,23 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
         # live baseline instead of promoting all pre-existing eligible rows
         # into an implicit historical catch-up. This receipt performs no
         # remote write. Subsequent rows are compared against this baseline.
-        if not current and plan["candidate_rows"]:
+        if not current and plan["latest_scanned_source_line"] is not None:
             baseline={row["source_record_key"]:content_digest(row)
                       for row in plan["candidate_rows"]}
+            baseline_source_line=plan["latest_scanned_source_line"]
             atomic_receipt(path,{"status":"BASELINED",
                 "source_identity":plan["source_identity"],
                 "accepted":baseline,
-                "baseline_source_line":max(row["source_line"] for row in plan["candidate_rows"]),
+                "baseline_source_line":baseline_source_line,
                 "legacy_backlog_fence_v2":True,
                 "legacy_baselined":0,
                 "pending_count":len(plan["pending_source_lines"])})
             return {"status":"BASELINED","aid":plan["aid"],"eligible":0,
-                    "baselined":len(baseline),"pending":len(plan["pending_source_lines"]),
+                    "baselined":len(baseline),"baseline_source_line":baseline_source_line,
+                    "pending":len(plan["pending_source_lines"]),
                     "source_identity":plan["source_identity"],"sent":0}
         missing=[]
+        baseline_skipped=[]
         mutations=[]
         for row in plan["candidate_rows"]:
             key=row["source_record_key"]
@@ -185,7 +192,11 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             if key in accepted and accepted[key]!=digest:
                 mutations.append({"aid":plan["aid"],
                     "source_record_key":key,"source_line":row["source_line"]})
-            if key not in accepted:missing.append(row)
+            if key not in accepted:
+                if baseline_source_line is not None and row["source_line"]<=baseline_source_line:
+                    baseline_skipped.append(row)
+                else:
+                    missing.append(row)
 
         # PTT pagination may transiently shift an already-ACKed source line.
         # Quarantine only this AID for this snapshot, without changing its
@@ -197,6 +208,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
                     "mutation_count":len(mutations),"mutations":mutations,
                     "eligible":0,"fresh_eligible":0,
                     "legacy_baseline_candidates":0,
+                    "baseline_skipped_candidates":len(baseline_skipped),
                     "retained_recovery_candidates":0,
                     "burst_safe_candidates":0,"stale_fenced_rows":0,
                     "pending":len(plan["pending_source_lines"]),
@@ -227,6 +239,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
                 atomic_receipt(path,{"status":"ACKED",
                     "source_identity":plan["source_identity"],
                     "accepted":accepted,
+                    "baseline_source_line":baseline_source_line,
                     "legacy_backlog_fence_v2":True,
                     "legacy_baselined":legacy_baselined,
                     "reconciled_from_remote_commit":bool(current.get("reconciled_from_remote_commit")),
@@ -246,6 +259,8 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
                  "eligible":len(missing),"fresh_eligible":fresh_eligible,
                  "legacy_baselined":legacy_baselined,
                  "legacy_baseline_candidates":stale_legacy_candidates,
+                 "baseline_skipped_candidates":len(baseline_skipped),
+                 "baseline_source_line":baseline_source_line,
                  "stale_fenced_rows":stale_fenced_rows,
                  "retained_recovery_candidates":retained_recovery_candidates,
                  "burst_safe_candidates":burst_safe_candidates,
@@ -273,6 +288,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
         batch=make_batch(checkpoint=checkpoint,rows=rows,batch_cap=batch_cap)
         atomic_receipt(path,{"status":"REMOTE_UNCERTAIN","source_identity":plan["source_identity"],
                             "accepted":accepted,"pending_batch_id":batch["batch_id"],
+                            "baseline_source_line":baseline_source_line,
                             "legacy_backlog_fence_v2":bool(current.get("legacy_backlog_fence_v2")),
                             "reconciled_from_remote_commit":bool(current.get("reconciled_from_remote_commit"))})
         ack=execute_once(batch=batch,executor=executor,max_rows=batch_cap,
@@ -282,6 +298,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             accepted[row["source_record_key"]]=content_digest(row)
         atomic_receipt(path,{"status":"ACKED","source_identity":plan["source_identity"],
                             "accepted":accepted,"last_batch_id":batch["batch_id"],
+                            "baseline_source_line":baseline_source_line,
                             "legacy_backlog_fence_v2":bool(current.get("legacy_backlog_fence_v2")),
                             "reconciled_from_remote_commit":bool(current.get("reconciled_from_remote_commit")),
                             "pending_count":len(plan["pending_source_lines"])})
