@@ -218,3 +218,32 @@ test('successful provider response before threshold resets miss state and restor
  assert.equal(row.lifecycle_observed_at,'2026-10-18T08:35:00Z');
  d.close();
 });
+
+
+test('legacy ended omitted repeatedly by provider remains ended and is never retired',async()=>{
+ const d=retirementDb();
+ const cid='UC'+'E'.repeat(22);
+ d.raw.prepare(`INSERT INTO public_today_canonical
+  (video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,
+   lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum)
+  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+   'endedmiss01',cid,'v85','hololive','Ended','Channel','ended',
+   '2026-10-17T09:30:00Z','2026-10-17T09:30:00Z',
+   '2026-10-17T08:00:00Z','2026-10-17T08:01:00Z','2026-10-17T09:00:00Z','YouTube','legacy'
+  );
+ const env={TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d};
+ for(let i=0;i<PROVIDER_MISS_RETIRE_THRESHOLD+1;i++){
+  const out=await refreshKnownTodayLifecycle(env,{
+   now:new Date(Date.parse('2026-10-18T08:30:00Z')+i*300000),
+   fetchImpl:emptyVideos
+  });
+  assert.equal(out.retired_missing,0);
+  const row=d.raw.prepare('SELECT lifecycle_state,actual_end,lifecycle_observed_at FROM public_today_canonical WHERE video_id=?').get('endedmiss01');
+  assert.ok(row);
+  assert.equal(row.lifecycle_state,'ended');
+  assert.equal(row.actual_end,'2026-10-17T09:00:00Z');
+  assert.equal(row.lifecycle_observed_at,'2026-10-17T09:30:00Z');
+  assert.equal(d.raw.prepare('SELECT * FROM public_today_provider_misses WHERE video_id=?').get('endedmiss01'),undefined);
+ }
+ d.close();
+});
