@@ -374,13 +374,54 @@ function renderHomeHighlights(rows){
 
 let homeLoadInFlight=false;
 let homeCatalogRows=[];
+function homeTimestamp(item,fields){
+ for(const field of fields){
+  const raw=String(item?.[field]||'').trim();
+  if(!raw)continue;
+  const ms=Date.parse(raw);
+  if(Number.isFinite(ms))return ms;
+ }
+ return null;
+}
+function homeStartTimestamp(item){return homeTimestamp(item,['actual_start','scheduled_start','start_at'])}
+function homeEndTimestamp(item){return homeTimestamp(item,['actual_end','end_at'])}
+function homeStableId(item){return String(item?.video_id||'')}
+function homeBuckets(rows){
+ const buckets={live:[],upcoming:[],unknown:[],ended:[]};
+ rows.forEach(item=>{
+  const state=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
+  const bucket=state==='live'?'live':['waiting','upcoming'].includes(state)?'upcoming':state==='ended'?'ended':'unknown';
+  buckets[bucket].push(item);
+ });
+ const chronological=(a,b)=>{
+  const at=homeStartTimestamp(a),bt=homeStartTimestamp(b);
+  if(at===null&&bt!==null)return 1;
+  if(at!==null&&bt===null)return -1;
+  if(at!==null&&bt!==null&&at!==bt)return at-bt;
+  return homeStableId(a).localeCompare(homeStableId(b));
+ };
+ buckets.live.sort(chronological);
+ buckets.upcoming.sort(chronological);
+ buckets.unknown.sort(chronological);
+ buckets.ended.sort((a,b)=>{
+  const ae=homeEndTimestamp(a),be=homeEndTimestamp(b);
+  const aVerified=ae!==null,bVerified=be!==null;
+  if(aVerified!==bVerified)return aVerified?-1:1;
+  const av=aVerified?ae:homeStartTimestamp(a);
+  const bv=bVerified?be:homeStartTimestamp(b);
+  if(av===null&&bv!==null)return 1;
+  if(av!==null&&bv===null)return -1;
+  if(av!==null&&bv!==null&&av!==bv)return bv-av;
+  return homeStableId(b).localeCompare(homeStableId(a));
+ });
+ return buckets;
+}
 async function loadHomeCollab(){
  try{
   const collabData=await api('/v1/collab/live');
   setHomeCollabEvents(collabData);
   if(homeCatalogRows.length){
-   const buckets={live:[],upcoming:[],unknown:[],ended:[]};
-   homeCatalogRows.forEach(item=>{const state=String(item.lifecycle_state||item.state||'unknown').toLowerCase();const bucket=state==='live'?'live':['waiting','upcoming'].includes(state)?'upcoming':state==='ended'?'ended':'unknown';buckets[bucket].push(item)});
+   const buckets=homeBuckets(homeCatalogRows);
    for(const key of Object.keys(buckets)){const el=$('home-'+key);el.replaceChildren();buckets[key].forEach(item=>homeCard(item,el))}
    homeSelection();renderHomeHighlights(homeCatalogRows);applyHomeFilter();
   }
@@ -398,8 +439,7 @@ async function loadHome(){
  homeCatalogRows=rows;
  customCatalogCache=rows;
  window.hvCustomCatalog?.(rows);
- const buckets={live:[],upcoming:[],unknown:[],ended:[]};
- rows.forEach(item=>{const state=String(item.lifecycle_state||item.state||'unknown').toLowerCase();const bucket=state==='live'?'live':['waiting','upcoming'].includes(state)?'upcoming':state==='ended'?'ended':'unknown';buckets[bucket].push(item)});
+ const buckets=homeBuckets(rows);
  for(const key of Object.keys(buckets)){const el=$('home-'+key);el.replaceChildren();buckets[key].forEach(item=>homeCard(item,el));$('home-'+key+'-section').hidden=!el.children.length}
  const allowed=new Set(rows.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!allowed.has(id))selectedHomeVideos.delete(id)}
  homeSelection();homeRail(buckets.live);renderHomeHighlights(rows);applyHomeFilter();
