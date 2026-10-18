@@ -373,18 +373,29 @@ function renderHomeHighlights(rows){
 }
 
 let homeLoadInFlight=false;
+let homeCatalogRows=[];
+async function loadHomeCollab(){
+ try{
+  const collabData=await api('/v1/collab/live');
+  setHomeCollabEvents(collabData);
+  if(homeCatalogRows.length){
+   const buckets={live:[],upcoming:[],unknown:[],ended:[]};
+   homeCatalogRows.forEach(item=>{const state=String(item.lifecycle_state||item.state||'unknown').toLowerCase();const bucket=state==='live'?'live':['waiting','upcoming'].includes(state)?'upcoming':state==='ended'?'ended':'unknown';buckets[bucket].push(item)});
+   for(const key of Object.keys(buckets)){const el=$('home-'+key);el.replaceChildren();buckets[key].forEach(item=>homeCard(item,el))}
+   homeSelection();renderHomeHighlights(homeCatalogRows);applyHomeFilter();
+  }
+ }catch{}
+}
 async function loadHome(){
  if(homeLoadInFlight)return;
  if(!config.apiBase){$('home-empty').textContent='正式直播資料 API 尚未接通。';return}
  homeLoadInFlight=true;
+ $('home-empty').textContent='';
  try{
- const [data,collabData]=await Promise.all([
-  api('/v1/catalog/today'),
-  api('/v1/collab/live').catch(()=>null)
- ]);
+ const data=await api('/v1/catalog/today');
  const rows=data.streams||data.items;
  if(!Array.isArray(rows))throw Error('資料格式錯誤');
- setHomeCollabEvents(collabData);
+ homeCatalogRows=rows;
  customCatalogCache=rows;
  window.hvCustomCatalog?.(rows);
  const buckets={live:[],upcoming:[],unknown:[],ended:[]};
@@ -394,6 +405,7 @@ async function loadHome(){
  homeSelection();homeRail(buckets.live);renderHomeHighlights(rows);applyHomeFilter();
  $('home-empty').textContent=rows.length?'':'目前沒有今天的直播資料。';
  $('connection').textContent='API 已連線';
+ loadHomeCollab();
  }catch(e){$('home-empty').textContent='無法讀取正式直播資料：'+e.message}
  finally{homeLoadInFlight=false}
 }
