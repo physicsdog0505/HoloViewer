@@ -155,6 +155,60 @@ body.settings-open .viewer-main{height:calc(100vh - 58px)}
 .player-card.primary{outline:2px solid rgba(111,174,201,.85);outline-offset:-2px}
 .player-host,.player-host iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 
+/* Call mode prototype: overlay only; never reparents or replaces YouTube iframes. */
+.viewer-watch-actions #viewerCallMode.active{background:#242321;color:#fff;border-color:#242321}
+.call-overlay{
+ --call-beat:500ms;
+ position:absolute;inset:0;z-index:4;pointer-events:none;overflow:hidden;
+ display:none;transform:translateZ(0)
+}
+body.call-mode .call-overlay{display:block}
+.call-hud{
+ position:absolute;left:50%;bottom:10px;transform:translateX(-50%);
+ padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.56);color:#fff;
+ font-size:10px;font-weight:700;letter-spacing:.02em;white-space:nowrap
+}
+.call-hands{position:absolute;left:50%;bottom:-8%;width:min(64%,520px);height:56%;transform:translateX(-50%)}
+.call-hand{
+ position:absolute;bottom:0;width:46%;height:100%;
+ transform-origin:50% 92%;will-change:transform;filter:drop-shadow(0 0 8px rgba(255,255,255,.18))
+}
+.call-hand.left{left:0;transform:rotate(-8deg)}
+.call-hand.right{right:0;transform:rotate(8deg)}
+.call-stick{
+ position:absolute;left:50%;bottom:4%;width:22px;height:72%;transform:translateX(-50%);
+ border:4px solid #111;border-radius:6px;background:#ff58ca;
+ box-shadow:0 0 10px #ff58ca,0 0 24px rgba(255,88,202,.7),inset 0 0 0 3px rgba(255,255,255,.34);
+ image-rendering:pixelated
+}
+.call-hand.right .call-stick{
+ background:#56d8ff;box-shadow:0 0 10px #56d8ff,0 0 24px rgba(86,216,255,.7),inset 0 0 0 3px rgba(255,255,255,.34)
+}
+.call-stick::after{
+ content:"";position:absolute;left:2px;right:2px;bottom:-18px;height:18px;
+ background:#242321;border:3px solid #111;border-radius:2px
+}
+.call-overlay.side-two-left .call-hands{animation:call-small-left calc(var(--call-beat) * 2) ease-in-out infinite}
+.call-overlay.side-two-right .call-hands{animation:call-small-right calc(var(--call-beat) * 2) ease-in-out infinite}
+.call-overlay.side-fast-left .call-hands,
+.call-overlay.side-fast-right .call-hands{animation:call-fast var(--call-beat) ease-in-out infinite}
+.call-overlay.side-wave-left .call-hands{animation:call-wave-left calc(var(--call-beat) * 4) ease-in-out infinite}
+.call-overlay.side-wave-right .call-hands{animation:call-wave-right calc(var(--call-beat) * 4) ease-in-out infinite}
+.call-overlay.space-pump .call-hands{animation:call-space-pump var(--call-beat) cubic-bezier(.2,.8,.25,1) infinite}
+@keyframes call-small-left{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-53%) rotate(-13deg)}}
+@keyframes call-small-right{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-47%) rotate(13deg)}}
+@keyframes call-fast{0%,100%{transform:translateX(-50%) rotate(-15deg)}50%{transform:translateX(-50%) rotate(15deg)}}
+@keyframes call-wave-left{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-59%) rotate(-31deg)}}
+@keyframes call-wave-right{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-41%) rotate(31deg)}}
+@keyframes call-space-pump{0%,100%{transform:translateX(-50%) translateY(0)}45%{transform:translateX(-50%) translateY(-17%)}65%{transform:translateX(-50%) translateY(-14%)}}
+
+body.immersive .call-hands{width:min(72%,720px);height:64%}
+body.immersive .call-hud{bottom:16px}
+@media(max-width:900px){
+ .call-hands{width:min(78%,460px);height:48%}
+ .call-stick{width:18px}
+}
+
 .viewer-ptt{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:#0c0d0f;border:1px solid #303238;border-radius:10px;overflow:hidden;color:#eee}
 .viewer-ptt[hidden]{display:none}
 .ptt-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border-bottom:1px solid #292c31;background:#111317}
