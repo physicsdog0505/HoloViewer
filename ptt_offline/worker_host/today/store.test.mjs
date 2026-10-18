@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
-import {writeEvidence,setCoverage,readToday,YOUTUBE_LIVE_SOURCE,HISTORY_SOURCE_REVISION} from './store.mjs';
+import {writeEvidence,setCoverage,readToday,classifyHomeConsumer,YOUTUBE_LIVE_SOURCE,HISTORY_SOURCE_REVISION} from './store.mjs';
 const C='UC'+'A'.repeat(22), V='abcdefghijk';
 function fixture({id=V,state='live',observed='2026-10-15T11:59:00Z',end=null,group='hololive'}={}) {
   return {video_id:id,channel_id:C,roster_version:'fixture-v1',group,
@@ -623,5 +623,74 @@ test('mixed production-like set preserves lifecycle counts without stale-categor
  assert.equal(counts.upcoming,1);
  assert.equal(counts.stale??0,0);
  assert.equal(x.streams.filter(r=>r.lifecycle_state==='live'&&r.stale).length,1);
+ d.close();
+});
+
+
+test('Home classification: fresh live is current live',async()=>{
+ const row={lifecycle_state:'live',stale:false};
+ assert.equal(classifyHomeConsumer(row),'current_live');
+});
+
+test('Home classification: stale live stays in response but is degraded, never current live',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'homeoldlive',state:'live',observed:'2026-10-18T00:00:00Z'}),
+  scheduled_start:'2026-10-18T00:00:00Z',
+  actual_start:'2026-10-18T00:01:00Z',
+  actual_end:null,
+  source_label:'YouTube'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='homeoldlive');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'live');
+ assert.equal(row.stale,true);
+ assert.equal(classifyHomeConsumer(row),'degraded');
+ assert.notEqual(classifyHomeConsumer(row),'current_live');
+ d.close();
+});
+
+test('Home classification: unknown is degraded without timestamp reconstruction',()=>{
+ assert.equal(classifyHomeConsumer({lifecycle_state:'unknown',stale:false}),'degraded');
+ assert.equal(classifyHomeConsumer({lifecycle_state:'unknown',stale:true}),'degraded');
+});
+
+test('Home classification: ended never revives into current live',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'homeended01',state:'ended',observed:'2026-10-18T00:31:00Z',end:'2026-10-18T00:30:00Z'}),
+  scheduled_start:'2026-10-17T23:00:00Z',
+  actual_start:'2026-10-17T23:01:00Z',
+  actual_end:'2026-10-18T00:30:00Z',
+  source_label:'YouTube'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:31:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='homeended01');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'ended');
+ assert.equal(classifyHomeConsumer(row),'ended');
+ assert.notEqual(classifyHomeConsumer(row),'current_live');
+ d.close();
+});
+
+test('Home classification: future upcoming remains upcoming and unaffected by stale-live policy',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'homefuture1',state:'upcoming',observed:'2026-10-18T00:00:00Z'}),
+  scheduled_start:'2026-10-19T12:30:00Z',
+  actual_start:null,actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T05:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='homefuture1');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'upcoming');
+ assert.equal(classifyHomeConsumer(row),'upcoming');
  d.close();
 });
