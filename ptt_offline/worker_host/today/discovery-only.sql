@@ -24,3 +24,13 @@ CREATE TABLE IF NOT EXISTS public_today_reconcile_cursor(
  next_index INTEGER NOT NULL DEFAULT 0,
  updated_at TEXT NOT NULL
 );
+
+-- Additive bounded cursor for 5-minute lifecycle refresh; one metadata write per batch,
+-- not one checked_at/evidence write per unchanged video.
+CREATE TABLE IF NOT EXISTS public_today_lifecycle_cursor (
+ singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+ roster_version TEXT NOT NULL,
+ last_video_id TEXT NOT NULL DEFAULT '',
+ checked_at_json TEXT NOT NULL DEFAULT '{}',
+ updated_at TEXT NOT NULL
+);

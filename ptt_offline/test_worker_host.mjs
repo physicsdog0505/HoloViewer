@@ -15,6 +15,20 @@ test('actual bundled existing-worker entry preserves health with binding',async(
  assert.equal(r.status,200);
  assert.equal((await r.json()).service,'holoviewer-public-read');
 });
+test('actual production entry mounts WebSub callback before the base 404 router',async()=>{
+ const DB={prepare(){return {
+  bind(){return this},
+  first:async()=>({roster_version:'today-roster-v85',expected_channels:85})
+ }}};
+ const r=await worker.fetch(new Request('https://api.example/internal/today/websub'),{
+  DB,
+  TODAY_WEBSUB_RECEIVER_ENABLED:'true',
+  TODAY_WEBSUB_CALLBACK_URL:'https://api.example/internal/today/websub',
+  TODAY_WEBSUB_SECRET:'local-fixture-secret-0123456789abcdef'
+ });
+ assert.equal(r.status,403);
+ assert.deepEqual(await r.json(),{error:'challenge_rejected'});
+});
 test('existing-worker entry blocks private POST until explicitly enabled',async()=>{
  const r=await worker.fetch(new Request('https://api.example/private/ptt/publish',
   {method:'POST',body:'{}'}),{DB:{}});

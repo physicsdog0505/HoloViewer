@@ -27,7 +27,7 @@ test('discovery source stays bounded and uses no search.list',async()=>{
     fs.readFile(new URL('./worker_host/today/discovery-refresh.mjs',import.meta.url),'utf8'));
   assert.match(source,/CHANNELS_PER_WAVE=10/);
   assert.match(source,/WAVES_PER_RUN=3/);
-  assert.match(source,/videos\/v3\/videos/);
+  assert.match(source,/youtube\/v3\/videos/);
   assert.doesNotMatch(source,/search\.list/);
   assert.doesNotMatch(source,/youtube\/v3\/search/);
 });
