@@ -15,7 +15,8 @@ EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md",
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
         present = {p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*")
-                   if p.is_file() and ".git" not in p.parts and "__pycache__" not in p.parts and not p.name.endswith(".pyc")}
+                   if p.is_file() and ".git" not in p.parts and ".wrangler" not in p.parts
+                   and "__pycache__" not in p.parts and not p.name.endswith(".pyc")}
         self.assertEqual(present, EXPECTED)
 
     def test_import_boundary_and_disabled_features(self):
