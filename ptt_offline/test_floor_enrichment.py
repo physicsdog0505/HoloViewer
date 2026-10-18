@@ -26,6 +26,7 @@ class FloorEnrichmentTests(unittest.TestCase):
             db.executescript("""
               CREATE TABLE articles(id INTEGER PRIMARY KEY,board TEXT,aid TEXT,url TEXT,title_hint TEXT,created_at TEXT,last_seen_at TEXT);
               CREATE TABLE pushes(id INTEGER PRIMARY KEY,article_id INTEGER,source_line INTEGER,source_page INTEGER,kind TEXT,author TEXT,content TEXT,ptt_date TEXT,ptt_time TEXT,collected_at TEXT);
+              CREATE TABLE article_screens(id INTEGER PRIMARY KEY,article_id INTEGER,source_page INTEGER,total_pages INTEGER,start_line INTEGER,end_line INTEGER,captured_at TEXT);
             """)
             db.execute("INSERT INTO articles VALUES(1,'C_Chat',?,?,'t','now','now')",(self.aid,url))
             db.executemany("INSERT INTO pushes VALUES(?,?,?,?,?,?,?,?,?,?)",[
@@ -33,6 +34,7 @@ class FloorEnrichmentTests(unittest.TestCase):
               (2,1,20,1,'推','b','new one','10/15','18:00','2026-10-15T10:01:05Z'),
               (3,1,30,2,'→','c','new two','10/15','18:01','2026-10-15T10:02:07Z'),
             ])
+            db.execute("INSERT INTO article_screens VALUES(1,1,1,2,1,40,'now')")
             db.commit()
         finally:
             db.close()
@@ -56,10 +58,11 @@ class FloorEnrichmentTests(unittest.TestCase):
         self.assertEqual(result["remote_writes"],0)
         self.assertEqual(result["checkpoint_mutations"],0)
 
-    def test_plan_fails_closed_without_page_one(self):
+    def test_plan_fails_closed_without_article_start_coverage(self):
         db=sqlite3.connect(self.source)
         try:
-            db.execute("UPDATE pushes SET source_page=2")
+            db.execute("DELETE FROM article_screens")
+            db.execute("INSERT INTO article_screens VALUES(1,1,2,2,20,40,'now')")
             db.commit()
         finally:
             db.close()
