@@ -102,11 +102,16 @@ class ParityContract(unittest.TestCase):
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
         for part in ('class="custom-layout"', 'class="selection-panel"', 'id="liveLibrary"',
                      'id="historyLibrary"', 'id="layout"', 'id="primary"', 'id="audio"',
-                     'id="pttMode"', 'id="selectedCount"', 'id="custom-session"'):
+                     'id="pttMode"', 'id="selectedCount"', 'id="custom-session"',
+                     'data-custom-filter="hololive"', 'data-custom-filter="holostars"',
+                     'data-custom-filter="mekpark"', 'data-custom-filter="all"'):
             self.assertIn(part, html)
         for part in ('moveStream(from,to)', "className='drag-handle'",
                      "radio.name='mainVideo'", "window.hvCustomCatalog=function(rows)",
-                     'window.hvOpenCustomSession=function(ids,opts={})'):
+                     'window.hvOpenCustomSession=function(ids,opts={})',
+                     'function customLibraryFilter(){return homeFilter()}',
+                     "card.dataset.group=String(row.group||row.channel_group||'other').toLowerCase()",
+                     "button.addEventListener('click',()=>setCustomLibraryFilter(button.dataset.customFilter))"):
             self.assertIn(part, js)
         self.assertIn('.selected-item{display:grid', css)
         self.assertIn('.live-picker-list{display:grid', css)
