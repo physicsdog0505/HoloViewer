@@ -781,17 +781,19 @@ function pttKey(row){return String(row?.source_record_key||row?.push_id||row?.ai
 function pttRow(row){
  const el=node('div',undefined,'ptt-row');
  el.dataset.pushId=pttKey(row);
- const floor=Number.isInteger(row?.floor)&&row.floor>0?row.floor:null;
- if(floor!==null){el.classList.add('has-floor');el.append(node('span','#'+floor,'ptt-floor'))}
  const kind=String(row?.kind||'→');
  const kindEl=node('span',kind,'ptt-kind'+(kind==='噓'?' boo':kind==='→'?' arrow':''));
  const when=new Date(String(row?.occurred_at||''));
  let clock='';
  if(Number.isFinite(when.getTime()))clock=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(when);
  const time=node('span',clock,'ptt-time');
+ const floor=Number.isInteger(row?.floor)&&row.floor>0?row.floor:null;
+ const floorEl=node('span',floor===null?'':floor+'樓','ptt-floor');
+ if(floor!==null)el.classList.add('has-floor');
+ else floorEl.setAttribute('aria-hidden','true');
  const body=node('span',undefined,'ptt-body');
  body.append(node('span',String(row?.author||'unknown')+':','ptt-author'),node('span',String(row?.content||''),'ptt-content'));
- el.append(kindEl,time,body);
+ el.append(kindEl,time,floorEl,body);
  return el;
 }
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
