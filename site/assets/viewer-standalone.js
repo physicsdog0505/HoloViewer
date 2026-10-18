@@ -1108,8 +1108,19 @@ async function loadTodayPttPayload(day){
  try{return await api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=1000')}
  catch{return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300')}
 }
+function vodPttVisibleCountAt(rows,absoluteMs){
+ let low=0,high=rows.length;
+ while(low<high){
+  const mid=(low+high)>>1;
+  if(Date.parse(String(rows[mid]?.occurred_at||''))<=absoluteMs)low=mid+1;
+  else high=mid;
+ }
+ return low;
+}
 function setVodPttRows(rows){
- pttVodRows=(Array.isArray(rows)?rows:[]).filter(row=>row&&typeof row.content==='string').slice().sort((a,b)=>
+ pttVodRows=(Array.isArray(rows)?rows:[]).filter(row=>
+  row&&typeof row.content==='string'&&Number.isFinite(Date.parse(String(row.occurred_at||'')))
+ ).slice().sort((a,b)=>
   Date.parse(String(a.occurred_at||''))-Date.parse(String(b.occurred_at||''))||
   String(pttKey(a)).localeCompare(String(pttKey(b))));
  pttVodVisibleCount=0;
@@ -1133,12 +1144,7 @@ function syncVodPttTimeline({forceFollow=false}={}){
  const currentSeconds=Math.max(0,(absoluteMs-Date.parse(pttContext.start))/1000);
  pttVodLastSample={seconds:currentSeconds,wallMs:now,playing};
 
- let visible=0;
- while(visible<pttVodRows.length){
-  const occurred=Date.parse(String(pttVodRows[visible]?.occurred_at||''));
-  if(!Number.isFinite(occurred)||occurred>absoluteMs)break;
-  visible++;
- }
+ const visible=vodPttVisibleCountAt(pttVodRows,absoluteMs);
  if(visible!==pttVodVisibleCount){
   if(visible>pttVodVisibleCount){
    const fragment=document.createDocumentFragment();
