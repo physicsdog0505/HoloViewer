@@ -635,7 +635,7 @@ test('Home classification: fresh live is current live',async()=>{
 test('Home classification: stale live stays in response but is degraded, never current live',async()=>{
  const d=db();
  await writeEvidence(d,{
-  ...fixture({id:'homeoldlive',state:'live',observed:'2026-10-18T00:00:00Z'}),
+  ...fixture({id:'homeoldlive',state:'live',observed:'2026-10-18T00:02:00Z'}),
   scheduled_start:'2026-10-18T00:00:00Z',
   actual_start:'2026-10-18T00:01:00Z',
   actual_end:null,
