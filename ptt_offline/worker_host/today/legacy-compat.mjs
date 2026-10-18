@@ -41,7 +41,8 @@ export async function legacyHistory(request,env){
   : 'NULL';
  const rows=await env.DB.prepare(`SELECT h.*,
    COALESCE(${profileExpr},(SELECT c.avatar_url FROM public_catalog c WHERE c.channel_id=h.channel_id AND c.avatar_url IS NOT NULL ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC LIMIT 1)) AS trusted_channel_avatar,
-   COALESCE((SELECT ac.channel_group FROM public_today_approved_channels ac WHERE ac.channel_id=h.channel_id LIMIT 1),'other') AS channel_group
+   COALESCE((SELECT ac.channel_group FROM public_today_approved_channels ac WHERE ac.channel_id=h.channel_id LIMIT 1),
+     (SELECT t.channel_group FROM public_today_canonical t WHERE t.publisher_channel_id=h.channel_id ORDER BY t.lifecycle_observed_at DESC LIMIT 1),'other') AS channel_group
    FROM public_history h WHERE h.taipei_day=? ORDER BY COALESCE(h.actual_start,h.scheduled_start) DESC,h.video_id DESC LIMIT ? OFFSET ?`)
   .bind(day,limit,offset).all();
  let colors=null;
