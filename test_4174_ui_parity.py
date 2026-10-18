@@ -3,7 +3,9 @@
 Only tests the frozen shared-sidebar contract, NOT full parity.
 """
 from html.parser import HTMLParser
+import json
 import re
+import subprocess
 from pathlib import Path
 import unittest
 
@@ -283,6 +285,59 @@ class ParityContract(unittest.TestCase):
         self.assertIn("parts.join(' · ')+' · 進入多人連動畫面'",js)
         self.assertIn("youtube.dataset.youtubeHref='https://www.youtube.com/watch?v='+first.video_id",js)
         self.assertIn("if(e.target.closest('[data-youtube-href]'))return",js)
+
+    def test_public_home_lifecycle_freshness_grouping_contract(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        start=js.index('function homeLifecycleBucket(item){')
+        end=js.index('function homeCard(',start)
+        classifier=js[start:end]
+        self.assertNotIn('scheduled_start',classifier)
+        self.assertNotIn('actual_start',classifier)
+        self.assertNotIn('actual_end',classifier)
+        cases=[
+            {'video_id':'fresh-live','lifecycle_state':'live','stale':False},
+            {'video_id':'stale-live','lifecycle_state':'live','stale':True},
+            {'video_id':'unknown','lifecycle_state':'unknown','stale':False},
+            {'video_id':'ended','lifecycle_state':'ended','stale':False},
+            {'video_id':'0-21K73BYWc','lifecycle_state':'upcoming','stale':False,'start_at':'2026-10-19T12:30:00Z'},
+            {'video_id':'waiting','lifecycle_state':'waiting','stale':False},
+        ]
+        script=classifier+'\nprocess.stdout.write(JSON.stringify('+json.dumps(cases)+' .map(homeLifecycleBucket)));'
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        self.assertEqual(json.loads(result.stdout),['live','unknown','unknown','ended','upcoming','upcoming'])
+        bucket_start=js.index('function homeBuckets(rows){')
+        bucket_end=js.index('async function loadHomeCollab()',bucket_start)
+        buckets=js[bucket_start:bucket_end]
+        self.assertIn('buckets[homeLifecycleBucket(item)].push(item)',buckets)
+
+    def test_public_home_highlights_follow_lifecycle_freshness_contract(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        classifier_start=js.index('function homeLifecycleBucket(item){')
+        classifier_end=js.index('function homeCard(',classifier_start)
+        rules_start=js.index('const HOME_HIGHLIGHT_RULES=')
+        choose_end=js.index('function renderHomeHighlights(rows){',rules_start)
+        script=js[classifier_start:classifier_end]+js[rules_start:choose_end]
+        cases=[
+            {'video_id':'stale000001','lifecycle_state':'live','stale':True,'title':'重大告知'},
+            {'video_id':'fresh000001','lifecycle_state':'live','stale':False,'title':'重大告知'},
+            {'video_id':'0-21K73BYWc','lifecycle_state':'upcoming','stale':False,'title':'重大告知','start_at':'2026-10-19T12:30:00Z'},
+        ]
+        node=script+'\nconst rows='+json.dumps(cases)+';process.stdout.write(JSON.stringify({picks:chooseHomeHighlights(rows).map(x=>({id:x.row.video_id,score:x.score})),scores:rows.map(x=>homeHighlightMatch(x).score)}));'
+        result=subprocess.run(['node','-e',node],check=True,capture_output=True,text=True)
+        payload=json.loads(result.stdout)
+        picks={item['id']:item['score'] for item in payload['picks']}
+        self.assertNotIn('stale000001',picks)
+        self.assertIn('fresh000001',picks)
+        self.assertIn('0-21K73BYWc',picks)
+        self.assertEqual(payload['scores'][0],105)
+        self.assertEqual(payload['scores'][1],110)
+        self.assertEqual(payload['scores'][2],105)
+        choose=js[js.index('function chooseHomeHighlights(rows){'):choose_end]
+        self.assertIn("const bucket=homeLifecycleBucket(row)",choose)
+        self.assertIn("if(bucket!=='live'&&bucket!=='upcoming')continue",choose)
+        match=js[js.index('function homeHighlightMatch(item){'):js.index('function chooseHomeHighlights(rows){')]
+        self.assertIn("homeLifecycleBucket(item)==='live'",match)
+        self.assertNotIn("String(item.lifecycle_state",match)
 
     def test_original_4174_home_highlights_have_verified_rules(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
