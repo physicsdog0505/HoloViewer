@@ -5,6 +5,10 @@ const ID=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
 
 function iso(x){return x?new Date(x).toISOString().replace(/\.\d{3}Z$/,'Z'):null;}
+function recentTaipeiCutoff(now){
+  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  return new Date(new Date(day+'T00:00:00+08:00').getTime()-6*86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
+}
 
 export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Date(),limit=50}={}){
   if(env?.TODAY_CADENCE_ENABLED!=='true')return {status:'disabled',requests:0,updated:0};
@@ -20,8 +24,10 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
       ) AS from_discovery
     FROM public_today_canonical
     WHERE lifecycle_state!='ended'
+       OR (lifecycle_state='ended' AND actual_end>=?
+           AND (source_label!=? OR actual_start IS NULL OR actual_end IS NULL))
     ORDER BY lifecycle_observed_at ASC,video_id ASC
-    LIMIT ?`).bind(limit).all();
+    LIMIT ?`).bind(recentTaipeiCutoff(now),YOUTUBE_LIVE_SOURCE,limit).all();
   const rows=got.results??[];
   const ids=rows.map(r=>r.video_id).filter(id=>ID.test(id??''));
   if(!ids.length)return {status:'idle',requests:0,updated:0,selected:0};
