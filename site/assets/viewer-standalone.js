@@ -13,6 +13,9 @@ let primaryIndex=Math.max(0,Math.min(Math.max(0,streams.length-1),Number(params.
 let audioMaster=primaryIndex;
 let watchMode=params.get('mode')==='multi'||streams.length>1?'multi':'single';
 const requestedPttMode=params.get('ptt')||'live';
+const collabEventId=String(params.get('collab_event')||'');
+const collabKind=['live','vod'].includes(params.get('collab_kind'))?params.get('collab_kind'):'';
+const collabManaged=Boolean(collabEventId&&collabKind);
 
 const stage=document.getElementById('stage');
 const workspace=document.querySelector('.viewer-workspace');
@@ -54,6 +57,12 @@ let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let confirmedLiveIds=new Set();
 let draggedLiveId='';
+let collabEvent=null;
+let collabRoster=new Map();
+let collabPollTimer=null;
+let collabVodTimer=null;
+let collabAbsoluteMs=null;
+let collabReconciling=false;
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
@@ -134,6 +143,10 @@ function updateUrl(){
  q.set('primary',String(primaryIndex));
  q.set('audio',String(primaryIndex));
  q.set('mode',watchMode);
+ if(collabManaged){
+  q.set('collab_event',collabEventId);
+  q.set('collab_kind',collabKind);
+ }
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
 
@@ -308,7 +321,7 @@ function handlePlayerStateChange(player,state){
  const sourceIndex=players.indexOf(player);
  if(sourceIndex>=0)syncPlayers(state,sourceIndex);
 }
-function mountPlayerAt(index,autoplay=false){
+function mountPlayerAt(index,autoplay=false,seekSeconds=null){
  if(!window.YT?.Player||players[index]||!streams[index])return;
  const host=document.getElementById(playerHostId(streams[index]));
  if(!host)return;
@@ -317,8 +330,9 @@ function mountPlayerAt(index,autoplay=false){
   playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
   events:{
    onReady:event=>{
+    if(Number.isFinite(seekSeconds)){try{event.target.seekTo(Math.max(0,seekSeconds),true)}catch{}}
     if(autoplay){
-     try{event.target.mute()}catch{}
+     try{if(index!==audioMaster)event.target.mute()}catch{}
      try{event.target.playVideo()}catch{}
     }else{
      setAudioMaster(primaryIndex);
@@ -408,38 +422,51 @@ function replaceSingleStream(row){
   }
  });
 }
-function appendMultiStream(row){
+function appendMultiStream(row,{focusExisting=true,seekSeconds=null,autoplay=null}={}){
  const id=String(row?.video_id||'');
  if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
  const existing=streams.findIndex(stream=>stream.videoId===id);
- if(existing>=0){setPrimary(existing);return}
- if(streams.length>=MAX_STREAMS)return;
+ if(existing>=0){if(focusExisting)setPrimary(existing);return existing}
+ if(streams.length>=MAX_STREAMS)return -1;
+ stage.querySelector('.collab-waiting')?.remove();
  const index=streams.length;
  streams.push({videoId:id,label:catalogName(row),channelId:String(row?.channel_id||''),avatarUrl:safeAvatar(row?.avatar_url)});
  const card=createPlayerCard(index);
  stage.append(card);
  players[index]=null;
+ if(streams.length===1){primaryIndex=0;audioMaster=0}
  renderControls();
  applyLayout();
- let shouldPlay=false;
- try{shouldPlay=players[primaryIndex]?.getPlayerState()===YT.PlayerState.PLAYING}catch{}
- if(window.YT?.Player)mountPlayerAt(index,shouldPlay);
+ let shouldPlay=Boolean(autoplay);
+ if(autoplay===null){try{shouldPlay=players[primaryIndex]?.getPlayerState()===YT.PlayerState.PLAYING}catch{}}
+ if(window.YT?.Player)mountPlayerAt(index,shouldPlay,seekSeconds);
  renderLiveRail(catalogRows);
+ updateUrl();
+ return index;
 }
-function removeMultiStream(index){
- if(watchMode!=='multi'||streams.length<=1||index<0||index>=streams.length)return;
+function showCollabWaiting(message='目前沒有符合這個多人連動狀態的 POV。'){
+ if(streams.length)return;
+ stage.replaceChildren(node('div',message,'ptt-empty collab-waiting'));
+ controls.hidden=true;
+}
+function removeMultiStreamInternal(index,{allowEmpty=false}={}){
+ if(watchMode!=='multi'||(!allowEmpty&&streams.length<=1)||index<0||index>=streams.length)return;
  const removedWasPrimary=index===primaryIndex;
  const removedPlayer=players[index];
  const removedCard=playerCards[index];
 
- // Detach first. Any late PAUSED event from destroy() then has no source index
- // and cannot propagate to the surviving players.
  streams.splice(index,1);
  players.splice(index,1);
  playerCards.splice(index,1);
  removedCard?.remove();
  try{removedPlayer?.destroy()}catch{}
 
+ if(!streams.length){
+  primaryIndex=0;audioMaster=0;lockedIndex=null;secondaryOffset=0;
+  renderControls();renderLiveRail(catalogRows);showCollabWaiting();
+  updateUrl();
+  return;
+ }
  if(index<primaryIndex)primaryIndex-=1;
  else if(removedWasPrimary)primaryIndex=Math.min(index,streams.length-1);
  audioMaster=primaryIndex;
@@ -451,8 +478,10 @@ function removeMultiStream(index){
  applyLayout();
  setAudioMaster(primaryIndex);
  renderLiveRail(catalogRows);
+ updateUrl();
  if(removedWasPrimary)resolvePrimaryPtt();
 }
+function removeMultiStream(index){removeMultiStreamInternal(index,{allowEmpty:false})}
 function addDraggedLive(row){
  const id=String(row?.video_id||'');
  if(!/^[A-Za-z0-9_-]{11}$/.test(id))return;
@@ -501,6 +530,116 @@ function handleLiveRailClick(row){
  if(watchMode==='multi')appendMultiStream(row);
  else replaceSingleStream(row);
 }
+function collabStreams(event){
+ return Array.isArray(event?.streams)
+  ?event.streams.filter(row=>row&&/^[A-Za-z0-9_-]{11}$/.test(String(row.video_id||'')))
+  :[];
+}
+function collabState(row){return String(row?.lifecycle_state||row?.state||'unknown').toLowerCase()}
+function collabStartMs(row){const ms=Date.parse(String(row?.actual_start||''));return Number.isFinite(ms)?ms:null}
+function collabEndMs(row){const ms=Date.parse(String(row?.actual_end||''));return Number.isFinite(ms)?ms:null}
+function collabRowFor(id){return collabRoster.get(id)||catalogRows.find(row=>String(row?.video_id||'')===id)||{video_id:id,title:id}}
+function applyCollabEvent(event){
+ collabEvent=event||null;
+ collabRoster=new Map(collabStreams(event).map(row=>[String(row.video_id),row]));
+}
+async function fetchCollabEvent(){
+ if(!collabManaged)return null;
+ try{
+  const data=await api('/v1/collab/events/'+encodeURIComponent(collabEventId));
+  return data?.event||null;
+ }catch{
+  try{
+   const data=await api('/v1/collab/live');
+   const events=Array.isArray(data?.events)?data.events:[];
+   const activeIds=new Set([...collabRoster.keys(),...streams.map(stream=>stream.videoId)]);
+   return events.find(event=>collabStreams(event).some(row=>activeIds.has(String(row.video_id))))||null;
+  }catch{return null}
+ }
+}
+function currentPrimaryAbsoluteMs(){
+ if(!streams.length)return Number.isFinite(collabAbsoluteMs)?collabAbsoluteMs:null;
+ const row=collabRowFor(streams[primaryIndex]?.videoId);
+ const start=collabStartMs(row);
+ if(start===null)return Number.isFinite(collabAbsoluteMs)?collabAbsoluteMs:null;
+ let seconds=null;
+ try{seconds=players[primaryIndex]?.getCurrentTime?.()}catch{}
+ if(!Number.isFinite(seconds))return Number.isFinite(collabAbsoluteMs)?collabAbsoluteMs:start;
+ return start+Math.max(0,seconds)*1000;
+}
+function desiredVodRowsAt(absoluteMs){
+ if(!Number.isFinite(absoluteMs))return [];
+ return [...collabRoster.values()].filter(row=>{
+  const start=collabStartMs(row),end=collabEndMs(row);
+  return start!==null&&end!==null&&end>start&&absoluteMs>=start&&absoluteMs<end;
+ }).sort((a,b)=>collabStartMs(a)-collabStartMs(b)||String(a.video_id).localeCompare(String(b.video_id)));
+}
+function seekVodPlayers(absoluteMs){
+ streams.forEach((stream,index)=>{
+  const row=collabRowFor(stream.videoId),start=collabStartMs(row);
+  if(start===null)return;
+  const target=(absoluteMs-start)/1000;
+  if(target<0)return;
+  const player=players[index];if(!player)return;
+  let current=null;try{current=player.getCurrentTime()}catch{}
+  if(!Number.isFinite(current)||Math.abs(current-target)>1.2){try{player.seekTo(target,true)}catch{}}
+ });
+}
+function reconcileCollabRows(desired,{absoluteMs=null}={}){
+ if(collabReconciling)return;
+ collabReconciling=true;
+ try{
+  const desiredIds=new Set(desired.map(row=>String(row.video_id)));
+  for(let i=streams.length-1;i>=0;i--){
+   if(!desiredIds.has(streams[i].videoId))removeMultiStreamInternal(i,{allowEmpty:true});
+  }
+  let playing=false;
+  try{playing=players[primaryIndex]?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{}
+  for(const row of desired){
+   const id=String(row.video_id);
+   if(streams.some(stream=>stream.videoId===id))continue;
+   const start=collabStartMs(row);
+   const seek=Number.isFinite(absoluteMs)&&start!==null?Math.max(0,(absoluteMs-start)/1000):null;
+   appendMultiStream(row,{focusExisting:false,seekSeconds:seek,autoplay:playing});
+  }
+  if(Number.isFinite(absoluteMs)&&streams.length)seekVodPlayers(absoluteMs);
+  if(!streams.length)showCollabWaiting(collabKind==='live'?'等待同一多人連動的新直播開始…':'這個時間點沒有進行中的 POV。');
+ }finally{collabReconciling=false}
+}
+async function reconcileLiveCollab(){
+ const event=await fetchCollabEvent();
+ if(!event)return;
+ applyCollabEvent(event);
+ const live=collabStreams(event).filter(row=>collabState(row)==='live').slice(0,MAX_STREAMS);
+ reconcileCollabRows(live);
+}
+function reconcileVodCollab(){
+ if(!collabEvent?.sync?.available)return;
+ const absolute=currentPrimaryAbsoluteMs();
+ if(!Number.isFinite(absolute))return;
+ collabAbsoluteMs=absolute;
+ reconcileCollabRows(desiredVodRowsAt(absolute),{absoluteMs:absolute});
+}
+async function initCollabManager(){
+ if(!collabManaged)return;
+ const event=await fetchCollabEvent();
+ if(!event)return;
+ applyCollabEvent(event);
+ if(collabKind==='live'){
+  await reconcileLiveCollab();
+  collabPollTimer=setInterval(()=>{if(!document.hidden)reconcileLiveCollab()},10000);
+  return;
+ }
+ if(event?.sync?.available===true){
+  const starts=[...collabRoster.values()].map(collabStartMs).filter(Number.isFinite);
+  if(starts.length){
+   collabAbsoluteMs=Math.min(...starts);
+   reconcileCollabRows(desiredVodRowsAt(collabAbsoluteMs),{absoluteMs:collabAbsoluteMs});
+  }
+  collabVodTimer=setInterval(()=>{if(!document.hidden)reconcileVodCollab()},500);
+ }
+}
+
 function supportStyle(button,row){
  const accent=accentFor(row);
  button.style.setProperty('--member-accent',accent);
@@ -837,6 +976,9 @@ fullscreenButton.addEventListener('click',async()=>{
   else await document.documentElement.requestFullscreen();
  }catch{}
 });
+window.addEventListener('pagehide',()=>{
+ clearInterval(collabPollTimer);clearInterval(collabVodTimer);
+});
 document.addEventListener('fullscreenchange',()=>{
  const on=Boolean(document.fullscreenElement);
  document.body.classList.toggle('immersive',on);
@@ -857,6 +999,7 @@ function tryMountPlayers(){
 }
 (async()=>{
  await loadCatalog();
+ if(collabManaged)await initCollabManager();
  viewerReadyForPlayers=true;
  tryMountPlayers();
  resolvePrimaryPtt();
