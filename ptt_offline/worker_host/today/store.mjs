@@ -80,6 +80,10 @@ export async function writeEvidence(db, evidence) {
     mutations.push(db.prepare(sql).bind(r.video_id,r.channel_id,r.roster_version,r.group,r.title,r.channel_name??'',
       r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.source_label,hash));
     if(r.lifecycle_state==='ended'&&r.source_label===YOUTUBE_LIVE_SOURCE&&r.actual_start&&r.actual_end){
+      const catalogAvatar=await db.prepare(`SELECT avatar_url FROM public_catalog
+        WHERE channel_id=? AND avatar_url IS NOT NULL
+        ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1`).bind(r.channel_id).first();
+      const historyAvatar=verifiedChannelAvatar(catalogAvatar?.avatar_url)??'';
       const historySql=`INSERT INTO public_history
         (video_id,taipei_day,title,channel_id,channel_name,avatar_url,scheduled_start,actual_start,actual_end,source_revision,published_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?)
@@ -89,7 +93,7 @@ export async function writeEvidence(db, evidence) {
           actual_start=excluded.actual_start,actual_end=excluded.actual_end,
           source_revision=excluded.source_revision,published_at=excluded.published_at`;
       mutations.push(db.prepare(historySql).bind(
-        r.video_id,taipeiDay(r.actual_start),r.title,r.channel_id,r.channel_name??'','',
+        r.video_id,taipeiDay(r.actual_start),r.title,r.channel_id,r.channel_name??'',historyAvatar,
         r.scheduled_start??null,r.actual_start,r.actual_end,HISTORY_SOURCE_REVISION,r.observed_at
       ));
     }
