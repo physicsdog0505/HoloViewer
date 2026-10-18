@@ -89,10 +89,9 @@ const selectedHomeVideos=new Set();
 function homeFilter(){try{const x=localStorage.getItem(HOME_FILTER_KEY);return HOME_FILTERS.has(x)?x:'hololive'}catch{return 'hololive'}}
 function setHomeFilter(value){if(!HOME_FILTERS.has(value))return;try{localStorage.setItem(HOME_FILTER_KEY,value)}catch{}applyHomeFilter(value)}
 function applyHomeFilter(value=homeFilter()){
- document.querySelectorAll('#homeDynamic .stream-card,#historyDynamic .stream-card').forEach(card=>{card.hidden=value!=='all'&&card.dataset.group!==value});
+ document.querySelectorAll('#homeDynamic .stream-card').forEach(card=>{card.hidden=value!=='all'&&card.dataset.group!==value});
  document.querySelectorAll('#live-channel-list .live-channel-rail-item').forEach(card=>{card.hidden=(value!=='all'&&card.dataset.group!==value)||(watchMode==='multi'&&viewing.ids.includes(card.dataset.liveVideoId))});
  document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.classList.toggle('active',button.dataset.filter===value));
- document.querySelectorAll('#historyDynamic [data-history-filter]').forEach(button=>button.classList.toggle('active',button.dataset.historyFilter===value));
 }
 function homeSelection(){
  document.querySelectorAll('#homeDynamic .stream-card[data-multiview-id],#historyDynamic .stream-card[data-multiview-id]').forEach(card=>{const on=selectedHomeVideos.has(card.dataset.multiviewId);card.classList.toggle('multi-selected',on);card.setAttribute('aria-selected',String(on))});
@@ -531,10 +530,9 @@ async function loadHistory(){
   const collabPromise=api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null);
   const [data,collabData]=await Promise.all([historyPromise,collabPromise]);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
-  const endedItems=data.items.filter(item=>String(item?.lifecycle_state||item?.state||'').toLowerCase()==='ended');
+  const endedItems=data.items.map(item=>({...item,lifecycle_state:'ended'}));
   const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map();
   endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));
-  applyHomeFilter();
   const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
   const total=Number(data.total||0);if(!endedItems.length)$('history-empty').hidden=false;
   if(!collabData&&endedItems.length){error.textContent='歷史直播已載入；多人連動資料暫時無法讀取。';error.hidden=false}
@@ -751,7 +749,6 @@ async function loadPtt(){
 }
 pttInitControls();
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
-document.querySelectorAll('#historyDynamic [data-history-filter]').forEach(button=>button.addEventListener('click',()=>{setHomeFilter(button.dataset.historyFilter);applyCustomLibraryFilter(button.dataset.historyFilter)}));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY){applyHomeFilter();applyCustomLibraryFilter()}});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
