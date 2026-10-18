@@ -372,8 +372,39 @@ function renderHomeHighlights(rows){
  section.append(carousel);highlights.append(section);
 }
 
+const HOME_CATALOG_CACHE_KEY='holoviewer-home-catalog-v1';
 let homeLoadInFlight=false;
 let homeCatalogRows=[];
+function readHomeCatalogCache(){
+ try{
+  const cached=JSON.parse(sessionStorage.getItem(HOME_CATALOG_CACHE_KEY)||'null');
+  if(!cached||cached.day!==taipeiDay()||!Array.isArray(cached.rows))return [];
+  return cached.rows;
+ }catch{return []}
+}
+function writeHomeCatalogCache(rows){
+ try{sessionStorage.setItem(HOME_CATALOG_CACHE_KEY,JSON.stringify({day:taipeiDay(),savedAt:Date.now(),rows}))}catch{}
+}
+function renderHomeRows(rows){
+ homeCatalogRows=rows;
+ customCatalogCache=rows;
+ window.hvCustomCatalog?.(rows);
+ const buckets=homeBuckets(rows);
+ for(const key of Object.keys(buckets)){
+  const el=$('home-'+key);
+  el.replaceChildren();
+  buckets[key].forEach(item=>homeCard(item,el));
+  $('home-'+key+'-section').hidden=!el.children.length;
+ }
+ const allowed=new Set(rows.map(item=>item.video_id));
+ for(const id of selectedHomeVideos){if(!allowed.has(id))selectedHomeVideos.delete(id)}
+ homeSelection();
+ homeRail(buckets.live);
+ renderHomeHighlights(rows);
+ applyHomeFilter();
+ $('home-empty').textContent=rows.length?'':'目前沒有今天的直播資料。';
+ document.documentElement.classList.add('home-hydrated');
+}
 function homeTimestamp(item,fields){
  for(const field of fields){
   const raw=String(item?.[field]||'').trim();
@@ -420,33 +451,32 @@ async function loadHomeCollab(){
  try{
   const collabData=await api('/v1/collab/live');
   setHomeCollabEvents(collabData);
-  if(homeCatalogRows.length){
-   const buckets=homeBuckets(homeCatalogRows);
-   for(const key of Object.keys(buckets)){const el=$('home-'+key);el.replaceChildren();buckets[key].forEach(item=>homeCard(item,el))}
-   homeSelection();renderHomeHighlights(homeCatalogRows);applyHomeFilter();
-  }
+  if(homeCatalogRows.length)renderHomeRows(homeCatalogRows);
  }catch{}
 }
 async function loadHome(){
  if(homeLoadInFlight)return;
- if(!config.apiBase){$('home-empty').textContent='正式直播資料 API 尚未接通。';return}
+ const cachedRows=homeCatalogRows.length?[]:readHomeCatalogCache();
+ if(cachedRows.length)renderHomeRows(cachedRows);
+ if(!config.apiBase){
+  document.documentElement.classList.add('home-hydrated');
+  $('home-empty').textContent='正式直播資料 API 尚未接通。';
+  return;
+ }
  homeLoadInFlight=true;
- $('home-empty').textContent='';
+ if(!cachedRows.length)$('home-empty').textContent='';
  try{
- const data=await api('/v1/catalog/today');
- const rows=data.streams||data.items;
- if(!Array.isArray(rows))throw Error('資料格式錯誤');
- homeCatalogRows=rows;
- customCatalogCache=rows;
- window.hvCustomCatalog?.(rows);
- const buckets=homeBuckets(rows);
- for(const key of Object.keys(buckets)){const el=$('home-'+key);el.replaceChildren();buckets[key].forEach(item=>homeCard(item,el));$('home-'+key+'-section').hidden=!el.children.length}
- const allowed=new Set(rows.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!allowed.has(id))selectedHomeVideos.delete(id)}
- homeSelection();homeRail(buckets.live);renderHomeHighlights(rows);applyHomeFilter();
- $('home-empty').textContent=rows.length?'':'目前沒有今天的直播資料。';
- $('connection').textContent='API 已連線';
- loadHomeCollab();
- }catch(e){$('home-empty').textContent='無法讀取正式直播資料：'+e.message}
+  const data=await api('/v1/catalog/today');
+  const rows=data.streams||data.items;
+  if(!Array.isArray(rows))throw Error('資料格式錯誤');
+  writeHomeCatalogCache(rows);
+  renderHomeRows(rows);
+  $('connection').textContent='API 已連線';
+  loadHomeCollab();
+ }catch(e){
+  document.documentElement.classList.add('home-hydrated');
+  if(!homeCatalogRows.length)$('home-empty').textContent='無法讀取正式直播資料：'+e.message;
+ }
  finally{homeLoadInFlight=false}
 }
 function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));return o.year+'-'+o.month+'-'+o.day}
