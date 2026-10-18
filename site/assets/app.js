@@ -184,7 +184,7 @@ function applyHomeSupportStyle(el,item){
 function homeStartLabel(item){
  const legacy=String(item?.start_label||item?.start_time_label||'').trim();
  if(legacy)return legacy;
- const raw=String(item?.start_at||'').trim();
+ const raw=String(item?.start_at||item?.actual_start||item?.scheduled_start||'').trim();
  if(!raw)return '時間未明';
  const date=new Date(raw);
  if(!Number.isFinite(date.getTime()))return '時間未明';
@@ -197,7 +197,7 @@ function homeAvatarUrl(item){
  try{
   const u=new URL(raw);
   if(u.protocol!=='https:'||u.username||u.password||u.port)return '';
-  return ['yt3.ggpht.com','i.ytimg.com'].includes(u.hostname)?u.href:'';
+  return ['yt3.ggpht.com','yt3.googleusercontent.com','i.ytimg.com'].includes(u.hostname)?u.href:'';
  }catch{return ''}
 }
 function homeAvatarChild(item,name){
@@ -205,6 +205,32 @@ function homeAvatarChild(item,name){
  if(url){const img=node('img',undefined,'channel-avatar-img');img.src=url;img.alt='';img.loading='lazy';return img}
  const first=[...name].find(c=>/[a-zA-Z0-9]/.test(c))||'H';
  return node('span',first.toUpperCase(),'channel-avatar-fallback');
+}
+
+function homeDisplayMetadataByChannel(rows){
+ const byChannel=new Map();
+ for(const row of Array.isArray(rows)?rows:[]){
+  const channelId=String(row?.channel_id||'');
+  if(!channelId||byChannel.has(channelId))continue;
+  byChannel.set(channelId,row);
+ }
+ return byChannel;
+}
+function historyDisplayRow(item,byChannel){
+ const channelId=String(item?.channel_id||'');
+ const profile=byChannel?.get(channelId);
+ if(!profile)return item;
+ return {
+  ...item,
+  channel_name:item.channel_name||profile.channel_name||profile.channel_title||'',
+  channel_title:item.channel_title||profile.channel_title||profile.channel_name||'',
+  avatar_url:item.avatar_url||profile.avatar_url||'',
+  member_accent:item.member_accent||profile.member_accent||'',
+  member_accent_dual:Array.isArray(item.member_accent_dual)&&item.member_accent_dual.length?item.member_accent_dual:profile.member_accent_dual,
+  support_mode:item.support_mode||profile.support_mode||'',
+  support_color_source:item.support_color_source||profile.support_color_source||null,
+  group:item.group||profile.group||profile.channel_group||item.channel_group||'other'
+ };
 }
 
 let homeCollabEvents=[],homeCollabByVideo=new Map();
@@ -458,6 +484,10 @@ function renderHomeRows(rows){
  for(const key of Object.keys(buckets)){
   const el=$('home-'+key);
   el.replaceChildren();
+  if(key==='unknown'){
+   $('home-unknown-section').hidden=true;
+   continue;
+  }
   buckets[key].forEach(item=>homeCard(item,el));
   $('home-'+key+'-section').hidden=!el.children.length;
  }
@@ -560,9 +590,14 @@ async function loadHistory(){
  try{
   const historyPromise=api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+state.offset);
   const collabPromise=api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null);
-  const [data,collabData]=await Promise.all([historyPromise,collabPromise]);
+  const catalogPromise=homeCatalogRows.length
+   ?Promise.resolve({streams:homeCatalogRows})
+   :api('/v1/catalog/today').catch(()=>null);
+  const [data,collabData,catalogData]=await Promise.all([historyPromise,collabPromise,catalogPromise]);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
-  const endedItems=data.items.map(item=>({...item,lifecycle_state:'ended'}));
+  const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
+  const displayByChannel=homeDisplayMetadataByChannel(catalogRows);
+  const endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
   const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map();
   historyVodWindows.clear();
   endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));
