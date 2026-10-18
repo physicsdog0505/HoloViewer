@@ -90,7 +90,8 @@ test('Hub challenge only activates a matching pending request for current approv
  const db=makeDb(),e=env(db),worker=mountTodayWebSubOnWorker(baseWorker());
  const missing=await challenge(worker,e);
  assert.equal(missing.status,403);
- await recordSubscriptionRequest(db,{channelId:channels[0].id,rosterVersion:version,now:at});
+ const pendingAt=new Date();
+ await recordSubscriptionRequest(db,{channelId:channels[0].id,rosterVersion:version,now:pendingAt});
  const accepted=await challenge(worker,e);
  assert.equal(accepted.status,200);
  assert.equal(await accepted.text(),'challenge-token');
@@ -105,7 +106,7 @@ test('challenge rejects stale roster, wrong mode and unapproved channels',async(
  const db=makeDb(),e=env(db),worker=mountTodayWebSubOnWorker(baseWorker());
  await recordSubscriptionRequest(db,{channelId:channels[0].id,rosterVersion:'old-roster',now:at});
  assert.equal((await challenge(worker,e)).status,403);
- await recordSubscriptionRequest(db,{channelId:channels[1].id,rosterVersion:version,mode:'unsubscribe',now:at});
+ await recordSubscriptionRequest(db,{channelId:channels[1].id,rosterVersion:version,mode:'unsubscribe',now:new Date()});
  assert.equal((await challenge(worker,e,channels[1].id,'subscribe')).status,403);
  assert.equal((await challenge(worker,e,channels[1].id,'unsubscribe')).status,200);
  const outsider='UC'+'Z'.repeat(22);
