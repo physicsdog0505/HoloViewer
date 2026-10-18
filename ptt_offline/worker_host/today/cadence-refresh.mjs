@@ -1,5 +1,5 @@
 import {refreshTodayDiscovery} from './discovery-refresh.mjs';
-import {writeEvidence} from './store.mjs';
+import {writeEvidence,YOUTUBE_LIVE_SOURCE} from './store.mjs';
 
 const ID=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
@@ -70,7 +70,7 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
       scheduled_start:scheduled,
       actual_start:actualStart,
       actual_end:actualEnd,
-      source_label:'YouTube'
+      source_label:YOUTUBE_LIVE_SOURCE
     });
     updated++;
   }
