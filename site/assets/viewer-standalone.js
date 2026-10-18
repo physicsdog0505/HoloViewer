@@ -32,7 +32,7 @@ function parseArchiveWindows(){
   if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)||anchorSource!==PTT_ARCHIVE_ANCHOR||
      !Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)continue;
   map.set(videoId,{videoId,start,end,anchorSource,
-   scheduledStart:Number.isFinite(scheduledMs)&&scheduledMs<=startMs?scheduledStart:''});
+   scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''});
  }
  return map;
 }
@@ -1042,7 +1042,7 @@ function vodPttCutoffMs(context,seconds,hasPlayed){
  const startMs=Date.parse(String(context?.start||''));
  if(!Number.isFinite(startMs)||!Number.isFinite(seconds))return null;
  const scheduledMs=Date.parse(String(context?.scheduledStart||''));
- if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&scheduledMs<=startMs)return scheduledMs;
+ if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000)return scheduledMs;
  const endMs=Date.parse(String(context?.end||''));
  const raw=startMs+Math.max(0,seconds)*1000;
  return Number.isFinite(endMs)?Math.min(raw,endMs):raw;
@@ -1051,7 +1051,9 @@ function vodPttFetchStartMs(context){
  const startMs=Date.parse(String(context?.start||''));
  const scheduledMs=Date.parse(String(context?.scheduledStart||''));
  if(!Number.isFinite(startMs))return null;
- return Number.isFinite(scheduledMs)&&scheduledMs<=startMs?Math.min(startMs,scheduledMs-3600000):startMs;
+ const hasScheduled=Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000;
+ const anchorMs=hasScheduled?Math.min(startMs,scheduledMs):startMs;
+ return anchorMs-3600000;
 }
 function pttVodPlaybackMs(){
  if(!pttVodMode())return null;
