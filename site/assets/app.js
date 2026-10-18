@@ -1336,8 +1336,21 @@ document.getElementById('displayMode').onclick=()=>{
 audio.addEventListener('change',()=>{audioId=items[Number(audio.value)]||null;});
 document.getElementById('add').onclick=()=>{const value=input.value.trim();if(!value){document.getElementById('custom-error').textContent='請先貼上 YouTube 網址或影片 ID。';document.getElementById('custom-error').hidden=false;return;}if(addStream(value))input.value='';input.focus();};
 input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();document.getElementById('add').click();}});
-document.getElementById('start').onclick=()=>{
+document.getElementById('start').onclick=async()=>{
   if(!items.length){alert('請先加入至少一個影片。');return;}
+  const missing=items.filter(id=>!historyVodWindows.has(id));
+  if(missing.length){
+    await Promise.all(missing.map(async id=>{
+      try{
+        const row=await api('/v1/catalog/videos/'+encodeURIComponent(id));
+        if(String(row?.lifecycle_state||row?.state||'').toLowerCase()!=='ended')return;
+        const window=trustedArchiveWindow(row);
+        if(!window)return;
+        window.scheduledStart=archiveScheduledStart(row,window);
+        historyVodWindows.set(id,window);
+      }catch{}
+    }));
+  }
   const q=new URLSearchParams();items.forEach(v=>q.append('stream',v));
   q.set('layout',items.length===1?'equal':document.getElementById('layout').value);
   const selectedHistory=items.length>0&&items.every(id=>historyVodWindows.has(id));
