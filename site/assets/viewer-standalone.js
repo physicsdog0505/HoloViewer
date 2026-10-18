@@ -196,7 +196,10 @@ function callEditableTarget(target){
 function callBpm(){return Math.round(60000/Math.max(240,Math.min(1200,callBeatMs)))}
 function callUpdateHud(label='待機'){
  if(!callOverlay)return;
- callOverlay.style.setProperty('--call-beat',Math.round(callBeatMs)+'ms');
+ const beat=Math.round(callBeatMs);
+ callOverlay.style.setProperty('--call-beat',beat+'ms');
+ callOverlay.style.setProperty('--call-beat-2',beat*2+'ms');
+ callOverlay.style.setProperty('--call-beat-4',beat*4+'ms');
  if(callHud)callHud.textContent='Call · '+callBpm()+' BPM · '+label;
 }
 function callClearMotion(){
