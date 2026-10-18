@@ -45,8 +45,8 @@ export async function legacyHistory(request,env){
      (SELECT t.channel_group FROM public_today_canonical t WHERE t.publisher_channel_id=h.channel_id ORDER BY t.lifecycle_observed_at DESC LIMIT 1),'other') AS channel_group
    FROM public_history h WHERE h.taipei_day=? ORDER BY COALESCE(h.actual_start,h.scheduled_start) DESC,h.video_id DESC LIMIT ? OFFSET ?`)
   .bind(day,limit,offset).all();
- let colors=null;
- try{const raw=supportColorJson(env);colors=raw?validateSupportColorExport(JSON.parse(raw)):null;}catch{colors=null;}
+ const rawColors=supportColorJson(env);
+ const colors=rawColors?validateSupportColorExport(JSON.parse(rawColors)):null;
  return response({day,total:count?.total??0,limit,offset,items:(rows.results??[]).map(row=>normalizeHistory(row,colors))});
 }
 export async function legacyVideo(request,env){
