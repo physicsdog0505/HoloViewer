@@ -173,13 +173,13 @@ body.settings-open .viewer-main{height:calc(100vh - 58px)}
 .ptt-font-control output{min-width:30px;font-variant-numeric:tabular-nums}
 .ptt-feed{flex:1;min-height:0;overflow:auto;padding:6px 8px;font-size:var(--ptt-font-size,14px);line-height:1.45;scrollbar-width:none}
 .ptt-feed::-webkit-scrollbar{width:0;height:0;display:none}
-.ptt-row{display:grid;grid-template-columns:1.05em 2.9em minmax(0,1fr);column-gap:1px;align-items:start;padding:4px 0;border-bottom:1px solid #25282a;overflow-wrap:anywhere}
-.ptt-row.has-floor{grid-template-columns:1.05em 2.9em 2.75em minmax(0,1fr)}
-.viewer-ptt.ptt-floor-hidden .ptt-row.has-floor{grid-template-columns:1.05em 2.9em minmax(0,1fr)}
-.ptt-floor{color:#929da4;font-size:.76em;font-weight:600;text-align:right;white-space:nowrap;padding-top:.2em;font-variant-numeric:tabular-nums}
+.ptt-row{display:grid;grid-template-columns:max-content max-content minmax(0,1fr);column-gap:0;align-items:start;padding:4px 0;border-bottom:1px solid #25282a;overflow-wrap:anywhere}
+.ptt-row.has-floor{grid-template-columns:max-content max-content max-content minmax(0,1fr)}
+.viewer-ptt.ptt-floor-hidden .ptt-row.has-floor{grid-template-columns:max-content max-content minmax(0,1fr)}
+.ptt-floor{color:#929da4;font-size:.76em;font-weight:600;white-space:nowrap;padding-top:.2em;padding-left:3px;font-variant-numeric:tabular-nums}
 .viewer-ptt.ptt-floor-hidden .ptt-floor{display:none}
-.ptt-kind{text-align:center;font-weight:800;color:#f4f4f4}.ptt-kind.boo{color:#ff4b4b}.ptt-kind.arrow{color:#ff3030}
-.ptt-time{color:#dedede;font-size:.82em;font-weight:500;white-space:nowrap;padding-top:.12em;text-align:right;font-variant-numeric:tabular-nums}
+.ptt-kind{font-weight:800;color:#f4f4f4;padding-right:2px}.ptt-kind.boo{color:#ff4b4b}.ptt-kind.arrow{color:#ff3030}
+.ptt-time{color:#dedede;font-size:.82em;font-weight:500;white-space:nowrap;padding-top:.12em;font-variant-numeric:tabular-nums}
 .ptt-body{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;padding-left:4px}
 .ptt-author{color:#ffff00;font-weight:650;margin-right:4px}.ptt-content{color:#a9a900}
 .ptt-newest{position:absolute;right:12px;bottom:12px;border:1px solid #454a50;border-radius:999px;background:#171a1e;color:#fff;padding:6px 10px;cursor:pointer}
