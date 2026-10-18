@@ -504,7 +504,7 @@ test('future upcoming tomorrow 20:30 Taipei remains visible alongside stale live
 test('legacy ended keeps lifecycle identity while withholding untrusted playback bounds',async()=>{
  const d=db();
  await writeEvidence(d,{
-  ...fixture({id:'legacyend01',state:'ended',observed:'2026-10-18T00:00:00Z',end:'2026-10-18T00:30:00Z'}),
+  ...fixture({id:'legacyend01',state:'ended',observed:'2026-10-18T00:31:00Z',end:'2026-10-18T00:30:00Z'}),
   scheduled_start:'2026-10-17T23:00:00Z',
   actual_start:'2026-10-17T23:01:00Z',
   actual_end:'2026-10-18T00:30:00Z',
@@ -593,7 +593,7 @@ test('mixed production-like set preserves lifecycle counts without stale-categor
  const d=db();
  for(let i=0;i<8;i++){
   await writeEvidence(d,{
-   ...fixture({id:'mixlive'+String(i).padStart(4,'0'),state:'live',observed:i===7?'2026-10-18T00:00:00Z':'2026-10-18T00:50:00Z'}),
+   ...fixture({id:'mixlive'+String(i).padStart(4,'0'),state:'live',observed:i===7?'2026-10-18T00:02:00Z':'2026-10-18T00:50:00Z'}),
    scheduled_start:'2026-10-18T00:00:00Z',
    actual_start:'2026-10-18T00:01:00Z',
    actual_end:null,
