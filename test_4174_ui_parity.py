@@ -576,7 +576,7 @@ class ParityContract(unittest.TestCase):
     def test_vod_ptt_tracks_youtube_playback_timeline(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("function pttVodPlaybackMs()",viewer)
-        self.assertIn("return startMs+Math.max(0,seconds)*1000",viewer)
+        self.assertIn("const raw=startMs+Math.max(0,seconds)*1000",viewer)
         self.assertIn("function syncVodPttTimeline({forceFollow=false}={})",viewer)
         self.assertIn("occurred>absoluteMs",viewer)
         self.assertIn("if(visible>pttVodVisibleCount)",viewer)
