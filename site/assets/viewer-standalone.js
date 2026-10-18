@@ -837,6 +837,49 @@ async function loadLivePtt(){
   if(!pttLoaded)pttFeed.replaceChildren(node('div','PTT 暫時無法讀取，稍後會自動重試。','ptt-empty'));
  }
 }
+function verifiedSameDayVodWindow(row){
+ const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
+ const start=String(row?.actual_start||''),end=String(row?.actual_end||'');
+ const startMs=Date.parse(start),endMs=Date.parse(end);
+ if(lifecycle!=='ended'||!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return null;
+ const today=taipeiDay();
+ if(taipeiDayForDate(start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null;
+ return {start,end,day:today,anchorSource:PTT_ARCHIVE_ANCHOR};
+}
+async function loadTodayPttPayload(day){
+ try{return await api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=1000')}
+ catch{return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300')}
+}
+async function loadSameDayVodPtt(context,token){
+ pttPanel.hidden=false;
+ pttTitle.textContent='PTT 今日專串';
+ pttMeta.textContent=context.day.replaceAll('-','/')+' · 今日暫存 · 讀取中';
+ try{
+  const data=await loadTodayPttPayload(context.day);
+  if(token!==pttResolveToken)return;
+  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw new Error('資料格式錯誤');
+  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
+  const rows=data.pushes.filter(row=>{
+   if(!row||typeof row.content!=='string')return false;
+   const occurred=Date.parse(String(row.occurred_at||''));
+   return Number.isFinite(occurred)&&occurred>=startMs&&occurred<endMs;
+  });
+  const seen=new Set(),deduped=[];
+  for(const row of rows){
+   const key=pttKey(row);
+   if(!key||seen.has(key))continue;
+   seen.add(key);deduped.push(row);
+  }
+  pttFeed.replaceChildren(...deduped.map(pttRow));
+  pttLoaded=true;pttFollowing=false;pttNewest.hidden=true;pttFeed.scrollTop=0;
+  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+deduped.length+' 則 · 今日暫存 · ⚠ 尚未封存，不宣稱完整';
+  if(!deduped.length)pttFeed.replaceChildren(node('div','這段今日 VOD 時間範圍內目前沒有可顯示的 PTT 推文；資料尚未封存。','ptt-empty'));
+ }catch(error){
+  if(token!==pttResolveToken)return;
+  pttMeta.textContent=context.day.replaceAll('-','/')+' · 今日暫存 · 讀取失敗';
+  pttFeed.replaceChildren(node('div','今日稍早 VOD 的 PTT 暫時無法讀取：'+String(error?.message||error),'ptt-empty'));
+ }
+}
 let archiveManifestCache=null;
 function archiveIntegrityError(message){
  const error=new Error(message);error.archiveIntegrity=true;return error;
@@ -1019,9 +1062,17 @@ async function resolvePrimaryPtt(){
    showPttUnavailable('這支影片尚未開始，沒有可連接的 PTT 時間軸。','尚未開始');
    return;
   }
+  const sameDayWindow=verifiedSameDayVodWindow(row);
+  if(sameDayWindow){
+   pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
+               day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
+   updateUrl();
+   await loadSameDayVodPtt(pttContext,token);
+   return;
+  }
   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
   updateUrl();
-  showPttUnavailable('已結束影片只接受 History 傳入的 verified actualStartTime，未自動查詢歷史 D1。','VOD 請由歷史頁進入');
+  showPttUnavailable('已結束影片若不是今天稍早的 verified VOD，仍需由 History 傳入 verified actualStartTime / actualEndTime。','VOD 請由歷史頁進入');
  }catch{
   if(token!==pttResolveToken)return;
   const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);
@@ -1031,11 +1082,19 @@ async function resolvePrimaryPtt(){
    updateUrl();
    await loadLivePtt();
   }else{
+   const sameDayWindow=verifiedSameDayVodWindow(todayRow);
+   if(requestedPttMode==='live'&&sameDayWindow){
+    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
+                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
+    updateUrl();
+    await loadSameDayVodPtt(pttContext,token);
+    return;
+   }
    pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
    updateUrl();
    showPttUnavailable(
     requestedPttMode==='live'
-     ?'這支影片沒有被今日 catalog 驗證為 LIVE，因此不會誤接今天的 PTT。舊 VOD 需要由 History 傳入 verified actualStartTime / actualEndTime。'
+     ?'這支影片沒有被今日 catalog 驗證為 LIVE，也沒有可用的今日 ended actual_start / actual_end，因此不會誤接今天的 PTT。歷史 VOD 請由 History 提供 verified window。'
      :'無法自動判定這支影片；未連接錯誤日期的 PTT。',
     requestedPttMode==='live'?'非今日 LIVE':'無法判定'
    );
