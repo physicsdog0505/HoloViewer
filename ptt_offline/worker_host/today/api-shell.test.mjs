@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createExistingApiRouter} from './api-shell.mjs';
+import {legacyVideo} from './legacy-compat.mjs';
 const ORIGIN='https://holoviewer-public.singlebagel.workers.dev';
 const router=createExistingApiRouter({
  legacyHistory:async()=>new Response('history'),
@@ -100,4 +101,42 @@ test('Watchalong route reaches feature gate instead of falling through 404',asyn
  const r=await router.fetch(req('/v1/watchalong/recent'),{...env,DB:db});
  assert.equal(r.status,503);
  assert.equal((await r.json()).error,'watchalong_not_enabled');
+});
+
+
+test('single-video lookup falls back to Today canonical when legacy public_catalog has no row',async()=>{
+ const today={
+  video_id:'zPCcFbCONek',title:'Ended stream',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
+  lifecycle_state:'ended',actual_start:'2026-10-18T03:15:53Z',actual_end:'2026-10-18T04:49:00Z',
+  scheduled_start:'2026-10-18T03:15:00Z',source_label:'YouTube'
+ };
+ const db={prepare(sql){return {bind(){return {async first(){
+  if(sql.includes('FROM public_catalog'))return null;
+  if(sql.includes('FROM public_today_canonical'))return today;
+  throw Error('unexpected query');
+ }}}}}};
+ const response=await legacyVideo(new Request('https://api.example/v1/catalog/videos/zPCcFbCONek'),{DB:db});
+ assert.equal(response.status,200);
+ const body=await response.json();
+ assert.equal(body.video_id,'zPCcFbCONek');
+ assert.equal(body.actual_start,'2026-10-18T03:15:53Z');
+ assert.equal(body.actual_end,'2026-10-18T04:49:00Z');
+ assert.equal(body.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+});
+
+test('single-video Today fallback hides untrusted actual bounds',async()=>{
+ const today={
+  video_id:'abcdefghijk',title:'Legacy',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
+  lifecycle_state:'ended',actual_start:'2026-10-18T03:15:53Z',actual_end:'2026-10-18T04:49:00Z',
+  scheduled_start:'2026-10-18T03:15:00Z',source_label:'legacy-import'
+ };
+ const db={prepare(sql){return {bind(){return {async first(){
+  if(sql.includes('FROM public_catalog'))return null;
+  if(sql.includes('FROM public_today_canonical'))return today;
+  throw Error('unexpected query');
+ }}}}}};
+ const body=await (await legacyVideo(new Request('https://api.example/v1/catalog/videos/abcdefghijk'),{DB:db})).json();
+ assert.equal(body.actual_start,null);
+ assert.equal(body.actual_end,null);
+ assert.equal(body.anchor_source,null);
 });
