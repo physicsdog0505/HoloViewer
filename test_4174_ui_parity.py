@@ -386,6 +386,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("@keyframes call-fast",css)
         self.assertIn("@keyframes call-wave-left",css)
         self.assertIn("@keyframes call-space-pump",css)
+        self.assertIn("--call-beat-2",css)
+        self.assertIn("callOverlay.style.setProperty('--call-beat-4'",js)
         self.assertNotIn("/v1/call",js)
 
     def test_4174_viewer_ptt_panel_is_not_a_fake_feed(self):
