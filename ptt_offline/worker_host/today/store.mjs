@@ -142,10 +142,10 @@ function consumerRow(row,nowStamp,supportColors){
  const trusted=source_label===YOUTUBE_LIVE_SOURCE;
  const actual_start=trusted?consumerTime(row.actual_start):null;
  const actual_end=trusted?consumerTime(row.actual_end):null;
- const lifecycle_state=state==='ended'&&actual_end?'ended':
-  state==='live'?(fresh?'live':'stale'):
-  state==='upcoming'?(consumerTime(row.scheduled_start)&&row.scheduled_start<=nowStamp?'waiting':'upcoming'):
-  !fresh?'stale':state;
+ // Lifecycle identity is canonical-state authority; timestamp provenance only gates playback bounds.
+ const lifecycle_state=state==='upcoming'?
+  (consumerTime(row.scheduled_start)&&row.scheduled_start<=nowStamp?'waiting':'upcoming'):state;
+ const stale=state==='live'&&!fresh;
  return {video_id,title:consumerText(row.title),channel_id,channel_name:consumerText(row.channel_name),
   group:groups.has(row.channel_group)?row.channel_group:'other',lifecycle_state,observed_at:observed,
   start_at:actual_start??consumerTime(row.scheduled_start),
@@ -154,7 +154,7 @@ function consumerRow(row,nowStamp,supportColors){
   avatar_url:verifiedChannelAvatar(row.trusted_channel_avatar),
   member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,
   support_mode:color.support_mode,support_color_source:color.support_color_source,
-  source_label,stale:lifecycle_state==='stale'};
+  source_label,stale};
 }
 export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false,supportColors=null}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
