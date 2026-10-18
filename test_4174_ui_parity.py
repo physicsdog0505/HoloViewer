@@ -93,6 +93,14 @@ class ParityContract(unittest.TestCase):
                         "['後一天 →',shiftDay(selected,1)]"):
             self.assertIn(snippet, js)
         self.assertIn('.history-picker,.history-shortcuts', css)
+        for snippet in ('data-history-filter="hololive"', 'data-history-filter="holostars"',
+                        'data-history-filter="mekpark"', 'data-history-filter="all"'):
+            self.assertIn(snippet, html)
+        self.assertIn("api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0')", js)
+        self.assertIn("const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map()", js)
+        self.assertIn("endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}))", js)
+        self.assertIn("if(!history)overlay.append(node('span',status[0],'thumb-badge '+status[1]))", js)
+        self.assertIn("if(history&&String(item.lifecycle_state||item.state||'').toLowerCase()!=='ended')return", js)
         self.assertNotIn('id="history-prev"', html)
         self.assertNotIn('id="history-next"', html)
 
