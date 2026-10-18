@@ -1,0 +1,149 @@
+"""Issue #47 read-only Stream Catalog -> public_history projection preview.
+
+This module NEVER opens Cloudflare/D1 and NEVER mutates the source SQLite.
+It produces deterministic rows suitable for later reviewed import.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+SOURCE_REVISION = "stream-catalog-v1:youtube-liveStreamingDetails"
+SCHEMA_VERSION = "public-history-import-preview-v1"
+VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+TAIPEI = ZoneInfo("Asia/Taipei")
+
+
+def _parse_utc(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        raise ValueError("timezone-aware timestamp required")
+    return dt.astimezone(timezone.utc)
+
+
+def _z(dt: datetime | None) -> str | None:
+    if dt is None:
+        return None
+    return dt.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _taipei_day(dt: datetime) -> str:
+    return dt.astimezone(TAIPEI).date().isoformat()
+
+
+def open_catalog_read_only(path: str | Path) -> sqlite3.Connection:
+    p = Path(path).expanduser().resolve()
+    con = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+    con.execute("PRAGMA query_only=ON")
+    version = con.execute(
+        "SELECT value FROM stream_catalog_metadata WHERE key='schema_version'"
+    ).fetchone()
+    if version is None or str(version["value"]) != "1":
+        con.close()
+        raise ValueError("unsupported Stream Catalog schema")
+    return con
+
+
+def project_row(row: sqlite3.Row | dict) -> dict | None:
+    r = dict(row)
+    video_id = r.get("video_id")
+    if not isinstance(video_id, str) or not VIDEO_ID.fullmatch(video_id):
+        return None
+    start = _parse_utc(r.get("actual_start"))
+    end = _parse_utc(r.get("actual_end"))
+    if start is None or end is None or end <= start:
+        return None
+    if r.get("lifecycle_state") != "ended" or int(r.get("is_livestream") or 0) != 1:
+        return None
+    observed = _parse_utc(r.get("projection_observed_at"))
+    if observed is None:
+        return None
+    return {
+        "video_id": video_id,
+        "taipei_day": _taipei_day(start),
+        "title": str(r.get("title") or ""),
+        "channel_id": str(r.get("channel_id") or ""),
+        "channel_name": str(r.get("channel_name") or ""),
+        "avatar_url": str(r.get("avatar_url") or ""),
+        "scheduled_start": _z(_parse_utc(r.get("scheduled_start"))),
+        "actual_start": _z(start),
+        "actual_end": _z(end),
+        "source_revision": SOURCE_REVISION,
+        "published_at": _z(observed),
+    }
+
+
+def build_preview(con: sqlite3.Connection, *, from_day: str, through_day: str) -> dict:
+    rows = con.execute(
+        """
+        SELECT
+          s.video_id,
+          s.title,
+          s.channel_id,
+          c.channel_name,
+          c.avatar_url,
+          s.scheduled_start,
+          s.actual_start,
+          s.actual_end,
+          s.lifecycle_state,
+          s.projection_observed_at,
+          s.is_livestream
+        FROM streams s
+        LEFT JOIN channels c ON c.channel_id=s.channel_id
+        WHERE s.actual_start IS NOT NULL
+          AND s.actual_end IS NOT NULL
+        ORDER BY s.actual_start, s.video_id
+        """
+    ).fetchall()
+    projected = []
+    for source in rows:
+        item = project_row(source)
+        if item is not None and from_day <= item["taipei_day"] <= through_day:
+            projected.append(item)
+    projected.sort(key=lambda x: (x["taipei_day"], x["actual_start"], x["video_id"]))
+    ids = [x["video_id"] for x in projected]
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate video_id in projection")
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "source_revision": SOURCE_REVISION,
+        "from_day_taipei": from_day,
+        "through_day_taipei": through_day,
+        "row_count": len(projected),
+        "distinct_days": len({x["taipei_day"] for x in projected}),
+        "rows": projected,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--catalog", required=True)
+    parser.add_argument("--from-day", required=True)
+    parser.add_argument("--through-day", required=True)
+    parser.add_argument("--out")
+    args = parser.parse_args()
+    if args.from_day > args.through_day:
+        raise SystemExit("from-day must be <= through-day")
+    con = open_catalog_read_only(args.catalog)
+    try:
+        preview = build_preview(con, from_day=args.from_day, through_day=args.through_day)
+    finally:
+        con.close()
+    raw = json.dumps(preview, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if args.out:
+        Path(args.out).write_text(raw, encoding="utf-8")
+    else:
+        print(raw, end="")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
