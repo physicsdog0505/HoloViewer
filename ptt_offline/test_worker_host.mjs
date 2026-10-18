@@ -80,7 +80,7 @@ test('combined host serves #47 Today consumer envelope directly to 4174 preload'
  assert.equal(body.streams[0].video_id,'abcdefghijk');
  assert.equal(body.streams[0].lifecycle_state,'stale'); // old fixture must fail closed under 20-minute freshness
  assert.equal(body.streams[0].group,'hololive');
- assert.equal(body.streams[0].source_label,'YouTube');
+ assert.equal(body.streams[0].source_label,'YouTube liveStreamingDetails');
 });
 
 test('combined host accepts chunked support-color payload without changing Today contract',async()=>{
