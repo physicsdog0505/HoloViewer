@@ -380,6 +380,9 @@ test('Today projection never exposes untrusted actual bounds as authoritative',a
 
 test('trusted ended evidence is idempotently projected into recent public_history',async()=>{
  const d=db();
+ d.raw.prepare('INSERT INTO public_catalog VALUES(?,?,?,?,?)').run(
+  'cataloghist1',C,'https://yt3.ggpht.com/history-projection-avatar',null,'2026-10-18T03:00:00Z'
+ );
  const ended={
   ...fixture({id:'recenthis01',state:'ended',observed:'2026-10-18T05:00:00Z',end:'2026-10-18T04:49:00Z'}),
   scheduled_start:'2026-10-18T03:15:00Z',
@@ -393,6 +396,7 @@ test('trusted ended evidence is idempotently projected into recent public_histor
  assert.equal(row.actual_start,'2026-10-18T03:15:53Z');
  assert.equal(row.actual_end,'2026-10-18T04:49:00Z');
  assert.equal(row.source_revision,HISTORY_SOURCE_REVISION);
+ assert.equal(row.avatar_url,'https://yt3.ggpht.com/history-projection-avatar');
  assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthis01').n,1);
  const newer={...ended,observed_at:'2026-10-18T05:05:00Z'};
  await writeEvidence(d,newer);
