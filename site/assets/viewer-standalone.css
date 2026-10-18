@@ -168,45 +168,82 @@ body.call-mode .call-overlay{display:block}
  padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.56);color:#fff;
  font-size:10px;font-weight:700;letter-spacing:.02em;white-space:nowrap
 }
-.call-hands{position:absolute;left:50%;bottom:-8%;width:min(64%,520px);height:56%;transform:translateX(-50%)}
+.call-hands{position:absolute;left:50%;bottom:-26%;width:min(78%,760px);height:50%;transform:translateX(-50%);will-change:transform}
 .call-hand{
- position:absolute;bottom:0;width:46%;height:100%;
- transform-origin:50% 92%;will-change:transform;filter:drop-shadow(0 0 8px rgba(255,255,255,.18))
+ position:absolute;bottom:0;width:42%;height:100%;
+ transform-origin:50% 96%;will-change:transform;filter:drop-shadow(0 0 6px rgba(255,255,255,.12))
 }
-.call-hand.left{left:0;transform:rotate(-8deg)}
-.call-hand.right{right:0;transform:rotate(8deg)}
+.call-hand.left{left:-2%;transform:rotate(-5deg)}
+.call-hand.right{right:-2%;transform:rotate(5deg)}
 .call-stick{
- position:absolute;left:50%;bottom:4%;width:22px;height:72%;transform:translateX(-50%);
- border:4px solid #111;border-radius:6px;background:#ff58ca;
- box-shadow:0 0 10px #ff58ca,0 0 24px rgba(255,88,202,.7),inset 0 0 0 3px rgba(255,255,255,.34);
+ position:absolute;left:50%;bottom:0;width:34px;height:54%;transform:translateX(-50%);
+ border:5px solid #111;border-radius:2px;background:#ff58ca;
+ box-shadow:0 0 4px #ff58ca,0 0 12px rgba(255,88,202,.58),inset 0 0 0 4px rgba(255,255,255,.22);
  image-rendering:pixelated
 }
+.call-stick::before{content:"";position:absolute;inset:7px 6px auto 6px;height:9px;background:rgba(255,255,255,.55)}
 .call-hand.right .call-stick{
- background:#56d8ff;box-shadow:0 0 10px #56d8ff,0 0 24px rgba(86,216,255,.7),inset 0 0 0 3px rgba(255,255,255,.34)
+ background:#56d8ff;box-shadow:0 0 4px #56d8ff,0 0 12px rgba(86,216,255,.58),inset 0 0 0 4px rgba(255,255,255,.22)
 }
 .call-stick::after{
- content:"";position:absolute;left:2px;right:2px;bottom:-18px;height:18px;
- background:#242321;border:3px solid #111;border-radius:2px
+ content:"";position:absolute;left:-1px;right:-1px;bottom:-24px;height:24px;
+ background:#242321;border:4px solid #111;border-radius:1px
 }
-.call-overlay.side-two-left .call-hands{animation:call-small-left var(--call-beat-2) ease-in-out infinite}
-.call-overlay.side-two-right .call-hands{animation:call-small-right calc(var(--call-beat) * 2) ease-in-out infinite}
+.call-overlay.side-two-left .call-hands{animation:call-small-left var(--call-beat-2) linear infinite}
+.call-overlay.side-two-right .call-hands{animation:call-small-right var(--call-beat-2) linear infinite}
 .call-overlay.side-fast-left .call-hands,
-.call-overlay.side-fast-right .call-hands{animation:call-fast var(--call-beat) ease-in-out infinite}
-.call-overlay.side-wave-left .call-hands{animation:call-wave-left var(--call-beat-4) ease-in-out infinite}
-.call-overlay.side-wave-right .call-hands{animation:call-wave-right calc(var(--call-beat) * 4) ease-in-out infinite}
+.call-overlay.side-fast-right .call-hands{animation:call-fast var(--call-beat) linear infinite}
+.call-overlay.side-wave-left .call-hands{animation:call-wave-left var(--call-beat-4) linear infinite}
+.call-overlay.side-wave-right .call-hands{animation:call-wave-right var(--call-beat-4) linear infinite}
 .call-overlay.space-pump .call-hands{animation:call-space-pump var(--call-beat) cubic-bezier(.2,.8,.25,1) infinite}
-@keyframes call-small-left{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-53%) rotate(-13deg)}}
-@keyframes call-small-right{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-47%) rotate(13deg)}}
-@keyframes call-fast{0%,100%{transform:translateX(-50%) rotate(-15deg)}50%{transform:translateX(-50%) rotate(15deg)}}
-@keyframes call-wave-left{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-59%) rotate(-31deg)}}
-@keyframes call-wave-right{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-41%) rotate(31deg)}}
-@keyframes call-space-pump{0%,100%{transform:translateX(-50%) translateY(0)}45%{transform:translateX(-50%) translateY(-17%)}65%{transform:translateX(-50%) translateY(-14%)}}
+@keyframes call-small-left{
+ 0%,100%{transform:translate(-50%,0) rotate(0)}
+ 25%{transform:translate(-55%,-4%) rotate(-8deg)}
+ 50%{transform:translate(-58%,-8%) rotate(-16deg)}
+ 75%{transform:translate(-55%,-4%) rotate(-8deg)}
+}
+@keyframes call-small-right{
+ 0%,100%{transform:translate(-50%,0) rotate(0)}
+ 25%{transform:translate(-45%,-4%) rotate(8deg)}
+ 50%{transform:translate(-42%,-8%) rotate(16deg)}
+ 75%{transform:translate(-45%,-4%) rotate(8deg)}
+}
+@keyframes call-fast{
+ 0%{transform:translate(-58%,-5%) rotate(-18deg)}
+ 25%{transform:translate(-53%,-10%) rotate(-8deg)}
+ 50%{transform:translate(-42%,-5%) rotate(18deg)}
+ 75%{transform:translate(-47%,-10%) rotate(8deg)}
+ 100%{transform:translate(-58%,-5%) rotate(-18deg)}
+}
+@keyframes call-wave-left{
+ 0%{transform:translate(-50%,0) rotate(0)}
+ 12.5%{transform:translate(-58%,-8%) rotate(-12deg)}
+ 25%{transform:translate(-64%,-18%) rotate(-24deg)}
+ 37.5%{transform:translate(-67%,-30%) rotate(-36deg)}
+ 50%{transform:translate(-64%,-38%) rotate(-44deg)}
+ 62.5%{transform:translate(-58%,-30%) rotate(-34deg)}
+ 75%{transform:translate(-53%,-18%) rotate(-20deg)}
+ 87.5%{transform:translate(-50%,-8%) rotate(-8deg)}
+ 100%{transform:translate(-50%,0) rotate(0)}
+}
+@keyframes call-wave-right{
+ 0%{transform:translate(-50%,0) rotate(0)}
+ 12.5%{transform:translate(-42%,-8%) rotate(12deg)}
+ 25%{transform:translate(-36%,-18%) rotate(24deg)}
+ 37.5%{transform:translate(-33%,-30%) rotate(36deg)}
+ 50%{transform:translate(-36%,-38%) rotate(44deg)}
+ 62.5%{transform:translate(-42%,-30%) rotate(34deg)}
+ 75%{transform:translate(-47%,-18%) rotate(20deg)}
+ 87.5%{transform:translate(-50%,-8%) rotate(8deg)}
+ 100%{transform:translate(-50%,0) rotate(0)}
+}
+@keyframes call-space-pump{0%,100%{transform:translate(-50%,0)}42%{transform:translate(-50%,-56%)}62%{transform:translate(-50%,-49%)}}
 
-body.immersive .call-hands{width:min(72%,720px);height:64%}
+body.immersive .call-hands{width:min(84%,900px);height:56%;bottom:-25%}
 body.immersive .call-hud{bottom:16px}
 @media(max-width:900px){
- .call-hands{width:min(78%,460px);height:48%}
- .call-stick{width:18px}
+ .call-hands{width:min(86%,560px);height:46%;bottom:-24%}
+ .call-stick{width:28px}
 }
 
 .viewer-ptt{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:#0c0d0f;border:1px solid #303238;border-radius:10px;overflow:hidden;color:#eee}
