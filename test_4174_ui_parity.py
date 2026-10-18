@@ -222,6 +222,11 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("/v1/ptt/history?day=",viewer)
         self.assertIn("if(!archiveVodEntry)await loadCatalog();",viewer)
         self.assertIn(".ptt-floor{",css)
+        self.assertIn(".ptt-row.has-floor{grid-template-columns:max-content 1.3em max-content minmax(0,1fr)}",css)
+        self.assertIn("if(floor!==null){el.classList.add('has-floor');",viewer)
+        self.assertIn("const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);",viewer)
+        self.assertIn("if(requestedPttMode==='live'&&todayState==='live')",viewer)
+        self.assertIn("這支影片沒有被今日 catalog 驗證為 LIVE",viewer)
 
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
