@@ -128,6 +128,20 @@ export async function setCoverage(db, c) {
 function consumerText(value){return typeof value==='string'?value:'';}
 function consumerTime(value){return validTime(value)?value:null;}
 function consumerLifecycle(value){return lifecycles.has(value)?value:'unknown';}
+/**
+ * Public Home grouping contract.
+ * Consumers MUST classify from lifecycle_state + stale only; they must not
+ * reconstruct YouTube lifecycle from timestamps or provenance.
+ */
+export function classifyHomeConsumer(stream){
+ const lifecycle=consumerLifecycle(stream?.lifecycle_state);
+ const stale=stream?.stale===true;
+ if(lifecycle==='live')return stale?'degraded':'current_live';
+ if(lifecycle==='unknown')return 'degraded';
+ if(lifecycle==='upcoming'||lifecycle==='waiting')return 'upcoming';
+ if(lifecycle==='ended')return 'ended';
+ return 'degraded';
+}
 function consumerRow(row,nowStamp,supportColors){
  const video_id=idPattern.test(row?.video_id??'')?row.video_id:null;
  const channel_id=channelPattern.test(row?.publisher_channel_id??'')?row.publisher_channel_id:null;
