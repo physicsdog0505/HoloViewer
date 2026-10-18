@@ -310,6 +310,35 @@ class ParityContract(unittest.TestCase):
         buckets=js[bucket_start:bucket_end]
         self.assertIn('buckets[homeLifecycleBucket(item)].push(item)',buckets)
 
+    def test_public_home_highlights_follow_lifecycle_freshness_contract(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        classifier_start=js.index('function homeLifecycleBucket(item){')
+        classifier_end=js.index('function homeCard(',classifier_start)
+        rules_start=js.index('const HOME_HIGHLIGHT_RULES=')
+        choose_end=js.index('function renderHomeHighlights(rows){',rules_start)
+        script=js[classifier_start:classifier_end]+js[rules_start:choose_end]
+        cases=[
+            {'video_id':'stale000001','lifecycle_state':'live','stale':True,'title':'重大告知'},
+            {'video_id':'fresh000001','lifecycle_state':'live','stale':False,'title':'重大告知'},
+            {'video_id':'0-21K73BYWc','lifecycle_state':'upcoming','stale':False,'title':'重大告知','start_at':'2026-10-19T12:30:00Z'},
+        ]
+        node=script+'\nconst rows='+json.dumps(cases)+';process.stdout.write(JSON.stringify({picks:chooseHomeHighlights(rows).map(x=>({id:x.row.video_id,score:x.score})),scores:rows.map(x=>homeHighlightMatch(x).score)}));'
+        result=subprocess.run(['node','-e',node],check=True,capture_output=True,text=True)
+        payload=json.loads(result.stdout)
+        picks={item['id']:item['score'] for item in payload['picks']}
+        self.assertNotIn('stale000001',picks)
+        self.assertIn('fresh000001',picks)
+        self.assertIn('0-21K73BYWc',picks)
+        self.assertEqual(payload['scores'][0],105)
+        self.assertEqual(payload['scores'][1],110)
+        self.assertEqual(payload['scores'][2],105)
+        choose=js[js.index('function chooseHomeHighlights(rows){'):choose_end]
+        self.assertIn("const bucket=homeLifecycleBucket(row)",choose)
+        self.assertIn("if(bucket!=='live'&&bucket!=='upcoming')continue",choose)
+        match=js[js.index('function homeHighlightMatch(item){'):js.index('function chooseHomeHighlights(rows){')]
+        self.assertIn("homeLifecycleBucket(item)==='live'",match)
+        self.assertNotIn("String(item.lifecycle_state",match)
+
     def test_original_4174_home_highlights_have_verified_rules(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
