@@ -86,6 +86,12 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".viewer-workspace.workspace-focus.layout-primary .viewer-stage,.viewer-workspace.workspace-sidebar.layout-primary .viewer-stage{display:contents}", css)
         self.assertIn(".transport-button.is-feedback", css)
         self.assertIn("location.href='/viewer/?'+q.toString();", app)
+        self.assertIn("function openStandaloneViewer(ids)", app)
+        self.assertIn("q.set('mode',clean.length>1?'multi':'single');", app)
+        self.assertIn("$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openStandaloneViewer(ids)};", app)
+        self.assertIn("href='/viewer/?stream='", app)
+        self.assertIn("entry.setAttribute('aria-disabled','true')", app)
+        self.assertIn("多人連動入口準備中", app)
         self.assertFalse((ROOT / "site/custom-view/index.html").exists())
 
     def test_standalone_ptt_today_contract(self):
