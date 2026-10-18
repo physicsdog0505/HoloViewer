@@ -11,7 +11,24 @@ export async function legacyHistory(request,env){
  if(!validDay(day)||!decimal(rawLimit,1,50)||!decimal(rawOffset,0,1000000))return response({error:'invalid_history_query'},400,0);
  const limit=Number(rawLimit),offset=Number(rawOffset);
  const count=await env.DB.prepare('SELECT COUNT(*) AS total FROM public_history WHERE taipei_day=?').bind(day).first();
- const rows=await env.DB.prepare('SELECT '+HISTORY_FIELDS+' FROM public_history WHERE taipei_day=? ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT ? OFFSET ?').bind(day,limit,offset).all();
+ const rows=await env.DB.prepare(`
+  SELECT
+    h.video_id,h.title,h.channel_id,h.channel_name,
+    COALESCE(NULLIF(h.avatar_url,''),(
+      SELECT c.avatar_url
+      FROM public_catalog c
+      WHERE c.channel_id=h.channel_id
+        AND c.avatar_url IS NOT NULL
+        AND c.avatar_url!=''
+      ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC
+      LIMIT 1
+    )) AS avatar_url,
+    h.actual_start,h.actual_end,h.scheduled_start
+  FROM public_history h
+  WHERE h.taipei_day=?
+  ORDER BY COALESCE(h.actual_start,h.scheduled_start) DESC,h.video_id DESC
+  LIMIT ? OFFSET ?
+ `).bind(day,limit,offset).all();
  return response({day,total:count?.total??0,limit,offset,items:rows.results??[]});
 }
 export async function legacyVideo(request,env){
