@@ -184,7 +184,8 @@ function updateUrl(){
  streams.forEach(stream=>q.append('stream',stream.videoId));
  q.set('layout',layout);
  q.set('workspace',workspaceLayout);
- q.set('ptt',pttContext.mode==='live'?'live':requestedPttMode);
+ const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode);
+ q.set('ptt',resolvedPttMode);
  archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|')));
  q.set('primary',String(primaryIndex));
  q.set('audio',String(primaryIndex));
@@ -1113,14 +1114,22 @@ async function loadLivePtt(){
   if(!pttLoaded)pttFeed.replaceChildren(node('div','PTT 暫時無法讀取，稍後會自動重試。','ptt-empty'));
  }
 }
-function verifiedSameDayVodWindow(row){
+function verifiedEndedVodWindow(row){
  const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
  const start=String(row?.actual_start||''),end=String(row?.actual_end||'');
  const startMs=Date.parse(start),endMs=Date.parse(end);
  if(lifecycle!=='ended'||!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return null;
- const today=taipeiDay();
- if(taipeiDayForDate(start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null;
- return {start,end,day:today,anchorSource:PTT_ARCHIVE_ANCHOR};
+ const scheduledStart=String(row?.scheduled_start||'');
+ const scheduledMs=Date.parse(scheduledStart);
+ return {start,end,day:taipeiDayForDate(start),anchorSource:PTT_ARCHIVE_ANCHOR,
+  scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''};
+}
+function verifiedSameDayVodWindow(row){
+ const window=verifiedEndedVodWindow(row);
+ if(!window)return null;
+ const today=taipeiDay(),endMs=Date.parse(window.end);
+ if(taipeiDayForDate(window.start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null;
+ return {...window,day:today};
 }
 async function loadTodayPttPayload(day){
  try{return await api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=1000')}
@@ -1384,22 +1393,22 @@ async function resolvePrimaryPtt(){
  resetPttFeed();
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 專串';
- const archiveWindow=archiveWindows.get(id);
- if(archiveVodEntry){
-  if(!archiveWindow){
-   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
-   updateUrl();
-   showPttUnavailable('缺少可信的 YouTube actualStartTime / actualEndTime；不會改用 scheduled time，也不會查 Live Worker / D1。','VOD 歷史 PTT 無法判定');
-   return;
-  }
-  pttContext={mode:'archive',videoId:id,start:archiveWindow.start,end:archiveWindow.end,
-              scheduledStart:archiveWindow.scheduledStart||'',
-              day:taipeiDayForDate(archiveWindow.start),anchorSource:archiveWindow.anchorSource};
+
+ const suppliedWindow=archiveWindows.get(id);
+ if(suppliedWindow){
+  const endMs=Date.parse(suppliedWindow.end),today=taipeiDay();
+  const sameDay=taipeiDayForDate(suppliedWindow.start)===today&&
+   Number.isFinite(endMs)&&taipeiDayForDate(new Date(endMs-1))===today;
+  pttContext={mode:sameDay?'same-day':'archive',videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
+              scheduledStart:suppliedWindow.scheduledStart||'',
+              day:taipeiDayForDate(suppliedWindow.start),anchorSource:suppliedWindow.anchorSource};
   updateUrl();
-  await loadArchivePtt(pttContext,token);
+  if(sameDay)await loadSameDayVodPtt(pttContext,token);
+  else await loadArchivePtt(pttContext,token);
   return;
  }
- pttMeta.textContent='判定 Live 中';
+
+ pttMeta.textContent='判定影片狀態中';
  try{
   const row=await api('/v1/catalog/videos/'+encodeURIComponent(id));
   if(token!==pttResolveToken)return;
@@ -1416,10 +1425,49 @@ async function resolvePrimaryPtt(){
    showPttUnavailable('這支影片尚未開始，沒有可連接的 PTT 時間軸。','尚未開始');
    return;
   }
-  const sameDayWindow=verifiedSameDayVodWindow(row);
+  if(lifecycle==='ended'){
+   const sameDayWindow=verifiedSameDayVodWindow(row);
+   if(sameDayWindow){
+    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
+                scheduledStart:sameDayWindow.scheduledStart||'',
+                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
+    updateUrl();
+    await loadSameDayVodPtt(pttContext,token);
+    return;
+   }
+   const archiveWindow=verifiedEndedVodWindow(row);
+   if(archiveWindow){
+    const cached={videoId:id,start:archiveWindow.start,end:archiveWindow.end,
+                  anchorSource:archiveWindow.anchorSource,scheduledStart:archiveWindow.scheduledStart||''};
+    archiveWindows.set(id,cached);
+    pttContext={mode:'archive',videoId:id,start:cached.start,end:cached.end,
+                scheduledStart:cached.scheduledStart,day:archiveWindow.day,anchorSource:cached.anchorSource};
+    updateUrl();
+    await loadArchivePtt(pttContext,token);
+    return;
+   }
+   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
+   updateUrl();
+   showPttUnavailable('這支已結束影片缺少可信的 actualStartTime / actualEndTime，因此不會猜測 PTT 時間軸。','VOD 時間窗不足');
+   return;
+  }
+  pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
+  updateUrl();
+  showPttUnavailable('目前無法判定這支影片的直播狀態，因此不會連接可能錯誤的 PTT。','狀態無法判定');
+ }catch{
+  if(token!==pttResolveToken)return;
+  const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);
+  const todayState=String(todayRow?.lifecycle_state||todayRow?.state||'').toLowerCase();
+  if(todayState==='live'){
+   pttContext={mode:'live',videoId:id,start:'',end:'',day:taipeiDay()};
+   updateUrl();
+   await loadLivePtt();
+   return;
+  }
+  const sameDayWindow=verifiedSameDayVodWindow(todayRow);
   if(sameDayWindow){
    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
-               scheduledStart:String(row?.scheduled_start||''),
+               scheduledStart:sameDayWindow.scheduledStart||'',
                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
    updateUrl();
    await loadSameDayVodPtt(pttContext,token);
@@ -1427,34 +1475,7 @@ async function resolvePrimaryPtt(){
   }
   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
   updateUrl();
-  showPttUnavailable('已結束影片若不是今天稍早的 verified VOD，仍需由 History 傳入 verified actualStartTime / actualEndTime。','VOD 請由歷史頁進入');
- }catch{
-  if(token!==pttResolveToken)return;
-  const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);
-  const todayState=String(todayRow?.lifecycle_state||todayRow?.state||'').toLowerCase();
-  if(requestedPttMode==='live'&&todayState==='live'){
-   pttContext={mode:'live',videoId:id,start:'',end:'',day:taipeiDay()};
-   updateUrl();
-   await loadLivePtt();
-  }else{
-   const sameDayWindow=verifiedSameDayVodWindow(todayRow);
-   if(requestedPttMode==='live'&&sameDayWindow){
-    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
-                scheduledStart:String(todayRow?.scheduled_start||''),
-                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
-    updateUrl();
-    await loadSameDayVodPtt(pttContext,token);
-    return;
-   }
-   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
-   updateUrl();
-   showPttUnavailable(
-    requestedPttMode==='live'
-     ?'這支影片沒有被今日 catalog 驗證為 LIVE，也沒有可用的今日 ended actual_start / actual_end，因此不會誤接今天的 PTT。歷史 VOD 請由 History 提供 verified window。'
-     :'無法自動判定這支影片；未連接錯誤日期的 PTT。',
-    requestedPttMode==='live'?'非今日 LIVE':'無法判定'
-   );
-  }
+  showPttUnavailable('暫時無法取得這支影片的可信 lifecycle / actual time，因此不會誤接其他日期的 PTT。','無法判定');
  }
 }
 async function loadPtt(){
