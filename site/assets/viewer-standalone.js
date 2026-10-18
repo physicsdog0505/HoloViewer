@@ -185,7 +185,7 @@ function updateUrl(){
  q.set('layout',layout);
  q.set('workspace',workspaceLayout);
  q.set('ptt',pttContext.mode==='live'?'live':requestedPttMode);
- archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource].join('|')));
+ archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|')));
  q.set('primary',String(primaryIndex));
  q.set('audio',String(primaryIndex));
  q.set('mode',watchMode);
