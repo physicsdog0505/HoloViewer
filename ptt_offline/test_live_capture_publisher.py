@@ -2,6 +2,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from datetime import datetime
 from ptt_offline.live_capture_publisher import active_article_ids,content_digest,inspect_latest_article,run_live_once,state_for_source
