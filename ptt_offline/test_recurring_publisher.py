@@ -147,9 +147,11 @@ class RecurringPublisherTests(unittest.TestCase):
         source="9"*64
         responses=[
             {"status":"READ_ONLY","eligible":12,"fresh_eligible":3,
-             "legacy_baseline_candidates":7,"retained_recovery_candidates":5,"burst_safe_candidates":5,"sent":0},
+             "legacy_baseline_candidates":7,"baseline_skipped_candidates":4,
+             "retained_recovery_candidates":5,"burst_safe_candidates":5,"sent":0},
             {"status":"READ_ONLY","eligible":8,"fresh_eligible":2,
-             "legacy_baseline_candidates":6,"retained_recovery_candidates":2,"burst_safe_candidates":2,"sent":0},
+             "legacy_baseline_candidates":6,"baseline_skipped_candidates":3,
+             "retained_recovery_candidates":2,"burst_safe_candidates":2,"sent":0},
         ]
         def plan(_,article_id=None):
             return {"status":"READY","source_identity":str(article_id)*64}
@@ -164,6 +166,7 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(result["fresh_eligible"],5)
         self.assertEqual(result["legacy_baseline_candidates"],13)
         self.assertEqual(result["retained_recovery_candidates"],7)
+        self.assertEqual(result["baseline_skipped_candidates"],7)
         self.assertEqual(result["burst_safe_candidates"],7)
         self.assertEqual(result["sent"],0)
         self.assertEqual(result["http_posts"],0)
