@@ -65,7 +65,7 @@ test('combined host serves #47 Today consumer envelope directly to 4174 preload'
   channel_group:'hololive',title:'Fixture LIVE',channel_name:'Fixture Channel',lifecycle_state:'live',
   lifecycle_observed_at:'2026-10-15T20:20:00Z',checked_at:'2026-10-15T20:20:00Z',
   scheduled_start:'2026-10-15T20:00:00Z',actual_start:'2026-10-15T20:01:00Z',actual_end:null,
-  source_label:'YouTube',source_checksum:'deadbeef',trusted_channel_avatar:null};
+  source_label:'YouTube liveStreamingDetails',source_checksum:'deadbeef',trusted_channel_avatar:null};
  const DB={prepare(sql){return {bind(){return this},first:async()=>sql.includes('public_today_catalog_meta')?coverage:null,
    all:async()=>({results:sql.includes('FROM public_today_canonical')?[row]:[]})}}};
  const r=await worker.fetch(new Request('https://api.example/v1/catalog/today?day=2026-10-16'),{DB});
@@ -90,7 +90,7 @@ test('combined host accepts chunked support-color payload without changing Today
   channel_group:'hololive',title:'Fixture',channel_name:'Fixture',lifecycle_state:'live',
   lifecycle_observed_at:'2026-10-16T04:45:00Z',checked_at:'2026-10-16T04:45:00Z',
   scheduled_start:'2026-10-16T04:30:00Z',actual_start:'2026-10-16T04:31:00Z',actual_end:null,
-  source_label:'YouTube',source_checksum:'deadbeef',trusted_channel_avatar:null};
+  source_label:'YouTube liveStreamingDetails',source_checksum:'deadbeef',trusted_channel_avatar:null};
  const DB={prepare(sql){return {bind(){return this},first:async()=>sql.includes('public_today_catalog_meta')?coverage:null,
    all:async()=>({results:sql.includes('FROM public_today_canonical')?[row]:[]})}}};
  const payload=JSON.stringify({schema_version:1,fallback:'neutral',channels:[{
