@@ -1,6 +1,10 @@
 'use strict';
 
 const API_BASE=String(window.HOLOVIEWER_CONFIG?.apiBase||'').replace(/\/$/,'');
+const PTT_ARCHIVE_BASE=String(window.HOLOVIEWER_CONFIG?.pttArchiveBase||'').replace(/\/$/,'');
+const PTT_ARCHIVE_MANIFEST=String(window.HOLOVIEWER_CONFIG?.pttArchiveManifest||'/ptt/v1/manifests/static-assets-full-2026-10.json');
+const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
+const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';
 const params=new URLSearchParams(location.search);
 const MAX_STREAMS=16;
 const FOCUS_VISIBLE_SLOTS=4;
@@ -17,6 +21,21 @@ const collabEventId=String(params.get('collab_event')||'');
 const collabKind=['live','vod'].includes(params.get('collab_kind'))?params.get('collab_kind'):'';
 const collabDay=/^\d{4}-\d{2}-\d{2}$/.test(String(params.get('collab_day')||''))?String(params.get('collab_day')):'';
 const collabManaged=Boolean(collabEventId&&collabKind);
+function parseArchiveWindows(){
+ const map=new Map();
+ for(const raw of params.getAll('ptt_window')){
+  const parts=String(raw).split('|');
+  if(parts.length!==4)continue;
+  const [videoId,start,end,anchorSource]=parts;
+  const startMs=Date.parse(start),endMs=Date.parse(end);
+  if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)||anchorSource!==PTT_ARCHIVE_ANCHOR||
+     !Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)continue;
+  map.set(videoId,{videoId,start,end,anchorSource});
+ }
+ return map;
+}
+const archiveWindows=parseArchiveWindows();
+const archiveVodEntry=requestedPttMode==='video';
 
 const stage=document.getElementById('stage');
 const workspace=document.querySelector('.viewer-workspace');
@@ -141,6 +160,7 @@ function updateUrl(){
  q.set('layout',layout);
  q.set('workspace',workspaceLayout);
  q.set('ptt',pttContext.mode==='live'?'live':requestedPttMode);
+ archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource].join('|')));
  q.set('primary',String(primaryIndex));
  q.set('audio',String(primaryIndex));
  q.set('mode',watchMode);
@@ -735,10 +755,12 @@ function taipeiDayForDate(value){
  const out=Object.fromEntries(parts.filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
  return out.year+'-'+out.month+'-'+out.day;
 }
-function pttKey(row){return String(row?.push_id||row?.aid+':'+row?.source_line)}
+function pttKey(row){return String(row?.source_record_key||row?.push_id||row?.aid+':'+row?.source_line)}
 function pttRow(row){
  const el=node('div',undefined,'ptt-row');
  el.dataset.pushId=pttKey(row);
+ const floor=Number.isInteger(row?.floor)&&row.floor>0?'#'+row.floor:'';
+ const floorEl=node('span',floor,'ptt-floor');
  const kind=String(row?.kind||'→');
  const kindEl=node('span',kind,'ptt-kind'+(kind==='噓'?' boo':kind==='→'?' arrow':''));
  const when=new Date(String(row?.occurred_at||''));
@@ -747,7 +769,7 @@ function pttRow(row){
  const time=node('span',clock,'ptt-time');
  const body=node('span',undefined,'ptt-body');
  body.append(node('span',String(row?.author||'unknown')+':','ptt-author'),node('span',String(row?.content||''),'ptt-content'));
- el.append(kindEl,time,body);
+ el.append(floorEl,kindEl,time,body);
  return el;
 }
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
@@ -793,43 +815,147 @@ async function loadLivePtt(){
   if(!pttLoaded)pttFeed.replaceChildren(node('div','PTT 暫時無法讀取，稍後會自動重試。','ptt-empty'));
  }
 }
+let archiveManifestCache=null;
+function archiveIntegrityError(message){
+ const error=new Error(message);error.archiveIntegrity=true;return error;
+}
+function nextIsoDay(day){
+ const date=new Date(day+'T00:00:00Z');
+ if(!Number.isFinite(date.getTime()))return '';
+ date.setUTCDate(date.getUTCDate()+1);
+ return date.toISOString().slice(0,10);
+}
+function archiveCoverageDays(startMs,endMs){
+ const first=taipeiDayForDate(new Date(startMs));
+ const last=taipeiDayForDate(new Date(endMs-1));
+ if(!first||!last)return [];
+ const days=[];for(let day=first;day&&day<=last;day=nextIsoDay(day))days.push(day);
+ return days;
+}
+function archiveHourKey(ms){
+ const date=new Date(ms);
+ return 'ptt/v1/chunks/'+date.getUTCFullYear()+'/'+String(date.getUTCMonth()+1).padStart(2,'0')+'/'+
+  String(date.getUTCDate()).padStart(2,'0')+'/'+String(date.getUTCHours()).padStart(2,'0')+'00.json';
+}
+function archiveHourKeys(startMs,endMs){
+ const keys=[];
+ let cursor=Math.floor(startMs/3600000)*3600000;
+ while(cursor<endMs){keys.push(archiveHourKey(cursor));cursor+=3600000}
+ return keys;
+}
+async function archiveSha256Hex(buffer){
+ if(!globalThis.crypto?.subtle)throw new Error('瀏覽器不支援歷史檔案完整性驗證');
+ const digest=await crypto.subtle.digest('SHA-256',buffer);
+ return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+function validateArchiveManifest(manifest){
+ if(manifest?.schema_version!==PTT_ARCHIVE_SCHEMA||manifest?.precision!=='minute'||
+    manifest?.chunk_minutes!==60||manifest?.timezone!=='UTC'||
+    !Array.isArray(manifest?.objects)||!Array.isArray(manifest?.days))throw new Error('歷史 PTT manifest 格式不支援');
+ const seen=new Set();
+ for(const item of manifest.objects){
+  if(!item||typeof item.key!=='string'||!item.key.endsWith('.json')||seen.has(item.key)||
+     !/^[0-9a-f]{64}$/.test(String(item.sha256||''))||!Number.isInteger(item.pushes)||item.pushes<0)
+    throw new Error('歷史 PTT manifest 物件索引無效');
+  seen.add(item.key);
+ }
+ return manifest;
+}
+async function fetchArchiveManifest(force=false){
+ if(!PTT_ARCHIVE_BASE||!/^https:\/\//.test(PTT_ARCHIVE_BASE))throw new Error('歷史 PTT Static Assets 未設定');
+ if(archiveManifestCache&&!force)return archiveManifestCache;
+ const response=await fetch(PTT_ARCHIVE_BASE+PTT_ARCHIVE_MANIFEST,{mode:'cors',credentials:'omit',cache:'no-cache',headers:{Accept:'application/json'}});
+ if(!response.ok)throw new Error('歷史 PTT manifest HTTP '+response.status);
+ archiveManifestCache=validateArchiveManifest(await response.json());
+ return archiveManifestCache;
+}
+async function fetchArchiveChunk(item){
+ const response=await fetch(PTT_ARCHIVE_BASE+'/'+item.key,{mode:'cors',credentials:'omit',cache:'no-cache',headers:{Accept:'application/json'}});
+ if(!response.ok)throw new Error('歷史 PTT chunk HTTP '+response.status);
+ const contentType=String(response.headers.get('content-type')||'').toLowerCase();
+ if(!contentType.startsWith('application/json'))throw archiveIntegrityError('歷史 PTT chunk Content-Type 不符');
+ const buffer=await response.arrayBuffer();
+ const digest=await archiveSha256Hex(buffer);
+ if(digest!==String(item.sha256))throw archiveIntegrityError('歷史 PTT chunk SHA 不符');
+ let payload;
+ try{payload=JSON.parse(new TextDecoder().decode(buffer))}catch{throw archiveIntegrityError('歷史 PTT chunk JSON 無效')}
+ if(payload?.schema_version!==PTT_ARCHIVE_SCHEMA||!Array.isArray(payload?.pushes)||
+    payload.pushes.length!==item.pushes)throw archiveIntegrityError('歷史 PTT chunk push count 不符');
+ if(String(payload.bucket_start||'')!==String(item.bucket_start||'')||
+    String(payload.bucket_end||'')!==String(item.bucket_end||''))throw archiveIntegrityError('歷史 PTT chunk bucket 不符');
+ return payload.pushes;
+}
+function archiveCoverageStatus(manifest,startMs,endMs){
+ const priority={COMPLETE:0,UNKNOWN:1,PARTIAL:2,MISSING:3};
+ const byDay=new Map(manifest.days.map(item=>[String(item?.day||''),String(item?.coverage_status||'MISSING')]));
+ const days=archiveCoverageDays(startMs,endMs);
+ let status='COMPLETE';
+ for(const day of days){
+  const candidate=priority[byDay.get(day)]===undefined?'MISSING':byDay.get(day);
+  if(priority[candidate]>priority[status])status=candidate;
+ }
+ return {status,days};
+}
+async function resolveArchiveRows(context,manifest){
+ const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
+ if(context.anchorSource!==PTT_ARCHIVE_ANCHOR||!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)
+  throw new Error('缺少可信的 YouTube actualStartTime / actualEndTime');
+ const objects=new Map(manifest.objects.map(item=>[item.key,item]));
+ const rows=[];
+ for(const key of archiveHourKeys(startMs,endMs)){
+  const item=objects.get(key);
+  if(!item)continue;
+  const pushes=await fetchArchiveChunk(item);
+  for(const row of pushes){
+   const occurred=Date.parse(String(row?.occurred_at||''));
+   if(Number.isFinite(occurred)&&occurred>=startMs&&occurred<endMs)rows.push(row);
+  }
+ }
+ const seen=new Set(),deduped=[];
+ rows.sort((a,b)=>Date.parse(String(a.occurred_at||''))-Date.parse(String(b.occurred_at||''))||
+  String(a.aid||'').localeCompare(String(b.aid||''))||
+  (Number(a.floor)||0)-(Number(b.floor)||0)||(Number(a.source_line)||0)-(Number(b.source_line)||0));
+ for(const row of rows){
+  const key=String(row?.source_record_key||'');
+  if(!key||seen.has(key))continue;
+  seen.add(key);deduped.push(row);
+ }
+ const coverage=archiveCoverageStatus(manifest,startMs,endMs);
+ return {rows:deduped,coverageStatus:coverage.status,coverageDays:coverage.days};
+}
 async function loadArchivePtt(context,token){
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 歷史專串';
- pttMeta.textContent=(context.day||'')+' · 讀取中';
- const startMs=Date.parse(context.start||'');
- const endMs=Date.parse(context.end||'');
- const rows=[];
- let after='',pages=0;
+ pttMeta.textContent='歷史 Static Assets · 讀取中';
+ let result=null;
  try{
-  while(pages++<50){
-   const path='/v1/ptt/history?day='+encodeURIComponent(context.day)+'&limit=200'+(after?'&after='+encodeURIComponent(after):'');
-   const data=await api(path);
-   if(token!==pttResolveToken)return;
-   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw new Error('資料格式錯誤');
-   let beyond=false;
-   for(const row of data.pushes){
-    const when=Date.parse(String(row?.occurred_at||''));
-    if(!Number.isFinite(when))continue;
-    if((!Number.isFinite(startMs)||when>=startMs)&&(!Number.isFinite(endMs)||when<=endMs))rows.push(row);
-    if(Number.isFinite(endMs)&&when>endMs)beyond=true;
+  for(let attempt=0;attempt<2;attempt++){
+   try{
+    const manifest=await fetchArchiveManifest(attempt===1);
+    result=await resolveArchiveRows(context,manifest);
+    break;
+   }catch(error){
+    if(attempt===0&&error?.archiveIntegrity){archiveManifestCache=null;continue}
+    throw error;
    }
-   const next=String(data.page?.next_checkpoint||'');
-   if(beyond||data.page?.has_more!==true||!next||next===after)break;
-   after=next;
   }
-  if(token!==pttResolveToken)return;
-  pttFeed.replaceChildren(...rows.map(pttRow));
+  if(token!==pttResolveToken||!result)return;
+  pttFeed.replaceChildren(...result.rows.map(pttRow));
   pttLoaded=true;
   pttFollowing=false;
   pttNewest.hidden=true;
   pttFeed.scrollTop=0;
-  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+rows.length+' 則 · VOD';
-  if(!rows.length)pttFeed.replaceChildren(node('div','這段 VOD 時間範圍內沒有找到 PTT 推文。','ptt-empty'));
- }catch{
+  const dayLabel=result.coverageDays.length?result.coverageDays.join('～'):(context.day||'').replaceAll('-','/');
+  const warning=result.coverageStatus==='COMPLETE'
+   ?'完整涵蓋'
+   :'⚠ '+result.coverageStatus+' · 資料可能不完整';
+  pttMeta.textContent=dayLabel+' · '+result.rows.length+' 則 · VOD · '+warning;
+  if(!result.rows.length)pttFeed.replaceChildren(node('div',
+   result.coverageStatus==='COMPLETE'?'這段 VOD 時間範圍內沒有 PTT 推文。':'這段 VOD 沒有可顯示推文；歷史涵蓋狀態為 '+result.coverageStatus+'。','ptt-empty'));
+ }catch(error){
   if(token!==pttResolveToken)return;
-  pttMeta.textContent=(context.day||'')+' · 讀取失敗';
-  pttFeed.replaceChildren(node('div','歷史 PTT 暫時無法讀取。','ptt-empty'));
+  pttMeta.textContent='歷史 Static Assets · 讀取失敗';
+  pttFeed.replaceChildren(node('div','歷史 PTT 暫時無法讀取：'+String(error?.message||error),'ptt-empty'));
  }
 }
 async function resolvePrimaryPtt(){
@@ -840,7 +966,21 @@ async function resolvePrimaryPtt(){
  resetPttFeed();
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 專串';
- pttMeta.textContent='判定 Live / VOD 中';
+ const archiveWindow=archiveWindows.get(id);
+ if(archiveVodEntry){
+  if(!archiveWindow){
+   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
+   updateUrl();
+   showPttUnavailable('缺少可信的 YouTube actualStartTime / actualEndTime；不會改用 scheduled time，也不會查 Live Worker / D1。','VOD 歷史 PTT 無法判定');
+   return;
+  }
+  pttContext={mode:'archive',videoId:id,start:archiveWindow.start,end:archiveWindow.end,
+              day:taipeiDayForDate(archiveWindow.start),anchorSource:archiveWindow.anchorSource};
+  updateUrl();
+  await loadArchivePtt(pttContext,token);
+  return;
+ }
+ pttMeta.textContent='判定 Live 中';
  try{
   const row=await api('/v1/catalog/videos/'+encodeURIComponent(id));
   if(token!==pttResolveToken)return;
@@ -851,24 +991,15 @@ async function resolvePrimaryPtt(){
    await loadLivePtt();
    return;
   }
-  if(lifecycle==='ended'){
-   const startValue=String(row?.actual_start||row?.scheduled_start||row?.start_at||'');
-   const endValue=String(row?.actual_end||row?.end_at||'');
-   const day=taipeiDayForDate(startValue);
-   if(day){
-    pttContext={mode:'archive',videoId:id,start:startValue,end:endValue,day};
-    updateUrl();
-    await loadArchivePtt(pttContext,token);
-    return;
-   }
-  }
   if(['upcoming','waiting'].includes(lifecycle)){
    pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
    updateUrl();
    showPttUnavailable('這支影片尚未開始，沒有可連接的 PTT 時間軸。','尚未開始');
    return;
   }
-  throw new Error('無法由 catalog 判定');
+  pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
+  updateUrl();
+  showPttUnavailable('已結束影片只接受 History 傳入的 verified actualStartTime，未自動查詢歷史 D1。','VOD 請由歷史頁進入');
  }catch{
   if(token!==pttResolveToken)return;
   if(requestedPttMode==='live'){
@@ -878,7 +1009,7 @@ async function resolvePrimaryPtt(){
   }else{
    pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
    updateUrl();
-   showPttUnavailable('無法自動判定這支影片是 Live 或 VOD；未自動連接錯誤日期的 PTT。','無法判定');
+   showPttUnavailable('無法自動判定這支影片；未連接錯誤日期的 PTT。','無法判定');
   }
  }
 }
@@ -1000,7 +1131,8 @@ function tryMountPlayers(){
  mountPlayers();
 }
 (async()=>{
- await loadCatalog();
+ if(!archiveVodEntry)await loadCatalog();
+ else{liveRail.hidden=true}
  if(collabManaged)await initCollabManager();
  viewerReadyForPlayers=true;
  tryMountPlayers();
