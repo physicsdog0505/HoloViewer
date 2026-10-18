@@ -70,13 +70,23 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
     article_id,board,raw_aid,url,_=article
     receipt=identity_receipt(board,raw_aid,url)
     epoch=int(url.split("/M.",1)[1].split(".A.",1)[0])
-    keys=("source_line","kind","author","content","ptt_date","ptt_time","collected_at")
+    keys=("source_line","source_page","kind","author","content","ptt_date","ptt_time","collected_at")
     raw=db.execute("""
-        SELECT source_line,kind,author,content,ptt_date,ptt_time,collected_at
+        SELECT source_line,source_page,kind,author,content,ptt_date,ptt_time,collected_at
         FROM pushes WHERE article_id=? ORDER BY source_line DESC LIMIT ?
     """,(article_id,max_rows+1)).fetchall()
     truncated=len(raw)>max_rows
     chronological_raw=[dict(zip(keys,record)) for record in reversed(raw[:max_rows])]
+    floor_by_line={}
+    floor_authoritative=False
+    source_lines=[row["source_line"] for row in chronological_raw]
+    source_pages=[row["source_page"] for row in chronological_raw]
+    if (not truncated and chronological_raw and
+        all(type(line) is int and line>0 for line in source_lines) and
+        source_lines==sorted(source_lines) and len(source_lines)==len(set(source_lines)) and
+        all(type(page) is int and page>=1 for page in source_pages) and min(source_pages)==1):
+        floor_by_line={row["source_line"]:index for index,row in enumerate(chronological_raw,start=1)}
+        floor_authoritative=True
     recovered_by_line={}
     if not truncated and chronological_raw:
         try:
@@ -118,6 +128,7 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
         separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
     return {"status":"READY","aid":receipt["aid"],"url":url,
             "source_identity":source_identity,"candidate_rows":ready,
+            "floor_authoritative":floor_authoritative,"floor_by_source_line":floor_by_line,
             "pending_source_lines":pending,"checked_source_rows":len(raw),
             "scan_truncated":truncated,
             "earliest_scanned_source_line":min((r[0] for r in raw[:max_rows]),default=None),
@@ -279,9 +290,15 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             if not burst_safe:
                 return {**receipt,"status":"BURST_BLOCKED"}
         selected=missing[:batch_cap]
-        for row in selected:
-            row["time_proof"]=sign_time_proof(row,secret)
-        rows=[{k:r.get(k) for k in OUTPUT_KEYS} for r in selected]
+        rows=[]
+        floor_map=plan.get("floor_by_source_line",{}) if plan.get("floor_authoritative") else {}
+        for source_row in selected:
+            outbound=dict(source_row)
+            floor=floor_map.get(source_row["source_line"])
+            if floor is not None:
+                outbound["floor"]=floor
+            outbound["time_proof"]=sign_time_proof(outbound,secret)
+            rows.append({k:outbound.get(k) for k in OUTPUT_KEYS})
         day=rows[0]["day"]
         rows=[r for r in rows if r["day"]==day]
         checkpoint=new_checkpoint(source_identity=plan["source_identity"],day=day,aids=[plan["aid"]])
@@ -294,7 +311,11 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
         ack=execute_once(batch=batch,executor=executor,max_rows=batch_cap,
             max_queries=min(150,2+5*batch_cap),max_written=min(80,2+2*batch_cap))
         apply_ack(checkpoint=checkpoint,batch=batch,ack=ack)
-        for row in rows:
+        # Checkpoint digests intentionally stay bound to the Collector-source
+        # row shape (floor=None). Floor is display enrichment derived from
+        # complete article ordering and must not turn a later re-scan into a
+        # false LOCAL_SOURCE_MUTATION_BLOCKED event.
+        for row in selected:
             accepted[row["source_record_key"]]=content_digest(row)
         atomic_receipt(path,{"status":"ACKED","source_identity":plan["source_identity"],
                             "accepted":accepted,"last_batch_id":batch["batch_id"],
