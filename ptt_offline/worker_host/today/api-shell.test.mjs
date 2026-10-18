@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createExistingApiRouter} from './api-shell.mjs';
+import {legacyHistory} from './legacy-compat.mjs';
 const ORIGIN='https://holoviewer-public.singlebagel.workers.dev';
 const router=createExistingApiRouter({
  legacyHistory:async()=>new Response('history'),
@@ -30,6 +31,27 @@ test('legacy route handlers preserved and unknown route 404',async()=>{
  assert.equal(await (await router.fetch(req('/v1/catalog/videos/abcdefghijk'),{...env,DB:db})).text(),'video');
  assert.equal((await router.fetch(req('/v1/absent'),{...env,DB:db})).status,404);
 });
+test('legacy history fills missing avatar from latest same-channel public_catalog row',async()=>{
+ const sqls=[];
+ const env={DB:{prepare(sql){
+  sqls.push(sql);
+  if(sql.includes('COUNT(*)'))return {bind(){return {first:async()=>({total:1})}}};
+  if(sql.includes('FROM public_history h'))return {bind(){return {all:async()=>({results:[{
+    video_id:'abcdefghijk',title:'History',channel_id:'UC'+'A'.repeat(22),channel_name:'Fixture',
+    avatar_url:'https://yt3.googleusercontent.com/history-avatar',
+    actual_start:'2026-10-17T01:00:00Z',actual_end:'2026-10-17T02:00:00Z',scheduled_start:null
+  }]})}}};
+  throw Error('unexpected SELECT: '+sql);
+ }}};
+ const r=await legacyHistory(new Request('https://api.example/v1/history?day=2026-10-17&limit=50&offset=0'),env);
+ assert.equal(r.status,200);
+ const body=await r.json();
+ assert.equal(body.items[0].avatar_url,'https://yt3.googleusercontent.com/history-avatar');
+ assert.ok(sqls.some(sql=>sql.includes("COALESCE(NULLIF(h.avatar_url,''),(")));
+ assert.ok(sqls.some(sql=>sql.includes('FROM public_catalog c')));
+ assert.ok(sqls.some(sql=>sql.includes('c.channel_id=h.channel_id')));
+});
+
 test('PTT extension requires explicitly injected reviewed handler',async()=>{
  assert.equal((await router.fetch(req('/v1/ptt/today'),{...env,DB:db})).status,404);
  const ptt=createExistingApiRouter({pttHandler:async()=>new Response('ptt')});
