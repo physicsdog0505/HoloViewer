@@ -65,6 +65,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             pending=0
             legacy_baseline_candidates=0
             retained_recovery_candidates=0
+            baseline_skipped_candidates=0
             burst_safe_candidates=0
             fresh_eligible=0
             burst_activated=False
@@ -83,6 +84,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     pending+=result.get("eligible",0)
                     legacy_baseline_candidates+=result.get("legacy_baseline_candidates",0)
                     retained_recovery_candidates+=result.get("retained_recovery_candidates",0)
+                    baseline_skipped_candidates+=result.get("baseline_skipped_candidates",0)
                     burst_safe_candidates+=result.get("burst_safe_candidates",0)
                     fresh_eligible+=result.get("fresh_eligible",0)
                     stale_fenced_rows+=result.get("stale_fenced_rows",0)
@@ -167,6 +169,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     "fresh_eligible":fresh_eligible,
                     "legacy_baseline_candidates":legacy_baseline_candidates,
                     "retained_recovery_candidates":retained_recovery_candidates,
+                    "baseline_skipped_candidates":baseline_skipped_candidates,
                     "burst_safe_candidates":burst_safe_candidates,
                     "http_posts":total_posts,"batch_count":total_posts,
                     "modeled_d1_writes_ceiling":modeled_writes,
