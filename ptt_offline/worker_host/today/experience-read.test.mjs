@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // #45 integration gate: run Today membership + route-mount regressions in the existing PTT workflow.
 import './store.test.mjs';
 import './api-shell.test.mjs';
-import {detectCollabCandidates} from './experience-read.mjs';
+import {detectCollabCandidates,handleExperienceRead} from './experience-read.mjs';
 
 const C1='UC'+'A'.repeat(22);
 const C2='UC'+'B'.repeat(22);
@@ -157,4 +157,67 @@ test('provenance-only overlap stays rejected even when all streams are ended and
       lifecycle_state:'ended',actual_start:'2026-10-16T10:05:00Z',actual_end:'2026-10-16T11:05:00Z'},
   ]);
   assert.deepEqual(events,[]);
+});
+
+
+function historyVideoDb(rows){
+  const byId=new Map(rows.map(row=>[row.video_id,row]));
+  return {
+    prepare(sql){
+      assert.match(sql,/FROM public_history WHERE video_id=\?/);
+      return {
+        bind(videoId){
+          return {async first(){return byId.get(videoId)??null;}};
+        }
+      };
+    }
+  };
+}
+
+test('history video metadata lookup returns exact verified YouTube actual window for known regressions',async()=>{
+  const source_revision='stream-catalog-v1:youtube-liveStreamingDetails';
+  const rows=[
+    {video_id:'62AgiXDP3tU',actual_start:'2026-10-05T12:01:05Z',actual_end:'2026-10-05T12:54:31Z',source_revision},
+    {video_id:'FVpLKAiHYFA',actual_start:'2026-10-09T10:00:05Z',actual_end:'2026-10-09T11:29:38Z',source_revision},
+    {video_id:'pwJeqkeHtPM',actual_start:'2026-10-04T15:29:35Z',actual_end:'2026-10-05T00:35:17Z',source_revision},
+  ];
+  const env={DB:historyVideoDb(rows)};
+  for(const expected of rows){
+    const response=await handleExperienceRead(
+      new Request('https://example.test/v1/history/videos/'+expected.video_id),env
+    );
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.deepEqual(body,{
+      schema_version:'public-history-video-v1',
+      video_id:expected.video_id,
+      actual_start:expected.actual_start,
+      actual_end:expected.actual_end,
+      anchor_source:'youtube-liveStreamingDetails-actualStartTime'
+    });
+  }
+});
+
+test('history video metadata lookup fails closed on missing provenance or actual bounds',async()=>{
+  const cases=[
+    {video_id:'aaaaaaaaaaa',actual_start:'2026-10-05T12:01:05Z',actual_end:'2026-10-05T12:54:31Z',source_revision:'legacy-import'},
+    {video_id:'bbbbbbbbbbb',actual_start:null,actual_end:'2026-10-05T12:54:31Z',source_revision:'stream-catalog-v1:youtube-liveStreamingDetails',scheduled_start:'2026-10-05T12:00:00Z'},
+    {video_id:'ccccccccccc',actual_start:'2026-10-05T12:54:31Z',actual_end:'2026-10-05T12:01:05Z',source_revision:'stream-catalog-v1:youtube-liveStreamingDetails'},
+  ];
+  const env={DB:historyVideoDb(cases)};
+  for(const row of cases){
+    const response=await handleExperienceRead(new Request('https://example.test/v1/history/videos/'+row.video_id),env);
+    assert.equal(response.status,404);
+    assert.deepEqual(await response.json(),{error:'not_found',verified:false});
+  }
+});
+
+test('history video metadata lookup is exact video id only and does not guess',async()=>{
+  const env={DB:historyVideoDb([])};
+  const missing=await handleExperienceRead(new Request('https://example.test/v1/history/videos/8pF4qHcshDc'),env);
+  assert.equal(missing.status,404);
+  assert.deepEqual(await missing.json(),{error:'not_found',verified:false});
+  const invalid=await handleExperienceRead(new Request('https://example.test/v1/history/videos/not-a-video-id'),env);
+  assert.equal(invalid.status,400);
+  assert.deepEqual(await invalid.json(),{error:'invalid_video_id'});
 });
