@@ -781,8 +781,8 @@ function pttKey(row){return String(row?.source_record_key||row?.push_id||row?.ai
 function pttRow(row){
  const el=node('div',undefined,'ptt-row');
  el.dataset.pushId=pttKey(row);
- const floor=Number.isInteger(row?.floor)&&row.floor>0?'#'+row.floor:'';
- const floorEl=node('span',floor,'ptt-floor');
+ const floor=Number.isInteger(row?.floor)&&row.floor>0?row.floor:null;
+ if(floor!==null){el.classList.add('has-floor');el.append(node('span','#'+floor,'ptt-floor'))}
  const kind=String(row?.kind||'→');
  const kindEl=node('span',kind,'ptt-kind'+(kind==='噓'?' boo':kind==='→'?' arrow':''));
  const when=new Date(String(row?.occurred_at||''));
@@ -791,7 +791,7 @@ function pttRow(row){
  const time=node('span',clock,'ptt-time');
  const body=node('span',undefined,'ptt-body');
  body.append(node('span',String(row?.author||'unknown')+':','ptt-author'),node('span',String(row?.content||''),'ptt-content'));
- el.append(floorEl,kindEl,time,body);
+ el.append(kindEl,time,body);
  return el;
 }
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
@@ -1024,14 +1024,21 @@ async function resolvePrimaryPtt(){
   showPttUnavailable('已結束影片只接受 History 傳入的 verified actualStartTime，未自動查詢歷史 D1。','VOD 請由歷史頁進入');
  }catch{
   if(token!==pttResolveToken)return;
-  if(requestedPttMode==='live'){
+  const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);
+  const todayState=String(todayRow?.lifecycle_state||todayRow?.state||'').toLowerCase();
+  if(requestedPttMode==='live'&&todayState==='live'){
    pttContext={mode:'live',videoId:id,start:'',end:'',day:taipeiDay()};
    updateUrl();
    await loadLivePtt();
   }else{
    pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
    updateUrl();
-   showPttUnavailable('無法自動判定這支影片；未連接錯誤日期的 PTT。','無法判定');
+   showPttUnavailable(
+    requestedPttMode==='live'
+     ?'這支影片沒有被今日 catalog 驗證為 LIVE，因此不會誤接今天的 PTT。舊 VOD 需要由 History 傳入 verified actualStartTime / actualEndTime。'
+     :'無法自動判定這支影片；未連接錯誤日期的 PTT。',
+    requestedPttMode==='live'?'非今日 LIVE':'無法判定'
+   );
   }
  }
 }
