@@ -204,7 +204,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const start=String(item?.actual_start||'');",app)
         self.assertIn("const end=String(item?.actual_end||'');",app)
         self.assertNotIn("scheduled_start",app.split("function trustedArchiveWindow(item)",1)[1].split("function appendArchiveWindow",1)[0])
-        self.assertIn("q.append('ptt_window'",app)
+        self.assertIn("query.append('ptt_window'",app)
         self.assertIn("openStandaloneViewer(ids,{vodWindows:historyVodWindows,pttMode:'video'})",app)
         self.assertIn("pttArchiveBase:",config)
         self.assertIn("holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",config)
