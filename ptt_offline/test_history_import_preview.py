@@ -118,10 +118,6 @@ class HistoryImportPreviewTest(unittest.TestCase):
         self.assertEqual(json.dumps(a,sort_keys=True),json.dumps(b,sort_keys=True))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_upsert_sql_is_idempotent_and_preserves_authoritative_bounds(self):
         td,path=self.make_catalog()
         self.addCleanup(td.cleanup)
@@ -131,14 +127,15 @@ if __name__ == "__main__":
         finally:
             con.close()
         sql=build_upsert_sql(preview)
-        self.assertIn("BEGIN TRANSACTION;",sql)
+        self.assertNotIn("BEGIN TRANSACTION",sql)
+        self.assertNotIn("COMMIT;",sql)
         self.assertIn("ON CONFLICT(video_id) DO UPDATE SET",sql)
         self.assertIn("'stream-catalog-v1:youtube-liveStreamingDetails'",sql)
         self.assertIn("'2026-10-05T12:01:05Z'",sql)
         self.assertIn("'2026-10-05T12:54:31Z'",sql)
         self.assertNotIn("badwindow01",sql)
         self.assertNotIn("scheduled01",sql)
-        self.assertTrue(sql.rstrip().endswith("COMMIT;"))
+        self.assertTrue(sql.rstrip().endswith(";"))
 
     def test_upsert_sql_escapes_titles(self):
         preview={
@@ -160,3 +157,52 @@ if __name__ == "__main__":
         self.assertIn("Owner''s stream",sql)
         self.assertIn("O''Brien",sql)
         self.assertIn("NULL",sql)
+
+
+    def test_upsert_sql_replays_twice_against_public_history_shape(self):
+        preview={
+            "rows":[{
+                "video_id":"quotevid001",
+                "taipei_day":"2026-10-01",
+                "title":"Owner's stream",
+                "channel_id":"UC"+"A"*22,
+                "channel_name":"O'Brien",
+                "avatar_url":"https://yt3.ggpht.com/example",
+                "scheduled_start":"2026-10-01T00:59:00Z",
+                "actual_start":"2026-10-01T01:00:00Z",
+                "actual_end":"2026-10-01T02:00:00Z",
+                "source_revision":SOURCE_REVISION,
+                "published_at":"2026-10-01T02:01:00Z",
+            }]
+        }
+        sql=build_upsert_sql(preview)
+        con=sqlite3.connect(":memory:")
+        self.addCleanup(con.close)
+        con.executescript("""
+            CREATE TABLE public_history(
+              video_id TEXT PRIMARY KEY NOT NULL,
+              taipei_day TEXT NOT NULL,
+              title TEXT NOT NULL,
+              channel_id TEXT NOT NULL,
+              channel_name TEXT NOT NULL DEFAULT '',
+              avatar_url TEXT NOT NULL DEFAULT '',
+              scheduled_start TEXT,
+              actual_start TEXT,
+              actual_end TEXT NOT NULL,
+              source_revision TEXT NOT NULL,
+              published_at TEXT NOT NULL
+            );
+        """)
+        con.executescript(sql)
+        con.executescript(sql)
+        row=con.execute("SELECT * FROM public_history WHERE video_id=?",("quotevid001",)).fetchone()
+        self.assertEqual(con.execute("SELECT COUNT(*) FROM public_history").fetchone()[0],1)
+        self.assertEqual(row[2],"Owner's stream")
+        self.assertEqual(row[4],"O'Brien")
+        self.assertEqual(row[7],"2026-10-01T01:00:00Z")
+        self.assertEqual(row[8],"2026-10-01T02:00:00Z")
+        self.assertEqual(row[9],SOURCE_REVISION)
+
+
+if __name__ == "__main__":
+    unittest.main()
