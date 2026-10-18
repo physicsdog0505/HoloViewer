@@ -231,6 +231,8 @@ function openStandaloneCollab(event){
  q.set('mode','multi');
  q.set('collab_event',String(event.event_id||''));
  q.set('collab_kind',isLive?'live':'vod');
+ const collabDay=String(event._history_day||event.day||'');
+ if(/^\d{4}-\d{2}-\d{2}$/.test(collabDay))q.set('collab_day',collabDay);
  location.href='/viewer/?'+q.toString();
 }
 function openCollabEvent(event){openStandaloneCollab(event)}
@@ -562,11 +564,45 @@ function collabEventCard(event){
  if(ended)parts.push(ended+' 個已結束');
  copy.append(node('p',parts.join(' · ')+' · 進入多人連動畫面'));card.append(copy);return card;
 }
+function collabHistoryBounds(){
+ const today=taipeiDay();
+ return {earliest:shiftDay(today,-30),latest:shiftDay(today,-1)};
+}
+function collabHistoryDateValid(day){
+ const b=collabHistoryBounds();
+ return /^\d{4}-\d{2}-\d{2}$/.test(day)&&day>=b.earliest&&day<=b.latest;
+}
+async function loadCollabHistory(day){
+ const bounds=collabHistoryBounds(),input=$('collabHistoryDate');
+ input.min=bounds.earliest;input.max=bounds.latest;
+ const selected=collabHistoryDateValid(day)?day:(collabHistoryDateValid(input.value)?input.value:bounds.latest);
+ input.value=selected;
+ const section=$('collab-history'),grid=section.querySelector('.collab-event-grid'),empty=$('collab-history-empty');
+ grid.replaceChildren();section.hidden=true;empty.hidden=false;
+ empty.textContent='讀取 '+selected.replaceAll('-','/')+' 多人連動中…';
+ $('collab-history-heading').textContent=selected.replaceAll('-','/')+' 歷史連動';
+ try{
+  const data=await api('/v1/collab/history?day='+encodeURIComponent(selected)+'&limit=50&offset=0');
+  const events=Array.isArray(data?.events)?data.events:[];
+  for(const raw of events){
+   const event={...raw,_history_day:selected};
+   const card=collabEventCard(event);
+   if(card)grid.append(card);
+  }
+  section.hidden=!grid.children.length;
+  empty.hidden=Boolean(grid.children.length);
+  if(!grid.children.length)empty.textContent=selected.replaceAll('-','/')+' 沒有偵測到多人連動。';
+ }catch(e){
+  empty.hidden=false;empty.textContent='歷史多人連動暫時無法讀取：'+e.message;
+ }
+}
 async function loadCollab(){
  for(const id of ['collab-live','collab-upcoming','collab-ended']){
   const section=$(id);section.hidden=true;section.querySelector('.collab-event-grid').replaceChildren();
  }
  $('collab-empty').hidden=false;$('collab-empty').textContent='讀取多人連動中…';
+ const bounds=collabHistoryBounds(),input=$('collabHistoryDate');
+ input.min=bounds.earliest;input.max=bounds.latest;if(!collabHistoryDateValid(input.value))input.value=bounds.latest;
  try{
   const data=await api('/v1/collab/live');
   setHomeCollabEvents(data);
@@ -582,7 +618,10 @@ async function loadCollab(){
  }catch(e){
   $('collab-empty').hidden=false;$('collab-empty').textContent='多人連動資料暫時無法讀取。';
  }
+ await loadCollabHistory(input.value);
 }
+$('collab-history-picker').onsubmit=event=>{event.preventDefault();loadCollabHistory($('collabHistoryDate').value)};
+
 let pttLastGoodCount=0,pttLastGoodDay='',pttLoadInFlight=false,pttFollowing=true,pttProgrammatic=false;
 function pttAtBottom(){
  const list=$('ptt-list');
