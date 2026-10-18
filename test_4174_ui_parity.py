@@ -126,7 +126,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.history-picker,.history-shortcuts', css)
         self.assertIn("api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0')", js)
         self.assertIn("const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map()", js)
-        self.assertIn("const endedItems=data.items.map(item=>({...item,lifecycle_state:'ended'}))", js)
+        self.assertIn("const endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel))", js)
         self.assertIn("endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}))", js)
         self.assertIn("if(!history)overlay.append(node('span',status[0],'thumb-badge '+status[1]))", js)
         self.assertIn("if(history&&String(item.lifecycle_state||item.state||'').toLowerCase()!=='ended')return", js)
