@@ -125,7 +125,20 @@
    </div>
   </div>
  </section>
- <section id="multi" class="page"><div class="page-head"><div><h1>多人連動</h1><p>正在進行的連動優先；稍後場次與過去活動依時間排列。</p></div></div><div id="collab-live" class="section collab-hub-section" hidden><div class="section-head"><div><h2>現在直播中</h2></div></div><div class="collab-event-grid"></div></div><div id="collab-upcoming" class="section collab-hub-section" hidden><div class="section-head"><div><h2>稍後</h2></div></div><div class="collab-event-grid"></div></div><div id="collab-ended" class="section collab-hub-section" hidden><div class="section-head"><div><h2>過去連動</h2></div></div><div class="collab-event-grid"></div></div><p id="collab-empty" class="empty-note">目前沒有偵測到可用的多人連動。</p></section>
+ <section id="multi" class="page">
+  <div class="page-head"><div><h1>多人連動</h1><p>正在進行的連動優先；也可選日期查看過去活動與 VOD 對齊。</p></div></div>
+  <div id="collab-live" class="section collab-hub-section" hidden><div class="section-head"><div><h2>現在直播中</h2></div></div><div class="collab-event-grid"></div></div>
+  <div id="collab-upcoming" class="section collab-hub-section" hidden><div class="section-head"><div><h2>稍後</h2></div></div><div class="collab-event-grid"></div></div>
+  <div id="collab-ended" class="section collab-hub-section" hidden><div class="section-head"><div><h2>今天已結束</h2></div></div><div class="collab-event-grid"></div></div>
+  <form id="collab-history-picker" class="history-picker">
+   <label for="collabHistoryDate">歷史日期</label>
+   <input id="collabHistoryDate" name="date" type="date" required>
+   <button class="primary-action" type="submit">查看</button>
+  </form>
+  <div id="collab-history" class="section collab-hub-section" hidden><div class="section-head"><div><h2 id="collab-history-heading">歷史連動</h2></div></div><div class="collab-event-grid"></div></div>
+  <p id="collab-history-empty" class="empty-note" hidden></p>
+  <p id="collab-empty" class="empty-note">目前沒有偵測到可用的多人連動。</p>
+ </section>
  <section id="history" class="page">
   <div id="historyDynamic">
    <div class="page-head"><div><h1>歷史直播</h1><p>依直播開始日期瀏覽最近 30 天的已結束影片。</p></div></div>
