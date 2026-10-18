@@ -75,11 +75,16 @@
   <main class="viewer-main">
     <section class="viewer-workspace">
       <div id="stage" class="viewer-stage"></div>
-      <aside id="pttPanel" class="viewer-ptt" hidden>
+      <aside id="pttPanel" class="viewer-ptt ptt-floor-hidden" hidden>
         <div class="ptt-heading">
           <div class="ptt-title-line">
             <strong id="pttTitle">PTT 專串</strong>
-            <small id="pttMeta">讀取中</small>
+            <label class="ptt-floor-control" title="顯示或隱藏樓數">
+              <input id="pttShowFloor" type="checkbox">
+              <span class="ptt-floor-check" aria-hidden="true"></span>
+              <span>樓數</span>
+            </label>
+            <small id="pttMeta" class="ptt-meta-sr" aria-live="polite">讀取中</small>
           </div>
           <label class="ptt-font-control">字體
             <input id="pttFontSize" type="range" min="12" max="26" step="1" value="14">
