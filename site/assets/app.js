@@ -286,19 +286,28 @@ function collabEntry(event){
  entry.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();openStandaloneCollab(event)}};
  return entry;
 }
+function homeLifecycleBucket(item){
+ const lifecycle=String(item?.lifecycle_state||'unknown').toLowerCase();
+ if(lifecycle==='live')return item?.stale===true?'unknown':'live';
+ if(lifecycle==='unknown')return 'unknown';
+ if(lifecycle==='upcoming'||lifecycle==='waiting')return 'upcoming';
+ if(lifecycle==='ended')return 'ended';
+ return 'unknown';
+}
 function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={}){
  if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
  if(history&&String(item.lifecycle_state||item.state||'').toLowerCase()!=='ended')return;
- const id=item.video_id;const lifecycle=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
+ const id=item.video_id;const lifecycle=String(item.lifecycle_state||'unknown').toLowerCase();
+ const lifecycleBucket=homeLifecycleBucket(item);
  const group=String(item.group||item.channel_group||'other').toLowerCase();
  const archiveWindow=history?trustedArchiveWindow(item):null;
  if(history&&archiveWindow)historyVodWindows.set(id,archiveWindow);
  const href=standaloneViewerUrl([id],{vodWindows:history?historyVodWindows:null,pttMode:history?'video':''});
  const card=node('a',undefined,'client-card stream-card');card.href=href;card.dataset.group=group;card.id='stream-'+id;
  applyHomeSupportStyle(card,item);
- const states={live:['LIVE','live'],waiting:['等待中','upcoming'],upcoming:['即將開始','upcoming'],ended:['已結束','ended'],unknown:['狀態待更新',''],stale:['狀態待更新','']};
- const status=states[lifecycle]||states.unknown;
- if(['live','waiting','upcoming','ended'].includes(lifecycle)){card.dataset.multiviewId=id;card.setAttribute('aria-selected','false')}
+ const states={live:['LIVE','live'],waiting:['等待中','upcoming'],upcoming:['即將開始','upcoming'],ended:['已結束','ended'],unknown:['狀態待更新','']};
+ const status=lifecycleBucket==='unknown'?states.unknown:(states[lifecycle]||states.unknown);
+ if(lifecycleBucket!=='unknown'){card.dataset.multiviewId=id;card.setAttribute('aria-selected','false')}
  const thumb=node('div',undefined,'card-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
  const youTube=node('span','YouTube ↗','youtube-source-link');youTube.role='link';youTube.tabIndex=0;youTube.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;thumb.append(youTube);
  const overlay=node('div',undefined,'thumb-overlay');
@@ -476,13 +485,7 @@ function homeStableId(item){return String(item?.video_id||'')}
 function homeBuckets(rows){
  const buckets={live:[],upcoming:[],unknown:[],ended:[]};
  rows.forEach(item=>{
-  const state=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
-  if(state==='live')buckets.live.push(item);
-  else if(['waiting','upcoming'].includes(state))buckets.upcoming.push(item);
-  else if(state==='ended')buckets.ended.push(item);
-  // Public Home intentionally suppresses unknown/stale/unrecognized lifecycle
-  // states. The source row remains in catalog data and reappears automatically
-  // when a later refresh resolves it to live/upcoming/ended.
+  buckets[homeLifecycleBucket(item)].push(item);
  });
  const chronological=(a,b)=>{
   const at=homeStartTimestamp(a),bt=homeStartTimestamp(b);
