@@ -97,6 +97,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("textContent=", js)
         frontend_config = (ROOT / "site/assets/config.js").read_text()
         self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
+        self.assertIn("https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", frontend_config)
+        self.assertIn("/ptt/v1/manifests/static-assets-full-2026-10.json", frontend_config)
         self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
 
     def test_standalone_viewer_mode_contract(self):
@@ -134,7 +136,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".viewer-workspace.workspace-focus.layout-primary .viewer-stage,.viewer-workspace.workspace-sidebar.layout-primary .viewer-stage{display:contents}", css)
         self.assertIn(".transport-button.is-feedback", css)
         self.assertIn("location.href='/viewer/?'+q.toString();", app)
-        self.assertIn("function openStandaloneViewer(ids)", app)
+        self.assertIn("function openStandaloneViewer(ids,options={})", app)
         self.assertIn("function collabEventMap(data,historyDay='')", app)
         self.assertIn("collabEventMap(collabData,day)", app)
         self.assertIn("history:true", app)
@@ -160,9 +162,19 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("player.seekTo(target,true)", js)
         self.assertIn("setInterval(()=>{if(!document.hidden)reconcileLiveCollab()},10000)", js)
         self.assertIn("setInterval(()=>{if(!document.hidden)reconcileVodCollab()},500)", js)
+        self.assertIn("const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';", js)
+        self.assertIn("const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';", js)
+        self.assertIn("async function fetchArchiveManifest(force=false)", js)
+        self.assertIn("async function fetchArchiveChunk(item)", js)
+        self.assertIn("crypto.subtle.digest('SHA-256',buffer)", js)
+        self.assertIn("occurred>=startMs&&occurred<endMs", js)
+        self.assertIn("row?.source_record_key||row?.push_id", js)
+        self.assertIn("Number.isInteger(row?.floor)&&row.floor>0", js)
+        self.assertNotIn("/v1/ptt/history?day=", js)
+        self.assertIn("if(!archiveVodEntry)await loadCatalog();", js)
         self.assertIn("q.set('mode',clean.length>1?'multi':'single');", app)
         self.assertIn("$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openStandaloneViewer(ids)};", app)
-        self.assertIn("href='/viewer/?stream='", app)
+        self.assertIn("function standaloneViewerUrl(ids,{vodWindows=null,pttMode=''}={})", app)
         self.assertIn("entry.setAttribute('role','button')", app)
         self.assertIn("開啟多人連動", app)
         self.assertFalse((ROOT / "site/custom-view/index.html").exists())
@@ -203,7 +215,7 @@ class PublicSmokeTests(unittest.TestCase):
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
-        for directive in ("default-src 'none'", "script-src 'self'", "connect-src https://holoviewer-public-api.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
+        for directive in ("default-src 'none'", "script-src 'self'", "connect-src https://holoviewer-public-api.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
             self.assertIn(directive, headers)
         self.assertNotIn("'unsafe-inline'", headers)
         self.assertNotIn("'unsafe-eval'", headers)
