@@ -364,7 +364,7 @@ class ParityContract(unittest.TestCase):
         js=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         css=(ROOT/'site/assets/viewer-standalone.css').read_text(encoding='utf-8')
         self.assertIn('id="viewerCallMode"',html)
-        self.assertIn("function setCallMode(on)",js)
+        self.assertIn("function setCallMode(on,{hint=false}={})",js)
         self.assertIn("function callTapTempo(now=performance.now())",js)
         self.assertIn("if(callTapTimes.length>4)callTapTimes.shift()",js)
         self.assertIn("function callDirectionDown(direction,now=performance.now())",js)
