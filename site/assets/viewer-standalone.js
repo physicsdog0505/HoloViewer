@@ -4,6 +4,8 @@ const API_BASE=String(window.HOLOVIEWER_CONFIG?.apiBase||'').replace(/\/$/,'');
 const params=new URLSearchParams(location.search);
 const MAX_STREAMS=16;
 const FOCUS_VISIBLE_SLOTS=4;
+const HOME_FILTER_KEY='holoviewer-live-filter';
+const HOME_FILTERS=new Set(['hololive','holostars','mekpark','all']);
 const streams=[...new Set(params.getAll('stream').filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)))].slice(0,MAX_STREAMS).map(id=>({videoId:id,label:id,channelId:''}));
 let layout=['equal','primary'].includes(params.get('layout'))?params.get('layout'):'equal';
 let workspaceLayout=['sidebar','focus'].includes(params.get('workspace'))?params.get('workspace'):'sidebar';
@@ -73,6 +75,8 @@ function safeAvatar(raw){
  }catch{return ''}
 }
 function catalogName(row){return String(row?.channel_title||row?.channel_name||row?.title||row?.video_id||'Hololive')}
+function homeLiveFilter(){try{const value=localStorage.getItem(HOME_FILTER_KEY);return HOME_FILTERS.has(value)?value:'hololive'}catch{return 'hololive'}}
+function catalogGroup(row){return String(row?.group||row?.channel_group||'other').toLowerCase()}
 function accentFor(row){
  const audited=String(row?.member_accent||'');
  return /^#[0-9a-fA-F]{6}$/.test(audited)?audited:'#9ab8c4';
@@ -508,9 +512,11 @@ function supportStyle(button,row){
 }
 function renderLiveRail(rows){
  const activeIds=new Set(streams.map(stream=>stream.videoId));
+ const filter=homeLiveFilter();
  const live=rows.filter(row=>{
   const id=String(row?.video_id||'');
   if(String(row?.lifecycle_state||row?.state||'').toLowerCase()!=='live'||!/^[A-Za-z0-9_-]{11}$/.test(id))return false;
+  if(filter!=='all'&&catalogGroup(row)!==filter)return false;
   return watchMode!=='multi'||!activeIds.has(id);
  });
  liveList.replaceChildren();
@@ -552,6 +558,7 @@ function renderLiveRail(rows){
  });
  liveRail.hidden=!liveList.childElementCount;
 }
+window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)renderLiveRail(catalogRows)});
 async function loadCatalog(){
  try{
   const data=await api('/v1/catalog/today');
