@@ -594,10 +594,10 @@ class ParityContract(unittest.TestCase):
         script=helper+"\nconst c={start:'2026-10-18T06:10:00Z',end:'2026-10-18T07:00:00Z',scheduledStart:'2026-10-18T06:00:00Z'};process.stdout.write(JSON.stringify([vodPttCutoffMs(c,0,false),vodPttCutoffMs(c,2,false),vodPttCutoffMs(c,10,false),vodPttCutoffMs(c,0,true)]));"
         result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
         values=json.loads(result.stdout)
-        self.assertEqual(values[0],1792293600000)
-        self.assertEqual(values[1],1792293600000)
-        self.assertEqual(values[2],1792294210000)
-        self.assertEqual(values[3],1792294200000)
+        self.assertEqual(values[0],1792303200000)
+        self.assertEqual(values[1],1792303200000)
+        self.assertEqual(values[2],1792303810000)
+        self.assertEqual(values[3],1792303800000)
 
     def test_vod_ptt_tracks_youtube_playback_timeline(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
