@@ -158,8 +158,16 @@ body.settings-open .viewer-main{height:calc(100vh - 58px)}
 .viewer-ptt{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:#0c0d0f;border:1px solid #303238;border-radius:10px;overflow:hidden;color:#eee}
 .viewer-ptt[hidden]{display:none}
 .ptt-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border-bottom:1px solid #292c31;background:#111317}
-.ptt-title-line{display:flex;align-items:baseline;gap:6px;min-width:0;white-space:nowrap;overflow:hidden}
-.ptt-heading strong{font-size:13px;flex:0 0 auto}.ptt-heading small{margin:0;color:#9ca4aa;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptt-title-line{display:flex;align-items:center;gap:7px;min-width:0;white-space:nowrap;overflow:hidden}
+.ptt-heading strong{font-size:13px;flex:0 0 auto}
+.ptt-meta-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.ptt-floor-control{display:inline-flex;align-items:center;gap:4px;color:#b8bec3;font-size:10px;font-weight:700;cursor:pointer;flex:0 0 auto}
+.ptt-floor-control input{position:absolute;opacity:0;pointer-events:none}
+.ptt-floor-check{width:13px;height:13px;border:1px solid #737a80;border-radius:3px;background:#171a1e;display:grid;place-items:center}
+.ptt-floor-check::after{content:"";width:6px;height:3px;border-left:1.5px solid #fff;border-bottom:1.5px solid #fff;transform:rotate(-45deg) scale(0)}
+.ptt-floor-control input:checked + .ptt-floor-check{background:#a65788;border-color:#a65788}
+.ptt-floor-control input:checked + .ptt-floor-check::after{transform:rotate(-45deg) scale(1)}
+.ptt-floor-control input:focus-visible + .ptt-floor-check{outline:2px solid #b8a6d8;outline-offset:2px}
 .ptt-font-control{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#c8c8c8;white-space:nowrap}
 .ptt-font-control input{width:74px}
 .ptt-font-control output{min-width:30px;font-variant-numeric:tabular-nums}
@@ -167,7 +175,9 @@ body.settings-open .viewer-main{height:calc(100vh - 58px)}
 .ptt-feed::-webkit-scrollbar{width:0;height:0;display:none}
 .ptt-row{display:grid;grid-template-columns:1.05em 2.9em minmax(0,1fr);column-gap:1px;align-items:start;padding:4px 0;border-bottom:1px solid #25282a;overflow-wrap:anywhere}
 .ptt-row.has-floor{grid-template-columns:1.05em 2.9em 2.75em minmax(0,1fr)}
+.viewer-ptt.ptt-floor-hidden .ptt-row.has-floor{grid-template-columns:1.05em 2.9em minmax(0,1fr)}
 .ptt-floor{color:#929da4;font-size:.76em;font-weight:600;text-align:right;white-space:nowrap;padding-top:.2em;font-variant-numeric:tabular-nums}
+.viewer-ptt.ptt-floor-hidden .ptt-floor{display:none}
 .ptt-kind{text-align:center;font-weight:800;color:#f4f4f4}.ptt-kind.boo{color:#ff4b4b}.ptt-kind.arrow{color:#ff3030}
 .ptt-time{color:#dedede;font-size:.82em;font-weight:500;white-space:nowrap;padding-top:.12em;text-align:right;font-variant-numeric:tabular-nums}
 .ptt-body{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;padding-left:4px}
