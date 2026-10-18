@@ -5,26 +5,27 @@ from ptt_offline.activate_today_profiles import validated_profiles, q
 class ActivateTodayProfilesTests(unittest.TestCase):
     def make_receipt(self, mutate=None):
         channels=[]
-        for i in range(66):
+        for i in range(85):
             row={
                 "channel_id":"UC"+f"{i:022d}",
                 "channel_title":f"Channel {i}",
                 "avatar_url":f"https://yt3.ggpht.com/avatar-{i}"
             }
             channels.append(row)
-        body={"count":66,"avatar_count":66,"fetched_at":"2026-10-15T21:00:00Z","channels":channels}
+        body={"count":85,"avatar_count":85,"roster_version":"today-roster-v85","fetched_at":"2026-10-15T21:00:00Z","channels":channels}
         if mutate: mutate(body)
         td=tempfile.TemporaryDirectory()
         p=Path(td.name)/"profiles.json"
         p.write_text(json.dumps(body),encoding="utf-8")
         return td,p
 
-    def test_exact_66_verified_profiles_pass(self):
+    def test_exact_active_roster_profiles_pass(self):
         td,p=self.make_receipt()
         try:
-            rows,stamp=validated_profiles(p)
-            self.assertEqual(len(rows),66)
+            rows,stamp,version=validated_profiles(p)
+            self.assertEqual(len(rows),85)
             self.assertEqual(stamp,"2026-10-15T21:00:00Z")
+            self.assertEqual(version,"today-roster-v85")
         finally: td.cleanup()
 
     def test_duplicate_channel_fails_closed(self):
@@ -52,3 +53,19 @@ class ActivateTodayProfilesTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+
+    def test_partial_avatar_receipt_fails_closed(self):
+        def mutate(body):
+            body["avatar_count"]=84
+        td,p=self.make_receipt(mutate)
+        try:
+            with self.assertRaises(SystemExit): validated_profiles(p)
+        finally: td.cleanup()
+
+    def test_count_is_not_hardcoded_to_66(self):
+        td,p=self.make_receipt()
+        try:
+            rows,_,_=validated_profiles(p)
+            self.assertEqual(len(rows),85)
+        finally: td.cleanup()
