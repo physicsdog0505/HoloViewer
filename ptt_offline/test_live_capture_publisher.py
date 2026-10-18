@@ -70,6 +70,8 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertEqual(active_article_ids(self.db,limit=2),[2,1])
         first=inspect_latest_article(self.db,article_id=1)
         second=inspect_latest_article(self.db,article_id=2)
+        self.assertTrue(first["floor_authoritative"])
+        self.assertEqual(first["floor_by_source_line"],{1:1,2:2,3:3})
         self.assertNotEqual(first["source_identity"],second["source_identity"])
         self.assertEqual(first["aid"],self.aid)
         self.assertEqual(second["aid"],aid)
@@ -79,6 +81,21 @@ class LiveCapturePublisherTests(unittest.TestCase):
                             state_for_source(directory,"b"*64))
         with self.assertRaisesRegex(ContractError,"invalid canonical source identity"):
             state_for_source(directory,"not-an-identity")
+
+    def test_floor_is_fail_closed_without_page_one_coverage(self):
+        self.db.execute("UPDATE pushes SET source_page=2")
+        inspected=inspect_latest_article(self.db)
+        self.assertFalse(inspected["floor_authoritative"])
+        self.assertEqual(inspected["floor_by_source_line"],{})
+        self.assertTrue(all(row["floor"] is None for row in inspected["candidate_rows"]))
+
+    def test_floor_map_counts_pending_pushes_in_article_order(self):
+        self.db.execute("UPDATE pushes SET collected_at='2026-10-16T01:01:23Z',ptt_date='10/16',ptt_time='06:36' WHERE source_line=2")
+        inspected=inspect_latest_article(self.db)
+        self.assertTrue(inspected["floor_authoritative"])
+        self.assertEqual(inspected["floor_by_source_line"],{1:1,2:2,3:3})
+        ready3=next(row for row in inspected["candidate_rows"] if row["source_line"]==3)
+        self.assertIsNone(ready3["floor"])
 
     def test_pending_old_does_not_block_new_source_lines(self):
         inspected=inspect_latest_article(self.db)
@@ -170,6 +187,7 @@ class LiveCapturePublisherTests(unittest.TestCase):
             calls.append(batch)
             self.assertEqual(len(batch["rows"]),1)
             self.assertEqual(batch["rows"][0]["source_line"],4)
+            self.assertEqual(batch["rows"][0]["floor"],4)
             return {"status":"ACK","batch_id":batch["batch_id"],"digest":batch["digest"],
               "logical_rows_acked":1,"d1_query_count":7,"d1_rows_written":4,
               "http_requests":1}
