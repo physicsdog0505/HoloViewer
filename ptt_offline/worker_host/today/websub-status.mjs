@@ -1,5 +1,5 @@
 import {getPendingEvents,markEventProcessed,markEventFailed} from './websub-store.mjs';
-import {writeEvidence} from './store.mjs';
+import {writeEvidence,YOUTUBE_LIVE_SOURCE} from './store.mjs';
 import {claimEvent,finishClaim,failClaim} from './websub-hardening.mjs';
 // Intended for an explicitly configured Cloudflare scheduled handler; no auto activation.
 export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date(),limit=25}){
@@ -46,7 +46,7 @@ export async function refreshPendingVideos({db,roster,fetchVideos,now=new Date()
      s.liveBroadcastContent==='upcoming'?'upcoming':start?'live':'unknown';
    await writeEvidence(db,{video_id:v.id,channel_id:e.channel_id,group:approved.get(e.channel_id),roster_version:roster.version,
     title:s.title,channel_name:s.channelTitle??'',lifecycle_state,observed_at,scheduled_start:scheduled,
-    actual_start:start,actual_end:end,source_label:'YouTube'});
+    actual_start:start,actual_end:end,source_label:YOUTUBE_LIVE_SOURCE});
    await finishClaim(db,e.event_hash,e.claimToken,{now});updated++;
   }catch(error){await markEventFailed(db,e.event_hash,error.message);failed++}
  }
