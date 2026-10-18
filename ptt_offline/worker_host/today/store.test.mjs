@@ -176,14 +176,17 @@ test('Today LIMIT explicitly reports truncation, retaining title and source for 
  assert.equal(x.streams[0].source_label,YOUTUBE_LIVE_SOURCE);
  d.close();
 });
-test('accepted live freshness is visible through 20 minutes and absent after',async()=>{
+test('fresh live remains live and stale live remains present as degraded',async()=>{
  const d=db();await writeEvidence(d,fixture({observed:'2026-10-15T12:00:00Z'}));
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
- for(const [minutes,count] of [[19,1],[20,1],[21,0],[31,0]]){
-  const x=await readToday(d,{day:'2026-10-15',now:new Date(Date.parse('2026-10-15T12:00:00Z')+minutes*60000)});
-  assert.equal(x.streams.length,count,String(minutes));
-  if(count)assert.equal(x.streams[0].lifecycle_state,'live');
- }
+ const fresh=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:19:00Z')});
+ assert.equal(fresh.streams.length,1);
+ assert.equal(fresh.streams[0].lifecycle_state,'live');
+ assert.equal(fresh.streams[0].stale,false);
+ const stale=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:31:00Z')});
+ assert.equal(stale.streams.length,1);
+ assert.equal(stale.streams[0].lifecycle_state,'stale');
+ assert.equal(stale.streams[0].stale,true);
  d.close();
 });
 
@@ -408,7 +411,7 @@ test('Today 4174 rules keep yesterday ended until noon, then remove it',async()=
  d.close();
 });
 
-test('Today 4174 rules keep fresh live regardless start date and drop stale live',async()=>{
+test('Today 4174 rules keep stale live regardless start date as degraded',async()=>{
  const d=db();
  await writeEvidence(d,{
   ...fixture({id:'oldlive0001',state:'live',observed:'2026-10-18T03:50:00Z'}),
@@ -417,11 +420,11 @@ test('Today 4174 rules keep fresh live regardless start date and drop stale live
  });
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T03:50:00Z',
   expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
- const fresh=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:10:00Z')});
- assert.equal(fresh.streams[0].video_id,'oldlive0001');
- assert.equal(fresh.streams[0].lifecycle_state,'live');
- const stale=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:10:01Z')});
- assert.equal(stale.streams.length,0);
+ const stale=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:30:00Z')});
+ assert.equal(stale.streams.length,1);
+ assert.equal(stale.streams[0].video_id,'oldlive0001');
+ assert.equal(stale.streams[0].lifecycle_state,'stale');
+ assert.equal(stale.streams[0].stale,true);
  d.close();
 });
 
@@ -444,5 +447,48 @@ test('Today 4174 rules keep current-day and future upcoming without observation 
  const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T05:00:00Z')});
  assert.deepEqual(new Set(x.streams.map(r=>r.video_id)),new Set(['todayupcom1','futureup001']));
  assert.ok(x.streams.every(r=>r.lifecycle_state==='upcoming'||r.lifecycle_state==='waiting'));
+ d.close();
+});
+
+
+test('provider verified ended transitions retained live row to ended',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'transition1',state:'live',observed:'2026-10-18T03:00:00Z'}),
+  scheduled_start:'2026-10-18T02:00:00Z',actual_start:'2026-10-18T02:01:00Z',
+  actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await writeEvidence(d,{
+  ...fixture({id:'transition1',state:'ended',observed:'2026-10-18T04:00:00Z',end:'2026-10-18T03:59:00Z'}),
+  scheduled_start:'2026-10-18T02:00:00Z',actual_start:'2026-10-18T02:01:00Z',
+  actual_end:'2026-10-18T03:59:00Z',source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T04:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:10:00Z')});
+ assert.equal(x.streams.length,1);
+ assert.equal(x.streams[0].lifecycle_state,'ended');
+ assert.equal(x.streams[0].actual_end,'2026-10-18T03:59:00Z');
+ d.close();
+});
+
+test('future upcoming tomorrow 20:30 Taipei remains visible alongside stale live',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'stalelive01',state:'live',observed:'2026-10-18T00:00:00Z'}),
+  scheduled_start:'2026-10-18T00:00:00Z',actual_start:'2026-10-18T00:01:00Z',
+  actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await writeEvidence(d,{
+  ...fixture({id:'futurekobo1',state:'upcoming',observed:'2026-10-18T00:00:00Z'}),
+  scheduled_start:'2026-10-19T12:30:00Z',actual_start:null,actual_end:null,
+  source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T05:00:00Z')});
+ const byId=new Map(x.streams.map(r=>[r.video_id,r]));
+ assert.equal(byId.get('stalelive01').lifecycle_state,'stale');
+ assert.equal(byId.get('futurekobo1').lifecycle_state,'upcoming');
  d.close();
 });
