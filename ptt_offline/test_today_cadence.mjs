@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {refreshKnownTodayLifecycle,mountTodayCadence,shouldRunLifecycleRefresh} from './worker_host/today/cadence-refresh.mjs';
+import {refreshKnownTodayLifecycle,mountTodayCadence,shouldRunLifecycleRefresh,PROVIDER_MISS_RETIRE_THRESHOLD} from './worker_host/today/cadence-refresh.mjs';
+import {readFileSync} from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
 
 function fakeDb(rows){
   return {
@@ -125,4 +127,94 @@ test('cadence includes recent ended rows needing authoritative re-verification f
   assert.match(selectSql,/actual_end>=\?/);
   assert.equal(selectArgs[1],'YouTube liveStreamingDetails');
   assert.equal(out.updated,1);
+});
+
+
+function retirementDb(){
+ const sqlite=new DatabaseSync(':memory:');
+ sqlite.exec(readFileSync(new URL('./worker_host/today/0002_today_canonical.sql',import.meta.url),'utf8'));
+ sqlite.exec(readFileSync(new URL('./worker_host/today/0003_provider_missing_retirement.sql',import.meta.url),'utf8'));
+ sqlite.exec(readFileSync(new URL('./worker_host/today/websub-event-queue.PROPOSED.sql',import.meta.url),'utf8'));
+ sqlite.exec('CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)');
+ sqlite.exec(`CREATE TABLE public_history(
+   video_id TEXT PRIMARY KEY NOT NULL,taipei_day TEXT NOT NULL,title TEXT NOT NULL,
+   channel_id TEXT NOT NULL,channel_name TEXT NOT NULL DEFAULT '',avatar_url TEXT NOT NULL DEFAULT '',
+   scheduled_start TEXT,actual_start TEXT,actual_end TEXT NOT NULL,source_revision TEXT NOT NULL,published_at TEXT NOT NULL
+ )`);
+ function statement(sql,params=[]){return {
+  bind(...values){return statement(sql,values)},
+  async first(){return sqlite.prepare(sql).get(...params)??null},
+  async all(){return {results:sqlite.prepare(sql).all(...params)}},
+  async run(){return sqlite.prepare(sql).run(...params)}
+ }}
+ return {
+  raw:sqlite,prepare(sql){return statement(sql)},
+  async batch(statements){sqlite.exec('BEGIN IMMEDIATE');try{const out=[];for(const s of statements)out.push(await s.run());sqlite.exec('COMMIT');return out;}catch(e){sqlite.exec('ROLLBACK');throw e;}},
+  close(){sqlite.close()}
+ };
+}
+function seedLive(db,id='ghostlive01'){
+ const cid='UC'+'G'.repeat(22);
+ db.raw.prepare(`INSERT INTO public_today_canonical
+  (video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,
+   lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum)
+  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+   id,cid,'v85','hololive','Ghost','Channel','live',
+   '2026-10-18T03:35:19Z','2026-10-18T03:35:19Z',
+   '2026-10-18T03:00:00Z','2026-10-18T03:01:00Z',null,'YouTube','legacy'
+  );
+ return cid;
+}
+const emptyVideos=async()=>new Response(JSON.stringify({items:[]}),{status:200,headers:{'content-type':'application/json'}});
+
+test('one transient videos.list omission retains live row and never fabricates actual_end',async()=>{
+ const d=retirementDb();seedLive(d);
+ const out=await refreshKnownTodayLifecycle(
+  {TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d},
+  {now:new Date('2026-10-18T08:30:00Z'),fetchImpl:emptyVideos}
+ );
+ assert.equal(out.missing,1);
+ assert.equal(out.retired_missing,0);
+ const row=d.raw.prepare('SELECT lifecycle_state,actual_end,lifecycle_observed_at FROM public_today_canonical WHERE video_id=?').get('ghostlive01');
+ assert.equal(row.lifecycle_state,'live');
+ assert.equal(row.actual_end,null);
+ assert.equal(row.lifecycle_observed_at,'2026-10-18T03:35:19Z');
+ assert.equal(d.raw.prepare('SELECT miss_count FROM public_today_provider_misses WHERE video_id=?').get('ghostlive01').miss_count,1);
+ d.close();
+});
+
+test('repeated videos.list omissions retire canonical live only after conservative threshold',async()=>{
+ const d=retirementDb();seedLive(d);
+ const env={TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d};
+ for(let i=1;i<PROVIDER_MISS_RETIRE_THRESHOLD;i++){
+  const out=await refreshKnownTodayLifecycle(env,{now:new Date(Date.parse('2026-10-18T08:30:00Z')+i*300000),fetchImpl:emptyVideos});
+  assert.equal(out.retired_missing,0);
+  assert.ok(d.raw.prepare('SELECT video_id FROM public_today_canonical WHERE video_id=?').get('ghostlive01'));
+ }
+ const out=await refreshKnownTodayLifecycle(env,{now:new Date('2026-10-18T08:45:00Z'),fetchImpl:emptyVideos});
+ assert.equal(out.retired_missing,1);
+ assert.equal(d.raw.prepare('SELECT video_id FROM public_today_canonical WHERE video_id=?').get('ghostlive01'),undefined);
+ assert.equal(d.raw.prepare('SELECT * FROM public_today_provider_misses WHERE video_id=?').get('ghostlive01'),undefined);
+ d.close();
+});
+
+test('successful provider response before threshold resets miss state and restores trusted provenance',async()=>{
+ const d=retirementDb();const cid=seedLive(d);
+ const env={TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d};
+ await refreshKnownTodayLifecycle(env,{now:new Date('2026-10-18T08:30:00Z'),fetchImpl:emptyVideos});
+ assert.equal(d.raw.prepare('SELECT miss_count FROM public_today_provider_misses WHERE video_id=?').get('ghostlive01').miss_count,1);
+ const success=async()=>new Response(JSON.stringify({items:[{
+  id:'ghostlive01',
+  snippet:{channelId:cid,title:'Restored',channelTitle:'Channel',liveBroadcastContent:'live'},
+  liveStreamingDetails:{scheduledStartTime:'2026-10-18T03:00:00Z',actualStartTime:'2026-10-18T03:01:00Z'}
+ }]}),{status:200,headers:{'content-type':'application/json'}});
+ const out=await refreshKnownTodayLifecycle(env,{now:new Date('2026-10-18T08:35:00Z'),fetchImpl:success});
+ assert.equal(out.updated,1);
+ assert.equal(d.raw.prepare('SELECT * FROM public_today_provider_misses WHERE video_id=?').get('ghostlive01'),undefined);
+ const row=d.raw.prepare('SELECT lifecycle_state,source_label,actual_end,lifecycle_observed_at FROM public_today_canonical WHERE video_id=?').get('ghostlive01');
+ assert.equal(row.lifecycle_state,'live');
+ assert.equal(row.source_label,'YouTube liveStreamingDetails');
+ assert.equal(row.actual_end,null);
+ assert.equal(row.lifecycle_observed_at,'2026-10-18T08:35:00Z');
+ d.close();
 });
