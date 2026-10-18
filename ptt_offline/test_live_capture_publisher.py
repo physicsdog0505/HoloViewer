@@ -351,4 +351,53 @@ class LiveCapturePublisherTests(unittest.TestCase):
         saved=json.loads(Path(self.state).read_text(encoding="utf-8"))
         self.assertEqual(len(saved["accepted"]),1820)
         self.assertTrue(saved["legacy_backlog_fence_v2"])
+    def test_baseline_frontier_covers_pending_rows_and_blocks_later_promotion(self):
+        # Make the highest source line pending at baseline time. It still belongs
+        # to the already-observed source frontier and must never become a later
+        # implicit publish merely because chronology reconstruction improves.
+        self.db.execute("UPDATE pushes SET collected_at='2026-10-16T01:01:23Z',ptt_date='10/16',ptt_time='06:36' WHERE source_line=3")
+        first=inspect_latest_article(self.db)
+        self.assertIn(3,first["pending_source_lines"])
+        self.assertEqual(first["latest_scanned_source_line"],3)
+        baseline=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=lambda _:self.fail("baseline must not post"),send=True)
+        self.assertEqual(baseline["status"],"BASELINED")
+        self.assertEqual(baseline["baseline_source_line"],3)
+        saved=json.loads(Path(self.state).read_text(encoding="utf-8"))
+        self.assertEqual(saved["baseline_source_line"],3)
+
+        # The same pre-baseline line later becomes eligible. Frontier semantics
+        # classify it as baseline-skipped, not as a newly publishable row.
+        self.db.execute("UPDATE pushes SET collected_at='2026-10-15T22:36:30Z' WHERE source_line=3")
+        with patch("ptt_offline.live_capture_publisher.inspect_latest_article") as inspected:
+            row={"push_id":"p3","aid":self.aid,"day":"2026-10-16","source_line":3,
+                 "kind":"推","author":"c","content":"new two","occurred_at":"2026-10-15T22:36:00Z",
+                 "floor":None,"source_url":"https://www.ptt.cc/bbs/C_Chat/M.1789081207.A.5FC.html",
+                 "source_record_key":f"{self.aid}:3"}
+            inspected.return_value={"status":"READY","aid":self.aid,
+                "source_identity":saved["source_identity"],"candidate_rows":[row],
+                "pending_source_lines":[],"scan_truncated":False,
+                "latest_scanned_source_line":3}
+            result=run_live_once(self.db,state_path=self.state,secret="k"*40,
+                executor=lambda _:self.fail("pre-baseline line must not post"),send=True,
+                now=datetime.fromisoformat("2026-10-15T22:37:00+00:00"))
+        self.assertEqual(result["status"],"NO_NEW_ROWS")
+        self.assertEqual(result["baseline_skipped_candidates"],1)
+        self.assertEqual(result["eligible"],0)
+
+    def test_baseline_frontier_survives_ack_for_newer_row(self):
+        baseline=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=lambda _:self.fail("baseline must not post"),send=True)
+        frontier=baseline["baseline_source_line"]
+        self.db.execute("INSERT INTO pushes VALUES(4,1,4,1,'推','d','after baseline','10/15','18:03','2026-10-15T10:03:30Z')")
+        def approve(batch):
+            return {"status":"ACK","batch_id":batch["batch_id"],"digest":batch["digest"],
+              "logical_rows_acked":1,"d1_query_count":7,"d1_rows_written":4,"http_requests":1}
+        result=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=approve,send=True,batch_cap=1,
+            now=datetime.fromisoformat("2026-10-15T10:04:00+00:00"))
+        self.assertEqual(result["status"],"ACK")
+        saved=json.loads(Path(self.state).read_text(encoding="utf-8"))
+        self.assertEqual(saved["baseline_source_line"],frontier)
+
 if __name__=="__main__":unittest.main()
