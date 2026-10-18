@@ -226,6 +226,16 @@ class ParityContract(unittest.TestCase):
         self.assertIn("if(floor!==null){el.classList.add('has-floor');",viewer)
         self.assertIn("const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);",viewer)
         self.assertIn("if(requestedPttMode==='live'&&todayState==='live')",viewer)
+        self.assertIn("function verifiedSameDayVodWindow(row)",viewer)
+        self.assertIn("lifecycle!=='ended'",viewer)
+        self.assertIn("taipeiDayForDate(start)!==today",viewer)
+        self.assertIn("taipeiDayForDate(new Date(endMs-1))!==today",viewer)
+        self.assertIn("async function loadTodayPttPayload(day)",viewer)
+        self.assertIn("&limit=1000",viewer)
+        self.assertIn("async function loadSameDayVodPtt(context,token)",viewer)
+        self.assertIn("occurred>=startMs&&occurred<endMs",viewer)
+        self.assertIn("今日暫存 · ⚠ 尚未封存，不宣稱完整",viewer)
+        self.assertIn("mode:'same-day'",viewer)
         self.assertIn("這支影片沒有被今日 catalog 驗證為 LIVE",viewer)
 
     def test_public_collab_context_reaches_standalone_viewer(self):
