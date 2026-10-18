@@ -126,6 +126,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".transport-button.is-feedback", css)
         self.assertIn("location.href='/viewer/?'+q.toString();", app)
         self.assertIn("function openStandaloneViewer(ids)", app)
+        self.assertIn("function customLibraryFilter(){return homeFilter()}", app)
+        self.assertIn("data-custom-filter=\"mekpark\"", (ROOT / "site/index.html").read_text())
         self.assertIn("function openStandaloneCollab(event)", app)
         self.assertIn("q.set('collab_event',String(event.event_id||''));", app)
         self.assertIn("q.set('collab_kind',isLive?'live':'vod');", app)
