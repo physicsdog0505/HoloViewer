@@ -99,6 +99,9 @@ let callLastDirection='';
 let callLastDirectionAt=0;
 let callWaveTimer=null;
 let callSpaceHeld=false;
+let callWakeTaps=[];
+let callAutoBeatTimer=null;
+let callHintTimer=null;
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
@@ -202,6 +205,26 @@ function callUpdateHud(label='待機'){
  callOverlay.style.setProperty('--call-beat-4',beat*4+'ms');
  if(callHud)callHud.textContent='Call · '+callBpm()+' BPM · '+label;
 }
+function callHint(label){
+ callUpdateHud(label);
+ if(!callHud)return;
+ callHud.classList.add('call-hint');
+ clearTimeout(callHintTimer);
+ callHintTimer=setTimeout(()=>callHud?.classList.remove('call-hint'),1300);
+}
+function stopCallAutoBeat(){
+ clearInterval(callAutoBeatTimer);callAutoBeatTimer=null;
+}
+function startCallAutoBeat(){
+ stopCallAutoBeat();
+ if(callTapTimes.length<4)return;
+ callPulseChest();
+ callAutoBeatTimer=setInterval(()=>{
+  if(!callEnabled)return;
+  callPulseChest();
+ },Math.max(240,Math.round(callBeatMs)));
+ callHint('已鎖定 '+callBpm()+' BPM');
+}
 function callClearMotion(){
  if(!callOverlay)return;
  callOverlay.classList.remove('side-two-left','side-two-right','side-fast-left','side-fast-right','side-wave-left','side-wave-right','space-pump');
@@ -229,19 +252,26 @@ function mountCallOverlay(){
  const card=playerCards[primaryIndex]||playerCards[0];
  if(card&&callOverlay.parentElement!==card)card.append(callOverlay);
 }
-function setCallMode(on){
+function setCallMode(on,{hint=false}={}){
  callEnabled=Boolean(on);
  document.body.classList.toggle('call-mode',callEnabled);
+ callModeButton.hidden=!callEnabled;
  callModeButton.classList.toggle('active',callEnabled);
  callModeButton.setAttribute('aria-pressed',String(callEnabled));
- if(callEnabled){ensureCallOverlay();mountCallOverlay();callUpdateHud('待機')}
- else{
+ if(callEnabled){
+  ensureCallOverlay();mountCallOverlay();
+  if(hint)callHint('隱藏 Call 已啟動 · 再按 ↓↓ 校拍');
+  else callUpdateHud('待機');
+ }else{
+  stopCallAutoBeat();
   clearTimeout(callWaveTimer);callWaveTimer=null;
-  callHeldDirection='';callSpaceHeld=false;callClearMotion();callUpdateHud('待機');
+  callHeldDirection='';callSpaceHeld=false;callWakeTaps=[];callTapTimes=[];callClearMotion();callUpdateHud('待機');
  }
 }
 function callTapTempo(now=performance.now()){
- if(callTapTimes.length&&now-callTapTimes[callTapTimes.length-1]>2500)callTapTimes=[];
+ if(callTapTimes.length&&now-callTapTimes[callTapTimes.length-1]>2500){
+  callTapTimes=[];stopCallAutoBeat();
+ }
  callTapTimes.push(now);
  if(callTapTimes.length>4)callTapTimes.shift();
  if(callTapTimes.length>=2){
@@ -250,7 +280,8 @@ function callTapTempo(now=performance.now()){
   const avg=gaps.reduce((a,b)=>a+b,0)/gaps.length;
   if(avg>=240&&avg<=1200)callBeatMs=avg;
  }
- callUpdateHud('胸前拍');
+ callUpdateHud('胸前拍 '+callTapTimes.length+'/4');
+ if(callTapTimes.length===4)startCallAutoBeat();
 }
 function callPulseChest(){
  if(!callOverlay)return;
@@ -267,10 +298,10 @@ function callFlickUp(){
  const hands=callOverlay.querySelector('.call-hands');
  hands?.animate([
   {transform:'translate(-50%,0) rotate(0)'},
-  {transform:'translate(-50%,-68%) rotate(0)',offset:.56},
-  {transform:'translate(-50%,-60%) rotate(0)',offset:.74},
+  {transform:'translate(-50%,-104%) rotate(0)',offset:.58},
+  {transform:'translate(-50%,-94%) rotate(0)',offset:.76},
   {transform:'translate(-50%,0) rotate(0)'}
- ],{duration:Math.max(300,callBeatMs),easing:'cubic-bezier(.16,.82,.24,1)'});
+ ],{duration:Math.max(420,callBeatMs*1.35),easing:'cubic-bezier(.2,.68,.3,1)'});
  callUpdateHud('上甩');
 }
 function callSetSideMotion(direction,mode){
@@ -282,6 +313,7 @@ function callSetSideMotion(direction,mode){
 }
 function callDirectionDown(direction,now=performance.now()){
  if(callHeldDirection===direction)return;
+ stopCallAutoBeat();
  clearTimeout(callWaveTimer);
  const switched=callLastDirection&&callLastDirection!==direction&&(now-callLastDirectionAt)<=callBeatMs*2.05;
  callHeldDirection=direction;
@@ -304,6 +336,7 @@ function callDirectionUp(direction){
 }
 function callSpaceDown(){
  if(callSpaceHeld)return;
+ stopCallAutoBeat();
  callSpaceHeld=true;
  callClearMotion();
  callOverlay?.classList.add('space-pump');
@@ -316,8 +349,23 @@ function callSpaceUp(){
  callUpdateHud('待機');
 }
 function handleCallKeyDown(event){
- if(!callEnabled||callEditableTarget(event.target))return;
+ if(callEditableTarget(event.target))return;
  const key=event.key;
+ if(!callEnabled){
+  if(key!=='ArrowDown'||event.repeat)return;
+  const now=performance.now();
+  callWakeTaps=callWakeTaps.filter(t=>now-t<=800);
+  callWakeTaps.push(now);
+  if(callWakeTaps.length<2)return;
+  event.preventDefault();
+  const wake=[...callWakeTaps.slice(-2)];
+  setCallMode(true,{hint:true});
+  callTapTimes=[];
+  wake.forEach(t=>callTapTempo(t));
+  callPulseChest();
+  callWakeTaps=[];
+  return;
+ }
  if(!['ArrowDown','ArrowUp','ArrowLeft','ArrowRight',' '].includes(key))return;
  event.preventDefault();
  if(key==='ArrowDown'){
@@ -326,7 +374,7 @@ function handleCallKeyDown(event){
  }
  if(key==='ArrowUp'){
   if(event.repeat)return;
-  callFlickUp();return;
+  stopCallAutoBeat();callFlickUp();return;
  }
  if(key==='ArrowLeft'){if(!event.repeat)callDirectionDown('left');return}
  if(key==='ArrowRight'){if(!event.repeat)callDirectionDown('right');return}
@@ -1319,7 +1367,7 @@ stage.addEventListener('drop',event=>{
  if(row)addDraggedLive(row);
 });
 
-callModeButton.addEventListener('click',()=>setCallMode(!callEnabled));
+callModeButton.addEventListener('click',()=>setCallMode(false));
 document.addEventListener('keydown',handleCallKeyDown);
 document.addEventListener('keyup',handleCallKeyUp);
 
