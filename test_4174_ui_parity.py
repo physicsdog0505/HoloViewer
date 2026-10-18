@@ -81,6 +81,35 @@ class ParityContract(unittest.TestCase):
         self.assertIn('<span class="eyebrow">CUSTOM</span>', html)
         self.assertNotIn("<h1>History</h1>", html)
 
+    def test_home_degraded_bucket_is_kept_but_hidden_from_public_home(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        bucket_start=js.index('function homeBuckets(rows){')
+        bucket_end=js.index('async function loadHomeCollab()',bucket_start)
+        buckets=js[bucket_start:bucket_end]
+        self.assertIn("buckets[homeLifecycleBucket(item)].push(item)",buckets)
+        render_start=js.index('function renderHomeRows(rows){')
+        render_end=js.index('function homeTimestamp(',render_start)
+        render=js[render_start:render_end]
+        self.assertIn("if(key==='unknown')",render)
+        self.assertIn("$('home-unknown-section').hidden=true",render)
+
+    def test_history_cards_reuse_home_display_metadata_and_actual_start(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("item?.start_at||item?.actual_start||item?.scheduled_start",js)
+        self.assertIn("'yt3.googleusercontent.com'",js)
+        self.assertIn('function homeDisplayMetadataByChannel(rows)',js)
+        self.assertIn('function historyDisplayRow(item,byChannel)',js)
+        self.assertIn("avatar_url:item.avatar_url||profile.avatar_url||''",js)
+        self.assertIn("member_accent:item.member_accent||profile.member_accent||''",js)
+        self.assertIn("support_mode:item.support_mode||profile.support_mode||''",js)
+        start=js.index('async function loadHistory(){')
+        end=js.index('function collabEventState(event){',start)
+        history=js[start:end]
+        self.assertIn("api('/v1/catalog/today').catch(()=>null)",history)
+        self.assertIn("historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel)",history)
+        # Display fallback is metadata-only; lifecycle still comes from /v1/history.
+        self.assertNotIn("scheduled_start",history.split("historyDisplayRow",1)[0].split("lifecycle_state",1)[-1])
+
     def test_history_matches_accepted_4174_date_and_paging_contract(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
