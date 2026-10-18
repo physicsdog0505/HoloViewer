@@ -9,6 +9,7 @@ const EXPLICIT=/#?ホロARK|ホロ鯖ARK|ロゼキャンARK/i;
 const STOPWORDS=new Set(['hololive','ホロライブ','live','配信','初見','雑談','vtuber','ホロドリ','holodream','コラボ','collab']);
 const MAX_HISTORY_ROWS=1000;
 const START_LABEL=/(?<month>\d{1,2})\/(?<day>\d{1,2})\s+(?<hour>\d{1,2}):(?<minute>\d{2})/;
+const HISTORY_VIDEO_SOURCE='stream-catalog-v1:youtube-liveStreamingDetails';
 
 function json(body,status=200,age=30){
  return new Response(JSON.stringify(body),{status,headers:{
@@ -210,6 +211,23 @@ async function historyRows(db,day){
   streams:normalized.slice(0,MAX_HISTORY_ROWS)
  };
 }
+
+async function historyVideoMetadata(db,videoId){
+ const row=await db.prepare(`SELECT video_id,actual_start,actual_end,source_revision
+ FROM public_history WHERE video_id=? LIMIT 1`).bind(videoId).first();
+ if(!row)return null;
+ if(row.source_revision!==HISTORY_VIDEO_SOURCE)return null;
+ const start=validTime(row.actual_start),end=validTime(row.actual_end);
+ if(!start||!end||end.getTime()<=start.getTime())return null;
+ return {
+  schema_version:'public-history-video-v1',
+  video_id:row.video_id,
+  actual_start:start.toISOString().replace(/\\.\d{3}Z$/,'Z'),
+  actual_end:end.toISOString().replace(/\\.\d{3}Z$/,'Z'),
+  anchor_source:'youtube-liveStreamingDetails-actualStartTime'
+ };
+}
+
 async function collabLive(db,{now=new Date(),profileTableEnabled=false}={}){
  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
  const today=await readToday(db,{day,limit:200,offset:0,now,profileTableEnabled});
@@ -287,6 +305,12 @@ export async function handleExperienceRead(request,env,now=new Date()){
  if(!env?.DB||typeof env.DB.prepare!=='function')return json({error:'service_unavailable'},503,0);
  let url;try{url=new URL(request.url);}catch{return json({error:'bad_request'},400,0);}
  try{
+  if(url.pathname.startsWith('/v1/history/videos/')){
+   const videoId=decodeURIComponent(url.pathname.slice('/v1/history/videos/'.length));
+   if(!VIDEO.test(videoId))return json({error:'invalid_video_id'},400,0);
+   const video=await historyVideoMetadata(env.DB,videoId);
+   return video?json(video,200,30):json({error:'not_found',verified:false},404,0);
+  }
   if(url.pathname==='/v1/collab/live'){
    return json(await collabLive(env.DB,{now,profileTableEnabled:env.TODAY_PROFILES_ENABLED==='true'}));
   }
