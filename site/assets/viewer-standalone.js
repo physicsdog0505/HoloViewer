@@ -45,6 +45,7 @@ const liveList=document.getElementById('viewerLiveList');
 const controls=document.getElementById('viewerControls');
 const persistentPlaybackControls=document.getElementById('persistentPlaybackControls');
 const settingsButton=document.getElementById('viewerSettings');
+const callModeButton=document.getElementById('viewerCallMode');
 const fullscreenButton=document.getElementById('viewerFullscreen');
 const multiModeSwitch=document.getElementById('multiModeSwitch');
 const focusChoices=document.getElementById('focusChoices');
@@ -85,6 +86,19 @@ let collabPollTimer=null;
 let collabVodTimer=null;
 let collabAbsoluteMs=null;
 let collabReconciling=false;
+
+const CALL_DEFAULT_BEAT_MS=500;
+let callEnabled=false;
+let callBeatMs=CALL_DEFAULT_BEAT_MS;
+let callTapTimes=[];
+let callOverlay=null;
+let callHud=null;
+let callHeldDirection='';
+let callDirectionStartedAt=0;
+let callLastDirection='';
+let callLastDirectionAt=0;
+let callWaveTimer=null;
+let callSpaceHeld=false;
 
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
@@ -175,6 +189,155 @@ function updateUrl(){
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
 
+function callEditableTarget(target){
+ if(!(target instanceof Element))return false;
+ return Boolean(target.closest('input,textarea,select,[contenteditable="true"]'));
+}
+function callBpm(){return Math.round(60000/Math.max(240,Math.min(1200,callBeatMs)))}
+function callUpdateHud(label='待機'){
+ if(!callOverlay)return;
+ callOverlay.style.setProperty('--call-beat',Math.round(callBeatMs)+'ms');
+ if(callHud)callHud.textContent='Call · '+callBpm()+' BPM · '+label;
+}
+function callClearMotion(){
+ if(!callOverlay)return;
+ callOverlay.classList.remove('side-two-left','side-two-right','side-fast-left','side-fast-right','side-wave-left','side-wave-right','space-pump');
+}
+function ensureCallOverlay(){
+ if(callOverlay&&callOverlay.isConnected)return callOverlay;
+ const overlay=node('div',undefined,'call-overlay');
+ overlay.id='viewerCallOverlay';
+ overlay.setAttribute('aria-hidden','true');
+ const hands=node('div',undefined,'call-hands');
+ const left=node('div',undefined,'call-hand left');
+ const right=node('div',undefined,'call-hand right');
+ left.append(node('span',undefined,'call-stick'));
+ right.append(node('span',undefined,'call-stick'));
+ hands.append(left,right);
+ callHud=node('div','Call · 120 BPM · 待機','call-hud');
+ overlay.append(hands,callHud);
+ callOverlay=overlay;
+ callUpdateHud();
+ mountCallOverlay();
+ return overlay;
+}
+function mountCallOverlay(){
+ if(!callOverlay)return;
+ const card=playerCards[primaryIndex]||playerCards[0];
+ if(card&&callOverlay.parentElement!==card)card.append(callOverlay);
+}
+function setCallMode(on){
+ callEnabled=Boolean(on);
+ document.body.classList.toggle('call-mode',callEnabled);
+ callModeButton.classList.toggle('active',callEnabled);
+ callModeButton.setAttribute('aria-pressed',String(callEnabled));
+ if(callEnabled){ensureCallOverlay();mountCallOverlay();callUpdateHud('待機')}
+ else{
+  clearTimeout(callWaveTimer);callWaveTimer=null;
+  callHeldDirection='';callSpaceHeld=false;callClearMotion();callUpdateHud('待機');
+ }
+}
+function callTapTempo(now=performance.now()){
+ if(callTapTimes.length&&now-callTapTimes[callTapTimes.length-1]>2500)callTapTimes=[];
+ callTapTimes.push(now);
+ if(callTapTimes.length>4)callTapTimes.shift();
+ if(callTapTimes.length>=2){
+  const gaps=[];
+  for(let i=1;i<callTapTimes.length;i++)gaps.push(callTapTimes[i]-callTapTimes[i-1]);
+  const avg=gaps.reduce((a,b)=>a+b,0)/gaps.length;
+  if(avg>=240&&avg<=1200)callBeatMs=avg;
+ }
+ callUpdateHud('胸前拍');
+}
+function callPulseChest(){
+ if(!callOverlay)return;
+ const hands=callOverlay.querySelector('.call-hands');
+ hands?.animate([
+  {transform:'translateX(-50%) translateY(0) scale(1)'},
+  {transform:'translateX(-50%) translateY(3%) scale(.97)',offset:.36},
+  {transform:'translateX(-50%) translateY(-2%) scale(1.015)',offset:.62},
+  {transform:'translateX(-50%) translateY(0) scale(1)'}
+ ],{duration:Math.max(180,callBeatMs*.72),easing:'cubic-bezier(.22,.8,.3,1)'});
+}
+function callFlickUp(){
+ if(!callOverlay)return;
+ const hands=callOverlay.querySelector('.call-hands');
+ hands?.animate([
+  {transform:'translateX(-50%) translateY(0) rotate(0)'},
+  {transform:'translateX(-50%) translateY(-24%) rotate(0)',offset:.58},
+  {transform:'translateX(-50%) translateY(-18%) rotate(0)',offset:.76},
+  {transform:'translateX(-50%) translateY(0) rotate(0)'}
+ ],{duration:Math.max(260,callBeatMs),easing:'cubic-bezier(.18,.78,.24,1)'});
+ callUpdateHud('上甩');
+}
+function callSetSideMotion(direction,mode){
+ if(!callOverlay)return;
+ callClearMotion();
+ const suffix=direction==='left'?'left':'right';
+ callOverlay.classList.add(mode==='fast'?'side-fast-'+suffix:mode==='wave'?'side-wave-'+suffix:'side-two-'+suffix);
+ callUpdateHud(mode==='fast'?'一拍雨刷':mode==='wave'?'大波浪':'兩拍搖');
+}
+function callDirectionDown(direction,now=performance.now()){
+ if(callHeldDirection===direction)return;
+ clearTimeout(callWaveTimer);
+ const switched=callLastDirection&&callLastDirection!==direction&&(now-callLastDirectionAt)<=callBeatMs*2.05;
+ callHeldDirection=direction;
+ callDirectionStartedAt=now;
+ callLastDirection=direction;
+ callLastDirectionAt=now;
+ callSetSideMotion(direction,switched?'fast':'two');
+ callWaveTimer=setTimeout(()=>{
+  if(callEnabled&&callHeldDirection===direction&&performance.now()-callDirectionStartedAt>=callBeatMs*1.9){
+   callSetSideMotion(direction,'wave');
+  }
+ },Math.max(160,callBeatMs*2));
+}
+function callDirectionUp(direction){
+ if(callHeldDirection!==direction)return;
+ clearTimeout(callWaveTimer);callWaveTimer=null;
+ callHeldDirection='';
+ callClearMotion();
+ callUpdateHud('待機');
+}
+function callSpaceDown(){
+ if(callSpaceHeld)return;
+ callSpaceHeld=true;
+ callClearMotion();
+ callOverlay?.classList.add('space-pump');
+ callUpdateHud('連續上舉');
+}
+function callSpaceUp(){
+ if(!callSpaceHeld)return;
+ callSpaceHeld=false;
+ callOverlay?.classList.remove('space-pump');
+ callUpdateHud('待機');
+}
+function handleCallKeyDown(event){
+ if(!callEnabled||callEditableTarget(event.target))return;
+ const key=event.key;
+ if(!['ArrowDown','ArrowUp','ArrowLeft','ArrowRight',' '].includes(key))return;
+ event.preventDefault();
+ if(key==='ArrowDown'){
+  if(event.repeat)return;
+  callTapTempo();callPulseChest();return;
+ }
+ if(key==='ArrowUp'){
+  if(event.repeat)return;
+  callFlickUp();return;
+ }
+ if(key==='ArrowLeft'){if(!event.repeat)callDirectionDown('left');return}
+ if(key==='ArrowRight'){if(!event.repeat)callDirectionDown('right');return}
+ if(key===' ')callSpaceDown();
+}
+function handleCallKeyUp(event){
+ if(!callEnabled||callEditableTarget(event.target))return;
+ if(!['ArrowLeft','ArrowRight',' '].includes(event.key))return;
+ event.preventDefault();
+ if(event.key==='ArrowLeft')callDirectionUp('left');
+ else if(event.key==='ArrowRight')callDirectionUp('right');
+ else callSpaceUp();
+}
+
 function playerHostId(stream){return 'viewer-player-'+String(stream?.videoId||'').replace(/[^A-Za-z0-9_-]/g,'')}
 function createPlayerCard(index){
  const stream=streams[index];
@@ -207,6 +370,7 @@ function renderShell(){
  ensureDragDropOverlay();
  renderControls();
  applyLayout();
+ mountCallOverlay();
 }
 function renderControls(){
  focusChoices.replaceChildren();
@@ -310,6 +474,7 @@ function setPrimary(index){
  if(currentLayoutPreset()==='focus')lockedIndex=index;
  setAudioMaster(index);
  applyLayout();
+ mountCallOverlay();
  resolvePrimaryPtt();
 }
 function handleFocusAvatarClick(index){
@@ -1151,6 +1316,10 @@ stage.addEventListener('drop',event=>{
  if(row)addDraggedLive(row);
 });
 
+callModeButton.addEventListener('click',()=>setCallMode(!callEnabled));
+document.addEventListener('keydown',handleCallKeyDown);
+document.addEventListener('keyup',handleCallKeyUp);
+
 settingsButton.addEventListener('click',()=>{
  if(watchMode==='single')return;
  const open=controls.hidden;
@@ -1206,6 +1375,10 @@ fullscreenButton.addEventListener('click',async()=>{
   if(document.fullscreenElement)await document.exitFullscreen();
   else await document.documentElement.requestFullscreen();
  }catch{}
+});
+window.addEventListener('blur',()=>{
+ if(!callEnabled)return;
+ clearTimeout(callWaveTimer);callWaveTimer=null;callHeldDirection='';callSpaceHeld=false;callClearMotion();callUpdateHud('待機');
 });
 window.addEventListener('pagehide',()=>{
  clearInterval(collabPollTimer);clearInterval(collabVodTimer);
