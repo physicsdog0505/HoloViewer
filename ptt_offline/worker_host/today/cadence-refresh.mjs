@@ -17,7 +17,7 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
   if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('invalid lifecycle refresh limit');
 
   const got=await env.DB.prepare(`
-    SELECT video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_observed_at,
+    SELECT video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,lifecycle_observed_at,
       scheduled_start,actual_start,actual_end,
       EXISTS(
         SELECT 1 FROM public_today_websub_events e
@@ -53,18 +53,23 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
     const base=expected.get(id),v=byId.get(id),s=v?.snippet,d=v?.liveStreamingDetails??{};
     if(!base||!v||!s){
       missing++;
-      await env.DB.prepare(`INSERT INTO public_today_provider_misses(video_id,first_missing_at,last_missing_at,miss_count)
-        VALUES(?,?,?,1)
-        ON CONFLICT(video_id) DO UPDATE SET
-          last_missing_at=excluded.last_missing_at,
-          miss_count=public_today_provider_misses.miss_count+1`).bind(id,observed_at,observed_at).run();
-      const miss=await env.DB.prepare('SELECT miss_count FROM public_today_provider_misses WHERE video_id=?').bind(id).first();
-      if((miss?.miss_count??0)>=PROVIDER_MISS_RETIRE_THRESHOLD){
-        await env.DB.batch([
-          env.DB.prepare('DELETE FROM public_today_canonical WHERE video_id=?').bind(id),
-          env.DB.prepare('DELETE FROM public_today_provider_misses WHERE video_id=?').bind(id)
-        ]);
-        retired_missing++;
+      if(base?.lifecycle_state==='live'){
+        await env.DB.prepare(`INSERT INTO public_today_provider_misses(video_id,first_missing_at,last_missing_at,miss_count)
+          VALUES(?,?,?,1)
+          ON CONFLICT(video_id) DO UPDATE SET
+            last_missing_at=excluded.last_missing_at,
+            miss_count=public_today_provider_misses.miss_count+1`).bind(id,observed_at,observed_at).run();
+        const miss=await env.DB.prepare('SELECT miss_count FROM public_today_provider_misses WHERE video_id=?').bind(id).first();
+        if((miss?.miss_count??0)>=PROVIDER_MISS_RETIRE_THRESHOLD){
+          await env.DB.batch([
+            env.DB.prepare('DELETE FROM public_today_canonical WHERE video_id=? AND lifecycle_state=?').bind(id,'live'),
+            env.DB.prepare('DELETE FROM public_today_provider_misses WHERE video_id=?').bind(id)
+          ]);
+          retired_missing++;
+        }
+      } else {
+        // Re-verification omission must never erase durable ENDED identity/history.
+        await env.DB.prepare('DELETE FROM public_today_provider_misses WHERE video_id=?').bind(id).run();
       }
       continue;
     }
