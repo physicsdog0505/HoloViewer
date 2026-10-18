@@ -188,8 +188,7 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
     JOIN public_today_approved_channels ac
       ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
     WHERE (
-      (lifecycle_state='live' AND actual_end IS NULL
-        AND lifecycle_observed_at>=? AND lifecycle_observed_at<=?)
+      (lifecycle_state='live' AND actual_end IS NULL)
       OR
       (lifecycle_state='upcoming' AND COALESCE(actual_start,scheduled_start)>=?)
       OR
@@ -199,7 +198,7 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
       ))
     )
     ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ? OFFSET ?`)
-    .bind(coverage?.roster_version??'',freshCutoff,nowStamp,start,start,end,beforeNoon?1:0,previous,start,limit+1,offset).all();
+    .bind(coverage?.roster_version??'',start,start,end,beforeNoon?1:0,previous,start,limit+1,offset).all();
   const truncated=(rows.results??[]).length>limit;
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
   const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
