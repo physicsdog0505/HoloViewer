@@ -39,15 +39,23 @@ def load_remote_lines(path):
     return found
 
 
-def audit(*, source, state, aid, remote_json=None):
+def audit(*, source, state, aid, remote_json=None, known_baseline_source_line=None):
     state_path=Path(state)
     checkpoint=json.loads(state_path.read_text(encoding="utf-8"))
     accepted=checkpoint.get("accepted",{})
     if not isinstance(accepted,dict):
         raise ContractError("checkpoint accepted must be an object")
-    baseline=checkpoint.get("baseline_source_line")
-    if baseline is not None and (type(baseline) is not int or baseline<0):
+    checkpoint_baseline=checkpoint.get("baseline_source_line")
+    if checkpoint_baseline is not None and (type(checkpoint_baseline) is not int or checkpoint_baseline<0):
         raise ContractError("invalid baseline_source_line")
+    if known_baseline_source_line is not None and (
+        type(known_baseline_source_line) is not int or known_baseline_source_line<0
+    ):
+        raise ContractError("invalid known baseline source-line frontier")
+    baseline=(checkpoint_baseline if checkpoint_baseline is not None
+              else known_baseline_source_line)
+    baseline_source=("checkpoint" if checkpoint_baseline is not None
+                     else ("operator_evidence" if known_baseline_source_line is not None else None))
 
     wanted=_norm_aid(aid)
     with open_source(source) as db:
@@ -133,6 +141,8 @@ def audit(*, source, state, aid, remote_json=None):
         "checkpoint_status":checkpoint.get("status"),
         "checkpoint_accepted":len(accepted_lines),
         "baseline_source_line":baseline,
+        "baseline_source":baseline_source,
+        "checkpoint_baseline_source_line":checkpoint_baseline,
         "ready_now":len(ready_lines),
         "pending_now":len(pending_lines),
         "remote_comparison_supplied":remote_lines is not None,
@@ -155,10 +165,12 @@ def main(argv=None):
     p.add_argument("--state",required=True)
     p.add_argument("--aid",required=True)
     p.add_argument("--remote-json")
+    p.add_argument("--known-baseline-source-line",type=int)
     p.add_argument("--output")
     args=p.parse_args(argv)
     result=audit(source=args.source,state=args.state,aid=args.aid,
-                 remote_json=args.remote_json)
+                 remote_json=args.remote_json,
+                 known_baseline_source_line=args.known_baseline_source_line)
     encoded=json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)
     if args.output:
         Path(args.output).write_text(encoded+"\n",encoding="utf-8")
