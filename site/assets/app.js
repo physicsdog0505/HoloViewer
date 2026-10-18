@@ -210,28 +210,42 @@ function verifiedTimelineStartsForEvent(event){
  }
  return starts;
 }
-function openCollabEvent(event){
- const streams=collabEventStreams(event);
- const ids=streams.map(x=>x.video_id);
- if(ids.length<2)return;
- const pollable=streams.some(x=>['live','upcoming','waiting'].includes(String(x.lifecycle_state||'').toLowerCase()));
- state.multi=ids.slice();renderMulti();
- window.hvOpenCustomSession?.(ids,{layout:'auto',ptt:'video',primary:0,audio:0,
-  collabPollUrl:pollable?collabDetailUrl(event):'',
-  collabLabel:String(event.label||'多人連動'),
-  verifiedTimelineStarts:verifiedTimelineStartsForEvent(event),
-  streamMetadata:streams.map(x=>({videoId:x.video_id,label:String(x.title||x.channel_name||x.video_id),channelId:String(x.channel_id||'')}))});
+function openStandaloneCollab(event){
+ const roster=collabEventStreams(event);
+ if(roster.length<2)return;
+ const isLive=roster.some(x=>['live','upcoming','waiting'].includes(String(x.lifecycle_state||'').toLowerCase()));
+ const initial=isLive
+  ?roster.filter(x=>String(x.lifecycle_state||'').toLowerCase()==='live')
+  :roster;
+ const fallback=isLive&&initial.length===0
+  ?roster.filter(x=>['upcoming','waiting'].includes(String(x.lifecycle_state||'').toLowerCase()))
+  :initial;
+ const ids=(fallback.length?fallback:roster).map(x=>x.video_id).slice(0,16);
+ const q=new URLSearchParams();
+ ids.forEach(id=>q.append('stream',id));
+ q.set('layout','equal');
+ q.set('workspace','sidebar');
+ q.set('ptt',isLive?'live':'video');
+ q.set('primary','0');
+ q.set('audio','0');
+ q.set('mode','multi');
+ q.set('collab_event',String(event.event_id||''));
+ q.set('collab_kind',isLive?'live':'vod');
+ location.href='/viewer/?'+q.toString();
 }
+function openCollabEvent(event){openStandaloneCollab(event)}
 function collabEntry(event){
  const streams=collabEventStreams(event);
  if(streams.length<2)return null;
  const entry=node('span',undefined,'stream-collab-entry');
  entry.dataset.collabEventId=String(event.event_id||'');
- entry.setAttribute('aria-disabled','true');
- entry.title='多人連動入口準備中';
+ entry.setAttribute('role','button');
+ entry.tabIndex=0;
+ entry.title='開啟多人連動';
  entry.append(node('span','👥','collab-glyph'),node('span','多人','collab-entry-label'));
  entry.querySelector('.collab-glyph').setAttribute('aria-hidden','true');
- entry.onclick=e=>{e.preventDefault();e.stopPropagation()};
+ entry.onclick=e=>{e.preventDefault();e.stopPropagation();openStandaloneCollab(event)};
+ entry.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();openStandaloneCollab(event)}};
  return entry;
 }
 function homeCard(item,container){
