@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Activate verified legacy-66 Today channel profiles on existing production API.
+"""Activate verified Today channel profiles for the exact active approved roster.
 
 No Worker source deploy. Uses existing holoviewer-public-api code path already
 supporting TODAY_PROFILES_ENABLED and public_today_channel_profiles.
@@ -38,8 +38,9 @@ def load_config(path):
 def validated_profiles(path):
     body=json.loads(Path(path).read_text(encoding="utf-8"))
     rows=body.get("channels")
-    if body.get("count")!=66 or body.get("avatar_count")!=66 or not isinstance(rows,list) or len(rows)!=66:
-        raise SystemExit("avatar receipt must be exact 66/66")
+    count=body.get("count"); avatars=body.get("avatar_count")
+    if not isinstance(count,int) or count<1 or count>500 or avatars!=count or not isinstance(rows,list) or len(rows)!=count:
+        raise SystemExit("avatar receipt must be exact N/N for one approved roster")
     seen=set()
     clean=[]
     for row in rows:
@@ -53,15 +54,26 @@ def validated_profiles(path):
         if u.scheme!="https" or u.hostname not in HOSTS or u.username or u.password or u.port:
             raise SystemExit("untrusted profile avatar")
         clean.append((cid,title,avatar))
-    return clean, body.get("fetched_at")
+    return clean, body.get("fetched_at"), body.get("roster_version")
 
-def active_roster_version(config):
-    sql="SELECT 'TODAY_ROSTER=' || roster_version AS marker FROM public_today_catalog_meta WHERE singleton=1;"
+def active_roster(config):
+    sql=(
+      "SELECT 'TODAY_META=' || roster_version || ',' || expected_channels AS marker "
+      "FROM public_today_catalog_meta WHERE singleton=1;"
+      "SELECT 'TODAY_CHANNEL=' || channel_id AS marker "
+      "FROM public_today_approved_channels "
+      "WHERE roster_version=(SELECT roster_version FROM public_today_catalog_meta WHERE singleton=1) "
+      "ORDER BY channel_id;"
+    )
     out=run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,"--command",sql],capture=True).stdout
-    m=re.search(r"TODAY_ROSTER=([A-Za-z0-9._:-]+)",out)
+    m=re.search(r"TODAY_META=([A-Za-z0-9._:-]+),(\d+)",out)
+    ids=re.findall(r"TODAY_CHANNEL=(UC[A-Za-z0-9_-]{22})",out)
     if not m:
-        raise SystemExit("could not read active Today roster version")
-    return m.group(1)
+        raise SystemExit("could not read active Today roster metadata")
+    version=m.group(1); expected=int(m.group(2))
+    if expected<1 or expected>500 or len(ids)!=expected or len(set(ids))!=expected:
+        raise SystemExit(f"active Today roster mismatch: expected {expected}, got {len(ids)} unique={len(set(ids))}")
+    return version, ids
 
 def ensure_schema(config):
     sql="""CREATE TABLE IF NOT EXISTS public_today_channel_profiles (
@@ -96,17 +108,21 @@ def import_profiles(config,rows,fetched_at,roster_version):
     finally:
         Path(sql_path).unlink(missing_ok=True)
 
-def verify_rows(config, roster_version):
+def verify_rows(config, roster_version, expected_ids):
+    expected=len(expected_ids)
     sql=(
       "SELECT 'PROFILE_COUNTS=' || COUNT(*) || ',' || "
       "SUM(CASE WHEN avatar_url IS NOT NULL AND avatar_url<>'' THEN 1 ELSE 0 END) AS marker "
       "FROM public_today_channel_profiles WHERE roster_version="+q(roster_version)+";"
+      "SELECT 'PROFILE_CHANNEL=' || channel_id AS marker "
+      "FROM public_today_channel_profiles WHERE roster_version="+q(roster_version)+" ORDER BY channel_id;"
     )
     out=run(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",config,"--command",sql],capture=True).stdout
     m=re.search(r"PROFILE_COUNTS=(\d+),(\d+)",out)
-    if not m or tuple(map(int,m.groups()))!=(66,66):
-        raise SystemExit("profile readback is not exact 66/66")
-    return {"rows":66,"avatars":66}
+    ids=re.findall(r"PROFILE_CHANNEL=(UC[A-Za-z0-9_-]{22})",out)
+    if not m or tuple(map(int,m.groups()))!=(expected,expected) or ids!=sorted(expected_ids):
+        raise SystemExit(f"profile readback is not exact approved roster {expected}/{expected}")
+    return {"rows":expected,"avatars":expected}
 
 def enable_profiles(config):
     run(["npx","wrangler","secret","put","TODAY_PROFILES_ENABLED","--name",WORKER,"--config",config],
@@ -130,22 +146,28 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--apply",action="store_true")
     p.add_argument("--config",required=True)
-    p.add_argument("--profiles-json",default="/tmp/hv47-legacy-avatars.json")
+    p.add_argument("--profiles-json",default="/tmp/hv47-active-roster-avatars.json")
     args=p.parse_args()
     if not args.apply:
         raise SystemExit("refusing production profile activation without --apply")
     config=str(Path(args.config).resolve())
     load_config(config)
-    rows,fetched_at=validated_profiles(args.profiles_json)
-    roster_version=active_roster_version(config)
+    rows,fetched_at,receipt_roster_version=validated_profiles(args.profiles_json)
+    roster_version,approved_ids=active_roster(config)
+    row_ids=sorted(cid for cid,_,_ in rows)
+    if receipt_roster_version!=roster_version:
+        raise SystemExit("avatar receipt roster_version does not match active Today roster")
+    if row_ids!=sorted(approved_ids):
+        raise SystemExit("avatar receipt channel IDs do not exactly match active Today approved roster")
     ensure_schema(config)
     import_profiles(config,rows,fetched_at,roster_version)
-    receipt=verify_rows(config,roster_version)
+    receipt=verify_rows(config,roster_version,approved_ids)
     enable_profiles(config)
     public=verify_public()
     print(json.dumps({
       "status":"TODAY_PROFILES_ENABLED",
       "active_roster_version":roster_version,
+      "active_roster_channels":len(approved_ids),
       "profile_readback":receipt,
       "public_readback":public,
       "worker_source_deployed":False,
