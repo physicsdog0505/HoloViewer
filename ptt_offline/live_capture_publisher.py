@@ -79,12 +79,36 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
     chronological_raw=[dict(zip(keys,record)) for record in reversed(raw[:max_rows])]
     floor_by_line={}
     floor_authoritative=False
+    floor_coverage_start=None
+    floor_coverage_end=None
+    floor_coverage_gaps=[]
     source_lines=[row["source_line"] for row in chronological_raw]
-    source_pages=[row["source_page"] for row in chronological_raw]
+    # Pushes need not begin on PTT page 1: the article body can occupy the
+    # first page(s). Authority therefore comes from Collector's captured
+    # article-line coverage, not min(push.source_page).
+    has_screens=db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='article_screens'"
+    ).fetchone() is not None
+    if has_screens:
+        screen_ranges=db.execute("""
+            SELECT start_line,end_line FROM article_screens
+            WHERE article_id=? ORDER BY start_line,end_line
+        """,(article_id,)).fetchall()
+        if screen_ranges:
+            floor_coverage_start=screen_ranges[0][0]
+            merged_end=screen_ranges[0][1]
+            for start,end in screen_ranges[1:]:
+                if start>merged_end+1:
+                    floor_coverage_gaps.append([merged_end+1,start-1])
+                merged_end=max(merged_end,end)
+            floor_coverage_end=merged_end
+    latest_push=max(source_lines,default=None)
     if (not truncated and chronological_raw and
         all(type(line) is int and line>0 for line in source_lines) and
         source_lines==sorted(source_lines) and len(source_lines)==len(set(source_lines)) and
-        all(type(page) is int and page>=1 for page in source_pages) and min(source_pages)==1):
+        floor_coverage_start==1 and not floor_coverage_gaps and
+        type(floor_coverage_end) is int and latest_push is not None and
+        floor_coverage_end>=latest_push):
         floor_by_line={row["source_line"]:index for index,row in enumerate(chronological_raw,start=1)}
         floor_authoritative=True
     recovered_by_line={}
@@ -129,6 +153,8 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
     return {"status":"READY","aid":receipt["aid"],"url":url,
             "source_identity":source_identity,"candidate_rows":ready,
             "floor_authoritative":floor_authoritative,"floor_by_source_line":floor_by_line,
+            "floor_coverage_start":floor_coverage_start,"floor_coverage_end":floor_coverage_end,
+            "floor_coverage_gaps":floor_coverage_gaps,
             "pending_source_lines":pending,"checked_source_rows":len(raw),
             "scan_truncated":truncated,
             "earliest_scanned_source_line":min((r[0] for r in raw[:max_rows]),default=None),
