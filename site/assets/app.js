@@ -1340,9 +1340,10 @@ document.getElementById('start').onclick=()=>{
   if(!items.length){alert('請先加入至少一個影片。');return;}
   const q=new URLSearchParams();items.forEach(v=>q.append('stream',v));
   q.set('layout',items.length===1?'equal':document.getElementById('layout').value);
-  const pttMode=document.getElementById('pttMode').value;
+  const selectedHistory=items.length>0&&items.every(id=>historyVodWindows.has(id));
+  const pttMode=selectedHistory?'video':document.getElementById('pttMode').value;
   q.set('ptt',pttMode);
-  if(pttMode==='video')items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)));
+  if(selectedHistory)items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)));
   q.set('primary',String(Math.max(0,items.indexOf(primaryId))));
   q.set('audio',String(Math.max(0,items.indexOf(audioId))));
   q.set('mode',items.length>1?'multi':'single');
