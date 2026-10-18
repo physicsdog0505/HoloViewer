@@ -173,15 +173,16 @@ test('Today LIMIT explicitly reports truncation, retaining title and source for 
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
  const x=await readToday(d,{day:'2026-10-15',limit:200,now:new Date('2026-10-15T12:00:00Z')});
  assert.equal(x.streams.length,200);assert.equal(x.completeness.limited,true);assert.equal(x.completeness.gap,true);
- assert.equal(x.streams[0].source_label,'YouTube');
+ assert.equal(x.streams[0].source_label,YOUTUBE_LIVE_SOURCE);
  d.close();
 });
-test('accepted 20-minute item freshness status at 19, 21 and 31 minutes',async()=>{
+test('accepted live freshness is visible through 20 minutes and absent after',async()=>{
  const d=db();await writeEvidence(d,fixture({observed:'2026-10-15T12:00:00Z'}));
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
- for(const [minutes,expected] of [[19,'live'],[21,'stale'],[31,'stale']]){
+ for(const [minutes,count] of [[19,1],[20,1],[21,0],[31,0]]){
   const x=await readToday(d,{day:'2026-10-15',now:new Date(Date.parse('2026-10-15T12:00:00Z')+minutes*60000)});
-  assert.equal(x.streams[0].lifecycle_state,expected);
+  assert.equal(x.streams.length,count,String(minutes));
+  if(count)assert.equal(x.streams[0].lifecycle_state,'live');
  }
  d.close();
 });
@@ -200,11 +201,11 @@ test('offset paging surfaces older highlight candidates instead of silently drop
  await assert.rejects(()=>readToday(d,{day:'2026-10-15',offset:10001}),/offset/);
  d.close();
 });
-test('overnight Home reads previous day until 05:59 Taipei but not after 06:00',async()=>{
+test('prior-day ended Home grace lasts until 11:59:59 Taipei and ends at noon',async()=>{
  const d=db();
  await writeEvidence(d,{...fixture({id:'oldnight001',state:'ended',observed:'2026-10-15T15:57:00Z',end:'2026-10-15T15:56:00Z'}),actual_start:'2026-10-15T15:00:00Z',scheduled_start:'2026-10-15T15:00:00Z'});
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T16:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
- for(const [time,count] of [['2026-10-15T16:15:00Z',1],['2026-10-15T21:59:00Z',1],['2026-10-15T22:00:00Z',0]]){
+ for(const [time,count] of [['2026-10-15T16:15:00Z',1],['2026-10-16T03:59:59Z',1],['2026-10-16T04:00:00Z',0]]){
   const x=await readToday(d,{day:'2026-10-16',now:new Date(time)});
   assert.equal(x.streams.length,count,time);
  }
@@ -371,23 +372,23 @@ test('Today projection never exposes untrusted actual bounds as authoritative',a
 test('trusted ended evidence is idempotently projected into recent public_history',async()=>{
  const d=db();
  const ended={
-  ...fixture({id:'recenthist01',state:'ended',observed:'2026-10-18T05:00:00Z',end:'2026-10-18T04:49:00Z'}),
+  ...fixture({id:'recenthis01',state:'ended',observed:'2026-10-18T05:00:00Z',end:'2026-10-18T04:49:00Z'}),
   scheduled_start:'2026-10-18T03:15:00Z',
   actual_start:'2026-10-18T03:15:53Z',
   actual_end:'2026-10-18T04:49:00Z',
   source_label:YOUTUBE_LIVE_SOURCE
  };
  await writeEvidence(d,ended);
- const row=d.raw.prepare('SELECT * FROM public_history WHERE video_id=?').get('recenthist01');
+ const row=d.raw.prepare('SELECT * FROM public_history WHERE video_id=?').get('recenthis01');
  assert.equal(row.taipei_day,'2026-10-18');
  assert.equal(row.actual_start,'2026-10-18T03:15:53Z');
  assert.equal(row.actual_end,'2026-10-18T04:49:00Z');
  assert.equal(row.source_revision,HISTORY_SOURCE_REVISION);
- assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthist01').n,1);
+ assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthis01').n,1);
  const newer={...ended,observed_at:'2026-10-18T05:05:00Z'};
  await writeEvidence(d,newer);
- assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthist01').n,1);
- assert.equal(d.raw.prepare('SELECT published_at FROM public_history WHERE video_id=?').get('recenthist01').published_at,'2026-10-18T05:05:00Z');
+ assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthis01').n,1);
+ assert.equal(d.raw.prepare('SELECT published_at FROM public_history WHERE video_id=?').get('recenthis01').published_at,'2026-10-18T05:05:00Z');
  d.close();
 });
 
