@@ -687,6 +687,14 @@ document.querySelectorAll('[data-page-link]').forEach(link=>link.addEventListene
 let customCatalogCache=null;
 const customHistoryCache=new Map();
 let customHistoryLoadInFlight=false;
+function customHistoryBounds(){
+ const today=taipeiDay();
+ return {earliest:shiftDay(today,-30),latest:today};
+}
+function customHistoryDateValid(day){
+ const b=customHistoryBounds();
+ return /^\d{4}-\d{2}-\d{2}$/.test(day)&&day>=b.earliest&&day<=b.latest;
+}
 async function loadCustomLibrary(){
  try{
   if(customCatalogCache===null){
@@ -702,10 +710,10 @@ async function loadCustomLibrary(){
 }
 async function loadCustomHistory(day){
  if(customHistoryLoadInFlight)return;
- const bounds=historyBounds();
+ const bounds=customHistoryBounds();
  const input=$('customHistoryDate');
  input.min=bounds.earliest;input.max=bounds.latest;
- const selected=historyDateValid(day)?day:(historyDateValid(input.value)?input.value:bounds.latest);
+ const selected=customHistoryDateValid(day)?day:(customHistoryDateValid(input.value)?input.value:bounds.latest);
  input.value=selected;
  const empty=$('custom-history-empty');
  if(customHistoryCache.has(selected)){
@@ -715,10 +723,21 @@ async function loadCustomHistory(day){
  customHistoryLoadInFlight=true;
  empty.hidden=false;empty.textContent='讀取 '+selected.replaceAll('-','/')+' 歷史影片中…';
  try{
-  const data=await api('/v1/history?day='+encodeURIComponent(selected)+'&limit=50&offset=0');
-  if(!Array.isArray(data.items))throw Error('資料格式錯誤');
-  customHistoryCache.set(selected,data.items);
-  window.hvCustomHistory?.(data.items,selected);
+  let rows;
+  if(selected===taipeiDay()){
+   if(customCatalogCache===null){
+    const data=await api('/v1/catalog/today');
+    if(!Array.isArray(data.streams||data.items))throw Error('資料格式錯誤');
+    customCatalogCache=data.streams||data.items;
+   }
+   rows=homeBuckets(customCatalogCache).ended;
+  }else{
+   const data=await api('/v1/history?day='+encodeURIComponent(selected)+'&limit=50&offset=0');
+   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
+   rows=data.items;
+  }
+  customHistoryCache.set(selected,rows);
+  window.hvCustomHistory?.(rows,selected);
  }catch(e){
   empty.hidden=false;empty.textContent='無法讀取歷史影片：'+e.message;
  }finally{customHistoryLoadInFlight=false}
@@ -1163,8 +1182,8 @@ document.getElementById('start').onclick=()=>{
 };
 render();
 {
- const bounds=historyBounds(),input=document.getElementById('customHistoryDate');
- input.min=bounds.earliest;input.max=bounds.latest;if(!historyDateValid(input.value))input.value=bounds.latest;
+ const bounds=customHistoryBounds(),input=document.getElementById('customHistoryDate');
+ input.min=bounds.earliest;input.max=bounds.latest;if(!customHistoryDateValid(input.value))input.value=bounds.latest;
 }
 
 function renderCustomLibraryRows(rows,box,empty){
