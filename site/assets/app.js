@@ -99,6 +99,17 @@ function homeSelection(){
   $(bar).hidden=!count;$(countEl).textContent='已選 '+count+' 個影片';$(watch).textContent=count>1?'開始多視角觀看':'觀看選取影片';
  }
 }
+function openStandaloneViewer(ids){
+ const clean=[...new Set(ids.filter(id=>/^[A-Za-z0-9_-]{11}$/.test(String(id||''))))];
+ if(!clean.length)return;
+ const q=new URLSearchParams();
+ clean.forEach(id=>q.append('stream',id));
+ q.set('layout','equal');
+ q.set('primary','0');
+ q.set('audio','0');
+ q.set('mode',clean.length>1?'multi':'single');
+ location.href='/viewer/?'+q.toString();
+}
 
 /* Fallback member accents from pinned 4174 client_home._CHANNEL_ACCENT_RULES.
    Audited member-ID palette should override when the reviewed Public schema exists. */
@@ -215,19 +226,19 @@ function collabEntry(event){
  const streams=collabEventStreams(event);
  if(streams.length<2)return null;
  const entry=node('span',undefined,'stream-collab-entry');
- entry.role='link';entry.tabIndex=0;entry.dataset.collabEventId=String(event.event_id||'');
- entry.setAttribute('aria-label','進入多人連動');entry.title='進入多人連動';
+ entry.dataset.collabEventId=String(event.event_id||'');
+ entry.setAttribute('aria-disabled','true');
+ entry.title='多人連動入口準備中';
  entry.append(node('span','👥','collab-glyph'),node('span','多人','collab-entry-label'));
  entry.querySelector('.collab-glyph').setAttribute('aria-hidden','true');
- entry.onclick=e=>{e.preventDefault();e.stopPropagation();openCollabEvent(event)};
- entry.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();openCollabEvent(event)}};
+ entry.onclick=e=>{e.preventDefault();e.stopPropagation()};
  return entry;
 }
 function homeCard(item,container){
  if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
  const id=item.video_id;const lifecycle=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
  const group=String(item.group||item.channel_group||'other').toLowerCase();
- const href='/custom-view/session?stream='+encodeURIComponent(id)+'&layout=auto&primary=0&audio=0';
+ const href='/viewer/?stream='+encodeURIComponent(id)+'&layout=equal&primary=0&audio=0&mode=single';
  const card=node('a',undefined,'client-card stream-card');card.href=href;card.dataset.group=group;card.id='stream-'+id;
  applyHomeSupportStyle(card,item);
  const states={live:['LIVE','live'],waiting:['等待中','upcoming'],upcoming:['即將開始','upcoming'],ended:['已結束','ended'],unknown:['狀態待更新',''],stale:['狀態待更新','']};
@@ -245,7 +256,7 @@ function homeCard(item,container){
   if(event.target.closest('.stream-collab-entry'))return;
   const source=event.target.closest('[data-youtube-href]');
   if(source){event.preventDefault();event.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer');return}
-  event.preventDefault();if(!card.dataset.multiviewId){window.hvOpenCustomSession?.([id],{layout:'auto',ptt:'video',primary:0,audio:0});return}
+  event.preventDefault();if(!card.dataset.multiviewId){openStandaloneViewer([id]);return}
   if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);homeSelection()
  });
  card.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open(event.target.dataset.youtubeHref,'_blank','noopener,noreferrer')}});
@@ -587,7 +598,7 @@ window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY)applyHo
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
 $('multiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
-$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
+$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openStandaloneViewer(ids)};
 $('ptt-refresh').onclick=event=>{event.preventDefault();loadPtt()};
 $('ptt-focus').onclick=event=>{event.preventDefault();route($('ptt').classList.contains('active')&&document.body.classList.contains('ptt-focus-mode')?'ptt':'ptt-focus')};
 document.querySelectorAll('[data-page-link]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();route(link.dataset.pageLink)}));
