@@ -1,3 +1,5 @@
+import {verifiedChannelAvatar} from './store.mjs';
+import {validateSupportColorExport,supportColorFor} from './support-colors.mjs';
 /** Production legacy read compatibility plus verified Today/recent-history bridge. */
 const videoId=/^[A-Za-z0-9_-]{11}$/;
 const HISTORY_FIELDS='video_id,title,channel_id,channel_name,avatar_url,actual_start,actual_end,scheduled_start,source_revision';
@@ -14,9 +16,19 @@ function trustedBounds(row,trusted){
  const valid=start&&end&&Date.parse(end)>Date.parse(start);
  return {actual_start:valid?start:null,actual_end:valid?end:null,anchor_source:valid?ANCHOR_SOURCE:null};
 }
-function normalizeHistory(row){
+function supportColorJson(env){
+ if(env?.TODAY_SUPPORT_COLORS_JSON)return String(env.TODAY_SUPPORT_COLORS_JSON);
+ const parts=[];
+ for(let i=0;i<16;i++){const v=env?.['TODAY_SUPPORT_COLORS_JSON_'+i];if(v==null){if(i===0)return null;break;}parts.push(String(v));}
+ return parts.length?parts.join(''):null;
+}
+function normalizeHistory(row,colors){
  const bounds=trustedBounds(row,TRUSTED_HISTORY_SOURCES.has(row?.source_revision));
- return {...row,...bounds};
+ const color=supportColorFor(row?.channel_id,colors);
+ return {...row,...bounds,
+  avatar_url:verifiedChannelAvatar(row?.trusted_channel_avatar)??verifiedChannelAvatar(row?.avatar_url),
+  group:['hololive','holostars','mekpark','other'].includes(row?.channel_group)?row.channel_group:'other',
+  ...color};
 }
 export async function legacyHistory(request,env){
  const p=new URL(request.url).searchParams,day=p.get('day')??'';
@@ -24,8 +36,17 @@ export async function legacyHistory(request,env){
  if(!validDay(day)||!decimal(rawLimit,1,50)||!decimal(rawOffset,0,1000000))return response({error:'invalid_history_query'},400,0);
  const limit=Number(rawLimit),offset=Number(rawOffset);
  const count=await env.DB.prepare('SELECT COUNT(*) AS total FROM public_history WHERE taipei_day=?').bind(day).first();
- const rows=await env.DB.prepare('SELECT '+HISTORY_FIELDS+' FROM public_history WHERE taipei_day=? ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT ? OFFSET ?').bind(day,limit,offset).all();
- return response({day,total:count?.total??0,limit,offset,items:(rows.results??[]).map(normalizeHistory)});
+ const profileExpr=env?.TODAY_PROFILES_ENABLED==='true'
+  ? '(SELECT p.avatar_url FROM public_today_channel_profiles p WHERE p.channel_id=h.channel_id ORDER BY p.fetched_at DESC LIMIT 1)'
+  : 'NULL';
+ const rows=await env.DB.prepare(`SELECT h.*,
+   COALESCE(${profileExpr},(SELECT c.avatar_url FROM public_catalog c WHERE c.channel_id=h.channel_id AND c.avatar_url IS NOT NULL ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC LIMIT 1)) AS trusted_channel_avatar,
+   COALESCE((SELECT ac.channel_group FROM public_today_approved_channels ac WHERE ac.channel_id=h.channel_id LIMIT 1),'other') AS channel_group
+   FROM public_history h WHERE h.taipei_day=? ORDER BY COALESCE(h.actual_start,h.scheduled_start) DESC,h.video_id DESC LIMIT ? OFFSET ?`)
+  .bind(day,limit,offset).all();
+ let colors=null;
+ try{const raw=supportColorJson(env);colors=raw?validateSupportColorExport(JSON.parse(raw)):null;}catch{colors=null;}
+ return response({day,total:count?.total??0,limit,offset,items:(rows.results??[]).map(row=>normalizeHistory(row,colors))});
 }
 export async function legacyVideo(request,env){
  const id=new URL(request.url).pathname.split('/').at(-1)??'';
