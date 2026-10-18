@@ -1340,7 +1340,9 @@ document.getElementById('start').onclick=()=>{
   if(!items.length){alert('請先加入至少一個影片。');return;}
   const q=new URLSearchParams();items.forEach(v=>q.append('stream',v));
   q.set('layout',items.length===1?'equal':document.getElementById('layout').value);
-  q.set('ptt',document.getElementById('pttMode').value);
+  const pttMode=document.getElementById('pttMode').value;
+  q.set('ptt',pttMode);
+  if(pttMode==='video')items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)));
   q.set('primary',String(Math.max(0,items.indexOf(primaryId))));
   q.set('audio',String(Math.max(0,items.indexOf(audioId))));
   q.set('mode',items.length>1?'multi':'single');
@@ -1381,6 +1383,12 @@ window.hvCustomHistory=function(rows,day){
   if(at!==null&&bt===null)return -1;
   if(at!==null&&bt!==null&&at!==bt)return bt-at;
   return homeStableId(b).localeCompare(homeStableId(a));
+ });
+ historyRows.forEach(row=>{
+  const window=trustedArchiveWindow(row);
+  if(!window)return;
+  window.scheduledStart=archiveScheduledStart(row,window);
+  historyVodWindows.set(window.videoId,window);
  });
  renderCustomLibraryRows(historyRows,box,empty);
  if(!box.childElementCount){empty.hidden=false;empty.textContent=day.replaceAll('-','/')+' 沒有歷史影片。'}
