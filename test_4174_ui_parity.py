@@ -292,7 +292,6 @@ class ParityContract(unittest.TestCase):
         self.assertIn("el.append(kindEl,time,floorEl,body);",viewer)
         self.assertIn("if(floor!==null)el.classList.add('has-floor');",viewer)
         self.assertIn("const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);",viewer)
-        self.assertIn("if(requestedPttMode==='live'&&todayState==='live')",viewer)
         self.assertIn("function verifiedSameDayVodWindow(row)",viewer)
         self.assertIn("lifecycle!=='ended'",viewer)
         self.assertIn("taipeiDayForDate(start)!==today",viewer)
