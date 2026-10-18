@@ -580,6 +580,15 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.custom-content-grid:has(#stage > .player-card:only-child)',fix)
         self.assertNotIn('viewerPttPanel.remove()',fix)
 
+    def test_custom_history_start_preserves_verified_ptt_windows(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("const historyVodWindows=new Map()",js)
+        self.assertIn("const window=trustedArchiveWindow(row)",js)
+        self.assertIn("window.scheduledStart=archiveScheduledStart(row,window)",js)
+        self.assertIn("historyVodWindows.set(window.videoId,window)",js)
+        self.assertIn("const pttMode=document.getElementById('pttMode').value",js)
+        self.assertIn("if(pttMode==='video')items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)))",js)
+
     def test_vod_ptt_preloads_before_actual_start_when_scheduled_hint_is_missing(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("const anchorMs=hasScheduled?Math.min(startMs,scheduledMs):startMs",viewer)
