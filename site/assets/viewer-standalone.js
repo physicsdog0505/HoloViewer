@@ -26,12 +26,13 @@ function parseArchiveWindows(){
  const map=new Map();
  for(const raw of params.getAll('ptt_window')){
   const parts=String(raw).split('|');
-  if(parts.length!==4)continue;
-  const [videoId,start,end,anchorSource]=parts;
-  const startMs=Date.parse(start),endMs=Date.parse(end);
+  if(parts.length!==4&&parts.length!==5)continue;
+  const [videoId,start,end,anchorSource,scheduledStart='']=parts;
+  const startMs=Date.parse(start),endMs=Date.parse(end),scheduledMs=Date.parse(scheduledStart);
   if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)||anchorSource!==PTT_ARCHIVE_ANCHOR||
      !Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)continue;
-  map.set(videoId,{videoId,start,end,anchorSource});
+  map.set(videoId,{videoId,start,end,anchorSource,
+   scheduledStart:Number.isFinite(scheduledMs)&&scheduledMs<=startMs?scheduledStart:''});
  }
  return map;
 }
@@ -82,6 +83,7 @@ let pttVodRows=[];
 let pttVodVisibleCount=0;
 let pttVodPollTimer=null;
 let pttVodLastSample=null;
+let pttVodHasPlayed=false;
 let confirmedLiveIds=new Set();
 let draggedLiveId='';
 let collabEvent=null;
@@ -557,7 +559,10 @@ function syncPlayers(state,sourceIndex){
  });
 }
 function handlePlayerStateChange(player,state){
- if(players[primaryIndex]===player&&pttVodMode())syncVodPttTimeline();
+ if(players[primaryIndex]===player&&pttVodMode()){
+  if(state===YT.PlayerState.PLAYING)pttVodHasPlayed=true;
+  syncVodPttTimeline();
+ }
  if(state!==YT.PlayerState.PLAYING&&state!==YT.PlayerState.PAUSED)return;
  const expected=syncExpected.get(player);
  if(expected&&Date.now()<expected.until&&expected.state===state){
@@ -1033,16 +1038,26 @@ function pttTimelineClock(ms){
  if(!Number.isFinite(date.getTime()))return '';
  return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(date);
 }
-function pttVodPlaybackMs(){
- if(!pttVodMode())return null;
- const startMs=Date.parse(String(pttContext.start||''));
- if(!Number.isFinite(startMs))return null;
- let seconds=null;
- try{seconds=players[primaryIndex]?.getCurrentTime?.()}catch{}
- if(!Number.isFinite(seconds))return null;
- const endMs=Date.parse(String(pttContext.end||''));
+function vodPttCutoffMs(context,seconds,hasPlayed){
+ const startMs=Date.parse(String(context?.start||''));
+ if(!Number.isFinite(startMs)||!Number.isFinite(seconds))return null;
+ const scheduledMs=Date.parse(String(context?.scheduledStart||''));
+ if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&scheduledMs<=startMs)return scheduledMs;
+ const endMs=Date.parse(String(context?.end||''));
  const raw=startMs+Math.max(0,seconds)*1000;
  return Number.isFinite(endMs)?Math.min(raw,endMs):raw;
+}
+function vodPttFetchStartMs(context){
+ const startMs=Date.parse(String(context?.start||''));
+ const scheduledMs=Date.parse(String(context?.scheduledStart||''));
+ if(!Number.isFinite(startMs))return null;
+ return Number.isFinite(scheduledMs)&&scheduledMs<=startMs?Math.min(startMs,scheduledMs-3600000):startMs;
+}
+function pttVodPlaybackMs(){
+ if(!pttVodMode())return null;
+ let seconds=null;
+ try{seconds=players[primaryIndex]?.getCurrentTime?.()}catch{}
+ return vodPttCutoffMs(pttContext,seconds,pttVodHasPlayed);
 }
 function pttToLatest(){
  if(pttVodMode())syncVodPttTimeline({forceFollow:true});
@@ -1058,6 +1073,7 @@ function resetPttFeed(){
  pttVodRows=[];
  pttVodVisibleCount=0;
  pttVodLastSample=null;
+ pttVodHasPlayed=false;
  pttFeed.replaceChildren();
 }
 function showPttUnavailable(message,meta='無可用專串'){
@@ -1190,10 +1206,11 @@ async function loadSameDayVodPtt(context,token){
   if(token!==pttResolveToken)return;
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw new Error('資料格式錯誤');
   const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
+  const fetchStartMs=vodPttFetchStartMs(context)??startMs;
   const rows=data.pushes.filter(row=>{
    if(!row||typeof row.content!=='string')return false;
    const occurred=Date.parse(String(row.occurred_at||''));
-   return Number.isFinite(occurred)&&occurred>=startMs&&occurred<endMs;
+   return Number.isFinite(occurred)&&occurred>=fetchStartMs&&occurred<endMs;
   });
   const seen=new Set(),deduped=[];
   for(const row of rows){
@@ -1297,15 +1314,16 @@ async function resolveArchiveRows(context,manifest){
  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
  if(context.anchorSource!==PTT_ARCHIVE_ANCHOR||!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)
   throw new Error('缺少可信的 YouTube actualStartTime / actualEndTime');
+ const fetchStartMs=vodPttFetchStartMs(context)??startMs;
  const objects=new Map(manifest.objects.map(item=>[item.key,item]));
  const rows=[];
- for(const key of archiveHourKeys(startMs,endMs)){
+ for(const key of archiveHourKeys(fetchStartMs,endMs)){
   const item=objects.get(key);
   if(!item)continue;
   const pushes=await fetchArchiveChunk(item);
   for(const row of pushes){
    const occurred=Date.parse(String(row?.occurred_at||''));
-   if(Number.isFinite(occurred)&&occurred>=startMs&&occurred<endMs)rows.push(row);
+   if(Number.isFinite(occurred)&&occurred>=fetchStartMs&&occurred<endMs)rows.push(row);
   }
  }
  const seen=new Set(),deduped=[];
@@ -1373,6 +1391,7 @@ async function resolvePrimaryPtt(){
    return;
   }
   pttContext={mode:'archive',videoId:id,start:archiveWindow.start,end:archiveWindow.end,
+              scheduledStart:archiveWindow.scheduledStart||'',
               day:taipeiDayForDate(archiveWindow.start),anchorSource:archiveWindow.anchorSource};
   updateUrl();
   await loadArchivePtt(pttContext,token);
@@ -1398,6 +1417,7 @@ async function resolvePrimaryPtt(){
   const sameDayWindow=verifiedSameDayVodWindow(row);
   if(sameDayWindow){
    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
+               scheduledStart:String(row?.scheduled_start||''),
                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
    updateUrl();
    await loadSameDayVodPtt(pttContext,token);
@@ -1418,6 +1438,7 @@ async function resolvePrimaryPtt(){
    const sameDayWindow=verifiedSameDayVodWindow(todayRow);
    if(requestedPttMode==='live'&&sameDayWindow){
     pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
+                scheduledStart:String(todayRow?.scheduled_start||''),
                 day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
     updateUrl();
     await loadSameDayVodPtt(pttContext,token);
