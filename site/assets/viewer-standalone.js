@@ -78,6 +78,10 @@ let pttFollowing=true;
 let pttLoaded=false;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
+let pttVodRows=[];
+let pttVodVisibleCount=0;
+let pttVodPollTimer=null;
+let pttVodLastSample=null;
 let confirmedLiveIds=new Set();
 let draggedLiveId='';
 let collabEvent=null;
@@ -553,6 +557,7 @@ function syncPlayers(state,sourceIndex){
  });
 }
 function handlePlayerStateChange(player,state){
+ if(players[primaryIndex]===player&&pttVodMode())syncVodPttTimeline();
  if(state!==YT.PlayerState.PLAYING&&state!==YT.PlayerState.PAUSED)return;
  const expected=syncExpected.get(player);
  if(expected&&Date.now()<expected.until&&expected.state===state){
@@ -572,6 +577,7 @@ function mountPlayerAt(index,autoplay=false,seekSeconds=null){
   events:{
    onReady:event=>{
     if(Number.isFinite(seekSeconds)){try{event.target.seekTo(Math.max(0,seekSeconds),true)}catch{}}
+    if(index===primaryIndex&&pttVodMode())setTimeout(()=>syncVodPttTimeline({forceFollow:true}),0);
     if(autoplay){
      try{if(index!==audioMaster)event.target.mute()}catch{}
      try{event.target.playVideo()}catch{}
@@ -1021,11 +1027,37 @@ pttShowFloor.addEventListener('change',()=>setPttFloorVisible(pttShowFloor.check
 setPttFloorVisible(false);
 
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
-function pttToLatest(){pttFeed.scrollTop=pttFeed.scrollHeight;pttNewest.hidden=true;pttFollowing=true}
+function pttVodMode(){return pttContext.mode==='archive'||pttContext.mode==='same-day'}
+function pttTimelineClock(ms){
+ const date=new Date(ms);
+ if(!Number.isFinite(date.getTime()))return '';
+ return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(date);
+}
+function pttVodPlaybackMs(){
+ if(!pttVodMode())return null;
+ const startMs=Date.parse(String(pttContext.start||''));
+ if(!Number.isFinite(startMs))return null;
+ let seconds=null;
+ try{seconds=players[primaryIndex]?.getCurrentTime?.()}catch{}
+ if(!Number.isFinite(seconds))return null;
+ const endMs=Date.parse(String(pttContext.end||''));
+ const raw=startMs+Math.max(0,seconds)*1000;
+ return Number.isFinite(endMs)?Math.min(raw,endMs):raw;
+}
+function pttToLatest(){
+ if(pttVodMode())syncVodPttTimeline({forceFollow:true});
+ pttFeed.scrollTop=pttFeed.scrollHeight;
+ pttNewest.hidden=true;
+ pttFollowing=true;
+}
 function resetPttFeed(){
  pttLoaded=false;
  pttFollowing=true;
  pttNewest.hidden=true;
+ pttNewest.textContent='最新';
+ pttVodRows=[];
+ pttVodVisibleCount=0;
+ pttVodLastSample=null;
  pttFeed.replaceChildren();
 }
 function showPttUnavailable(message,meta='無可用專串'){
@@ -1076,6 +1108,70 @@ async function loadTodayPttPayload(day){
  try{return await api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=1000')}
  catch{return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300')}
 }
+function setVodPttRows(rows){
+ pttVodRows=(Array.isArray(rows)?rows:[]).filter(row=>row&&typeof row.content==='string').slice().sort((a,b)=>
+  Date.parse(String(a.occurred_at||''))-Date.parse(String(b.occurred_at||''))||
+  String(pttKey(a)).localeCompare(String(pttKey(b))));
+ pttVodVisibleCount=0;
+ pttVodLastSample=null;
+ pttFeed.replaceChildren();
+}
+function syncVodPttTimeline({forceFollow=false}={}){
+ if(!pttVodMode()||!pttLoaded)return;
+ const absoluteMs=pttVodPlaybackMs();
+ if(!Number.isFinite(absoluteMs))return;
+ const now=performance.now();
+ let seeked=forceFollow;
+ if(pttVodLastSample){
+  const elapsed=Math.max(0,now-pttVodLastSample.wallMs)/1000;
+  const expected=pttVodLastSample.seconds+(pttVodLastSample.playing?elapsed:0);
+  const currentSeconds=Math.max(0,(absoluteMs-Date.parse(pttContext.start))/1000);
+  if(currentSeconds<pttVodLastSample.seconds-.75||Math.abs(currentSeconds-expected)>2.5)seeked=true;
+ }
+ let playing=false;
+ try{playing=players[primaryIndex]?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{}
+ const currentSeconds=Math.max(0,(absoluteMs-Date.parse(pttContext.start))/1000);
+ pttVodLastSample={seconds:currentSeconds,wallMs:now,playing};
+
+ let visible=0;
+ while(visible<pttVodRows.length){
+  const occurred=Date.parse(String(pttVodRows[visible]?.occurred_at||''));
+  if(!Number.isFinite(occurred)||occurred>absoluteMs)break;
+  visible++;
+ }
+ if(visible!==pttVodVisibleCount){
+  if(visible>pttVodVisibleCount){
+   const fragment=document.createDocumentFragment();
+   for(let i=pttVodVisibleCount;i<visible;i++)fragment.append(pttRow(pttVodRows[i]));
+   if(pttFeed.querySelector('.ptt-empty'))pttFeed.replaceChildren();
+   pttFeed.append(fragment);
+  }else{
+   pttFeed.replaceChildren(...pttVodRows.slice(0,visible).map(pttRow));
+  }
+  pttVodVisibleCount=visible;
+ }
+ if(!visible&&!pttFeed.children.length){
+  pttFeed.replaceChildren(node('div','目前播放位置之前尚無 PTT 推文。','ptt-empty'));
+ }
+ const clock=pttTimelineClock(absoluteMs);
+ pttNewest.textContent=clock?'最新 · '+clock:'最新';
+ if(seeked){
+  pttFollowing=true;
+  requestAnimationFrame(pttToLatest);
+ }else if(pttFollowing||pttAtBottom()){
+  requestAnimationFrame(()=>{
+   pttFeed.scrollTop=pttFeed.scrollHeight;
+   pttNewest.hidden=true;
+  });
+ }else{
+  pttNewest.hidden=false;
+ }
+}
+function startVodPttTimeline(){
+ clearInterval(pttVodPollTimer);
+ pttVodPollTimer=setInterval(()=>syncVodPttTimeline(),500);
+ syncVodPttTimeline({forceFollow:true});
+}
 async function loadSameDayVodPtt(context,token){
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 今日專串';
@@ -1096,10 +1192,11 @@ async function loadSameDayVodPtt(context,token){
    if(!key||seen.has(key))continue;
    seen.add(key);deduped.push(row);
   }
-  pttFeed.replaceChildren(...deduped.map(pttRow));
-  pttLoaded=true;pttFollowing=false;pttNewest.hidden=true;pttFeed.scrollTop=0;
-  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+deduped.length+' 則 · 今日暫存 · ⚠ 尚未封存，不宣稱完整';
+  setVodPttRows(deduped);
+  pttLoaded=true;pttFollowing=true;pttNewest.hidden=true;
+  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+deduped.length+' 則 · 今日暫存 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整';
   if(!deduped.length)pttFeed.replaceChildren(node('div','這段今日 VOD 時間範圍內目前沒有可顯示的 PTT 推文；資料尚未封存。','ptt-empty'));
+  startVodPttTimeline();
  }catch(error){
   if(token!==pttResolveToken)return;
   pttMeta.textContent=context.day.replaceAll('-','/')+' · 今日暫存 · 讀取失敗';
@@ -1231,18 +1328,18 @@ async function loadArchivePtt(context,token){
    }
   }
   if(token!==pttResolveToken||!result)return;
-  pttFeed.replaceChildren(...result.rows.map(pttRow));
+  setVodPttRows(result.rows);
   pttLoaded=true;
-  pttFollowing=false;
+  pttFollowing=true;
   pttNewest.hidden=true;
-  pttFeed.scrollTop=0;
   const dayLabel=result.coverageDays.length?result.coverageDays.join('～'):(context.day||'').replaceAll('-','/');
   const warning=result.coverageStatus==='COMPLETE'
    ?'完整涵蓋'
    :'⚠ '+result.coverageStatus+' · 資料可能不完整';
-  pttMeta.textContent=dayLabel+' · '+result.rows.length+' 則 · VOD · '+warning;
+  pttMeta.textContent=dayLabel+' · '+result.rows.length+' 則 · VOD · 對齊播放時間 · '+warning;
   if(!result.rows.length)pttFeed.replaceChildren(node('div',
    result.coverageStatus==='COMPLETE'?'這段 VOD 時間範圍內沒有 PTT 推文。':'這段 VOD 沒有可顯示推文；歷史涵蓋狀態為 '+result.coverageStatus+'。','ptt-empty'));
+  startVodPttTimeline();
  }catch(error){
   if(token!==pttResolveToken)return;
   pttMeta.textContent='歷史 Static Assets · 讀取失敗';
@@ -1250,6 +1347,7 @@ async function loadArchivePtt(context,token){
  }
 }
 async function resolvePrimaryPtt(){
+ clearInterval(pttVodPollTimer);pttVodPollTimer=null;
  const stream=streams[primaryIndex];
  if(!stream){showPttUnavailable('沒有可判定的影片。');return}
  const token=++pttResolveToken;
@@ -1414,6 +1512,10 @@ pttFontSize.addEventListener('input',()=>{
 pttFeed.addEventListener('scroll',()=>{
  pttFollowing=pttAtBottom();
  pttNewest.hidden=pttFollowing;
+ if(!pttFollowing&&pttVodMode()){
+  const ms=pttVodPlaybackMs(),clock=pttTimelineClock(ms);
+  pttNewest.textContent=clock?'最新 · '+clock:'最新';
+ }
 },{passive:true});
 pttFeed.addEventListener('wheel',event=>{if(event.deltaY<0)pttFollowing=false},{passive:true});
 pttFeed.addEventListener('dblclick',event=>{
@@ -1432,7 +1534,7 @@ window.addEventListener('blur',()=>{
  clearTimeout(callWaveTimer);callWaveTimer=null;callHeldDirection='';callSpaceHeld=false;callClearMotion();callUpdateHud('待機');
 });
 window.addEventListener('pagehide',()=>{
- clearInterval(collabPollTimer);clearInterval(collabVodTimer);
+ clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);
 });
 document.addEventListener('fullscreenchange',()=>{
  const on=Boolean(document.fullscreenElement);
