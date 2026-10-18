@@ -15,6 +15,7 @@ let watchMode=params.get('mode')==='multi'||streams.length>1?'multi':'single';
 const requestedPttMode=params.get('ptt')||'live';
 const collabEventId=String(params.get('collab_event')||'');
 const collabKind=['live','vod'].includes(params.get('collab_kind'))?params.get('collab_kind'):'';
+const collabDay=/^\d{4}-\d{2}-\d{2}$/.test(String(params.get('collab_day')||''))?String(params.get('collab_day')):'';
 const collabManaged=Boolean(collabEventId&&collabKind);
 
 const stage=document.getElementById('stage');
@@ -146,6 +147,7 @@ function updateUrl(){
  if(collabManaged){
   q.set('collab_event',collabEventId);
   q.set('collab_kind',collabKind);
+  if(collabDay)q.set('collab_day',collabDay);
  }
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
@@ -546,7 +548,7 @@ function applyCollabEvent(event){
 async function fetchCollabEvent(){
  if(!collabManaged)return null;
  try{
-  const data=await api('/v1/collab/events/'+encodeURIComponent(collabEventId));
+  const data=await api('/v1/collab/events/'+encodeURIComponent(collabEventId)+(collabDay?'?day='+encodeURIComponent(collabDay):''));
   return data?.event||null;
  }catch{
   try{
