@@ -611,7 +611,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''",viewer)
         self.assertIn("function vodPttCutoffMs(context,seconds,hasPlayed)",viewer)
         self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000)return scheduledMs",viewer)
-        self.assertIn("scheduledMs-3600000",viewer)
+        self.assertIn("return anchorMs-3600000",viewer)
         self.assertIn("if(state===YT.PlayerState.PLAYING)pttVodHasPlayed=true",viewer)
         self.assertIn("scheduledStart:archiveWindow.scheduledStart||''",viewer)
         helper_start=viewer.index("function vodPttCutoffMs(context,seconds,hasPlayed){")
