@@ -577,8 +577,14 @@ class ParityContract(unittest.TestCase):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("function pttVodPlaybackMs()",viewer)
         self.assertIn("const raw=startMs+Math.max(0,seconds)*1000",viewer)
+        self.assertIn("function vodPttVisibleCountAt(rows,absoluteMs)",viewer)
         self.assertIn("function syncVodPttTimeline({forceFollow=false}={})",viewer)
-        self.assertIn("occurred>absoluteMs",viewer)
+        helper_start=viewer.index("function vodPttVisibleCountAt(rows,absoluteMs){")
+        helper_end=viewer.index("function setVodPttRows(rows){",helper_start)
+        helper=viewer[helper_start:helper_end]
+        script=helper+"\nconst rows=[{occurred_at:'2026-10-18T08:14:59Z'},{occurred_at:'2026-10-18T08:15:00Z'},{occurred_at:'2026-10-18T08:15:01Z'}];process.stdout.write(String(vodPttVisibleCountAt(rows,Date.parse('2026-10-18T08:15:00Z'))));"
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        self.assertEqual(result.stdout,'2')
         self.assertIn("if(visible>pttVodVisibleCount)",viewer)
         self.assertIn("pttFeed.replaceChildren(...pttVodRows.slice(0,visible).map(pttRow))",viewer)
         self.assertIn("currentSeconds<pttVodLastSample.seconds-.75",viewer)
