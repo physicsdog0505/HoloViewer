@@ -261,6 +261,7 @@ function openStandaloneCollab(event){
  q.set('collab_event',String(event.event_id||''));
  q.set('collab_kind',isLive?'live':'vod');
  if(!isLive){
+  if(event?.sync?.available===true)q.set('collab_sync','verified');
   for(const row of roster){
    const window=trustedArchiveWindow(row);
    if(window)appendArchiveWindow(q,window);
