@@ -57,19 +57,20 @@ function pttRow(row){
  push.dataset.pushId=pushKey(row);
  const kind=String(row.kind||'→');
  const kindEl=node('div',kind,'ptt-push-kind '+(kind==='噓'?'kind-boo':kind==='→'?'kind-arrow':''));
- const meta=node('div',undefined,'ptt-push-meta');
  const when=new Date(String(row.occurred_at||''));
+ const timeEl=node('time','--:--','ptt-push-time');
  if(Number.isFinite(when.getTime())){
-  const label=new Intl.DateTimeFormat('zh-TW',{
+  timeEl.textContent=new Intl.DateTimeFormat('zh-TW',{
    timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false
   }).format(when);
-  meta.append(node('time',label,'ptt-push-time'));
  }
- if(Number.isInteger(row.floor)&&row.floor>0)meta.append(node('span',row.floor+'樓','ptt-push-floor'));
+ const floorValue=Number.isInteger(row.floor)&&row.floor>0?row.floor:null;
+ const floorEl=node('span',floorValue===null?'':floorValue+'樓','ptt-push-floor');
+ if(floorValue===null)floorEl.setAttribute('aria-hidden','true');
  const body=node('div',undefined,'ptt-push-body');
  body.append(node('span',String(row.author||'unknown')+':','ptt-push-author'));
  body.append(node('span',String(row.content||''),'ptt-push-content'));
- push.append(kindEl,meta,body);
+ push.append(kindEl,timeEl,floorEl,body);
  if(row.source_url){
   push.title='點兩下開啟 PTT 原文';
   push.addEventListener('dblclick',()=>window.open(String(row.source_url),'_blank','noopener,noreferrer'));
