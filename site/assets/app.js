@@ -421,8 +421,12 @@ function homeBuckets(rows){
  const buckets={live:[],upcoming:[],unknown:[],ended:[]};
  rows.forEach(item=>{
   const state=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
-  const bucket=state==='live'?'live':['waiting','upcoming'].includes(state)?'upcoming':state==='ended'?'ended':'unknown';
-  buckets[bucket].push(item);
+  if(state==='live')buckets.live.push(item);
+  else if(['waiting','upcoming'].includes(state))buckets.upcoming.push(item);
+  else if(state==='ended')buckets.ended.push(item);
+  // Public Home intentionally suppresses unknown/stale/unrecognized lifecycle
+  // states. The source row remains in catalog data and reappears automatically
+  // when a later refresh resolves it to live/upcoming/ended.
  });
  const chronological=(a,b)=>{
   const at=homeStartTimestamp(a),bt=homeStartTimestamp(b);
