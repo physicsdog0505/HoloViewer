@@ -256,21 +256,21 @@ function callPulseChest(){
  if(!callOverlay)return;
  const hands=callOverlay.querySelector('.call-hands');
  hands?.animate([
-  {transform:'translateX(-50%) translateY(0) scale(1)'},
-  {transform:'translateX(-50%) translateY(3%) scale(.97)',offset:.36},
-  {transform:'translateX(-50%) translateY(-2%) scale(1.015)',offset:.62},
-  {transform:'translateX(-50%) translateY(0) scale(1)'}
+  {transform:'translate(-50%,0) scale(1)'},
+  {transform:'translate(-50%,5%) scale(.98)',offset:.34},
+  {transform:'translate(-50%,-4%) scale(1.02)',offset:.62},
+  {transform:'translate(-50%,0) scale(1)'}
  ],{duration:Math.max(180,callBeatMs*.72),easing:'cubic-bezier(.22,.8,.3,1)'});
 }
 function callFlickUp(){
  if(!callOverlay)return;
  const hands=callOverlay.querySelector('.call-hands');
  hands?.animate([
-  {transform:'translateX(-50%) translateY(0) rotate(0)'},
-  {transform:'translateX(-50%) translateY(-24%) rotate(0)',offset:.58},
-  {transform:'translateX(-50%) translateY(-18%) rotate(0)',offset:.76},
-  {transform:'translateX(-50%) translateY(0) rotate(0)'}
- ],{duration:Math.max(260,callBeatMs),easing:'cubic-bezier(.18,.78,.24,1)'});
+  {transform:'translate(-50%,0) rotate(0)'},
+  {transform:'translate(-50%,-68%) rotate(0)',offset:.56},
+  {transform:'translate(-50%,-60%) rotate(0)',offset:.74},
+  {transform:'translate(-50%,0) rotate(0)'}
+ ],{duration:Math.max(300,callBeatMs),easing:'cubic-bezier(.16,.82,.24,1)'});
  callUpdateHud('上甩');
 }
 function callSetSideMotion(direction,mode){
@@ -293,7 +293,7 @@ function callDirectionDown(direction,now=performance.now()){
   if(callEnabled&&callHeldDirection===direction&&performance.now()-callDirectionStartedAt>=callBeatMs*1.9){
    callSetSideMotion(direction,'wave');
   }
- },Math.max(160,callBeatMs*2));
+ },Math.max(160,callBeatMs*1.92));
 }
 function callDirectionUp(direction){
  if(callHeldDirection!==direction)return;
