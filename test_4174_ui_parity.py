@@ -225,6 +225,24 @@ class ParityContract(unittest.TestCase):
         self.assertIn("location.href='/viewer/?'+q.toString();", js)
         self.assertIn("if(event.target.closest('.stream-collab-entry'))return", js)
 
+    def test_viewer_resolves_ptt_source_from_lifecycle_not_entry_mode(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("function verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("pttMeta.textContent='判定影片狀態中'",viewer)
+        self.assertIn("const row=await api('/v1/catalog/videos/'+encodeURIComponent(id))",viewer)
+        self.assertIn("if(lifecycle==='live')",viewer)
+        self.assertIn("if(lifecycle==='ended')",viewer)
+        self.assertIn("const sameDayWindow=verifiedSameDayVodWindow(row)",viewer)
+        self.assertIn("const archiveWindow=verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("archiveWindows.set(id,cached)",viewer)
+        self.assertIn("await loadSameDayVodPtt(pttContext,token)",viewer)
+        self.assertIn("await loadArchivePtt(pttContext,token)",viewer)
+        self.assertIn("const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode)",viewer)
+        resolver=viewer.split("async function resolvePrimaryPtt(){",1)[1].split("async function loadPtt(){",1)[0]
+        self.assertNotIn("if(archiveVodEntry)",resolver)
+        self.assertNotIn("requestedPttMode==='live'&&todayState==='live'",resolver)
+        self.assertNotIn("歷史 VOD 請由 History 提供 verified window",resolver)
+
     def test_vod_history_ptt_uses_static_assets_and_verified_windows(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
