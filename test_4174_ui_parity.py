@@ -580,13 +580,28 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.custom-content-grid:has(#stage > .player-card:only-child)',fix)
         self.assertNotIn('viewerPttPanel.remove()',fix)
 
+    def test_vod_ptt_preloads_before_actual_start_when_scheduled_hint_is_missing(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("const anchorMs=hasScheduled?Math.min(startMs,scheduledMs):startMs",viewer)
+        self.assertIn("return anchorMs-3600000",viewer)
+        self.assertIn("Math.abs(scheduledMs-startMs)<=43200000",viewer)
+        helper_start=viewer.index("function vodPttFetchStartMs(context){")
+        helper_end=viewer.index("function pttVodPlaybackMs(){",helper_start)
+        helper=viewer[helper_start:helper_end]
+        script=helper+"\nprocess.stdout.write(JSON.stringify([vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:''}),vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:'2026-10-17T06:00:00Z'}),vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:'2026-10-17T06:01:00Z'})]));"
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        values=json.loads(result.stdout)
+        self.assertEqual(values[0],1792209612000)
+        self.assertEqual(values[1],1792209600000)
+        self.assertEqual(values[2],1792209612000)
+
     def test_vod_ptt_preloads_scheduled_start_before_first_play(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("parts.length!==4&&parts.length!==5",viewer)
-        self.assertIn("scheduledStart:Number.isFinite(scheduledMs)&&scheduledMs<=startMs?scheduledStart:''",viewer)
+        self.assertIn("scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''",viewer)
         self.assertIn("function vodPttCutoffMs(context,seconds,hasPlayed)",viewer)
-        self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&scheduledMs<=startMs)return scheduledMs",viewer)
+        self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000)return scheduledMs",viewer)
         self.assertIn("scheduledMs-3600000",viewer)
         self.assertIn("if(state===YT.PlayerState.PLAYING)pttVodHasPlayed=true",viewer)
         self.assertIn("scheduledStart:archiveWindow.scheduledStart||''",viewer)
