@@ -83,7 +83,16 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("const aVerified=ae!==null,bVerified=be!==null", js)
         self.assertIn("if(aVerified!==bVerified)return aVerified?-1:1", js)
         self.assertIn("const data=await api('/v1/catalog/today');", js)
-        self.assertNotIn("const [data,collabData]=await Promise.all", js)
+        # Home must render Today before optional Collab enrichment; History may
+        # fetch its date-scoped archive and Collab metadata in parallel.
+        home_start = js.index("async function loadHome(){")
+        home_end = js.index("function taipeiDay()", home_start)
+        home_source = js[home_start:home_end]
+        self.assertNotIn("Promise.all", home_source)
+        self.assertIn("renderHomeRows(rows);", home_source)
+        self.assertIn("loadHomeCollab();", home_source)
+        self.assertLess(home_source.index("renderHomeRows(rows);"), home_source.index("loadHomeCollab();"))
+        self.assertIn("const [data,collabData]=await Promise.all([historyPromise,collabPromise]);", js)
         self.assertIn('rel="preconnect" href="https://holoviewer-public-api.singlebagel.workers.dev"', (ROOT / "site/index.html").read_text())
         self.assertIn("textContent=", js)
         frontend_config = (ROOT / "site/assets/config.js").read_text()
