@@ -3,7 +3,9 @@
 Only tests the frozen shared-sidebar contract, NOT full parity.
 """
 from html.parser import HTMLParser
+import json
 import re
+import subprocess
 from pathlib import Path
 import unittest
 
@@ -283,6 +285,30 @@ class ParityContract(unittest.TestCase):
         self.assertIn("parts.join(' · ')+' · 進入多人連動畫面'",js)
         self.assertIn("youtube.dataset.youtubeHref='https://www.youtube.com/watch?v='+first.video_id",js)
         self.assertIn("if(e.target.closest('[data-youtube-href]'))return",js)
+
+    def test_public_home_lifecycle_freshness_grouping_contract(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        start=js.index('function homeLifecycleBucket(item){')
+        end=js.index('function homeCard(',start)
+        classifier=js[start:end]
+        self.assertNotIn('scheduled_start',classifier)
+        self.assertNotIn('actual_start',classifier)
+        self.assertNotIn('actual_end',classifier)
+        cases=[
+            {'video_id':'fresh-live','lifecycle_state':'live','stale':False},
+            {'video_id':'stale-live','lifecycle_state':'live','stale':True},
+            {'video_id':'unknown','lifecycle_state':'unknown','stale':False},
+            {'video_id':'ended','lifecycle_state':'ended','stale':False},
+            {'video_id':'0-21K73BYWc','lifecycle_state':'upcoming','stale':False,'start_at':'2026-10-19T12:30:00Z'},
+            {'video_id':'waiting','lifecycle_state':'waiting','stale':False},
+        ]
+        script=classifier+'\nprocess.stdout.write(JSON.stringify('+json.dumps(cases)+' .map(homeLifecycleBucket)));'
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        self.assertEqual(json.loads(result.stdout),['live','unknown','unknown','ended','upcoming','upcoming'])
+        bucket_start=js.index('function homeBuckets(rows){')
+        bucket_end=js.index('async function loadHomeCollab()',bucket_start)
+        buckets=js[bucket_start:bucket_end]
+        self.assertIn('buckets[homeLifecycleBucket(item)].push(item)',buckets)
 
     def test_original_4174_home_highlights_have_verified_rules(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
