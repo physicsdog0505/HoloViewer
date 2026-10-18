@@ -359,7 +359,7 @@ function homeHighlightMatch(item){
   if(label==='三期生告知')found=found&&['告知','重大','終了','結束','ANNOUNCEMENT'].some(x=>upper.includes(x));
   if(found&&score>bestScore){bestScore=score;bestLabel=label}
  }
- if(bestScore&&String(item.lifecycle_state||item.state||'').toLowerCase()==='live')bestScore+=5;
+ if(bestScore&&homeLifecycleBucket(item)==='live')bestScore+=5;
  return {score:bestScore,label:bestLabel};
 }
 function chooseHomeHighlights(rows){
@@ -368,8 +368,8 @@ function chooseHomeHighlights(rows){
   const id=String(row?.video_id||'');
   if(!/^[A-Za-z0-9_-]{11}$/.test(id)||seen.has(id))continue;
   seen.add(id);
-  const state=String(row.lifecycle_state||row.state||'').toLowerCase();
-  if(!['live','waiting','upcoming'].includes(state))continue;
+  const bucket=homeLifecycleBucket(row);
+  if(bucket!=='live'&&bucket!=='upcoming')continue;
   const match=homeHighlightMatch(row);
   if(match.score)candidates.push({row,label:match.label,score:match.score});
  }
