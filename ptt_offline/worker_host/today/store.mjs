@@ -118,15 +118,20 @@ function consumerRow(row,nowStamp,supportColors){
  const age=observed?Date.parse(nowStamp)-Date.parse(observed):NaN;
  const fresh=Number.isFinite(age)&&age>=0&&age<=1200000;
  const state=consumerLifecycle(row.lifecycle_state);
- const lifecycle_state=state==='ended'&&consumerTime(row.actual_end)?'ended':!fresh?'stale':
+ const source_label=consumerText(row.source_label);
+ const actual_start=source_label==='YouTube'?consumerTime(row.actual_start):null;
+ const actual_end=source_label==='YouTube'?consumerTime(row.actual_end):null;
+ const lifecycle_state=state==='ended'&&actual_end?'ended':!fresh?'stale':
   state==='upcoming'&&consumerTime(row.scheduled_start)&&row.scheduled_start<=nowStamp?'waiting':state;
  return {video_id,title:consumerText(row.title),channel_id,channel_name:consumerText(row.channel_name),
   group:groups.has(row.channel_group)?row.channel_group:'other',lifecycle_state,observed_at:observed,
-  start_at:consumerTime(row.actual_start)??consumerTime(row.scheduled_start),
+  start_at:actual_start??consumerTime(row.scheduled_start),
+  actual_start,actual_end,
+  anchor_source:actual_start?'youtube-liveStreamingDetails-actualStartTime':null,
   avatar_url:verifiedChannelAvatar(row.trusted_channel_avatar),
   member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,
   support_mode:color.support_mode,support_color_source:color.support_color_source,
-  source_label:consumerText(row.source_label),stale:lifecycle_state==='stale'};
+  source_label,stale:lifecycle_state==='stale'};
 }
 export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false,supportColors=null}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
