@@ -222,8 +222,8 @@ async function historyVideoMetadata(db,videoId){
  return {
   schema_version:'public-history-video-v1',
   video_id:row.video_id,
-  actual_start:start.toISOString().replace(/\\.\d{3}Z$/,'Z'),
-  actual_end:end.toISOString().replace(/\\.\d{3}Z$/,'Z'),
+  actual_start:start.toISOString().replace(/\.\d{3}Z$/,'Z'),
+  actual_end:end.toISOString().replace(/\.\d{3}Z$/,'Z'),
   anchor_source:'youtube-liveStreamingDetails-actualStartTime'
  };
 }
