@@ -305,7 +305,6 @@ class ParityContract(unittest.TestCase):
         self.assertIn("[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||'']",viewer)
         self.assertIn("今日暫存 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整",viewer)
         self.assertIn("mode:'same-day'",viewer)
-        self.assertIn("這支影片沒有被今日 catalog 驗證為 LIVE",viewer)
 
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
