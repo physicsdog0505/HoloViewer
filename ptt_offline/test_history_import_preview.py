@@ -7,6 +7,7 @@ from pathlib import Path
 from ptt_offline.history_import_preview import (
     SOURCE_REVISION,
     build_preview,
+    build_upsert_sql,
     open_catalog_read_only,
 )
 
@@ -119,3 +120,43 @@ class HistoryImportPreviewTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_upsert_sql_is_idempotent_and_preserves_authoritative_bounds(self):
+        td,path=self.make_catalog()
+        self.addCleanup(td.cleanup)
+        con=open_catalog_read_only(path)
+        try:
+            preview=build_preview(con,from_day="2026-10-01",through_day="2026-10-17")
+        finally:
+            con.close()
+        sql=build_upsert_sql(preview)
+        self.assertIn("BEGIN TRANSACTION;",sql)
+        self.assertIn("ON CONFLICT(video_id) DO UPDATE SET",sql)
+        self.assertIn("'stream-catalog-v1:youtube-liveStreamingDetails'",sql)
+        self.assertIn("'2026-10-05T12:01:05Z'",sql)
+        self.assertIn("'2026-10-05T12:54:31Z'",sql)
+        self.assertNotIn("badwindow01",sql)
+        self.assertNotIn("scheduled01",sql)
+        self.assertTrue(sql.rstrip().endswith("COMMIT;"))
+
+    def test_upsert_sql_escapes_titles(self):
+        preview={
+            "rows":[{
+                "video_id":"quotevid001",
+                "taipei_day":"2026-10-01",
+                "title":"Owner's stream",
+                "channel_id":"UC"+"A"*22,
+                "channel_name":"O'Brien",
+                "avatar_url":"",
+                "scheduled_start":None,
+                "actual_start":"2026-10-01T01:00:00Z",
+                "actual_end":"2026-10-01T02:00:00Z",
+                "source_revision":SOURCE_REVISION,
+                "published_at":"2026-10-01T02:01:00Z",
+            }]
+        }
+        sql=build_upsert_sql(preview)
+        self.assertIn("Owner''s stream",sql)
+        self.assertIn("O''Brien",sql)
+        self.assertIn("NULL",sql)
