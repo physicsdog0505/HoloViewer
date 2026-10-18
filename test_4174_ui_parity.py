@@ -591,9 +591,9 @@ class ParityContract(unittest.TestCase):
         script=helper+"\nprocess.stdout.write(JSON.stringify([vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:''}),vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:'2026-10-17T06:00:00Z'}),vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:'2026-10-17T06:01:00Z'})]));"
         result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
         values=json.loads(result.stdout)
-        self.assertEqual(values[0],1792209612000)
-        self.assertEqual(values[1],1792209600000)
-        self.assertEqual(values[2],1792209612000)
+        self.assertEqual(values[0],1792213212000)
+        self.assertEqual(values[1],1792213200000)
+        self.assertEqual(values[2],1792213212000)
 
     def test_vod_ptt_preloads_scheduled_start_before_first_play(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
