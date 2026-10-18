@@ -15,6 +15,20 @@ test('actual bundled existing-worker entry preserves health with binding',async(
  assert.equal(r.status,200);
  assert.equal((await r.json()).service,'holoviewer-public-read');
 });
+test('actual production entry mounts WebSub callback before the base 404 router',async()=>{
+ const DB={prepare(){return {
+  bind(){return this},
+  first:async()=>({roster_version:'today-roster-v85',expected_channels:85})
+ }}};
+ const r=await worker.fetch(new Request('https://api.example/internal/today/websub'),{
+  DB,
+  TODAY_WEBSUB_RECEIVER_ENABLED:'true',
+  TODAY_WEBSUB_CALLBACK_URL:'https://api.example/internal/today/websub',
+  TODAY_WEBSUB_SECRET:'local-fixture-secret-0123456789abcdef'
+ });
+ assert.equal(r.status,403);
+ assert.deepEqual(await r.json(),{error:'challenge_rejected'});
+});
 test('existing-worker entry blocks private POST until explicitly enabled',async()=>{
  const r=await worker.fetch(new Request('https://api.example/private/ptt/publish',
   {method:'POST',body:'{}'}),{DB:{}});
@@ -65,7 +79,7 @@ test('combined host serves #47 Today consumer envelope directly to 4174 preload'
   channel_group:'hololive',title:'Fixture LIVE',channel_name:'Fixture Channel',lifecycle_state:'live',
   lifecycle_observed_at:'2026-10-15T20:20:00Z',checked_at:'2026-10-15T20:20:00Z',
   scheduled_start:'2026-10-15T20:00:00Z',actual_start:'2026-10-15T20:01:00Z',actual_end:null,
-  source_label:'YouTube',source_checksum:'deadbeef',trusted_channel_avatar:null};
+  source_label:'YouTube liveStreamingDetails',source_checksum:'deadbeef',trusted_channel_avatar:null};
  const DB={prepare(sql){return {bind(){return this},first:async()=>sql.includes('public_today_catalog_meta')?coverage:null,
    all:async()=>({results:sql.includes('FROM public_today_canonical')?[row]:[]})}}};
  const r=await worker.fetch(new Request('https://api.example/v1/catalog/today?day=2026-10-16'),{DB});
@@ -74,13 +88,14 @@ test('combined host serves #47 Today consumer envelope directly to 4174 preload'
  assert.equal(body.schema_version,'public-consumer-v1');
  assert.equal(body.streams.length,1);
  assert.deepEqual(Object.keys(body.streams[0]).sort(),[
-  'avatar_url','channel_id','channel_name','group','lifecycle_state','member_accent','member_accent_dual',
+  'actual_end','actual_start','anchor_source','avatar_url','channel_id','channel_name','group','lifecycle_state','member_accent','member_accent_dual',
   'observed_at','source_label','stale','start_at','support_color_source','support_mode','title','video_id'
  ].sort());
  assert.equal(body.streams[0].video_id,'abcdefghijk');
- assert.equal(body.streams[0].lifecycle_state,'stale'); // old fixture must fail closed under 20-minute freshness
+ assert.equal(body.streams[0].lifecycle_state,'live'); // lifecycle identity is preserved even when freshness is stale
+ assert.equal(body.streams[0].stale,true);
  assert.equal(body.streams[0].group,'hololive');
- assert.equal(body.streams[0].source_label,'YouTube');
+ assert.equal(body.streams[0].source_label,'YouTube liveStreamingDetails');
 });
 
 test('combined host accepts chunked support-color payload without changing Today contract',async()=>{
@@ -90,7 +105,7 @@ test('combined host accepts chunked support-color payload without changing Today
   channel_group:'hololive',title:'Fixture',channel_name:'Fixture',lifecycle_state:'live',
   lifecycle_observed_at:'2026-10-16T04:45:00Z',checked_at:'2026-10-16T04:45:00Z',
   scheduled_start:'2026-10-16T04:30:00Z',actual_start:'2026-10-16T04:31:00Z',actual_end:null,
-  source_label:'YouTube',source_checksum:'deadbeef',trusted_channel_avatar:null};
+  source_label:'YouTube liveStreamingDetails',source_checksum:'deadbeef',trusted_channel_avatar:null};
  const DB={prepare(sql){return {bind(){return this},first:async()=>sql.includes('public_today_catalog_meta')?coverage:null,
    all:async()=>({results:sql.includes('FROM public_today_canonical')?[row]:[]})}}};
  const payload=JSON.stringify({schema_version:1,fallback:'neutral',channels:[{

@@ -8,17 +8,21 @@ export async function persistEvent(db,event,{now=new Date()}={}){
   (event.video_id!==null&&!V.test(event.video_id??''))||
   typeof event.roster_version!=='string'||!event.roster_version)throw Error('invalid durable event');
  const received=now.toISOString().replace(/\.\d{3}Z$/,'Z');
- await db.prepare(`INSERT INTO public_today_websub_events
+ const result=await db.prepare(`INSERT INTO public_today_websub_events
  (event_hash,channel_id,video_id,roster_version,received_at,status,attempts)
  VALUES (?,?,?,?,?,'pending',0) ON CONFLICT(event_hash) DO NOTHING`)
  .bind(event.raw_sha256,event.channel_id,event.video_id,event.roster_version,received).run();
- return {persisted:true,event_hash:event.raw_sha256};
+ const changes=Number(result?.meta?.changes??result?.changes??0);
+ return {persisted:true,inserted:changes===1,event_hash:event.raw_sha256};
 }
-export async function getPendingEvents(db,{limit=50}={}){
- if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('unbounded pending batch');
+export async function getPendingEvents(db,{limit=50,now=new Date()}={}){
+ if(!Number.isInteger(limit)||limit<1||limit>50||!(now instanceof Date)||!Number.isFinite(now.getTime()))
+  throw Error('unbounded/invalid pending batch');
+ const current=now.toISOString().replace(/\.\d{3}Z$/,'Z');
  const rows=await db.prepare(`SELECT event_hash,channel_id,video_id,roster_version,attempts
- FROM public_today_websub_events WHERE status='pending' AND attempts<5
- ORDER BY received_at,event_hash LIMIT ?`).bind(limit).all();
+ FROM public_today_websub_events
+ WHERE attempts<5 AND (status='pending' OR (status='processing' AND claim_until<?))
+ ORDER BY received_at,event_hash LIMIT ?`).bind(current,limit).all();
  return rows.results??[];
 }
 export async function markEventProcessed(db,eventHash,{time=new Date()}={}){

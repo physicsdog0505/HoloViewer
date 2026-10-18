@@ -8,6 +8,8 @@ const channelPattern=/^UC[A-Za-z0-9_-]{22}$/;
 const groups=new Set(['hololive','holostars','mekpark','other']);
 const lifecycles=new Set(['unknown','upcoming','live','ended']);
 const ckPattern=/^cp_[A-Za-z0-9_-]{8,128}$/;
+export const YOUTUBE_LIVE_SOURCE='YouTube liveStreamingDetails';
+export const HISTORY_SOURCE_REVISION='youtube-videos-list:liveStreamingDetails';
 // Legacy public_catalog avatar is channel artwork, never the video thumbnail.
 export function verifiedChannelAvatar(value){
  if(typeof value!=='string'||value.length>2048)return null;
@@ -16,6 +18,10 @@ export function verifiedChannelAvatar(value){
  }catch{return null}
 }
 function validTime(x) {return typeof x==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(x) && !Number.isNaN(Date.parse(x));}
+function taipeiDay(value){
+ const d=new Date(value);
+ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+}
 export function validateEvidence(r) {
   if (!r || !idPattern.test(r.video_id) || !channelPattern.test(r.channel_id) ||
       typeof r.roster_version!=='string' || !r.roster_version ||
@@ -73,6 +79,24 @@ export async function writeEvidence(db, evidence) {
         AND public_today_canonical.publisher_channel_id=excluded.publisher_channel_id`;
     mutations.push(db.prepare(sql).bind(r.video_id,r.channel_id,r.roster_version,r.group,r.title,r.channel_name??'',
       r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.source_label,hash));
+    if(r.lifecycle_state==='ended'&&r.source_label===YOUTUBE_LIVE_SOURCE&&r.actual_start&&r.actual_end){
+      const catalogAvatar=await db.prepare(`SELECT avatar_url FROM public_catalog
+        WHERE channel_id=? AND avatar_url IS NOT NULL
+        ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1`).bind(r.channel_id).first();
+      const historyAvatar=verifiedChannelAvatar(catalogAvatar?.avatar_url)??'';
+      const historySql=`INSERT INTO public_history
+        (video_id,taipei_day,title,channel_id,channel_name,avatar_url,scheduled_start,actual_start,actual_end,source_revision,published_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(video_id) DO UPDATE SET
+          taipei_day=excluded.taipei_day,title=excluded.title,channel_id=excluded.channel_id,
+          channel_name=excluded.channel_name,scheduled_start=excluded.scheduled_start,
+          actual_start=excluded.actual_start,actual_end=excluded.actual_end,
+          source_revision=excluded.source_revision,published_at=excluded.published_at`;
+      mutations.push(db.prepare(historySql).bind(
+        r.video_id,taipeiDay(r.actual_start),r.title,r.channel_id,r.channel_name??'',historyAvatar,
+        r.scheduled_start??null,r.actual_start,r.actual_end,HISTORY_SOURCE_REVISION,r.observed_at
+      ));
+    }
   }
   await db.batch(mutations);
   return {changed:canSelect,reason:canSelect?'selected':'evidence_only'};
@@ -108,6 +132,20 @@ export async function setCoverage(db, c) {
 function consumerText(value){return typeof value==='string'?value:'';}
 function consumerTime(value){return validTime(value)?value:null;}
 function consumerLifecycle(value){return lifecycles.has(value)?value:'unknown';}
+/**
+ * Public Home grouping contract.
+ * Consumers MUST classify from lifecycle_state + stale only; they must not
+ * reconstruct YouTube lifecycle from timestamps or provenance.
+ */
+export function classifyHomeConsumer(stream){
+ const lifecycle=consumerLifecycle(stream?.lifecycle_state);
+ const stale=stream?.stale===true;
+ if(lifecycle==='live')return stale?'degraded':'current_live';
+ if(lifecycle==='unknown')return 'degraded';
+ if(lifecycle==='upcoming'||lifecycle==='waiting')return 'upcoming';
+ if(lifecycle==='ended')return 'ended';
+ return 'degraded';
+}
 function consumerRow(row,nowStamp,supportColors){
  const video_id=idPattern.test(row?.video_id??'')?row.video_id:null;
  const channel_id=channelPattern.test(row?.publisher_channel_id??'')?row.publisher_channel_id:null;
@@ -118,15 +156,23 @@ function consumerRow(row,nowStamp,supportColors){
  const age=observed?Date.parse(nowStamp)-Date.parse(observed):NaN;
  const fresh=Number.isFinite(age)&&age>=0&&age<=1200000;
  const state=consumerLifecycle(row.lifecycle_state);
- const lifecycle_state=state==='ended'&&consumerTime(row.actual_end)?'ended':!fresh?'stale':
-  state==='upcoming'&&consumerTime(row.scheduled_start)&&row.scheduled_start<=nowStamp?'waiting':state;
+ const source_label=consumerText(row.source_label);
+ const trusted=source_label===YOUTUBE_LIVE_SOURCE;
+ const actual_start=trusted?consumerTime(row.actual_start):null;
+ const actual_end=trusted?consumerTime(row.actual_end):null;
+ // Lifecycle identity is canonical-state authority; timestamp provenance only gates playback bounds.
+ const lifecycle_state=state==='upcoming'?
+  (consumerTime(row.scheduled_start)&&row.scheduled_start<=nowStamp?'waiting':'upcoming'):state;
+ const stale=state==='live'&&!fresh;
  return {video_id,title:consumerText(row.title),channel_id,channel_name:consumerText(row.channel_name),
   group:groups.has(row.channel_group)?row.channel_group:'other',lifecycle_state,observed_at:observed,
-  start_at:consumerTime(row.actual_start)??consumerTime(row.scheduled_start),
+  start_at:actual_start??consumerTime(row.scheduled_start),
+  actual_start,actual_end,
+  anchor_source:actual_start?'youtube-liveStreamingDetails-actualStartTime':null,
   avatar_url:verifiedChannelAvatar(row.trusted_channel_avatar),
   member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,
   support_mode:color.support_mode,support_color_source:color.support_color_source,
-  source_label:consumerText(row.source_label),stale:lifecycle_state==='stale'};
+  source_label,stale};
 }
 export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false,supportColors=null}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
@@ -134,16 +180,21 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
   if (!Number.isInteger(limit)||limit<1||limit>200) throw Error('invalid limit');
   if (!Number.isSafeInteger(offset)||offset<0||offset>10000) throw Error('invalid offset');
   const coverage=await db.prepare('SELECT * FROM public_today_catalog_meta WHERE singleton=1').first();
-  // Taipei day boundaries are UTC+08:00. Scope includes this day's activity and
-  // actively LIVE streams crossing midnight, but not unrelated historical rows.
-  // Membership uses actual start first, then scheduled start: observation and end timestamps
-  // never pull an old ended stream back into Home. Cross-midnight LIVE needs fresh evidence.
+  // 4174 product authority:
+  // live = date-independent while provider observation is fresh (20m);
+  // upcoming = current Taipei day or future;
+  // ended = ended today, plus yesterday until 12:00 Asia/Taipei.
   const requestedStart=new Date(day+'T00:00:00+08:00');
-  const localHour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',hourCycle:'h23'}).format(now));
+  const nextStart=new Date(requestedStart.getTime()+86400000);
+  const previousStart=new Date(requestedStart.getTime()-86400000);
+  const noon=new Date(requestedStart.getTime()+12*3600000);
   const localDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
-  const overnight=day===localDay&&localHour<6;
-  const start=new Date(requestedStart.getTime()-(overnight?86400000:0)).toISOString().replace(/\.\d{3}Z$/,'Z');
-  const end=new Date(requestedStart.getTime()+86400000).toISOString().replace(/\.\d{3}Z$/,'Z');
+  const beforeNoon=day===localDay&&now.getTime()<noon.getTime();
+  const start=requestedStart.toISOString().replace(/\.\d{3}Z$/,'Z');
+  const end=nextStart.toISOString().replace(/\.\d{3}Z$/,'Z');
+  const previous=previousStart.toISOString().replace(/\.\d{3}Z$/,'Z');
+  const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
+  const freshCutoff=new Date(now.getTime()-1200000).toISOString().replace(/\.\d{3}Z$/,'Z');
   // Profile table is a separate owner-approved migration; legacy SQL remains
   // unchanged until that table is proven available and explicitly enabled.
   const profileExpr=profileTableEnabled?`(SELECT p.avatar_url FROM public_today_channel_profiles p WHERE p.channel_id=public_today_canonical.publisher_channel_id AND p.roster_version=ac.roster_version)`:null;
@@ -154,21 +205,25 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
     FROM public_today_canonical
     JOIN public_today_approved_channels ac
       ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
-    WHERE ((COALESCE(actual_start,scheduled_start)>=? AND COALESCE(actual_start,scheduled_start)<?)
-        OR (lifecycle_state='live' AND actual_start<? AND actual_end IS NULL
-            AND lifecycle_observed_at>=? AND lifecycle_observed_at<=?))
+    WHERE (
+      (lifecycle_state='live' AND actual_end IS NULL)
+      OR
+      (lifecycle_state='upcoming' AND COALESCE(actual_start,scheduled_start)>=?)
+      OR
+      (lifecycle_state='ended' AND actual_end IS NOT NULL AND (
+        (actual_end>=? AND actual_end<?)
+        OR (?=1 AND actual_end>=? AND actual_end<?)
+      ))
+    )
     ORDER BY lifecycle_observed_at DESC,video_id DESC LIMIT ? OFFSET ?`)
-    .bind(coverage?.roster_version??'',start,end,end,
-      new Date(Date.parse(now.toISOString())-1200000).toISOString().replace(/\.\d{3}Z$/,'Z'),
-      now.toISOString().replace(/\.\d{3}Z$/,'Z'),limit+1,offset).all();
+    .bind(coverage?.roster_version??'',start,start,end,beforeNoon?1:0,previous,start,limit+1,offset).all();
   const truncated=(rows.results??[]).length>limit;
-  const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const last=coverage?.last_success_at??null,age=last?Date.parse(nowStamp)-Date.parse(last):NaN;
   const freshness=!last?'unknown':age>=0&&age<=1800000?'fresh':'stale';
   return {schema_version:'public-consumer-v1',as_of:nowStamp,
     freshness:{status:freshness,last_success_at:last},
     completeness:{status:coverage?(coverage.gap||coverage.scanned_channels>0?'partial':'unverified'):'unverified',
-                  gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated,has_more:truncated,offset,overnight},
+                  gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated,has_more:truncated,offset,before_noon_grace:beforeNoon},
     checkpoint:coverage?.checkpoint??null,
     streams:(rows.results??[]).slice(0,limit).map(r=>consumerRow(r,nowStamp,supportColors)).filter(Boolean)};
 }

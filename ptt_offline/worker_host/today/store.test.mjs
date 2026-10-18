@@ -4,19 +4,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
-import {writeEvidence,setCoverage,readToday} from './store.mjs';
+import {writeEvidence,setCoverage,readToday,classifyHomeConsumer,YOUTUBE_LIVE_SOURCE,HISTORY_SOURCE_REVISION} from './store.mjs';
 const C='UC'+'A'.repeat(22), V='abcdefghijk';
 function fixture({id=V,state='live',observed='2026-10-15T11:59:00Z',end=null,group='hololive'}={}) {
   return {video_id:id,channel_id:C,roster_version:'fixture-v1',group,
     title:'Fixture',channel_name:'Fixture channel',lifecycle_state:state,
     observed_at:observed,scheduled_start:'2026-10-16T00:00:00Z',
     actual_start:state==='upcoming'?null:'2026-10-15T11:00:00Z',
-    actual_end:end,source_label:'YouTube'};
+    actual_end:end,source_label:YOUTUBE_LIVE_SOURCE};
 }
 function db() {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8'));
   sqlite.exec('CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)');
+  sqlite.exec(`CREATE TABLE public_history(
+    video_id TEXT PRIMARY KEY NOT NULL,taipei_day TEXT NOT NULL,title TEXT NOT NULL,
+    channel_id TEXT NOT NULL,channel_name TEXT NOT NULL DEFAULT '',avatar_url TEXT NOT NULL DEFAULT '',
+    scheduled_start TEXT,actual_start TEXT,actual_end TEXT NOT NULL,source_revision TEXT NOT NULL,published_at TEXT NOT NULL
+  )`);
   function statement(sql,params=[]){
     return {
       bind(...values){return statement(sql,values)},
@@ -115,13 +120,17 @@ test('Taipei requested day excludes unrelated prior-day entries',async()=>{
   assert.deepEqual(result.streams.map(x=>x.video_id),['newvideo001']);
   d.close();
 });
-test('bounded cross-midnight LIVE survives and unrelated ancient LIVE is excluded',async()=>{
+test('cross-midnight and ancient live rows remain present; stale state carries degradation',async()=>{
   const d=db();
   await writeEvidence(d,{...fixture({id:'carrylive01',observed:'2026-10-15T01:59:00Z'}),actual_start:'2026-10-14T13:00:00Z',scheduled_start:'2026-10-14T13:00:00Z'});
   await writeEvidence(d,{...fixture({id:'distantlive',observed:'2026-10-12T02:00:00Z'}),actual_start:'2026-10-12T01:00:00Z',scheduled_start:'2026-10-12T01:00:00Z'});
   await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T02:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
   const result=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T02:00:00Z')});
-  assert.deepEqual(result.streams.map(x=>x.video_id),['carrylive01']);
+  assert.deepEqual(new Set(result.streams.map(x=>x.video_id)),new Set(['carrylive01','distantlive']));
+  const byId=new Map(result.streams.map(x=>[x.video_id,x]));
+  assert.equal(byId.get('carrylive01').lifecycle_state,'live');
+  assert.equal(byId.get('distantlive').lifecycle_state,'live');
+  assert.equal(byId.get('distantlive').stale,true);
   d.close();
 });
 
@@ -163,21 +172,25 @@ test('Today LIMIT explicitly reports truncation, retaining title and source for 
  const d=db();
  for(let i=0;i<201;i++){
   const video_id='v'+String(i).padStart(10,'0');
-  await writeEvidence(d,{...fixture({id:video_id,observed:'2026-10-15T11:59:00Z'}),title:i===0?'重大告知 生日':'Other',source_label:'YouTube'});
+  await writeEvidence(d,{...fixture({id:video_id,observed:'2026-10-15T11:59:00Z'}),title:i===0?'重大告知 生日':'Other',source_label:YOUTUBE_LIVE_SOURCE});
  }
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
  const x=await readToday(d,{day:'2026-10-15',limit:200,now:new Date('2026-10-15T12:00:00Z')});
  assert.equal(x.streams.length,200);assert.equal(x.completeness.limited,true);assert.equal(x.completeness.gap,true);
- assert.equal(x.streams[0].source_label,'YouTube');
+ assert.equal(x.streams[0].source_label,YOUTUBE_LIVE_SOURCE);
  d.close();
 });
-test('accepted 20-minute item freshness status at 19, 21 and 31 minutes',async()=>{
+test('fresh live remains live and stale live remains present as degraded',async()=>{
  const d=db();await writeEvidence(d,fixture({observed:'2026-10-15T12:00:00Z'}));
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
- for(const [minutes,expected] of [[19,'live'],[21,'stale'],[31,'stale']]){
-  const x=await readToday(d,{day:'2026-10-15',now:new Date(Date.parse('2026-10-15T12:00:00Z')+minutes*60000)});
-  assert.equal(x.streams[0].lifecycle_state,expected);
- }
+ const fresh=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:19:00Z')});
+ assert.equal(fresh.streams.length,1);
+ assert.equal(fresh.streams[0].lifecycle_state,'live');
+ assert.equal(fresh.streams[0].stale,false);
+ const stale=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:31:00Z')});
+ assert.equal(stale.streams.length,1);
+ assert.equal(stale.streams[0].lifecycle_state,'live');
+ assert.equal(stale.streams[0].stale,true);
  d.close();
 });
 
@@ -195,11 +208,11 @@ test('offset paging surfaces older highlight candidates instead of silently drop
  await assert.rejects(()=>readToday(d,{day:'2026-10-15',offset:10001}),/offset/);
  d.close();
 });
-test('overnight Home reads previous day until 05:59 Taipei but not after 06:00',async()=>{
+test('prior-day ended Home grace lasts until 11:59:59 Taipei and ends at noon',async()=>{
  const d=db();
  await writeEvidence(d,{...fixture({id:'oldnight001',state:'ended',observed:'2026-10-15T15:57:00Z',end:'2026-10-15T15:56:00Z'}),actual_start:'2026-10-15T15:00:00Z',scheduled_start:'2026-10-15T15:00:00Z'});
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T16:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
- for(const [time,count] of [['2026-10-15T16:15:00Z',1],['2026-10-15T21:59:00Z',1],['2026-10-15T22:00:00Z',0]]){
+ for(const [time,count] of [['2026-10-15T16:15:00Z',1],['2026-10-16T03:59:59Z',1],['2026-10-16T04:00:00Z',0]]){
   const x=await readToday(d,{day:'2026-10-16',now:new Date(time)});
   assert.equal(x.streams.length,count,time);
  }
@@ -302,7 +315,7 @@ test('Today membership uses actual/scheduled starts, not later refresh or end ti
   {id:'oct16upcom1',start:'2026-10-16T12:00:00Z',end:null,observed:'2026-10-16T07:00:00Z',state:'upcoming',visible:true},
   {id:'oct16live01',start:'2026-10-16T06:00:00Z',end:null,observed:'2026-10-16T07:00:00Z',state:'live',visible:true},
   {id:'crosslive01',start:'2026-10-15T14:00:00Z',end:null,observed:'2026-10-16T06:59:00Z',state:'live',visible:true},
-  {id:'staleoldlv1',start:'2026-10-13T12:00:00Z',end:null,observed:'2026-10-14T12:00:00Z',state:'live',visible:false},
+  {id:'staleoldlv1',start:'2026-10-13T12:00:00Z',end:null,observed:'2026-10-14T12:00:00Z',state:'live',visible:true},
  ];
  for(const c of cases){
   await writeEvidence(d,{...fixture({id:c.id,state:c.state,observed:c.observed,end:c.end}),
@@ -313,7 +326,375 @@ test('Today membership uses actual/scheduled starts, not later refresh or end ti
  const x=await readToday(d,{day:'2026-10-16',now:new Date('2026-10-16T07:00:00Z')});
  const present=new Set(x.streams.map(r=>r.video_id));
  for(const c of cases)assert.equal(present.has(c.id),c.visible,c.id);
+ assert.equal(x.streams.find(r=>r.video_id==='staleoldlv1').lifecycle_state,'live');
+ assert.equal(x.streams.find(r=>r.video_id==='staleoldlv1').stale,true);
  // Today filtering is a read-only projection; older source remains untouched.
  assert.equal(d.raw.prepare('SELECT COUNT(*) AS n FROM public_today_canonical').get().n,cases.length);
+ d.close();
+});
+
+
+test('ended Today row exposes authoritative YouTube actual bounds for same-day PTT bridge',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'zPCcFbCONek',state:'ended',observed:'2026-10-18T04:50:19Z',end:'2026-10-18T04:49:00Z'}),
+  scheduled_start:'2026-10-18T03:15:00Z',
+  actual_start:'2026-10-18T03:15:53Z',
+  actual_end:'2026-10-18T04:49:00Z',
+  source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T04:50:19Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:51:00Z')});
+ assert.equal(x.streams.length,1);
+ const row=x.streams[0];
+ assert.equal(row.video_id,'zPCcFbCONek');
+ assert.equal(row.lifecycle_state,'ended');
+ assert.equal(row.actual_start,'2026-10-18T03:15:53Z');
+ assert.equal(row.actual_end,'2026-10-18T04:49:00Z');
+ assert.equal(row.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+ assert.equal(row.start_at,row.actual_start);
+ d.close();
+});
+
+test('Today projection never exposes untrusted actual bounds as authoritative',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'untrusted01',state:'ended',observed:'2026-10-18T04:50:19Z',end:'2026-10-18T04:49:00Z'}),
+  scheduled_start:'2026-10-18T03:15:00Z',
+  actual_start:'2026-10-18T03:15:53Z',
+  actual_end:'2026-10-18T04:49:00Z',
+  source_label:'legacy-import'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T04:50:19Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:51:00Z')});
+ assert.equal(x.streams.length,1);
+ assert.equal(x.streams[0].actual_start,null);
+ assert.equal(x.streams[0].actual_end,null);
+ assert.equal(x.streams[0].anchor_source,null);
+ assert.equal(x.streams[0].start_at,'2026-10-18T03:15:00Z');
+ d.close();
+});
+
+
+test('trusted ended evidence is idempotently projected into recent public_history',async()=>{
+ const d=db();
+ d.raw.prepare('INSERT INTO public_catalog VALUES(?,?,?,?,?)').run(
+  'cataloghist1',C,'https://yt3.ggpht.com/history-projection-avatar',null,'2026-10-18T03:00:00Z'
+ );
+ const ended={
+  ...fixture({id:'recenthis01',state:'ended',observed:'2026-10-18T05:00:00Z',end:'2026-10-18T04:49:00Z'}),
+  scheduled_start:'2026-10-18T03:15:00Z',
+  actual_start:'2026-10-18T03:15:53Z',
+  actual_end:'2026-10-18T04:49:00Z',
+  source_label:YOUTUBE_LIVE_SOURCE
+ };
+ await writeEvidence(d,ended);
+ const row=d.raw.prepare('SELECT * FROM public_history WHERE video_id=?').get('recenthis01');
+ assert.equal(row.taipei_day,'2026-10-18');
+ assert.equal(row.actual_start,'2026-10-18T03:15:53Z');
+ assert.equal(row.actual_end,'2026-10-18T04:49:00Z');
+ assert.equal(row.source_revision,HISTORY_SOURCE_REVISION);
+ assert.equal(row.avatar_url,'https://yt3.ggpht.com/history-projection-avatar');
+ assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthis01').n,1);
+ const newer={...ended,observed_at:'2026-10-18T05:05:00Z'};
+ await writeEvidence(d,newer);
+ assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_history WHERE video_id=?').get('recenthis01').n,1);
+ assert.equal(d.raw.prepare('SELECT published_at FROM public_history WHERE video_id=?').get('recenthis01').published_at,'2026-10-18T05:05:00Z');
+ d.close();
+});
+
+test('Today 4174 rules keep yesterday ended until noon, then remove it',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'yesterday01',state:'ended',observed:'2026-10-17T15:55:00Z',end:'2026-10-17T15:50:00Z'}),
+  scheduled_start:'2026-10-17T14:00:00Z',actual_start:'2026-10-17T14:01:00Z',
+  actual_end:'2026-10-17T15:50:00Z',source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T01:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const morning=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T03:59:59Z')});
+ assert.deepEqual(morning.streams.map(x=>x.video_id),['yesterday01']);
+ const noon=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:00:00Z')});
+ assert.deepEqual(noon.streams.map(x=>x.video_id),[]);
+ d.close();
+});
+
+test('Today 4174 rules keep stale live regardless start date as degraded',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'oldlive0001',state:'live',observed:'2026-10-18T03:50:00Z'}),
+  scheduled_start:'2026-10-16T03:00:00Z',actual_start:'2026-10-16T03:01:00Z',
+  actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T03:50:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const stale=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:30:00Z')});
+ assert.equal(stale.streams.length,1);
+ assert.equal(stale.streams[0].video_id,'oldlive0001');
+ assert.equal(stale.streams[0].lifecycle_state,'live');
+ assert.equal(stale.streams[0].stale,true);
+ d.close();
+});
+
+test('Today 4174 rules keep current-day and future upcoming without observation freshness',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'todayupcom1',state:'upcoming',observed:'2026-10-17T00:00:00Z'}),
+  scheduled_start:'2026-10-18T08:00:00Z',actual_start:null,actual_end:null
+ });
+ await writeEvidence(d,{
+  ...fixture({id:'futureup001',state:'upcoming',observed:'2026-10-17T00:00:00Z'}),
+  scheduled_start:'2026-10-20T08:00:00Z',actual_start:null,actual_end:null
+ });
+ await writeEvidence(d,{
+  ...fixture({id:'pastupcom01',state:'upcoming',observed:'2026-10-17T00:00:00Z'}),
+  scheduled_start:'2026-10-17T08:00:00Z',actual_start:null,actual_end:null
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T05:00:00Z')});
+ assert.deepEqual(new Set(x.streams.map(r=>r.video_id)),new Set(['todayupcom1','futureup001']));
+ assert.ok(x.streams.every(r=>r.lifecycle_state==='upcoming'||r.lifecycle_state==='waiting'));
+ d.close();
+});
+
+
+test('provider verified ended transitions retained live row to ended',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'transition1',state:'live',observed:'2026-10-18T03:00:00Z'}),
+  scheduled_start:'2026-10-18T02:00:00Z',actual_start:'2026-10-18T02:01:00Z',
+  actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await writeEvidence(d,{
+  ...fixture({id:'transition1',state:'ended',observed:'2026-10-18T04:00:00Z',end:'2026-10-18T03:59:00Z'}),
+  scheduled_start:'2026-10-18T02:00:00Z',actual_start:'2026-10-18T02:01:00Z',
+  actual_end:'2026-10-18T03:59:00Z',source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T04:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T04:10:00Z')});
+ assert.equal(x.streams.length,1);
+ assert.equal(x.streams[0].lifecycle_state,'ended');
+ assert.equal(x.streams[0].actual_end,'2026-10-18T03:59:00Z');
+ d.close();
+});
+
+test('future upcoming tomorrow 20:30 Taipei remains visible alongside stale live',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'stalelive01',state:'live',observed:'2026-10-18T00:02:00Z'}),
+  scheduled_start:'2026-10-18T00:00:00Z',actual_start:'2026-10-18T00:01:00Z',
+  actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await writeEvidence(d,{
+  ...fixture({id:'futurekobo1',state:'upcoming',observed:'2026-10-18T00:00:00Z'}),
+  scheduled_start:'2026-10-19T12:30:00Z',actual_start:null,actual_end:null,
+  source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T05:00:00Z')});
+ const byId=new Map(x.streams.map(r=>[r.video_id,r]));
+ assert.equal(byId.get('stalelive01').lifecycle_state,'live');
+ assert.equal(byId.get('stalelive01').stale,true);
+ assert.equal(byId.get('futurekobo1').lifecycle_state,'upcoming');
+ d.close();
+});
+
+
+test('legacy ended keeps lifecycle identity while withholding untrusted playback bounds',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'legacyend01',state:'ended',observed:'2026-10-18T00:31:00Z',end:'2026-10-18T00:30:00Z'}),
+  scheduled_start:'2026-10-17T23:00:00Z',
+  actual_start:'2026-10-17T23:01:00Z',
+  actual_end:'2026-10-18T00:30:00Z',
+  source_label:'YouTube'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:30:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='legacyend01');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'ended');
+ assert.equal(row.stale,false);
+ assert.equal(row.actual_start,null);
+ assert.equal(row.actual_end,null);
+ assert.equal(row.anchor_source,null);
+ d.close();
+});
+
+test('legacy stale live keeps live lifecycle identity with stale flag',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'legacylive1',state:'live',observed:'2026-10-18T00:00:00Z'}),
+  scheduled_start:'2026-10-17T23:00:00Z',
+  actual_start:'2026-10-17T23:01:00Z',
+  actual_end:null,
+  source_label:'YouTube'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='legacylive1');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'live');
+ assert.equal(row.stale,true);
+ assert.equal(row.actual_start,null);
+ assert.equal(row.actual_end,null);
+ assert.equal(row.anchor_source,null);
+ d.close();
+});
+
+test('trusted fresh live stays live and non-stale with authoritative actual start',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'trustedliv1',state:'live',observed:'2026-10-18T00:50:00Z'}),
+  scheduled_start:'2026-10-18T00:00:00Z',
+  actual_start:'2026-10-18T00:01:00Z',
+  actual_end:null,
+  source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:50:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='trustedliv1');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'live');
+ assert.equal(row.stale,false);
+ assert.equal(row.actual_start,'2026-10-18T00:01:00Z');
+ assert.equal(row.actual_end,null);
+ assert.equal(row.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+ d.close();
+});
+
+test('trusted provider ended keeps ended lifecycle and authoritative bounds',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'trustedend1',state:'ended',observed:'2026-10-18T01:00:00Z',end:'2026-10-18T00:59:00Z'}),
+  scheduled_start:'2026-10-18T00:00:00Z',
+  actual_start:'2026-10-18T00:01:00Z',
+  actual_end:'2026-10-18T00:59:00Z',
+  source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T01:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:05:00Z')});
+ const row=x.streams.find(r=>r.video_id==='trustedend1');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'ended');
+ assert.equal(row.stale,false);
+ assert.equal(row.actual_start,'2026-10-18T00:01:00Z');
+ assert.equal(row.actual_end,'2026-10-18T00:59:00Z');
+ assert.equal(row.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+ d.close();
+});
+
+test('mixed production-like set preserves lifecycle counts without stale-category flood',async()=>{
+ const d=db();
+ for(let i=0;i<8;i++){
+  await writeEvidence(d,{
+   ...fixture({id:'mixlive'+String(i).padStart(4,'0'),state:'live',observed:i===7?'2026-10-18T00:02:00Z':'2026-10-18T00:50:00Z'}),
+   scheduled_start:'2026-10-18T00:00:00Z',
+   actual_start:'2026-10-18T00:01:00Z',
+   actual_end:null,
+   source_label:i===7?'YouTube':YOUTUBE_LIVE_SOURCE
+  });
+ }
+ for(let i=0;i<6;i++){
+  await writeEvidence(d,{
+   ...fixture({id:'mixended'+String(i).padStart(3,'0'),state:'ended',observed:'2026-10-18T00:40:00Z',end:'2026-10-18T00:30:00Z'}),
+   scheduled_start:'2026-10-17T23:00:00Z',
+   actual_start:'2026-10-17T23:01:00Z',
+   actual_end:'2026-10-18T00:30:00Z',
+   source_label:i===0?YOUTUBE_LIVE_SOURCE:'YouTube'
+  });
+ }
+ await writeEvidence(d,{
+  ...fixture({id:'mixfuture01',state:'upcoming',observed:'2026-10-18T00:00:00Z'}),
+  scheduled_start:'2026-10-19T12:30:00Z',actual_start:null,actual_end:null,
+  source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:50:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:00:00Z')});
+ const counts=x.streams.reduce((a,r)=>(a[r.lifecycle_state]=(a[r.lifecycle_state]??0)+1,a),{});
+ assert.equal(counts.live,8);
+ assert.equal(counts.ended,6);
+ assert.equal(counts.upcoming,1);
+ assert.equal(counts.stale??0,0);
+ assert.equal(x.streams.filter(r=>r.lifecycle_state==='live'&&r.stale).length,1);
+ d.close();
+});
+
+
+test('Home classification: fresh live is current live',async()=>{
+ const row={lifecycle_state:'live',stale:false};
+ assert.equal(classifyHomeConsumer(row),'current_live');
+});
+
+test('Home classification: stale live stays in response but is degraded, never current live',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'homeoldlive',state:'live',observed:'2026-10-18T00:02:00Z'}),
+  scheduled_start:'2026-10-18T00:00:00Z',
+  actual_start:'2026-10-18T00:01:00Z',
+  actual_end:null,
+  source_label:'YouTube'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='homeoldlive');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'live');
+ assert.equal(row.stale,true);
+ assert.equal(classifyHomeConsumer(row),'degraded');
+ assert.notEqual(classifyHomeConsumer(row),'current_live');
+ d.close();
+});
+
+test('Home classification: unknown is degraded without timestamp reconstruction',()=>{
+ assert.equal(classifyHomeConsumer({lifecycle_state:'unknown',stale:false}),'degraded');
+ assert.equal(classifyHomeConsumer({lifecycle_state:'unknown',stale:true}),'degraded');
+});
+
+test('Home classification: ended never revives into current live',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'homeended01',state:'ended',observed:'2026-10-18T00:31:00Z',end:'2026-10-18T00:30:00Z'}),
+  scheduled_start:'2026-10-17T23:00:00Z',
+  actual_start:'2026-10-17T23:01:00Z',
+  actual_end:'2026-10-18T00:30:00Z',
+  source_label:'YouTube'
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:31:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T01:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='homeended01');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'ended');
+ assert.equal(classifyHomeConsumer(row),'ended');
+ assert.notEqual(classifyHomeConsumer(row),'current_live');
+ d.close();
+});
+
+test('Home classification: future upcoming remains upcoming and unaffected by stale-live policy',async()=>{
+ const d=db();
+ await writeEvidence(d,{
+  ...fixture({id:'homefuture1',state:'upcoming',observed:'2026-10-18T00:00:00Z'}),
+  scheduled_start:'2026-10-19T12:30:00Z',
+  actual_start:null,actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
+ });
+ await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-18T00:00:00Z',
+  expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+ const x=await readToday(d,{day:'2026-10-18',now:new Date('2026-10-18T05:00:00Z')});
+ const row=x.streams.find(r=>r.video_id==='homefuture1');
+ assert.ok(row);
+ assert.equal(row.lifecycle_state,'upcoming');
+ assert.equal(classifyHomeConsumer(row),'upcoming');
  d.close();
 });

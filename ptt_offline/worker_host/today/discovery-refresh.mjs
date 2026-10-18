@@ -51,6 +51,64 @@ async function fetchFeed(channel,fetchImpl){
   return entries(xml).filter(x=>x.channel_id===channel.id);
 }
 
+export async function auditWebSubPrimaryCoverage(db,{now=new Date()}={}){
+  if(!db?.prepare||!(now instanceof Date)||!Number.isFinite(now.getTime()))
+    return {status:'HOLD',reason:'invalid_coverage_input'};
+  try{
+    const meta=await db.prepare(
+      'SELECT roster_version,expected_channels FROM public_today_catalog_meta WHERE singleton=1'
+    ).first();
+    if(typeof meta?.roster_version!=='string'||!meta.roster_version||
+       !Number.isInteger(meta.expected_channels)||meta.expected_channels<1||meta.expected_channels>500)
+      return {status:'HOLD',reason:'approved_roster_unavailable'};
+    const approved=await db.prepare(
+      'SELECT COUNT(*) AS n FROM public_today_approved_channels WHERE roster_version=?'
+    ).bind(meta.roster_version).first();
+    const leases=await db.prepare(
+      `SELECT COUNT(*) AS n FROM public_today_websub_leases
+       WHERE roster_version=? AND state='active' AND expires_at>?`
+    ).bind(meta.roster_version,now.toISOString().replace(/\.\d{3}Z$/,'Z')).first();
+    const approvedCount=Number(approved?.n??0),activeCount=Number(leases?.n??0);
+    const ready=approvedCount===meta.expected_channels&&activeCount===meta.expected_channels;
+    return {status:ready?'PASS':'HOLD',roster_version:meta.roster_version,
+      expected_channels:meta.expected_channels,approved_channels:approvedCount,active_leases:activeCount,
+      reason:ready?null:'incomplete_active_lease_coverage'};
+  }catch{
+    return {status:'HOLD',reason:'coverage_schema_unavailable'};
+  }
+}
+
+export async function reconcileTodayChannelsViaAtom(env,{roster,channelIds,fetchImpl=fetch,now=new Date(),limit=5}={}){
+  if(!env?.DB?.prepare||!roster?.version||!Array.isArray(roster.channels)||
+     !Array.isArray(channelIds)||!Number.isInteger(limit)||limit<1||limit>10)
+    throw Error('invalid bounded Atom reconciliation input');
+  const approved=new Map(roster.channels.map(c=>[c.id,c]));
+  const unique=[...new Set(channelIds)].filter(id=>approved.has(id)&&CHANNEL.test(id)).slice(0,limit);
+  let channels=0,feed_entries=0,discovered=0,failed=0;
+  for(const id of unique){
+    const channel=approved.get(id);
+    try{
+      const items=await fetchFeed(channel,fetchImpl);
+      channels++;
+      for(const entry of items){
+        feed_entries++;
+        const bytes=new TextEncoder().encode(
+          'feed-reconcile-v2:'+entry.channel_id+':'+entry.video_id+':'+roster.version
+        );
+        const hash=Array.from(
+          new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),
+          b=>b.toString(16).padStart(2,'0')
+        ).join('');
+        const stored=await persistEvent(env.DB,{
+          raw_sha256:hash,channel_id:entry.channel_id,video_id:entry.video_id,roster_version:roster.version
+        },{now});
+        if(stored.inserted)discovered++;
+      }
+    }catch{failed++;}
+  }
+  return {status:'bounded_atom_reconcile',channels,feed_entries,discovered,failed};
+}
+
 async function reconcileWave(db,roster,{fetchImpl,now}){
   const window=await nextReconcileWindow(db,roster,{now,limit:CHANNELS_PER_WAVE});
   const settled=await Promise.allSettled(window.selected.map(async channel=>({
@@ -105,6 +163,20 @@ function videoFetcher(env,fetchImpl){
 }
 
 export async function refreshTodayDiscovery(env,{fetchImpl=fetch,now=new Date()}={}){
+  if(env?.TODAY_WEBSUB_PRIMARY_ENABLED==='true'&&env?.TODAY_ATOM_FALLBACK_ENABLED!=='true'){
+    const configured=env?.TODAY_WEBSUB_RECEIVER_ENABLED==='true'&&
+      env?.TODAY_WEBSUB_PROCESS_ENABLED==='true'&&env?.TODAY_WEBSUB_RENEW_ENABLED==='true'&&
+      typeof env?.TODAY_WEBSUB_CALLBACK_URL==='string'&&
+      typeof env?.TODAY_WEBSUB_SECRET==='string'&&env.TODAY_WEBSUB_SECRET.length>=32&&
+      typeof env?.YOUTUBE_API_KEY==='string'&&env.YOUTUBE_API_KEY.length>0;
+    if(!configured)return {status:'blocked_websub_primary_not_ready',
+      feed_requests:0,channels:0,discovered:0,updated:0};
+    const coverage=await auditWebSubPrimaryCoverage(env.DB,{now});
+    if(coverage.status!=='PASS')return {status:'blocked_websub_primary_incomplete_coverage',
+      coverage,feed_requests:0,channels:0,discovered:0,updated:0};
+    return {status:'disabled_websub_primary',coverage,
+      feed_requests:0,channels:0,discovered:0,updated:0};
+  }
   if(env?.TODAY_DISCOVERY_ENABLED!=='true')
     return {status:'disabled',feed_requests:0,channels:0,discovered:0,updated:0};
   if(!env?.DB?.prepare||!env?.YOUTUBE_API_KEY)throw Error('Today discovery configuration missing');

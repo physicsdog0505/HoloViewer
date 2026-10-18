@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createExistingApiRouter} from './api-shell.mjs';
+import {legacyHistory,legacyVideo} from './legacy-compat.mjs';
 const ORIGIN='https://holoviewer-public.singlebagel.workers.dev';
 const router=createExistingApiRouter({
  legacyHistory:async()=>new Response('history'),
@@ -100,4 +101,143 @@ test('Watchalong route reaches feature gate instead of falling through 404',asyn
  const r=await router.fetch(req('/v1/watchalong/recent'),{...env,DB:db});
  assert.equal(r.status,503);
  assert.equal((await r.json()).error,'watchalong_not_enabled');
+});
+
+
+test('single-video lookup falls back to Today canonical when legacy public_catalog has no row',async()=>{
+ const today={
+  video_id:'zPCcFbCONek',title:'Ended stream',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
+  lifecycle_state:'ended',actual_start:'2026-10-18T03:15:53Z',actual_end:'2026-10-18T04:49:00Z',
+  scheduled_start:'2026-10-18T03:15:00Z',source_label:'YouTube liveStreamingDetails'
+ };
+ const db={prepare(sql){return {bind(){return {async first(){
+  if(sql.includes('FROM public_catalog'))return null;
+  if(sql.includes('FROM public_today_canonical'))return today;
+  throw Error('unexpected query');
+ }}}}}};
+ const response=await legacyVideo(new Request('https://api.example/v1/catalog/videos/zPCcFbCONek'),{DB:db});
+ assert.equal(response.status,200);
+ const body=await response.json();
+ assert.equal(body.video_id,'zPCcFbCONek');
+ assert.equal(body.actual_start,'2026-10-18T03:15:53Z');
+ assert.equal(body.actual_end,'2026-10-18T04:49:00Z');
+ assert.equal(body.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+});
+
+test('single-video Today fallback hides untrusted actual bounds',async()=>{
+ const today={
+  video_id:'abcdefghijk',title:'Legacy',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
+  lifecycle_state:'ended',actual_start:'2026-10-18T03:15:53Z',actual_end:'2026-10-18T04:49:00Z',
+  scheduled_start:'2026-10-18T03:15:00Z',source_label:'legacy-import'
+ };
+ const db={prepare(sql){return {bind(){return {async first(){
+  if(sql.includes('FROM public_catalog'))return null;
+  if(sql.includes('FROM public_today_canonical'))return today;
+  throw Error('unexpected query');
+ }}}}}};
+ const body=await (await legacyVideo(new Request('https://api.example/v1/catalog/videos/abcdefghijk'),{DB:db})).json();
+ assert.equal(body.actual_start,null);
+ assert.equal(body.actual_end,null);
+ assert.equal(body.anchor_source,null);
+});
+
+
+test('single-video lookup resolves trusted recent public_history when Today row is absent',async()=>{
+ const history={
+  video_id:'recentvod01',title:'Recent VOD',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
+  avatar_url:'',actual_start:'2026-10-17T10:00:05Z',actual_end:'2026-10-17T11:00:00Z',
+  scheduled_start:'2026-10-17T10:00:00Z',source_revision:'youtube-videos-list:liveStreamingDetails'
+ };
+ const db={prepare(sql){return {bind(){return {async first(){
+  if(sql.includes('FROM public_today_canonical'))return null;
+  if(sql.includes('FROM public_history'))return history;
+  if(sql.includes('FROM public_catalog'))return null;
+  throw Error('unexpected query');
+ }}}}}};
+ const body=await (await legacyVideo(new Request('https://api.example/v1/catalog/videos/recentvod01'),{DB:db})).json();
+ assert.equal(body.lifecycle_state,'ended');
+ assert.equal(body.actual_start,'2026-10-17T10:00:05Z');
+ assert.equal(body.actual_end,'2026-10-17T11:00:00Z');
+ assert.equal(body.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+});
+
+test('single-video recent history fails closed on untrusted provenance',async()=>{
+ const history={
+  video_id:'recentbad01',title:'Recent VOD',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
+  avatar_url:'',actual_start:'2026-10-17T10:00:05Z',actual_end:'2026-10-17T11:00:00Z',
+  scheduled_start:'2026-10-17T10:00:00Z',source_revision:'legacy-import'
+ };
+ const db={prepare(sql){return {bind(){return {async first(){
+  if(sql.includes('FROM public_today_canonical'))return null;
+  if(sql.includes('FROM public_history'))return history;
+  if(sql.includes('FROM public_catalog'))return null;
+  throw Error('unexpected query');
+ }}}}}};
+ const body=await (await legacyVideo(new Request('https://api.example/v1/catalog/videos/recentbad01'),{DB:db})).json();
+ assert.equal(body.actual_start,null);
+ assert.equal(body.actual_end,null);
+ assert.equal(body.anchor_source,null);
+});
+
+
+test('History read enriches trusted avatar, group and audited dual support colors without changing bounds authority',async()=>{
+ const cid='UC'+'H'.repeat(22);
+ const row={
+  video_id:'histcard001',taipei_day:'2026-10-17',title:'History',channel_id:cid,channel_name:'Member',
+  avatar_url:'',scheduled_start:'2026-10-17T10:00:00Z',
+  actual_start:'2026-10-17T10:01:00Z',actual_end:'2026-10-17T11:00:00Z',
+  source_revision:'youtube-videos-list:liveStreamingDetails',
+  trusted_channel_avatar:'https://yt3.ggpht.com/history-avatar',
+  channel_group:'hololive'
+ };
+ const DB={prepare(sql){return {bind(){return {
+  async first(){return sql.includes('COUNT(*)')?{total:1}:null},
+  async all(){return {results:[row]}}
+ }}}}};
+ const colors=JSON.stringify({schema_version:1,fallback:'neutral',channels:[{
+  channel_id:cid,verification_status:'community',color_semantics:'2025_6th_fes_penlight',
+  display_mode:'dual_color',color_hexes:['#112233','#AABBCC']
+ }]});
+ const res=await legacyHistory(new Request('https://api.example/v1/history?day=2026-10-17'),{
+  DB,TODAY_SUPPORT_COLORS_JSON:colors
+ });
+ assert.equal(res.status,200);
+ const item=(await res.json()).items[0];
+ assert.equal(item.avatar_url,'https://yt3.ggpht.com/history-avatar');
+ assert.equal(item.group,'hololive');
+ assert.equal(item.member_accent,'#112233');
+ assert.deepEqual(item.member_accent_dual,['#112233','#AABBCC']);
+ assert.equal(item.support_mode,'dual_color');
+ assert.equal(item.support_color_source,'2025_6th_fes_penlight');
+ assert.equal(item.actual_start,'2026-10-17T10:01:00Z');
+ assert.equal(item.actual_end,'2026-10-17T11:00:00Z');
+ assert.equal(item.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+});
+
+test('History presentation enrichment fails closed for invalid avatar and neutral member',async()=>{
+ const cid='UC'+'N'.repeat(22);
+ const row={
+  video_id:'histneutral1',taipei_day:'2026-10-17',title:'History',channel_id:cid,channel_name:'Member',
+  avatar_url:'https://evil.example/avatar.png',scheduled_start:'2026-10-17T10:00:00Z',
+  actual_start:'2026-10-17T10:01:00Z',actual_end:'2026-10-17T11:00:00Z',
+  source_revision:'legacy-import',trusted_channel_avatar:null,channel_group:'other'
+ };
+ const DB={prepare(sql){return {bind(){return {
+  async first(){return sql.includes('COUNT(*)')?{total:1}:null},
+  async all(){return {results:[row]}}
+ }}}}};
+ const colors=JSON.stringify({schema_version:1,fallback:'neutral',channels:[]});
+ const item=(await (await legacyHistory(
+  new Request('https://api.example/v1/history?day=2026-10-17'),
+  {DB,TODAY_SUPPORT_COLORS_JSON:colors}
+ )).json()).items[0];
+ assert.equal(item.avatar_url,null);
+ assert.equal(item.group,'other');
+ assert.equal(item.member_accent,null);
+ assert.equal(item.member_accent_dual,null);
+ assert.equal(item.support_mode,'neutral');
+ assert.equal(item.support_color_source,null);
+ assert.equal(item.actual_start,null);
+ assert.equal(item.actual_end,null);
+ assert.equal(item.anchor_source,null);
 });
