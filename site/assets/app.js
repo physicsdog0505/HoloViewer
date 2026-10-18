@@ -96,9 +96,14 @@ function trustedArchiveWindow(item){
  if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)||!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return null;
  return {videoId,start,end,anchorSource:PTT_ARCHIVE_ANCHOR};
 }
+function archiveScheduledStart(item,window){
+ const scheduledStart=String(item?.scheduled_start||'');
+ const scheduledMs=Date.parse(scheduledStart),actualMs=Date.parse(String(window?.start||''));
+ return Number.isFinite(scheduledMs)&&Number.isFinite(actualMs)&&scheduledMs<=actualMs?scheduledStart:'';
+}
 function appendArchiveWindow(query,window){
  if(!window)return;
- query.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource].join('|'));
+ query.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|'));
 }
 function homeFilter(){try{const x=localStorage.getItem(HOME_FILTER_KEY);return HOME_FILTERS.has(x)?x:'hololive'}catch{return 'hololive'}}
 function setHomeFilter(value){if(!HOME_FILTERS.has(value))return;try{localStorage.setItem(HOME_FILTER_KEY,value)}catch{}applyHomeFilter(value)}
@@ -290,7 +295,7 @@ function openStandaloneCollab(event){
   if(event?.sync?.available===true)q.set('collab_sync','verified');
   for(const row of roster){
    const window=trustedArchiveWindow(row);
-   if(window)appendArchiveWindow(q,window);
+   if(window)appendArchiveWindow(q,{...window,scheduledStart:archiveScheduledStart(row,window)});
   }
  }
  const collabDay=String(event._history_day||event.day||'');
@@ -327,7 +332,7 @@ function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={})
  const lifecycleBucket=homeLifecycleBucket(item);
  const group=String(item.group||item.channel_group||'other').toLowerCase();
  const archiveWindow=history?trustedArchiveWindow(item):null;
- if(history&&archiveWindow)historyVodWindows.set(id,archiveWindow);
+ if(history&&archiveWindow)historyVodWindows.set(id,{...archiveWindow,scheduledStart:archiveScheduledStart(item,archiveWindow)});
  const href=standaloneViewerUrl([id],{vodWindows:history?historyVodWindows:null,pttMode:history?'video':''});
  const card=node('a',undefined,'client-card stream-card');card.href=href;card.dataset.group=group;card.id='stream-'+id;
  applyHomeSupportStyle(card,item);

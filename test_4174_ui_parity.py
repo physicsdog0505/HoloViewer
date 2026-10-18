@@ -234,8 +234,12 @@ class ParityContract(unittest.TestCase):
         self.assertIn("function trustedArchiveWindow(item)",app)
         self.assertIn("const start=String(item?.actual_start||'');",app)
         self.assertIn("const end=String(item?.actual_end||'');",app)
-        self.assertNotIn("scheduled_start",app.split("function trustedArchiveWindow(item)",1)[1].split("function appendArchiveWindow",1)[0])
+        trusted=app.split("function trustedArchiveWindow(item)",1)[1].split("function archiveScheduledStart",1)[0]
+        self.assertNotIn("scheduled_start",trusted)
+        self.assertIn("function archiveScheduledStart(item,window)",app)
+        self.assertIn("scheduledStart:archiveScheduledStart(item,archiveWindow)",app)
         self.assertIn("query.append('ptt_window'",app)
+        self.assertIn("window.scheduledStart||''",app)
         self.assertIn("openStandaloneViewer(ids,{vodWindows:historyVodWindows,pttMode:'video'})",app)
         self.assertIn("pttArchiveBase:",config)
         self.assertIn("holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",config)
@@ -246,7 +250,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const objects=new Map(manifest.objects.map(item=>[item.key,item]));",viewer)
         self.assertIn("crypto.subtle.digest('SHA-256',buffer)",viewer)
         self.assertIn("payload.pushes.length!==item.pushes",viewer)
-        self.assertIn("occurred>=startMs&&occurred<endMs",viewer)
+        self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
+        self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
         self.assertIn("row?.source_record_key||row?.push_id",viewer)
         self.assertIn("Number.isInteger(row?.floor)&&row.floor>0",viewer)
         self.assertIn("資料可能不完整",viewer)
@@ -572,6 +577,27 @@ class ParityContract(unittest.TestCase):
         self.assertIn('aspect-ratio:16/9!important',fix)
         self.assertIn('.custom-content-grid:has(#stage > .player-card:only-child)',fix)
         self.assertNotIn('viewerPttPanel.remove()',fix)
+
+    def test_vod_ptt_preloads_scheduled_start_before_first_play(self):
+        app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("parts.length!==4&&parts.length!==5",viewer)
+        self.assertIn("scheduledStart:Number.isFinite(scheduledMs)&&scheduledMs<=startMs?scheduledStart:''",viewer)
+        self.assertIn("function vodPttCutoffMs(context,seconds,hasPlayed)",viewer)
+        self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&scheduledMs<=startMs)return scheduledMs",viewer)
+        self.assertIn("scheduledMs-3600000",viewer)
+        self.assertIn("if(state===YT.PlayerState.PLAYING)pttVodHasPlayed=true",viewer)
+        self.assertIn("scheduledStart:archiveWindow.scheduledStart||''",viewer)
+        helper_start=viewer.index("function vodPttCutoffMs(context,seconds,hasPlayed){")
+        helper_end=viewer.index("function vodPttFetchStartMs(context){",helper_start)
+        helper=viewer[helper_start:helper_end]
+        script=helper+"\nconst c={start:'2026-10-18T06:10:00Z',end:'2026-10-18T07:00:00Z',scheduledStart:'2026-10-18T06:00:00Z'};process.stdout.write(JSON.stringify([vodPttCutoffMs(c,0,false),vodPttCutoffMs(c,2,false),vodPttCutoffMs(c,10,false),vodPttCutoffMs(c,0,true)]));"
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        values=json.loads(result.stdout)
+        self.assertEqual(values[0],1792303200000)
+        self.assertEqual(values[1],1792303200000)
+        self.assertEqual(values[2],1792303810000)
+        self.assertEqual(values[3],1792303800000)
 
     def test_vod_ptt_tracks_youtube_playback_timeline(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
