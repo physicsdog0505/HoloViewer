@@ -120,13 +120,16 @@ test('Taipei requested day excludes unrelated prior-day entries',async()=>{
   assert.deepEqual(result.streams.map(x=>x.video_id),['newvideo001']);
   d.close();
 });
-test('bounded cross-midnight LIVE survives and unrelated ancient LIVE is excluded',async()=>{
+test('cross-midnight and ancient live rows remain present; stale state carries degradation',async()=>{
   const d=db();
   await writeEvidence(d,{...fixture({id:'carrylive01',observed:'2026-10-15T01:59:00Z'}),actual_start:'2026-10-14T13:00:00Z',scheduled_start:'2026-10-14T13:00:00Z'});
   await writeEvidence(d,{...fixture({id:'distantlive',observed:'2026-10-12T02:00:00Z'}),actual_start:'2026-10-12T01:00:00Z',scheduled_start:'2026-10-12T01:00:00Z'});
   await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T02:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
   const result=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T02:00:00Z')});
-  assert.deepEqual(result.streams.map(x=>x.video_id),['carrylive01']);
+  assert.deepEqual(new Set(result.streams.map(x=>x.video_id)),new Set(['carrylive01','distantlive']));
+  const byId=new Map(result.streams.map(x=>[x.video_id,x]));
+  assert.equal(byId.get('carrylive01').lifecycle_state,'live');
+  assert.equal(byId.get('distantlive').lifecycle_state,'stale');
   d.close();
 });
 
@@ -311,7 +314,7 @@ test('Today membership uses actual/scheduled starts, not later refresh or end ti
   {id:'oct16upcom1',start:'2026-10-16T12:00:00Z',end:null,observed:'2026-10-16T07:00:00Z',state:'upcoming',visible:true},
   {id:'oct16live01',start:'2026-10-16T06:00:00Z',end:null,observed:'2026-10-16T07:00:00Z',state:'live',visible:true},
   {id:'crosslive01',start:'2026-10-15T14:00:00Z',end:null,observed:'2026-10-16T06:59:00Z',state:'live',visible:true},
-  {id:'staleoldlv1',start:'2026-10-13T12:00:00Z',end:null,observed:'2026-10-14T12:00:00Z',state:'live',visible:false},
+  {id:'staleoldlv1',start:'2026-10-13T12:00:00Z',end:null,observed:'2026-10-14T12:00:00Z',state:'live',visible:true},
  ];
  for(const c of cases){
   await writeEvidence(d,{...fixture({id:c.id,state:c.state,observed:c.observed,end:c.end}),
@@ -322,6 +325,7 @@ test('Today membership uses actual/scheduled starts, not later refresh or end ti
  const x=await readToday(d,{day:'2026-10-16',now:new Date('2026-10-16T07:00:00Z')});
  const present=new Set(x.streams.map(r=>r.video_id));
  for(const c of cases)assert.equal(present.has(c.id),c.visible,c.id);
+ assert.equal(x.streams.find(r=>r.video_id==='staleoldlv1').lifecycle_state,'stale');
  // Today filtering is a read-only projection; older source remains untouched.
  assert.equal(d.raw.prepare('SELECT COUNT(*) AS n FROM public_today_canonical').get().n,cases.length);
  d.close();
@@ -475,7 +479,7 @@ test('provider verified ended transitions retained live row to ended',async()=>{
 test('future upcoming tomorrow 20:30 Taipei remains visible alongside stale live',async()=>{
  const d=db();
  await writeEvidence(d,{
-  ...fixture({id:'stalelive01',state:'live',observed:'2026-10-18T00:00:00Z'}),
+  ...fixture({id:'stalelive01',state:'live',observed:'2026-10-18T00:02:00Z'}),
   scheduled_start:'2026-10-18T00:00:00Z',actual_start:'2026-10-18T00:01:00Z',
   actual_end:null,source_label:YOUTUBE_LIVE_SOURCE
  });
