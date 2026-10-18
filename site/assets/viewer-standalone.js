@@ -20,6 +20,7 @@ const requestedPttMode=params.get('ptt')||'live';
 const collabEventId=String(params.get('collab_event')||'');
 const collabKind=['live','vod'].includes(params.get('collab_kind'))?params.get('collab_kind'):'';
 const collabDay=/^\d{4}-\d{2}-\d{2}$/.test(String(params.get('collab_day')||''))?String(params.get('collab_day')):'';
+const collabSyncVerified=collabKind==='vod'&&params.get('collab_sync')==='verified';
 const collabManaged=Boolean(collabEventId&&collabKind);
 function parseArchiveWindows(){
  const map=new Map();
@@ -168,6 +169,7 @@ function updateUrl(){
   q.set('collab_event',collabEventId);
   q.set('collab_kind',collabKind);
   if(collabDay)q.set('collab_day',collabDay);
+  if(collabSyncVerified)q.set('collab_sync','verified');
  }
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
@@ -644,6 +646,26 @@ function reconcileVodCollab(){
 }
 async function initCollabManager(){
  if(!collabManaged)return;
+ if(collabKind==='vod'&&archiveWindows.size){
+  const localRows=streams.map(stream=>{
+   const window=archiveWindows.get(stream.videoId);
+   return window?{video_id:stream.videoId,lifecycle_state:'ended',
+    actual_start:window.start,actual_end:window.end}:null;
+  }).filter(Boolean);
+  if(localRows.length){
+   const event={event_id:collabEventId,sync:{available:collabSyncVerified},streams:localRows};
+   applyCollabEvent(event);
+   if(collabSyncVerified&&localRows.length===streams.length){
+    const starts=localRows.map(collabStartMs).filter(Number.isFinite);
+    if(starts.length){
+     collabAbsoluteMs=Math.min(...starts);
+     reconcileCollabRows(desiredVodRowsAt(collabAbsoluteMs),{absoluteMs:collabAbsoluteMs});
+    }
+    collabVodTimer=setInterval(()=>{if(!document.hidden)reconcileVodCollab()},500);
+   }
+   return;
+  }
+ }
  const event=await fetchCollabEvent();
  if(!event)return;
  applyCollabEvent(event);
