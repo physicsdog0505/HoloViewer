@@ -158,7 +158,7 @@ body.settings-open .viewer-main{height:calc(100vh - 58px)}
 /* Call mode prototype: overlay only; never reparents or replaces YouTube iframes. */
 .viewer-watch-actions #viewerCallMode.active{background:#242321;color:#fff;border-color:#242321}
 .call-overlay{
- --call-beat:500ms;
+ --call-beat:500ms;--call-beat-2:1000ms;--call-beat-4:2000ms;
  position:absolute;inset:0;z-index:4;pointer-events:none;overflow:hidden;
  display:none;transform:translateZ(0)
 }
@@ -188,11 +188,11 @@ body.call-mode .call-overlay{display:block}
  content:"";position:absolute;left:2px;right:2px;bottom:-18px;height:18px;
  background:#242321;border:3px solid #111;border-radius:2px
 }
-.call-overlay.side-two-left .call-hands{animation:call-small-left calc(var(--call-beat) * 2) ease-in-out infinite}
+.call-overlay.side-two-left .call-hands{animation:call-small-left var(--call-beat-2) ease-in-out infinite}
 .call-overlay.side-two-right .call-hands{animation:call-small-right calc(var(--call-beat) * 2) ease-in-out infinite}
 .call-overlay.side-fast-left .call-hands,
 .call-overlay.side-fast-right .call-hands{animation:call-fast var(--call-beat) ease-in-out infinite}
-.call-overlay.side-wave-left .call-hands{animation:call-wave-left calc(var(--call-beat) * 4) ease-in-out infinite}
+.call-overlay.side-wave-left .call-hands{animation:call-wave-left var(--call-beat-4) ease-in-out infinite}
 .call-overlay.side-wave-right .call-hands{animation:call-wave-right calc(var(--call-beat) * 4) ease-in-out infinite}
 .call-overlay.space-pump .call-hands{animation:call-space-pump var(--call-beat) cubic-bezier(.2,.8,.25,1) infinite}
 @keyframes call-small-left{0%,100%{transform:translateX(-50%) rotate(0)}50%{transform:translateX(-53%) rotate(-13deg)}}
