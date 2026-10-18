@@ -586,8 +586,9 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const window=trustedArchiveWindow(row)",js)
         self.assertIn("window.scheduledStart=archiveScheduledStart(row,window)",js)
         self.assertIn("historyVodWindows.set(window.videoId,window)",js)
-        self.assertIn("const pttMode=document.getElementById('pttMode').value",js)
-        self.assertIn("if(pttMode==='video')items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)))",js)
+        self.assertIn("const selectedHistory=items.length>0&&items.every(id=>historyVodWindows.has(id))",js)
+        self.assertIn("const pttMode=selectedHistory?'video':document.getElementById('pttMode').value",js)
+        self.assertIn("if(selectedHistory)items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)))",js)
 
     def test_vod_ptt_preloads_before_actual_start_when_scheduled_hint_is_missing(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
