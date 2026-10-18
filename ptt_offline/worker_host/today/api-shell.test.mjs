@@ -108,7 +108,7 @@ test('single-video lookup falls back to Today canonical when legacy public_catal
  const today={
   video_id:'zPCcFbCONek',title:'Ended stream',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
   lifecycle_state:'ended',actual_start:'2026-10-18T03:15:53Z',actual_end:'2026-10-18T04:49:00Z',
-  scheduled_start:'2026-10-18T03:15:00Z',source_label:'YouTube'
+  scheduled_start:'2026-10-18T03:15:00Z',source_label:'YouTube liveStreamingDetails'
  };
  const db={prepare(sql){return {bind(){return {async first(){
   if(sql.includes('FROM public_catalog'))return null;
@@ -136,6 +136,44 @@ test('single-video Today fallback hides untrusted actual bounds',async()=>{
   throw Error('unexpected query');
  }}}}}};
  const body=await (await legacyVideo(new Request('https://api.example/v1/catalog/videos/abcdefghijk'),{DB:db})).json();
+ assert.equal(body.actual_start,null);
+ assert.equal(body.actual_end,null);
+ assert.equal(body.anchor_source,null);
+});
+
+
+test('single-video lookup resolves trusted recent public_history when Today row is absent',async()=>{
+ const history={
+  video_id:'recentvod01',title:'Recent VOD',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
+  avatar_url:'',actual_start:'2026-10-17T10:00:05Z',actual_end:'2026-10-17T11:00:00Z',
+  scheduled_start:'2026-10-17T10:00:00Z',source_revision:'youtube-videos-list:liveStreamingDetails'
+ };
+ const db={prepare(sql){return {bind(){return {async first(){
+  if(sql.includes('FROM public_today_canonical'))return null;
+  if(sql.includes('FROM public_history'))return history;
+  if(sql.includes('FROM public_catalog'))return null;
+  throw Error('unexpected query');
+ }}}}}};
+ const body=await (await legacyVideo(new Request('https://api.example/v1/catalog/videos/recentvod01'),{DB:db})).json();
+ assert.equal(body.lifecycle_state,'ended');
+ assert.equal(body.actual_start,'2026-10-17T10:00:05Z');
+ assert.equal(body.actual_end,'2026-10-17T11:00:00Z');
+ assert.equal(body.anchor_source,'youtube-liveStreamingDetails-actualStartTime');
+});
+
+test('single-video recent history fails closed on untrusted provenance',async()=>{
+ const history={
+  video_id:'recentbad01',title:'Recent VOD',channel_id:'UC'+'A'.repeat(22),channel_name:'Channel',
+  avatar_url:'',actual_start:'2026-10-17T10:00:05Z',actual_end:'2026-10-17T11:00:00Z',
+  scheduled_start:'2026-10-17T10:00:00Z',source_revision:'legacy-import'
+ };
+ const db={prepare(sql){return {bind(){return {async first(){
+  if(sql.includes('FROM public_today_canonical'))return null;
+  if(sql.includes('FROM public_history'))return history;
+  if(sql.includes('FROM public_catalog'))return null;
+  throw Error('unexpected query');
+ }}}}}};
+ const body=await (await legacyVideo(new Request('https://api.example/v1/catalog/videos/recentbad01'),{DB:db})).json();
  assert.equal(body.actual_start,null);
  assert.equal(body.actual_end,null);
  assert.equal(body.anchor_source,null);
