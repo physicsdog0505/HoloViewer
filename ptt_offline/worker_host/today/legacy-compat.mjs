@@ -17,7 +17,27 @@ export async function legacyHistory(request,env){
 export async function legacyVideo(request,env){
  const id=new URL(request.url).pathname.split('/').at(-1)??'';
  if(!videoId.test(id))return response({error:'invalid_video_id'},400,0);
- const video=await env.DB.prepare('SELECT '+VIDEO_FIELDS+' FROM public_catalog WHERE video_id=?').bind(id).first();
+ let video=await env.DB.prepare('SELECT '+VIDEO_FIELDS+' FROM public_catalog WHERE video_id=?').bind(id).first();
+ if(!video){
+  const row=await env.DB.prepare(`SELECT video_id,title,publisher_channel_id AS channel_id,channel_name,
+    lifecycle_state,actual_start,actual_end,scheduled_start,source_label
+    FROM public_today_canonical WHERE video_id=? LIMIT 1`).bind(id).first();
+  if(row){
+   const trusted=row.source_label==='YouTube';
+   video={
+    video_id:row.video_id,
+    title:row.title??'',
+    channel_id:row.channel_id??'',
+    channel_name:row.channel_name??'',
+    avatar_url:'',
+    lifecycle_state:row.lifecycle_state??'unknown',
+    actual_start:trusted?row.actual_start??null:null,
+    actual_end:trusted?row.actual_end??null:null,
+    scheduled_start:row.scheduled_start??null,
+    anchor_source:trusted&&row.actual_start?'youtube-liveStreamingDetails-actualStartTime':null
+   };
+  }
+ }
  if(!video)return response({error:'not_found'},404,0);
  return response(video,200,15);
 }
