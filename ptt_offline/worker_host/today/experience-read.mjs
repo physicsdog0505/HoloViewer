@@ -194,21 +194,51 @@ function nextDay(day){
  d.setUTCDate(d.getUTCDate()+1);
  return d.toISOString().slice(0,10);
 }
+function monthDayKey(day){
+ if(!validDay(day))return null;
+ const [,month,date]=day.split('-').map(Number);
+ return {month,date};
+}
+function historyEventDayMatch(stream,day){
+ if(stream.start_at)return taipeiDayWithSixHourRollover(stream.start_at)===day;
+ const label=labelEventMonthDay(stream.start_label);
+ const target=monthDayKey(day);
+ return Boolean(label&&target&&label.month===target.month&&label.day===target.date);
+}
+export function resolveHistoryRows(raw,day){
+ const normalized=(raw??[]).map(x=>normalizeStream(x,{state:'ended'})).filter(Boolean);
+ const eventDay=normalized.filter(x=>historyEventDayMatch(x,day));
+ return {
+  streams:eventDay.slice(0,MAX_HISTORY_ROWS),
+  diagnostics:{
+   raw_rows:Array.isArray(raw)?raw.length:0,
+   normalized_rows:normalized.length,
+   event_day_rows:eventDay.length
+  },
+  limited:(Array.isArray(raw)?raw.length:0)>MAX_HISTORY_ROWS*2||eventDay.length>MAX_HISTORY_ROWS
+ };
+}
 async function historyRows(db,day){
  // Accepted 4174 Collab event-day rolls over at 06:00 Taipei. Read the selected
- // calendar day plus the following early-morning calendar day, then filter by
- // canonical event-day so one overnight event is never split in two.
- const rows=await db.prepare(`SELECT video_id,title,channel_id,channel_name,avatar_url,actual_start,actual_end,scheduled_start
- FROM public_history WHERE taipei_day IN (?,?)
- ORDER BY COALESCE(actual_start,scheduled_start) ASC,video_id ASC LIMIT ?`)
-  .bind(day,nextDay(day),MAX_HISTORY_ROWS*2+1).all();
- const raw=rows.results??[];
- const normalized=raw.map(x=>normalizeStream(x,{state:'ended'})).filter(Boolean)
-  .filter(x=>x.start_at&&taipeiDayWithSixHourRollover(x.start_at)===day);
- return {
-  limited:raw.length>MAX_HISTORY_ROWS*2||normalized.length>MAX_HISTORY_ROWS,
-  streams:normalized.slice(0,MAX_HISTORY_ROWS)
- };
+ // calendar day plus the following early-morning calendar day, then resolve
+ // membership from actual/scheduled start first and an optional legacy
+ // start_label only when its month/day maps unambiguously to the selected day.
+ const baseFields='video_id,title,channel_id,channel_name,avatar_url,actual_start,actual_end,scheduled_start';
+ let rows;
+ try{
+  rows=await db.prepare(`SELECT ${baseFields},start_label
+   FROM public_history WHERE taipei_day IN (?,?)
+   ORDER BY COALESCE(actual_start,scheduled_start) ASC,video_id ASC LIMIT ?`)
+    .bind(day,nextDay(day),MAX_HISTORY_ROWS*2+1).all();
+ }catch{
+  // Older production history schemas do not expose start_label. Preserve the
+  // existing route rather than turning a missing optional column into HTTP 503.
+  rows=await db.prepare(`SELECT ${baseFields}
+   FROM public_history WHERE taipei_day IN (?,?)
+   ORDER BY COALESCE(actual_start,scheduled_start) ASC,video_id ASC LIMIT ?`)
+    .bind(day,nextDay(day),MAX_HISTORY_ROWS*2+1).all();
+ }
+ return resolveHistoryRows(rows.results??[],day);
 }
 async function collabLive(db,{now=new Date(),profileTableEnabled=false}={}){
  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
