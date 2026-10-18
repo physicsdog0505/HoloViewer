@@ -573,6 +573,28 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.custom-content-grid:has(#stage > .player-card:only-child)',fix)
         self.assertNotIn('viewerPttPanel.remove()',fix)
 
+    def test_vod_ptt_tracks_youtube_playback_timeline(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("function pttVodPlaybackMs()",viewer)
+        self.assertIn("const raw=startMs+Math.max(0,seconds)*1000",viewer)
+        self.assertIn("function vodPttVisibleCountAt(rows,absoluteMs)",viewer)
+        self.assertIn("function syncVodPttTimeline({forceFollow=false}={})",viewer)
+        helper_start=viewer.index("function vodPttVisibleCountAt(rows,absoluteMs){")
+        helper_end=viewer.index("function setVodPttRows(rows){",helper_start)
+        helper=viewer[helper_start:helper_end]
+        script=helper+"\nconst rows=[{occurred_at:'2026-10-18T08:14:59Z'},{occurred_at:'2026-10-18T08:15:00Z'},{occurred_at:'2026-10-18T08:15:01Z'}];process.stdout.write(String(vodPttVisibleCountAt(rows,Date.parse('2026-10-18T08:15:00Z'))));"
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        self.assertEqual(result.stdout,'2')
+        self.assertIn("if(visible>pttVodVisibleCount)",viewer)
+        self.assertIn("pttFeed.replaceChildren(...pttVodRows.slice(0,visible).map(pttRow))",viewer)
+        self.assertIn("currentSeconds<pttVodLastSample.seconds-.75",viewer)
+        self.assertIn("Math.abs(currentSeconds-expected)>2.5",viewer)
+        self.assertIn("setInterval(()=>syncVodPttTimeline(),500)",viewer)
+        self.assertIn("syncVodPttTimeline({forceFollow:true})",viewer)
+        self.assertIn("最新 · '+clock",viewer)
+        self.assertIn("對齊播放時間",viewer)
+        self.assertNotIn("pttFeed.scrollTop=0;\n  pttMeta.textContent=context.day",viewer)
+
     def test_public_viewer_does_not_mount_uncertified_ptt_or_collapse_video(self):
         dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
         css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
