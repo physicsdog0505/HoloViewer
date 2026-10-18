@@ -56,12 +56,14 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.db.executescript("""
           CREATE TABLE articles(id INTEGER PRIMARY KEY,board TEXT,aid TEXT,url TEXT,title_hint TEXT,created_at TEXT,last_seen_at TEXT);
           CREATE TABLE pushes(id INTEGER PRIMARY KEY,article_id INTEGER,source_line INTEGER,source_page INTEGER,kind TEXT,author TEXT,content TEXT,ptt_date TEXT,ptt_time TEXT,collected_at TEXT);
+          CREATE TABLE article_screens(id INTEGER PRIMARY KEY,article_id INTEGER,source_page INTEGER,total_pages INTEGER,start_line INTEGER,end_line INTEGER,captured_at TEXT);
         """)
         self.db.execute("INSERT INTO articles VALUES(1,'C_Chat',?,?,'t','now','now')",(self.aid,url))
         self.db.executemany("INSERT INTO pushes VALUES(?,?,?,?,?,?,?,?,?,?)",[
           (1,1,1,1,'推','a','old historical','10/14','09:00','2026-10-15T10:00:00Z'),
           (2,1,2,1,'推','b','new one','10/15','18:00','2026-10-15T10:01:05Z'),
           (3,1,3,1,'→','c','new two','10/15','18:01','2026-10-15T10:02:07Z')])
+        self.db.execute("INSERT INTO article_screens VALUES(1,1,1,1,1,50,'now')")
     def test_recent_articles_select_separate_active_aids(self):
         url="https://www.ptt.cc/bbs/C_Chat/M.1789081300.A.5FC.html"
         aid=aid_from_article_url(url)[1]
@@ -82,12 +84,30 @@ class LiveCapturePublisherTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError,"invalid canonical source identity"):
             state_for_source(directory,"not-an-identity")
 
-    def test_floor_is_fail_closed_without_page_one_coverage(self):
+    def test_floor_authority_uses_article_line_coverage_not_first_push_page(self):
         self.db.execute("UPDATE pushes SET source_page=2")
+        inspected=inspect_latest_article(self.db)
+        self.assertTrue(inspected["floor_authoritative"])
+        self.assertEqual(inspected["floor_by_source_line"],{1:1,2:2,3:3})
+
+    def test_floor_is_fail_closed_without_article_start_coverage(self):
+        self.db.execute("DELETE FROM article_screens")
+        self.db.execute("INSERT INTO article_screens VALUES(1,1,2,2,20,50,'now')")
         inspected=inspect_latest_article(self.db)
         self.assertFalse(inspected["floor_authoritative"])
         self.assertEqual(inspected["floor_by_source_line"],{})
+        self.assertEqual(inspected["floor_coverage_start"],20)
         self.assertTrue(all(row["floor"] is None for row in inspected["candidate_rows"]))
+
+    def test_floor_is_fail_closed_on_article_line_gap(self):
+        self.db.execute("DELETE FROM article_screens")
+        self.db.executemany("INSERT INTO article_screens VALUES(?,?,?,?,?,?,?)",[
+            (1,1,1,2,1,10,'now'),
+            (2,1,2,2,20,50,'now'),
+        ])
+        inspected=inspect_latest_article(self.db)
+        self.assertFalse(inspected["floor_authoritative"])
+        self.assertEqual(inspected["floor_coverage_gaps"],[[11,19]])
 
     def test_floor_map_counts_pending_pushes_in_article_order(self):
         self.db.execute("UPDATE pushes SET collected_at='2026-10-16T01:01:23Z',ptt_date='10/16',ptt_time='06:36' WHERE source_line=2")
