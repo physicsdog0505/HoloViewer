@@ -95,7 +95,9 @@ Given `actual_start` and `actual_end`:
 1. Convert both timestamps to UTC.
 2. Floor start to UTC hour.
 3. Fetch each hourly object intersecting the interval.
-4. Browser automatically decodes gzip when served with `Content-Encoding: gzip`.
+4. R2 clients decode the archive object's gzip representation. A Workers
+   Static Assets package instead stores canonical uncompressed `.json` and
+   lets Cloudflare negotiate transport compression.
 5. Filter rows to the exact VOD interval.
 6. Compute `vod_minute` from `occurred_at - actual_start`.
 7. Render/filter/sort entirely in the browser.
@@ -112,12 +114,15 @@ from the manifest day matrix, not from fabricating an empty object.
 
 The offline pilot under `ptt_offline/static_assets_pilot/` has no Worker
 script, API route, D1 binding, R2 binding, or secret. Matching files are served
-directly by Static Assets. `.json.gz` responses require explicit
-`Content-Type: application/json` and `Content-Encoding: gzip` rules.
+directly by Static Assets. The accepted source archive remains `.json.gz`, but
+the package builder decodes each selected object into canonical `.json` bytes.
+It rewrites only the package manifest key and preserves the source canonical
+SHA. `_headers` declares JSON content type and never authors
+`Content-Encoding`; Cloudflare owns transport compression negotiation.
 
 Until replaceable objects use fingerprinted/versioned URLs, chunks and the
 manifest use revalidation (`must-revalidate` / `no-cache`). A consumer verifies
-each decompressed object against the manifest SHA before rendering. This avoids
+the Fetch-decoded canonical bytes against the manifest SHA before rendering. This avoids
 silently mixing an old manifest with a newer same-key replacement.
 
 ## R2 serving

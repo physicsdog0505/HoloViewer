@@ -29,7 +29,7 @@ def _manifest_digest(path: Path) -> str:
     return sha256(path.read_bytes()).hexdigest()
 
 
-def _read_object(root: Path, item: dict) -> tuple[dict,int]:
+def _read_object_bytes(root: Path, item: dict) -> tuple[dict,bytes,int]:
     target=root/item["key"]
     if not target.is_file():
         raise ContractError(f"manifest object missing: {item['key']}")
@@ -43,7 +43,12 @@ def _read_object(root: Path, item: dict) -> tuple[dict,int]:
         raise ContractError(f"invalid gzip JSON: {item['key']}") from exc
     if len(payload.get("pushes",[])) != item["pushes"]:
         raise ContractError(f"manifest object count mismatch: {item['key']}")
-    return payload,target.stat().st_size
+    return payload,raw,target.stat().st_size
+
+
+def _read_object(root: Path, item: dict) -> tuple[dict,int]:
+    payload,_,size=_read_object_bytes(root,item)
+    return payload,size
 
 
 def build_static_bundle(*, archive_root: Path, out_dir: Path,
@@ -59,11 +64,19 @@ def build_static_bundle(*, archive_root: Path, out_dir: Path,
         item=by_key.get(key)
         if item is None:
             raise ContractError(f"object is not in source manifest: {key}")
-        _read_object(archive_root,item)
-        target=out_dir/key
+        _,raw,_=_read_object_bytes(archive_root,item)
+        if not key.endswith(".json.gz"):
+            raise ContractError(f"source archive object is not JSON gzip: {key}")
+        asset_key=key.removesuffix(".gz")
+        target=out_dir/asset_key
         target.parent.mkdir(parents=True,exist_ok=True)
-        shutil.copyfile(archive_root/key,target)
-        selected.append(item)
+        target.write_bytes(raw)
+        asset_item=dict(item)
+        asset_item["key"]=asset_key
+        asset_item["source_archive_key"]=key
+        asset_item["bytes_json"]=len(raw)
+        asset_item["source_gzip_bytes"]=asset_item.pop("bytes_gzip")
+        selected.append(asset_item)
     pilot={
         "schema_version":manifest["schema_version"],
         "precision":manifest["precision"],
@@ -85,7 +98,6 @@ def build_static_bundle(*, archive_root: Path, out_dir: Path,
     (out_dir/"_headers").write_text(
         "/ptt/v1/chunks/*\n"
         "  Content-Type: application/json\n"
-        "  Content-Encoding: gzip\n"
         "  Cache-Control: public, max-age=0, must-revalidate\n"
         "  Access-Control-Allow-Origin: *\n"
         "  X-Content-Type-Options: nosniff\n\n"
@@ -108,7 +120,7 @@ def build_static_bundle(*, archive_root: Path, out_dir: Path,
         shutil.copyfile(browser_check,out_dir/"browser-check.html")
     return {"status":"STATIC_BUNDLE_READY","objects":len(selected),
             "pushes":pilot["total_pushes"],
-            "gzip_bytes":sum((out_dir/item["key"]).stat().st_size for item in selected),
+            "canonical_bytes":sum((out_dir/item["key"]).stat().st_size for item in selected),
             "manifest":str(pilot_path),"worker_code":False,"d1_bindings":0}
 
 

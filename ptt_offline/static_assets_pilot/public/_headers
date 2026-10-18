@@ -1,6 +1,5 @@
 /ptt/v1/chunks/*
   Content-Type: application/json
-  Content-Encoding: gzip
   Cache-Control: public, max-age=0, must-revalidate
   Access-Control-Allow-Origin: *
   X-Content-Type-Options: nosniff

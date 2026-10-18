@@ -9,13 +9,12 @@ from pathlib import Path
 
 class StaticAssetHandler(SimpleHTTPRequestHandler):
     def guess_type(self,path):
-        if path.endswith(".json.gz"):
+        if path.endswith(".json"):
             return "application/json"
         return super().guess_type(path)
 
     def end_headers(self):
-        if self.path.endswith(".json.gz"):
-            self.send_header("Content-Encoding","gzip")
+        if "/chunks/" in self.path and self.path.endswith(".json"):
             self.send_header("Cache-Control","public, max-age=0, must-revalidate")
         elif "/manifests/" in self.path:
             self.send_header("Cache-Control","no-cache")

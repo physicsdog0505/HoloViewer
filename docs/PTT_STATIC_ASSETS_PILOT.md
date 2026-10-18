@@ -105,16 +105,18 @@ Offline package:
 
 Selected corrected chunks:
 
-| Status | Key | Pushes | gzip bytes |
+| Status | Static Assets key | Pushes | canonical JSON bytes |
 | --- | --- | ---: | ---: |
-| COMPLETE | `ptt/v1/chunks/2026/10/05/0900.json.gz` | 17 | 1,339 |
-| UNKNOWN | `ptt/v1/chunks/2026/10/09/1600.json.gz` | 208 | 9,312 |
-| PARTIAL | `ptt/v1/chunks/2026/10/16/1600.json.gz` | 25 | 1,580 |
+| COMPLETE | `ptt/v1/chunks/2026/10/05/0900.json` | 17 | 9,555 |
+| UNKNOWN | `ptt/v1/chunks/2026/10/09/1600.json` | 208 | 120,055 |
+| PARTIAL | `ptt/v1/chunks/2026/10/16/1600.json` | 25 | 14,456 |
 
 The project has no `main` Worker script, bindings, D1, R2 or secrets. The
 declarative asset rules provide:
 
-- gzip chunks: `Content-Type: application/json`, `Content-Encoding: gzip`;
+- chunks are stored as canonical uncompressed `.json` with
+  `Content-Type: application/json`; `_headers` does not author
+  `Content-Encoding`;
 - manifest: JSON UTF-8;
 - CORS: `Access-Control-Allow-Origin: *` for this public data pilot;
 - chunks: `public, max-age=0, must-revalidate`;
@@ -129,8 +131,8 @@ long-term way to prevent old-manifest/new-chunk mixing.
 
 Local integration results:
 
-- HTTP header, gzip, JSON and row-count readback: PASS.
-- Headless Google Chrome `fetch()` auto-decompression and `response.json()`:
+- HTTP header, canonical JSON and row-count readback: PASS.
+- Headless Google Chrome `fetch()` transport decoding and JSON parsing:
   PASS (`data-status=pass`, 17 rows). The checked-in harness now hashes the
   browser-decoded raw JSON bytes with Web Crypto and compares them to the
   manifest before parsing or rendering.

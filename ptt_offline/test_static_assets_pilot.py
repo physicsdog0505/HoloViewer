@@ -18,13 +18,12 @@ from ptt_offline.static_assets_pilot import (build_static_bundle,
 
 class _AssetHandler(SimpleHTTPRequestHandler):
     def guess_type(self,path):
-        if path.endswith(".json.gz"):
+        if path.endswith(".json"):
             return "application/json"
         return super().guess_type(path)
 
     def end_headers(self):
-        if self.path.endswith(".json.gz"):
-            self.send_header("Content-Encoding","gzip")
+        if "/chunks/" in self.path and self.path.endswith(".json"):
             self.send_header("Cache-Control","public, max-age=0, must-revalidate")
         elif "/manifests/" in self.path:
             self.send_header("Content-Type","application/json; charset=utf-8")
@@ -86,32 +85,48 @@ class StaticAssetsPilotTests(unittest.TestCase):
             self.assertEqual(receipt["worker_code"],False)
             self.assertEqual(receipt["d1_bindings"],0)
             pilot=json.loads(Path(receipt["manifest"]).read_text())
-            self.assertEqual([item["key"] for item in pilot["objects"]],keys)
+            asset_keys=[key.removesuffix(".gz") for key in keys]
+            self.assertEqual([item["key"] for item in pilot["objects"]],asset_keys)
+            self.assertEqual([item["source_archive_key"] for item in pilot["objects"]],keys)
             self.assertEqual(pilot["source_manifest_sha256"],sha256(
                 (source/"ptt/v1/manifests/2026-10-pilot.json").read_bytes()).hexdigest())
+            for item in pilot["objects"]:
+                raw=(public/item["key"]).read_bytes()
+                self.assertFalse(raw.startswith(b"\x1f\x8b"))
+                self.assertEqual(sha256(raw).hexdigest(),item["sha256"])
+                self.assertEqual(len(raw),item["bytes_json"])
+                self.assertEqual(len(json.loads(raw)["pushes"]),item["pushes"])
             headers=(public/"_headers").read_text()
-            self.assertIn("Content-Encoding: gzip",headers)
+            self.assertNotIn("Content-Encoding",headers)
             self.assertIn("must-revalidate",headers)
             self.assertIn("Cache-Control: no-cache",headers)
 
-    def test_http_headers_and_gzip_json_readback(self):
+    def test_http_headers_and_canonical_json_readback(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td)
-            manifest=self.make_archive(root)
+            base=Path(td)
+            source=base/"source"
+            manifest=self.make_archive(source)
+            root=base/"package/public"
+            build_static_bundle(archive_root=source,out_dir=root,
+                                object_keys=[manifest["objects"][0]["key"]])
+            pilot=json.loads((root/"ptt/v1/manifests/static-assets-pilot.json").read_text())
             handler=lambda *args,**kwargs:_AssetHandler(*args,directory=str(root),**kwargs)
             server=ThreadingHTTPServer(("127.0.0.1",0),handler)
             thread=threading.Thread(target=server.serve_forever,daemon=True)
             thread.start()
             try:
-                key=manifest["objects"][0]["key"]
+                item=pilot["objects"][0]
+                key=item["key"]
                 with urlopen(f"http://127.0.0.1:{server.server_port}/{key}") as response:
                     self.assertEqual(response.headers.get_content_type(),"application/json")
-                    self.assertEqual(response.headers["Content-Encoding"],"gzip")
+                    self.assertIsNone(response.headers["Content-Encoding"])
                     self.assertEqual(response.headers["Access-Control-Allow-Origin"],"*")
-                    payload=json.loads(gzip.decompress(response.read()))
+                    raw=response.read()
+                    self.assertEqual(sha256(raw).hexdigest(),item["sha256"])
+                    payload=json.loads(raw)
                 self.assertGreater(len(payload["pushes"]),0)
                 with urlopen(
-                    f"http://127.0.0.1:{server.server_port}/ptt/v1/manifests/2026-10-pilot.json"
+                    f"http://127.0.0.1:{server.server_port}/ptt/v1/manifests/static-assets-pilot.json"
                 ) as response:
                     self.assertEqual(response.headers["Cache-Control"],"no-cache")
                     self.assertEqual(response.headers["Access-Control-Allow-Origin"],"*")

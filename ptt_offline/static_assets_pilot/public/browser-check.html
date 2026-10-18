@@ -12,9 +12,8 @@
     const objectResponse=await fetch('/'+item.key,{cache:'no-cache'});
     if(!objectResponse.ok) throw new Error('object HTTP '+objectResponse.status);
     if(!objectResponse.headers.get('content-type')?.startsWith('application/json')) throw new Error('content-type');
-    if(objectResponse.headers.get('content-encoding')!=='gzip') throw new Error('content-encoding');
-    // Fetch exposes decoded response bytes while retaining the HTTP content
-    // encoding header. The manifest digest is over these canonical JSON bytes.
+    // Static Assets stores canonical JSON. Cloudflare may negotiate transport
+    // compression, but Fetch exposes the decoded bytes hashed by the manifest.
     const raw=new Uint8Array(await objectResponse.arrayBuffer());
     const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',raw));
     const actualSha=Array.from(hash,byte=>byte.toString(16).padStart(2,'0')).join('');
