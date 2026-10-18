@@ -89,9 +89,10 @@ const selectedHomeVideos=new Set();
 function homeFilter(){try{const x=localStorage.getItem(HOME_FILTER_KEY);return HOME_FILTERS.has(x)?x:'hololive'}catch{return 'hololive'}}
 function setHomeFilter(value){if(!HOME_FILTERS.has(value))return;try{localStorage.setItem(HOME_FILTER_KEY,value)}catch{}applyHomeFilter(value)}
 function applyHomeFilter(value=homeFilter()){
- document.querySelectorAll('#homeDynamic .stream-card').forEach(card=>{card.hidden=value!=='all'&&card.dataset.group!==value});
+ document.querySelectorAll('#homeDynamic .stream-card,#historyDynamic .stream-card').forEach(card=>{card.hidden=value!=='all'&&card.dataset.group!==value});
  document.querySelectorAll('#live-channel-list .live-channel-rail-item').forEach(card=>{card.hidden=(value!=='all'&&card.dataset.group!==value)||(watchMode==='multi'&&viewing.ids.includes(card.dataset.liveVideoId))});
  document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.classList.toggle('active',button.dataset.filter===value));
+ document.querySelectorAll('#historyDynamic [data-history-filter]').forEach(button=>button.classList.toggle('active',button.dataset.historyFilter===value));
 }
 function homeSelection(){
  document.querySelectorAll('#homeDynamic .stream-card[data-multiview-id],#historyDynamic .stream-card[data-multiview-id]').forEach(card=>{const on=selectedHomeVideos.has(card.dataset.multiviewId);card.classList.toggle('multi-selected',on);card.setAttribute('aria-selected',String(on))});
@@ -191,11 +192,20 @@ let homeCollabEvents=[],homeCollabByVideo=new Map();
 function collabEventStreams(event){
  return Array.isArray(event?.streams)?event.streams.filter(x=>x&&/^[A-Za-z0-9_-]{11}$/.test(String(x.video_id||''))):[];
 }
+function collabEventMap(data,historyDay=''){
+ const events=data?.schema_version==='public-experience-v1'&&data?.kind==='collab'&&Array.isArray(data.events)?data.events:[];
+ const map=new Map();
+ for(const raw of events){
+  const event=historyDay?{...raw,_history_day:historyDay}:raw;
+  if(collabEventStreams(event).length<2)continue;
+  for(const stream of collabEventStreams(event))map.set(stream.video_id,event);
+ }
+ return map;
+}
 function setHomeCollabEvents(data){
  const events=data?.schema_version==='public-experience-v1'&&data?.kind==='collab'&&Array.isArray(data.events)?data.events:[];
  homeCollabEvents=events.filter(event=>collabEventStreams(event).length>1);
- homeCollabByVideo=new Map();
- for(const event of homeCollabEvents)for(const stream of collabEventStreams(event))homeCollabByVideo.set(stream.video_id,event);
+ homeCollabByVideo=collabEventMap(data);
 }
 function collabDetailUrl(event){
  const eventId=String(event?.event_id||'');if(!eventId||!config.apiBase)return '';
@@ -250,8 +260,9 @@ function collabEntry(event){
  entry.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();openStandaloneCollab(event)}};
  return entry;
 }
-function homeCard(item,container){
+function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={}){
  if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
+ if(history&&String(item.lifecycle_state||item.state||'').toLowerCase()!=='ended')return;
  const id=item.video_id;const lifecycle=String(item.lifecycle_state||item.state||'unknown').toLowerCase();
  const group=String(item.group||item.channel_group||'other').toLowerCase();
  const href='/viewer/?stream='+encodeURIComponent(id)+'&layout=equal&primary=0&audio=0&mode=single';
@@ -262,12 +273,13 @@ function homeCard(item,container){
  if(['live','waiting','upcoming','ended'].includes(lifecycle)){card.dataset.multiviewId=id;card.setAttribute('aria-selected','false')}
  const thumb=node('div',undefined,'card-thumb');const img=node('img');img.src='https://i.ytimg.com/vi/'+id+'/mqdefault.jpg';img.alt='';img.loading='lazy';thumb.append(img);
  const youTube=node('span','YouTube ↗','youtube-source-link');youTube.role='link';youTube.tabIndex=0;youTube.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;thumb.append(youTube);
- const overlay=node('div',undefined,'thumb-overlay');overlay.append(node('span',status[0],'thumb-badge '+status[1]));
+ const overlay=node('div',undefined,'thumb-overlay');
+ if(!history)overlay.append(node('span',status[0],'thumb-badge '+status[1]));
  const time=homeStartLabel(item);overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
- const collab=homeCollabByVideo.get(id);const collabButton=collabEntry(collab);if(collabButton)card.append(collabButton);
+ const collab=collabMap.get(id);const collabButton=collabEntry(collab);if(collabButton)card.append(collabButton);
  card.addEventListener('click',event=>{
   if(event.target.closest('.stream-collab-entry'))return;
   const source=event.target.closest('[data-youtube-href]');
@@ -515,11 +527,17 @@ async function loadHistory(){
  const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;
  if(!config.apiBase){error.textContent='History 正式 API 尚未接通。';error.hidden=false;return}
  try{
-  const data=await api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+state.offset);
+  const historyPromise=api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+state.offset);
+  const collabPromise=api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null);
+  const [data,collabData]=await Promise.all([historyPromise,collabPromise]);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
-  data.items.forEach(item=>homeCard(item,list));
-  const ids=new Set(data.items.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
- const total=Number(data.total||0);if(!data.items.length)$('history-empty').hidden=false;
+  const endedItems=data.items.filter(item=>String(item?.lifecycle_state||item?.state||'').toLowerCase()==='ended');
+  const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map();
+  endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));
+  applyHomeFilter();
+  const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
+  const total=Number(data.total||0);if(!endedItems.length)$('history-empty').hidden=false;
+  if(!collabData&&endedItems.length){error.textContent='歷史直播已載入；多人連動資料暫時無法讀取。';error.hidden=false}
   const page=Math.floor(state.offset/50)+1;if(page>1)pagination.append(historyLink('上一頁',day,page-1));
   if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
  }catch(e){error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false}
@@ -733,6 +751,7 @@ async function loadPtt(){
 }
 pttInitControls();
 document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.addEventListener('click',()=>setHomeFilter(button.dataset.filter)));
+document.querySelectorAll('#historyDynamic [data-history-filter]').forEach(button=>button.addEventListener('click',()=>{setHomeFilter(button.dataset.historyFilter);applyCustomLibraryFilter(button.dataset.historyFilter)}));
 window.addEventListener('storage',event=>{if(event.key===HOME_FILTER_KEY){applyHomeFilter();applyCustomLibraryFilter()}});
 $('historyMultiClear').onclick=()=>{selectedHomeVideos.clear();homeSelection()};
 $('historyMultiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;if(ids.length===1){window.hvOpenCustomSession?.([ids[0]],{layout:'auto',ptt:'video',primary:0,audio:0})}else{state.multi=ids;renderMulti();window.hvOpenCustomSession?.(state.multi.slice(),{layout:'auto',ptt:'video',primary:0,audio:0})}};
