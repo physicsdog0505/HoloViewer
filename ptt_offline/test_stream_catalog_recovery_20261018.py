@@ -49,14 +49,14 @@ class StreamCatalogRecoveryInventoryTests(unittest.TestCase):
         td,path,con=self.make_db(); self.addCleanup(td.cleanup)
         common=("2026-10-18T05:00:00Z","2026-10-18T05:01:00Z")
         con.execute("INSERT INTO streams VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",(
-          "livestream01",C,"live",common[0],common[1],None,"live","2026-10-18T05:02:00Z",
+          "livevid0001",C,"live",common[0],common[1],None,"live","2026-10-18T05:02:00Z",
           "2026-10-18T04:00:00Z",None,None,1,1))
         con.execute("INSERT INTO streams VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",(
           "upload00001",C,"upload",common[0],common[1],None,"unknown","2026-10-18T05:02:00Z",
           "2026-10-18T04:00:00Z",None,None,0,1))
         con.commit(); con.close()
         ids={r["video_id"] for r in source_inventory(path,"2026-10-18")}
-        self.assertEqual(ids,{"livestream01"})
+        self.assertEqual(ids,{"livevid0001"})
 
     def test_known_roboco_fixture_preserves_exact_actual_window(self):
         td,path,con=self.make_db(); self.addCleanup(td.cleanup)
