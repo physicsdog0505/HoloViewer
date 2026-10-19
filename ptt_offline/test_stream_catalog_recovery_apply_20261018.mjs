@@ -128,7 +128,8 @@ test('recovery preserves exact bounds and never fabricates missing actual times'
  })]));
  await applyRecoveryPlan(d,exact,{dryRun:false});
  let got=d.raw.prepare('SELECT actual_start,actual_end FROM public_today_canonical WHERE video_id=?').get('exactbnd001');
- assert.deepEqual(got,{actual_start:'2026-10-18T15:00:06Z',actual_end:'2026-10-18T16:04:31Z'});
+ assert.equal(got.actual_start,'2026-10-18T15:00:06Z');
+ assert.equal(got.actual_end,'2026-10-18T16:04:31Z');
  const livePlan=recoveryPlan(artifact([row({
   video_id:'nobounds001',channel_id:C,lifecycle_state:'live',
   projection_observed_at:'2026-10-18T12:00:00Z',
