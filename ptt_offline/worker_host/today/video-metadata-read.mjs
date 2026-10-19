@@ -1,4 +1,5 @@
 import {fetchYoutubeVideoMetadata} from './youtube-metadata-provider.mjs';
+import {writeEvidence,YOUTUBE_LIVE_SOURCE} from './store.mjs';
 
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
 const TRUSTED_TODAY='YouTube liveStreamingDetails';
@@ -23,10 +24,34 @@ function trustedBounds(row,trusted){
  }
  return {actual_start,actual_end};
 }
-async function managedChannel(db,channelId){
- if(!channelId)return false;
- const row=await db.prepare('SELECT 1 AS ok FROM public_today_approved_channels WHERE channel_id=? LIMIT 1').bind(channelId).first();
- return Boolean(row?.ok);
+async function managedMembership(db,channelId){
+ if(!channelId)return null;
+ return await db.prepare(
+  'SELECT ac.roster_version,ac.channel_group FROM public_today_approved_channels ac '+
+  'JOIN public_today_catalog_meta m ON m.singleton=1 AND m.roster_version=ac.roster_version '+
+  'WHERE ac.channel_id=? LIMIT 1'
+ ).bind(channelId).first();
+}
+export async function ingestManagedFallback(env,meta,membership,{now=new Date()}={}){
+ if(!env?.DB?.prepare||!meta?.is_livestream||!membership?.roster_version)return {status:'skipped'};
+ const lifecycle=meta.lifecycle_state==='waiting'?'upcoming':meta.lifecycle_state;
+ if(!['unknown','upcoming','live','ended'].includes(lifecycle))return {status:'skipped'};
+ const observed_at=now.toISOString().replace(/\.\d{3}Z$/,'Z');
+ const result=await writeEvidence(env.DB,{
+   video_id:meta.video_id,
+   channel_id:meta.channel_id,
+   roster_version:membership.roster_version,
+   group:membership.channel_group,
+   title:meta.title??'',
+   channel_name:meta.channel_name??'',
+   lifecycle_state:lifecycle,
+   observed_at,
+   scheduled_start:meta.scheduled_start??null,
+   actual_start:meta.actual_start??null,
+   actual_end:meta.actual_end??null,
+   source_label:YOUTUBE_LIVE_SOURCE
+ });
+ return {status:'ingested',...result};
 }
 async function readCatalog(db,id){
  const today=await db.prepare('SELECT video_id,title,publisher_channel_id AS channel_id,channel_name,lifecycle_state,scheduled_start,actual_start,actual_end,source_label FROM public_today_canonical WHERE video_id=? LIMIT 1').bind(id).first();
@@ -53,10 +78,14 @@ export async function handleVideoMetadataRead(request,env,{fetchImpl=fetch,now=n
  if(!VIDEO.test(id))return json({error:'invalid_video_id'},400,0);
  if(!env?.DB?.prepare)return json({error:'database_not_bound'},503,0);
  const catalog=await readCatalog(env.DB,id);
- if(catalog)return json({...catalog,managed_channel:await managedChannel(env.DB,catalog.channel_id),source:'catalog'},200,15);
+ if(catalog){const membership=await managedMembership(env.DB,catalog.channel_id);return json({...catalog,managed_channel:Boolean(membership),source:'catalog'},200,15);}
  let meta;
  try{meta=await fetchYoutubeVideoMetadata(env,id,{fetchImpl,now});}
  catch{return json({error:'youtube_metadata_unavailable',video_id:id,lifecycle_state:'unknown'},503,0);}
  if(!meta)return json({error:'youtube_video_not_found',video_id:id,lifecycle_state:'unknown'},404,0);
- return json({...meta,managed_channel:await managedChannel(env.DB,meta.channel_id),source:'youtube-fallback'},200,15);
+ const membership=await managedMembership(env.DB,meta.channel_id);
+ if(membership&&meta.is_livestream&&typeof arguments[2]?.ctx?.waitUntil==='function'){
+   arguments[2].ctx.waitUntil(ingestManagedFallback(env,meta,membership,{now}));
+ }
+ return json({...meta,managed_channel:Boolean(membership),source:'youtube-fallback'},200,15);
 }
