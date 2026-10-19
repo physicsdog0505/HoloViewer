@@ -90,7 +90,11 @@ def source_inventory(path, day):
     return out
 
 def run_json(cmd):
-    p=subprocess.run(cmd,check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    print("[READ-ONLY]", " ".join(map(str,cmd[:6])), "...", flush=True)
+    try:
+        p=subprocess.run(cmd,check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=60)
+    except subprocess.TimeoutExpired as e:
+        raise SystemExit("read-only Wrangler query timed out after 60s") from e
     text=p.stdout
     start=text.find("[")
     if start<0: raise SystemExit("Wrangler JSON result not found:\n"+text)
@@ -163,8 +167,12 @@ def main():
     p.add_argument("--config")
     p.add_argument("--out",default="/tmp/hv47-recovery-20261018.json")
     args=p.parse_args()
+    print("[1/4] reading local Stream Catalog", flush=True)
     rows=source_inventory(args.catalog,args.day)
+    print(f"[1/4] source rows selected: {len(rows)}", flush=True)
+    print("[2/4] reading production Today roster/canonical/history (READ-ONLY)", flush=True)
     roster,groups,canonical,history=production_snapshot(args.config,[r["video_id"] for r in rows])
+    print(f"[2/4] production rows: canonical={len(canonical)} history={len(history)}", flush=True)
     by_prod={r["video_id"]:r for r in canonical}; hist_ids={r["video_id"] for r in history}
     counts=Counter(); life=Counter()
     for r in rows:
@@ -176,6 +184,7 @@ def main():
         r["group"]=groups.get(r["channel_id"],"other")
         r["today_import_candidate"]=cls in {"missing","local_newer_richer"}
         r["history_missing_candidate"]=history_candidate(r) and r["video_id"] not in hist_ids
+    print("[3/4] computing diff", flush=True)
     roboco=next((r for r in rows if r["video_id"]==KNOWN_ROBOCO),None)
     artifact={
       "schema_version":"stream-catalog-recovery-inventory-v1",
@@ -197,6 +206,7 @@ def main():
       "rows":rows,
     }
     Path(args.out).write_text(json.dumps(artifact,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+    print("[4/4] inventory artifact written", flush=True)
     print(json.dumps(artifact["summary"],ensure_ascii=False,indent=2))
     print("roboco=",json.dumps(roboco,ensure_ascii=False))
     print("artifact=",args.out)
