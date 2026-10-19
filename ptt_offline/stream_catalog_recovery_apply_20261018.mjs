@@ -60,7 +60,7 @@ export class WranglerD1Adapter{
   this.config=config;this.apply=apply;this.execImpl=execImpl;this.writeCount=0;
  }
  prepare(sql){return new BoundStatement(this,sql);}
- _args(commandArgs){return ['wrangler','d1','execute',DB_NAME,'--remote','--config',this.config,...commandArgs];}
+ _args(commandArgs){return ['--yes','wrangler','d1','execute',DB_NAME,'--remote','--config',this.config,...commandArgs];}
  query(sql){
    const raw=this.execImpl('npx',this._args(['--command',sql,'--json']),{encoding:'utf8'});
    const body=parseWranglerJson(raw),rows=[];
