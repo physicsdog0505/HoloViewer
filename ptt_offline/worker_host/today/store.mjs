@@ -44,7 +44,7 @@ export function evidenceChecksum(r) {
   for (let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
   return (h>>>0).toString(16).padStart(8,'0');
 }
-export async function writeEvidence(db, evidence) {
+export async function writeEvidence(db, evidence, {projectHistory=true}={}) {
   const r=validateEvidence(evidence), hash=evidenceChecksum(r);
   const oldEvidence=await db.prepare('SELECT checksum FROM public_today_evidence WHERE video_id=? AND observed_at=? AND source_label=?')
     .bind(r.video_id,r.observed_at,r.source_label).first();
@@ -79,7 +79,7 @@ export async function writeEvidence(db, evidence) {
         AND public_today_canonical.publisher_channel_id=excluded.publisher_channel_id`;
     mutations.push(db.prepare(sql).bind(r.video_id,r.channel_id,r.roster_version,r.group,r.title,r.channel_name??'',
       r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.source_label,hash));
-    if(r.lifecycle_state==='ended'&&r.source_label===YOUTUBE_LIVE_SOURCE&&r.actual_start&&r.actual_end){
+    if(projectHistory&&r.lifecycle_state==='ended'&&r.source_label===YOUTUBE_LIVE_SOURCE&&r.actual_start&&r.actual_end){
       const catalogAvatar=await db.prepare(`SELECT avatar_url FROM public_catalog
         WHERE channel_id=? AND avatar_url IS NOT NULL
         ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1`).bind(r.channel_id).first();
