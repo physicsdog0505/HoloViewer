@@ -132,11 +132,19 @@ def richness(r):
     return sum(bool(r.get(k)) for k in ("actual_start","actual_end","scheduled_start"))
 
 def classify(source, prod):
-    if not prod:return "missing"
+    if not prod:
+        return "missing"
     so=parse_time(source.get("projection_observed_at"))
     po=parse_time(prod.get("lifecycle_observed_at"))
-    if po and so and po>so:return "production_richer_newer"
-    if richness(prod)>richness(source):return "production_richer_newer"
+    sr=richness(source); pr=richness(prod)
+    if po and so and po>so:
+        return "production_newer_richer"
+    if pr>sr:
+        return "production_newer_richer"
+    if so and (not po or so>po):
+        return "local_newer_richer"
+    if sr>pr:
+        return "local_newer_richer"
     return "already_present"
 
 def history_candidate(r):
@@ -162,7 +170,7 @@ def main():
         r["production"]=by_prod.get(r["video_id"])
         r["roster_version"]=roster
         r["group"]=groups.get(r["channel_id"],"other")
-        r["today_import_candidate"]=cls=="missing" or cls=="already_present"
+        r["today_import_candidate"]=cls in {"missing","local_newer_richer"}
         r["history_missing_candidate"]=history_candidate(r) and r["video_id"] not in hist_ids
     roboco=next((r for r in rows if r["video_id"]==KNOWN_ROBOCO),None)
     artifact={
@@ -176,7 +184,8 @@ def main():
         "lifecycle":{"upcoming":life["upcoming"],"live":life["live"],"ended":life["ended"],"unknown_missing":life["unknown"]},
         "production_already_present":counts["already_present"],
         "production_missing":counts["missing"],
-        "production_richer_newer_conflict":counts["production_richer_newer"],
+        "production_local_newer_richer":counts["local_newer_richer"],
+        "production_newer_richer_conflict":counts["production_newer_richer"],
         "today_import_candidates":sum(bool(r["today_import_candidate"]) for r in rows),
         "history_missing_candidates":sum(bool(r["history_missing_candidate"]) for r in rows),
       },
