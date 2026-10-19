@@ -147,6 +147,8 @@ test('invalid video id is rejected before provider access',async()=>{
 function sqliteD1(){
  const sqlite=new DatabaseSync(':memory:');
  sqlite.exec(readFileSync(new URL('./worker_host/today/0002_today_canonical.sql',import.meta.url),'utf8'));
+ sqlite.exec("CREATE TABLE public_history(video_id TEXT PRIMARY KEY,title TEXT,channel_id TEXT,channel_name TEXT,scheduled_start TEXT,actual_start TEXT,actual_end TEXT,source_revision TEXT);");
+ sqlite.exec("CREATE TABLE public_catalog(video_id TEXT PRIMARY KEY,title TEXT,channel_id TEXT,channel_name TEXT,lifecycle_state TEXT,scheduled_start TEXT,actual_start TEXT,avatar_url TEXT);");
  sqlite.prepare("INSERT INTO public_today_catalog_meta(singleton,roster_version,last_success_at,expected_channels,scanned_channels,gap,checkpoint) VALUES(1,?,?,?,?,?,NULL)")
    .run('fixture-v1','2026-10-19T00:00:00Z',1,1,0);
  sqlite.prepare("INSERT INTO public_today_approved_channels(channel_id,roster_version,activated_at,channel_group) VALUES(?,?,?,?)")
