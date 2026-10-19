@@ -10,6 +10,7 @@ function iso(value){
 export function normalizeYoutubeVideoItem(item,{now=new Date()}={}){
  if(!item||!VIDEO.test(item.id??'')||!item.snippet||!CHANNEL.test(item.snippet.channelId??''))return null;
  const s=item.snippet,d=item.liveStreamingDetails??{};
+ const has_live_streaming_details=item.liveStreamingDetails!=null&&typeof item.liveStreamingDetails==='object';
  const actual_start=iso(d.actualStartTime);
  const actual_end=iso(d.actualEndTime);
  const scheduled_start=iso(d.scheduledStartTime);
@@ -27,7 +28,8 @@ export function normalizeYoutubeVideoItem(item,{now=new Date()}={}){
    lifecycle_state,
    scheduled_start,
    actual_start,
-   actual_end
+   actual_end,
+   is_livestream:Boolean(has_live_streaming_details||actual_start||actual_end||scheduled_start||s.liveBroadcastContent==='live'||s.liveBroadcastContent==='upcoming')
  };
 }
 export async function fetchYoutubeVideoItems(env,ids,{fetchImpl=fetch,now=new Date()}={}){
