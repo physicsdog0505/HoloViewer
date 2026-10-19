@@ -1,0 +1,47 @@
+{
+  "youtube": {
+    "available": true,
+    "exported_at": "2026-10-20T00:00:00Z",
+    "roster": {
+      "version": "pr53-contract-fixture-v1",
+      "channels": [{"id": "UCAAAAAAAAAAAAAAAAAAAAAA", "group": "fixture"}]
+    },
+    "today": {
+      "schema_version": "public-consumer-v1",
+      "as_of": "2026-10-15T14:45:00Z",
+      "completeness": {"status": "partial", "gap": false},
+      "streams": []
+    },
+    "history": {
+      "schema_version": "public-history-import-preview-v1",
+      "source_revision": "stream-catalog-v1:youtube-liveStreamingDetails",
+      "rows": [{
+        "video_id": "8pF4qHcshDc",
+        "taipei_day": "2026-10-15",
+        "title": "Sanitized contract fixture",
+        "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+        "channel_name": "Fixture A",
+        "avatar_url": "",
+        "scheduled_start": "2026-10-15T12:00:00Z",
+        "actual_start": "2026-10-15T12:00:16Z",
+        "actual_end": "2026-10-15T14:42:31Z",
+        "source_revision": "stream-catalog-v1:youtube-liveStreamingDetails",
+        "published_at": "2026-10-16T23:03:55Z"
+      }]
+    },
+    "expected_video_ids": ["8pF4qHcshDc"],
+    "expected_authority": {
+      "verified": true,
+      "day": "2026-10-15",
+      "version": "contract-fixture-authority-v1",
+      "issuer": "offline-test-only"
+    },
+    "target": {"sanitized": true, "rows": []}
+  },
+  "ptt": {
+    "available": false,
+    "exported_at": "2026-10-20T00:00:00Z",
+    "day_stage": {"day": "2026-10-15", "rows": []},
+    "target": {"sanitized": true, "rows": []}
+  }
+}

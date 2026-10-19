@@ -16,8 +16,13 @@ EXPECTED |= {
     "data_lifecycle/inventory.py", "data_lifecycle/planner.py",
     "data_lifecycle/checkpoint.py", "data_lifecycle/report.py",
     "data_lifecycle/cli.py", "test_data_lifecycle.py",
+    "data_lifecycle/adapters.py", "test_snapshot_integration.py",
     "docs/data-lifecycle/README.md", "docs/data-lifecycle/architecture-audit.md",
     "docs/data-lifecycle/rfc.md", "docs/data-lifecycle/rollout.md",
+    "docs/data-lifecycle/independent-review.md",
+    "docs/data-lifecycle/snapshot-integration.md",
+    "fixtures/data-lifecycle/youtube-2026-10-15.sanitized.json",
+    "fixtures/data-lifecycle/ptt-2026-10-01.sanitized.json",
 }
 
 class PublicSmokeTests(unittest.TestCase):

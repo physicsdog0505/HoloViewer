@@ -8,7 +8,10 @@ from .common import content_hash, taipei_day, validate_day
 def _youtube(day: str, snapshot: dict) -> dict:
     available = snapshot.get("available") is True
     expected = snapshot.get("expected_ids")
-    expected_known = available and isinstance(expected, list)
+    authority = snapshot.get("expected_authority") if isinstance(snapshot.get("expected_authority"), dict) else {}
+    expected_known = (available and isinstance(expected, list) and authority.get("verified") is True
+                      and authority.get("day") == day and isinstance(authority.get("version"), str)
+                      and bool(authority.get("version")))
     rows = snapshot.get("rows") if available and isinstance(snapshot.get("rows"), list) else []
     actual, uncertain, delayed = [], [], []
     for row in rows:
@@ -42,13 +45,17 @@ def _youtube(day: str, snapshot: dict) -> dict:
             "actual_set": actual_set, "missing_ids": missing, "duplicates": duplicates,
             "unconfirmed_ids": sorted(set(uncertain)), "metadata_delayed_ids": sorted(set(delayed)),
             "completeness_status": status, "last_updated_at": snapshot.get("last_updated_at"),
-            "source_version": snapshot.get("source_version")}
+            "source_version": snapshot.get("source_version"), "expected_authority": authority or None,
+            "contract_gaps": list(snapshot.get("contract_gaps", []))}
 
 
 def _ptt(day: str, snapshot: dict) -> dict:
     available = snapshot.get("available") is True
     expected = snapshot.get("expected_aids")
-    expected_known = available and isinstance(expected, list)
+    authority = snapshot.get("expected_authority") if isinstance(snapshot.get("expected_authority"), dict) else {}
+    expected_known = (available and isinstance(expected, list) and authority.get("verified") is True
+                      and authority.get("day") == day and isinstance(authority.get("version"), str)
+                      and bool(authority.get("version")))
     rows = snapshot.get("rows") if available and isinstance(snapshot.get("rows"), list) else []
     by_aid, keys = defaultdict(list), []
     for row in rows:
@@ -85,7 +92,9 @@ def _ptt(day: str, snapshot: dict) -> dict:
             "actual_set": sorted(by_aid), "missing_ids": missing_aids, "source_line_gaps": gaps,
             "duplicates": duplicates, "unconfirmed_ids": sorted(set(unconfirmed)),
             "completeness_status": status, "last_updated_at": snapshot.get("last_updated_at"),
-            "source_version": snapshot.get("source_version")}
+            "source_version": snapshot.get("source_version"), "expected_authority": authority or None,
+            "checkpoint": snapshot.get("checkpoint"), "manifest": snapshot.get("manifest"),
+            "contract_gaps": list(snapshot.get("contract_gaps", []))}
 
 
 def build_inventory(day: str, snapshot: dict) -> dict:

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .inventory import build_inventory
+from .adapters import adapt_contract_snapshot
 from .planner import build_sync_plan
 from .report import build_reconciliation_report, render_markdown
 
@@ -15,8 +16,12 @@ def main() -> int:
     parser.add_argument("--snapshot", required=True)
     parser.add_argument("--json-out", required=True)
     parser.add_argument("--markdown-out", required=True)
+    parser.add_argument("--contract-export", action="store_true",
+                        help="adapt sanitized #47/#48 contract exports before reconciliation")
     args = parser.parse_args()
     snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
+    if args.contract_export:
+        snapshot = adapt_contract_snapshot(args.date, snapshot)
     inventory = build_inventory(args.date, snapshot)
     plans = []
     for source in ("youtube", "ptt"):

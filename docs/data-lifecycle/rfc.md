@@ -44,12 +44,23 @@ coverage is classified as push or explicit non-push, source lines are unique,
 and unresolved timestamp/AID/revision conflicts are absent. A push whose
 content is the empty string is a valid row, not a gap.
 
+An expected set is authoritative only when an independent evidence envelope
+names the exact Taipei day and a non-empty authority version. A provider's own
+`available`, `gap=false`, row count, manifest checksum, or empty list cannot
+self-certify completeness. Existing #47 Today and History Preview exports and
+#48 archive manifests do not currently provide this independent daily
+expected-set authority; their adapters therefore return `UNKNOWN` unless a
+separately verified envelope accompanies the sanitized export.
+
 ## Idempotency, recovery, and budgets
 
 Planning yields `INSERT`, `UPDATE`, `NOOP`, `CONFLICT`, or `REPAIR_NEEDED`.
 There is no execution API. Checkpoints record pending/completed identity,
-attempt counts, content-bound hashes, and traffic usage. Only exact ACKs from a
-future existing owner writer may advance checkpoints. Retry uses capped
+attempt counts, one content-bound in-flight reservation, and traffic usage.
+The reservation includes the exact payload SHA-256. Re-reserving the same
+in-flight item and payload is idempotent; another item or payload is refused.
+Only an ACK matching identity and reservation digest may advance a checkpoint.
+Retry uses capped
 exponential backoff. Exceeding the global traffic budget fails closed before a
 reservation. Unavailable upstreams produce `UNKNOWN`/`UPSTREAM_UNAVAILABLE`,
 never empty-complete.

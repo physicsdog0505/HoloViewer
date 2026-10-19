@@ -29,7 +29,11 @@ def taipei_day(value: str) -> str:
 
 
 def validate_day(value: str) -> str:
-    if date.fromisoformat(value).isoformat() != value:
+    try:
+        valid = isinstance(value, str) and date.fromisoformat(value).isoformat() == value
+    except ValueError:
+        valid = False
+    if not valid:
         raise ValueError("invalid ISO day")
     return value
 
@@ -41,8 +45,9 @@ def identity(source: str, row: dict) -> str:
             raise ValueError("youtube video_id required")
         return value
     if source == "ptt":
-        aid, line = row.get("aid"), row.get("source_line")
+        day, aid, line = row.get("day"), row.get("aid"), row.get("source_line")
+        validate_day(day)
         if not isinstance(aid, str) or not aid or type(line) is not int or line < 1:
             raise ValueError("PTT aid and positive source_line required")
-        return f"{row.get('day')}:{aid}:{line}"
+        return f"{day}:{aid}:{line}"
     raise ValueError("unsupported source")

@@ -1,0 +1,33 @@
+{
+  "youtube": {
+    "available": false,
+    "exported_at": "2026-10-20T00:00:00Z",
+    "roster": {"version": "pr53-contract-fixture-v1", "channels": []},
+    "target": {"sanitized": true, "rows": []}
+  },
+  "ptt": {
+    "available": true,
+    "exported_at": "2026-10-20T00:00:00Z",
+    "day_stage": {
+      "day": "2026-10-01",
+      "rows": [
+        {"day": "2026-10-01", "aid": "fixture-aid", "source_line": 10, "push_id": "fixture-push-10", "source_record_key": "fixture-aid:10", "author": "alice", "content": "hello", "occurred_at": "2026-10-01T04:01:00Z"},
+        {"day": "2026-10-01", "aid": "fixture-aid", "source_line": 11, "push_id": "fixture-push-11", "source_record_key": "fixture-aid:11", "author": "bob", "content": "", "occurred_at": "2026-10-01T04:02:00Z"}
+      ]
+    },
+    "coverage": {
+      "fixture-aid": {"complete": true, "start_line": 1, "end_line": 11, "non_push_lines": [1,2,3,4,5,6,7,8,9]}
+    },
+    "manifest": {
+      "schema_version": "ptt-r2-archive-v1",
+      "from_day_taipei": "2026-10-01",
+      "through_day_taipei": "2026-10-01",
+      "days": [{"day": "2026-10-01", "coverage_status": "COMPLETE", "finalized": true}],
+      "objects": [{"key": "ptt/v1/chunks/2026/10/01/0400.json.gz", "pushes": 2, "sha256": "fixture-only"}]
+    },
+    "checkpoint": {"schema_version": "ptt48-checkpoint-v1", "job_id": "fixture-job", "state": "provisional", "day": "2026-10-01", "source_identity": "fixture-source", "traffic_used": 1, "traffic_budget": 10},
+    "expected_aids": ["fixture-aid"],
+    "expected_authority": {"verified": true, "day": "2026-10-01", "version": "contract-fixture-authority-v1", "issuer": "offline-test-only"},
+    "target": {"sanitized": true, "rows": []}
+  }
+}
