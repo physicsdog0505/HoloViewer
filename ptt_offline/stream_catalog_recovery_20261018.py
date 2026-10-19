@@ -98,7 +98,11 @@ def run_json(cmd):
     return body
 
 def d1_query(config, sql):
-    body=run_json(["npx","wrangler","d1","execute",DB_NAME,"--remote","--config",str(config),"--command",sql,"--json"])
+    cmd=["npx","wrangler","d1","execute",DB_NAME,"--remote"]
+    if config:
+        cmd += ["--config",str(config)]
+    cmd += ["--command",sql,"--json"]
+    body=run_json(cmd)
     results=[]
     for part in body if isinstance(body,list) else [body]:
         if isinstance(part,dict):
@@ -156,7 +160,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--catalog",default="~/Downloads/Hololive-PTT-Viewer/hololive_stream_catalog.sqlite3")
     p.add_argument("--day",default="2026-10-18")
-    p.add_argument("--config",required=True)
+    p.add_argument("--config")
     p.add_argument("--out",default="/tmp/hv47-recovery-20261018.json")
     args=p.parse_args()
     rows=source_inventory(args.catalog,args.day)
