@@ -1,5 +1,6 @@
 import {refreshTodayDiscovery} from './discovery-refresh.mjs';
 import {writeEvidence,YOUTUBE_LIVE_SOURCE} from './store.mjs';
+import {fetchYoutubeVideoItems} from './youtube-metadata-provider.mjs';
 
 const ID=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
@@ -33,25 +34,15 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
   const ids=rows.map(r=>r.video_id).filter(id=>ID.test(id??''));
   if(!ids.length)return {status:'idle',requests:0,updated:0,selected:0};
 
-  const url=new URL('https://www.googleapis.com/youtube/v3/videos');
-  url.searchParams.set('part','snippet,liveStreamingDetails');
-  url.searchParams.set('id',ids.join(','));
-  url.searchParams.set('key',String(env.YOUTUBE_API_KEY));
-  const response=await fetchImpl(url.toString(),{
-    headers:{accept:'application/json'},
-    signal:AbortSignal.timeout(12000)
-  });
-  if(!response.ok)throw Error('YouTube videos.list failed HTTP '+response.status);
-  const payload=await response.json();
-  if(!Array.isArray(payload.items))throw Error('malformed videos.list');
-  const byId=new Map(payload.items.map(item=>[item.id,item]));
+  const providerRows=await fetchYoutubeVideoItems(env,ids,{fetchImpl,now});
+  const byId=new Map(providerRows.map(item=>[item.video_id,item]));
   const expected=new Map(rows.map(r=>[r.video_id,r]));
   const observed_at=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   let updated=0,missing=0,removed_non_live=0,retired_missing=0;
 
   for(const id of ids){
-    const base=expected.get(id),v=byId.get(id),s=v?.snippet,d=v?.liveStreamingDetails??{};
-    if(!base||!v||!s){
+    const base=expected.get(id),v=byId.get(id);
+    if(!base||!v){
       missing++;
       if(base?.lifecycle_state==='live'){
         await env.DB.prepare(`INSERT INTO public_today_provider_misses(video_id,first_missing_at,last_missing_at,miss_count)
@@ -74,11 +65,11 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
       continue;
     }
     await env.DB.prepare('DELETE FROM public_today_provider_misses WHERE video_id=?').bind(id).run();
-    if(!CHANNEL.test(base.publisher_channel_id??'')||s.channelId!==base.publisher_channel_id)throw Error('publisher mismatch');
-    const actualEnd=iso(d.actualEndTime),actualStart=iso(d.actualStartTime),scheduled=iso(d.scheduledStartTime);
+    if(!CHANNEL.test(base.publisher_channel_id??'')||v.channel_id!==base.publisher_channel_id)throw Error('publisher mismatch');
+    const actualEnd=v.actual_end,actualStart=v.actual_start,scheduled=v.scheduled_start;
     const hasLivestreamEvidence=Boolean(
       actualEnd || actualStart || scheduled ||
-      s.liveBroadcastContent==='live' || s.liveBroadcastContent==='upcoming'
+      v.lifecycle_state==='live' || v.lifecycle_state==='upcoming' || v.lifecycle_state==='waiting'
     );
     if(!hasLivestreamEvidence && Boolean(base.from_discovery)){
       await env.DB.batch([
@@ -88,15 +79,14 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
       removed_non_live++;
       continue;
     }
-    const lifecycle=actualEnd?'ended':s.liveBroadcastContent==='live'?'live':
-      s.liveBroadcastContent==='upcoming'?'upcoming':actualStart?'live':'unknown';
+    const lifecycle=v.lifecycle_state==='waiting'?'upcoming':v.lifecycle_state;
     await writeEvidence(env.DB,{
       video_id:id,
       channel_id:base.publisher_channel_id,
       roster_version:base.roster_version,
       group:base.channel_group,
-      title:String(s.title??base.title??''),
-      channel_name:String(s.channelTitle??base.channel_name??''),
+      title:String(v.title??base.title??''),
+      channel_name:String(v.channel_name??base.channel_name??''),
       lifecycle_state:lifecycle,
       observed_at,
       scheduled_start:scheduled,
