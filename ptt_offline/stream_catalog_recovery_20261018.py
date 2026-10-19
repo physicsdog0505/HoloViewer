@@ -102,7 +102,7 @@ def run_json(cmd):
     return body
 
 def d1_query(config, sql):
-    cmd=["npx","wrangler","d1","execute",DB_NAME,"--remote"]
+    cmd=["npx","--yes","wrangler","d1","execute",DB_NAME,"--remote"]
     if config:
         cmd += ["--config",str(config)]
     cmd += ["--command",sql,"--json"]
