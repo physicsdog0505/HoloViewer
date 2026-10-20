@@ -833,7 +833,7 @@ async function loadPtt(){
   meta.textContent=today.replaceAll('-','/')+' · 後端暫未就緒 · 60 秒後重試 · 純 PTT 閱讀';
   if(!pttLastGoodCount){
    list.hidden=true;empty.hidden=false;latest.hidden=true;
-   empty.textContent='今日 PTT 後端資料暫未就緒；頁面會每 10 秒自動重試。';
+   empty.textContent='今日 PTT 後端資料暫未就緒；頁面會每 60 秒自動重試。';
   }
  }finally{pttLoadInFlight=false}
 }
