@@ -37,6 +37,7 @@ jobs:
             ptt_offline.test_d1_provider \
             ptt_offline.test_migration_preflight \
             ptt_offline.test_collector_source_preview \
+            ptt_offline.test_collector_integrity_export \
             ptt_offline.test_publisher_cli \
             ptt_offline.test_timestamp_authority \
             ptt_offline.test_resumable_publisher \
