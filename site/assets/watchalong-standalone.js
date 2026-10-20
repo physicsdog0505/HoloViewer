@@ -617,7 +617,7 @@ async function loadReadOnlyArtifacts(){
  }
 }
 renderSegments();
-loadReadOnlyArtifacts();
+const staticArtifactsPromise=loadReadOnlyArtifacts();
 
 function pttKey(row){return String(row?.source_record_key||row?.push_id||row?.aid+':'+row?.source_line)}
 function pttRow(row){
@@ -683,9 +683,9 @@ async function loadArchivePtt(windowInfo){
  }catch(e){pttFeed.replaceChildren();const m=document.createElement('div');m.className='ptt-empty';m.textContent='歷史 PTT 暫時無法讀取：'+String(e?.message||e);pttFeed.append(m)}
 }
 async function resolveHostPtt(){
- if(!HOST_ID){pttMeta.textContent='缺少 Hololive 主影片';return}
+ if(!hostVideoId){pttMeta.textContent='缺少 Hololive 主影片';return}
  try{
-  const row=await api('/v1/catalog/videos/'+encodeURIComponent(HOST_ID));
+  const row=await api('/v1/catalog/videos/'+encodeURIComponent(hostVideoId));
   const state=String(row?.lifecycle_state||row?.state||'').toLowerCase();
   hostStatus.textContent=state||'unknown';
   if(state==='live'){hostWindow=null;await loadTodayPtt(taipeiDay());pttTimer=setInterval(()=>{if(!document.hidden)loadTodayPtt(taipeiDay())},10000);return}
@@ -702,6 +702,8 @@ async function resolveHostPtt(){
   pttMeta.textContent='無法取得可信 lifecycle / actual time';
  }
 }
-resolveHostPtt();
+staticArtifactsPromise.then(()=>{
+ if(!staticArtifactsFailed)resolveHostPtt();
+});
 
 window.addEventListener('pagehide',()=>{clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer)});
