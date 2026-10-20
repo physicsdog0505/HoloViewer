@@ -8,11 +8,17 @@ Three facts are intentionally independent:
 from __future__ import annotations
 
 from copy import deepcopy
+import re
 
 SOURCE_STATES = {"VERIFIED_COMPLETE", "REPAIR_NEEDED", "UNKNOWN", "CONFLICT"}
 JOB_STATES = {"completed", "succeeded", "failed", "running", "waiting", "unknown", "unavailable"}
 PACKAGE_STATES = {"COMPLETE", "PARTIAL", "UNKNOWN"}
 READBACK_STATES = {"VERIFIED", "UNKNOWN"}
+_ERROR_CODE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
+
+
+def _bounded_error_code(value: object) -> str | None:
+    return value if isinstance(value, str) and _ERROR_CODE.fullmatch(value) else None
 
 
 def _count_gap_ranges(gaps: object) -> int:
@@ -68,7 +74,7 @@ def _repair_projection(raw: object) -> dict:
         "failed": raw.get("failed") if isinstance(raw.get("failed"), bool) else None,
         "attempted_at": raw.get("attempted_at"),
         "succeeded_at": raw.get("succeeded_at"),
-        "error_code": raw.get("error_code"),
+        "error_code": _bounded_error_code(raw.get("error_code")),
         "contract_gaps": list(raw.get("contract_gaps") or []),
     }
 
@@ -131,6 +137,10 @@ def build_daily_finalization(evidence: dict) -> dict:
     if day and not day.get("final_verification_at"):
         contract_gaps.append("final-verification-timestamp-unavailable")
 
+    top_error = _bounded_error_code(evidence.get("error_code"))
+    if evidence.get("error_code") is not None and top_error is None:
+        contract_gaps.append("invalid-error-code")
+
     final_verification_at = day.get("final_verification_at")
     return {
         "schema_version": "holoviewer-admin-daily-finalization-v1",
@@ -147,7 +157,7 @@ def build_daily_finalization(evidence: dict) -> dict:
             },
             "repair_job": {k: v for k, v in repair.items() if k != "contract_gaps"},
             "archive": {k: v for k, v in archive.items() if k != "contract_gaps"},
-            "error_code": evidence.get("error_code"),
+            "error_code": top_error,
             "contract_gaps": sorted(set(str(x) for x in contract_gaps if x)),
             "evidence": {
                 "coverage_day": deepcopy(day),
