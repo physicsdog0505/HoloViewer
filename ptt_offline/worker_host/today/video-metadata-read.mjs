@@ -1,5 +1,4 @@
 import {YOUTUBE_LIVE_SOURCE} from './store.mjs';
-import {processVideoMetadataDemands} from './video-metadata-recovery.mjs';
 
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
 const TRUSTED_TODAY='YouTube liveStreamingDetails';
@@ -74,7 +73,7 @@ async function readCatalog(db,id){
  return {video_id:legacy.video_id,channel_id:legacy.channel_id??'',title:legacy.title??'',channel_name:legacy.channel_name??'',lifecycle_state:legacy.lifecycle_state??'unknown',scheduled_start:validTime(legacy.scheduled_start)?legacy.scheduled_start:null,actual_start:null,actual_end:null};
 }
 
-export async function handleVideoMetadataRead(request,env,{ctx=null,now=new Date(),fetchImpl=fetch}={}){
+export async function handleVideoMetadataRead(request,env,{now=new Date()}={}){
  if(!request||request.method!=='GET')return json({error:'method_not_allowed'},405,0);
  let url;
  try{url=new URL(request.url)}catch{return json({error:'bad_request'},400,0)}
@@ -95,11 +94,8 @@ export async function handleVideoMetadataRead(request,env,{ctx=null,now=new Date
    retry_after_seconds:Math.max(1,Math.ceil((Date.parse(demand.next_attempt_at)-now.getTime())/1000)),
    priority:Number(demand.priority),ptt_priority:Boolean(Number(demand.priority)===1)},404,0);
  }
- const work=processVideoMetadataDemands(env,{fetchImpl,now,limit:1,preferredVideoId:id});
- if(ctx?.waitUntil)ctx.waitUntil(work);
- else work.catch(()=>{});
  return json({status:'metadata_pending',video_id:id,lifecycle_state:'unknown',
-  retry_after_seconds:2,priority:Number(demand?.priority??ptt.priority),
+  retry_after_seconds:60,priority:Number(demand?.priority??ptt.priority),
   ptt_priority:Boolean(Number(demand?.priority??ptt.priority)===1),
   demand_state:String(demand?.status||'pending')},202,0);
 }
