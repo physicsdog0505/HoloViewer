@@ -79,6 +79,8 @@ D1 bounds are encoded in `D1ReadScope`:
 - bounded day/AID scope;
 - explicit verification mode.
 
+Automatic Admin reads use `bounded_sample`. `full_partition` is rejected unless a future separately reviewed manual request class/cost class is explicitly authorized; Phase 1 exposes no such browser control.
+
 Actual query templates/table/view allowlists belong to the future D1 capability implementation, not the Admin consumer.
 
 ## Provider selection
@@ -94,7 +96,7 @@ Production mode never auto-detects. It requires an explicitly supplied Productio
 - Publisher;
 - Collector.
 
-Every gate defaults `enabled=false`.
+Every gate defaults `enabled=false`. Disabled or credential-missing sources surface as **UNAVAILABLE / NOT ENABLED**, not as fabricated Production evidence.
 
 ## Credential design
 
@@ -112,7 +114,7 @@ It is multi-process safe through SQLite transactions and WAL locking and does no
 
 Default D1 admission:
 - 6 refreshes / 10 minutes globally per admission DB;
-- same-key in-flight lease coalescing;
+- same-key in-flight lease coalescing (duplicate request is fail-closed instead of issuing a second Production read);
 - atomic window update;
 - corrupt state => deny;
 - over budget => deny;
