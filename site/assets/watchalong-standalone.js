@@ -99,7 +99,8 @@ function api(path){
 }
 async function metadataRead(videoId){
  const result=await window.HoloViewerVideoMetadata?.resolve(videoId,{
-  apiBase:API_BASE,preferCatalog:true,waitForRecovery:true,maxAttempts:6
+  apiBase:API_BASE,preferCatalog:true,waitForRecovery:true,maxAttempts:6,
+  pttDay:/^\d{4}-\d{2}-\d{2}$/.test(watchalongSessionDay)?watchalongSessionDay:''
  });
  if(result?.status==='ready')return {status:200,payload:result.row};
  if(result?.status==='pending')return {status:202,payload:result.row||{status:'metadata_pending'}};
