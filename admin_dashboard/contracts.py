@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from data_lifecycle.common import parse_time
 
-MONITOR_STATES = {"running", "waiting", "failed", "completed", "succeeded", "unknown"}
+MONITOR_STATES = {"running", "waiting", "failed", "completed", "succeeded", "unknown", "unavailable"}
 HEALTH_STATES = {"healthy", "degraded", "unhealthy", "unknown", "unavailable"}
 
 
@@ -83,6 +83,7 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
     checkpoint = evidence.get("publisher_checkpoint")
     archive_sync_job = evidence.get("archive_sync_job")
     target = evidence.get("d1_snapshot")
+    shell_errors = evidence.get("shell_source_errors") if isinstance(evidence.get("shell_source_errors"), dict) else {}
     jobs = []
 
     if isinstance(checkpoint, dict):
@@ -100,9 +101,12 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
         values.update(telemetry)
         jobs.append(_job(**values))
     else:
+        publisher_error = shell_errors.get("publisher")
         jobs.append(_job(component="Publisher", source="PTT SQLite", target="D1",
+                         status="unavailable" if publisher_error else "unknown",
                          evidence_source="#48 publisher checkpoint",
-                         contract_gaps=["publisher-checkpoint-unavailable"]))
+                         error_code=publisher_error,
+                         contract_gaps=[publisher_error or "publisher-checkpoint-unavailable"]))
 
     # Archive producer semantics are owned by #48. The injected reader must
     # supply the canonical normalized project_archive_as_sync_job() shape.
@@ -163,9 +167,12 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
                              evidence_source="#48 normalized archive projection",
                              contract_gaps=["invalid-archive-sync-job-projection"]))
     else:
+        archive_error = shell_errors.get("archive")
         jobs.append(_job(component="Archive", source="PTT Archive", target=None,
+                         status="unavailable" if archive_error else "unknown",
                          evidence_source="#48 normalized archive projection",
-                         contract_gaps=["archive-delivery-job-evidence-unavailable"]))
+                         error_code=archive_error,
+                         contract_gaps=[archive_error or "archive-delivery-job-evidence-unavailable"]))
 
     if isinstance(target, dict) and target.get("sanitized") is True and isinstance(target.get("rows"), list):
         observed = target.get("observed_at")
@@ -196,9 +203,12 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
         values.update(telemetry)
         jobs.append(_job(**values))
     else:
+        d1_error = shell_errors.get("d1")
         jobs.append(_job(component="D1 Snapshot", source="Publisher", target="D1",
+                         status="unavailable" if d1_error else "unknown",
                          evidence_source="sanitized D1 snapshot",
-                         contract_gaps=["sanitized-d1-snapshot-unavailable"]))
+                         error_code=d1_error,
+                         contract_gaps=[d1_error or "sanitized-d1-snapshot-unavailable"]))
 
     return {"schema_version": "holoviewer-sync-monitor-v1", "jobs": jobs,
             "read_only": True, "rerun_sync_available": False}
