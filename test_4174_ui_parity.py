@@ -203,7 +203,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.source-choice{display:grid', css)
         self.assertIn('.manual-shell{padding:20px}', css)
         self.assertIn("const youtubePanel=document.getElementById('youtubePanel')", js)
-        self.assertIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
+        self.assertIn("location.href='/watchalong-viewer/?'+q.toString();", js)
+        self.assertIn("第一版同時視聽先支援 YouTube 片源", js)
         self.assertNotIn("watch-add').onclick", js)
 
     def test_original_4174_collab_hub_structure(self):
