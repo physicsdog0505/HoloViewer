@@ -174,7 +174,7 @@ def start_publisher(repo_root, source, state_root, secrets_path):
          "--metrics",str(metrics),"--iterations","1"],capture=False)
     cmd=[sys.executable,"-B","-m","ptt_offline.recurring_publisher",
          "--source",source,"--state-dir",str(state_root/"state"),
-         "--metrics",str(metrics),"--iterations","1440",
+         "--metrics",str(metrics),"--iterations","0",
          "--batch-cap",str(PRODUCTION_PROFILE["rows"]),
          "--max-batches",str(PRODUCTION_PROFILE["max_batches"]),
          "--burst-max-batches",str(PRODUCTION_PROFILE["burst_max_batches"]),
