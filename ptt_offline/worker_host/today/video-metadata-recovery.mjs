@@ -4,6 +4,11 @@ import {signature} from './today-private-post.mjs';
 
 const enc=new TextEncoder();
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
+const VIDEO_COOLDOWN_MS=60_000;
+const BUDGET_WINDOW_MS=10*60_000;
+const BUDGET_MAX_CALLS=30;
+function stamp(ms){return new Date(ms).toISOString().replace(/\.\d{3}Z$/,'Z');}
+function windowStart(ms){return Math.floor(ms/BUDGET_WINDOW_MS)*BUDGET_WINDOW_MS;}
 function reply(body,status){return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});}
 function equal(a,b){if(!/^[a-f0-9]{64}$/.test(a)||b.length!==64)return false;let diff=0;for(let i=0;i<64;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}
 async function approvedMembership(db,channelId){
@@ -24,6 +29,28 @@ export async function handleVideoMetadataRecovery(request,env,{fetchImpl=fetch,n
  let body;try{body=JSON.parse(raw)}catch{return reply({error:'invalid_json'},400)}
  const videoId=body?.video_id;
  if(!VIDEO.test(videoId??''))return reply({error:'invalid_video_id'},400);
+
+ const nowMs=now.getTime();
+ const replayKey=mac;
+ await env.DB.prepare('DELETE FROM public_video_metadata_recovery_replay WHERE expires_at<?').bind(stamp(nowMs)).run();
+ const replay=await env.DB.prepare('INSERT OR IGNORE INTO public_video_metadata_recovery_replay(replay_key,accepted_at,expires_at) VALUES(?,?,?)')
+  .bind(replayKey,stamp(nowMs),stamp(nowMs+120000)).run();
+ if(Number(replay?.meta?.changes??replay?.changes??0)===0)return reply({status:'replay_suppressed',video_id:videoId},200);
+
+ const cached=await env.DB.prepare('SELECT video_id,channel_id,title,channel_name,lifecycle_state,scheduled_start,actual_start,actual_end,managed_channel,source,observed_at FROM public_video_metadata_cache WHERE video_id=? LIMIT 1').bind(videoId).first();
+ if(cached&&Date.parse(cached.observed_at)>=nowMs-VIDEO_COOLDOWN_MS){
+  return reply({status:'cached',video_id:videoId,managed_channel:Boolean(cached.managed_channel),source:'youtube-fallback',cooldown_seconds:60},200);
+ }
+
+ const bucket=stamp(windowStart(nowMs));
+ const budget=await env.DB.prepare(
+  'INSERT INTO public_video_metadata_recovery_budget(window_start,calls,updated_at) VALUES(?,1,?) '+
+  'ON CONFLICT(window_start) DO UPDATE SET calls=public_video_metadata_recovery_budget.calls+1,updated_at=excluded.updated_at '+
+  'WHERE public_video_metadata_recovery_budget.calls<?'
+ ).bind(bucket,stamp(nowMs),BUDGET_MAX_CALLS).run();
+ if(Number(budget?.meta?.changes??budget?.changes??0)===0){
+  return reply({error:'recovery_budget_exhausted',retry_after_seconds:Math.max(1,Math.ceil((windowStart(nowMs)+BUDGET_WINDOW_MS-nowMs)/1000))},429);
+ }
  let meta;try{meta=await fetchYoutubeVideoMetadata(env,videoId,{fetchImpl,now});}catch{return reply({error:'youtube_metadata_unavailable'},503)}
  if(!meta)return reply({error:'youtube_video_not_found'},404);
  const membership=await approvedMembership(env.DB,meta.channel_id);
