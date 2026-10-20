@@ -10,7 +10,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 SOURCE_STATES = {"VERIFIED_COMPLETE", "REPAIR_NEEDED", "UNKNOWN", "CONFLICT"}
-JOB_STATES = {"succeeded", "failed", "running", "waiting", "unknown", "unavailable"}
+JOB_STATES = {"completed", "succeeded", "failed", "running", "waiting", "unknown", "unavailable"}
 PACKAGE_STATES = {"COMPLETE", "PARTIAL", "UNKNOWN"}
 READBACK_STATES = {"VERIFIED", "UNKNOWN"}
 
@@ -42,7 +42,8 @@ def _source_state(day: dict) -> str:
     if local == "REPAIR_NEEDED" or missing or _count_gap_ranges(gaps):
         return "REPAIR_NEEDED"
     if (local == "COMPLETE" and isinstance(expected, list) and isinstance(actual, list)
-            and set(expected) == set(actual)):
+            and set(expected) == set(actual) and isinstance(day.get("final_verification_at"), str)
+            and day.get("final_verification_at")):
         return "VERIFIED_COMPLETE"
     return "UNKNOWN"
 
@@ -127,10 +128,10 @@ def build_daily_finalization(evidence: dict) -> dict:
     contract_gaps.extend(archive["contract_gaps"])
     if not day:
         contract_gaps.append("source-completeness-evidence-unavailable")
-    if day and not day.get("last_updated_at"):
+    if day and not day.get("final_verification_at"):
         contract_gaps.append("final-verification-timestamp-unavailable")
 
-    final_verification_at = day.get("final_verification_at") or day.get("last_updated_at")
+    final_verification_at = day.get("final_verification_at")
     return {
         "schema_version": "holoviewer-admin-daily-finalization-v1",
         "read_only": True,
