@@ -1,4 +1,5 @@
 import {YOUTUBE_LIVE_SOURCE} from './store.mjs';
+import {processVideoMetadataDemands} from './video-metadata-recovery.mjs';
 
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
 const TRUSTED_TODAY='YouTube liveStreamingDetails';
@@ -31,6 +32,32 @@ async function managedMembership(db,channelId){
   'WHERE ac.channel_id=? LIMIT 1'
  ).bind(channelId).first();
 }
+async function verifiedPttPriority(db,url){
+ const day=String(url.searchParams.get('ptt_day')||'');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return {priority:2,ptt_day:null};
+ try{
+  const row=await db.prepare("SELECT aid FROM ptt_threads WHERE day=? AND verified_at IS NOT NULL LIMIT 1").bind(day).first();
+  return row?{priority:1,ptt_day:day}:{priority:2,ptt_day:null};
+ }catch{
+  return {priority:2,ptt_day:null};
+ }
+}
+async function registerDemand(db,id,{priority,ptt_day,now}){
+ const nowIso=now.toISOString().replace(/\.\d{3}Z$/,'Z');
+ const existing=await db.prepare('SELECT video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error FROM public_video_metadata_recovery_demand WHERE video_id=? LIMIT 1').bind(id).first();
+ if(existing?.status==='not_found'&&Date.parse(existing.next_attempt_at)>now.getTime())return existing;
+ await db.prepare(
+  "INSERT INTO public_video_metadata_recovery_demand(video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error) VALUES(?,?, 'pending', ?, ?, ?, ?, 0, NULL) "+
+  "ON CONFLICT(video_id) DO UPDATE SET "+
+  "priority=MIN(public_video_metadata_recovery_demand.priority,excluded.priority),"+
+  "ptt_day=COALESCE(public_video_metadata_recovery_demand.ptt_day,excluded.ptt_day),"+
+  "status=CASE WHEN public_video_metadata_recovery_demand.status='processing' THEN 'processing' ELSE 'pending' END,"+
+  "updated_at=excluded.updated_at,"+
+  "next_attempt_at=CASE WHEN public_video_metadata_recovery_demand.status='processing' THEN public_video_metadata_recovery_demand.next_attempt_at ELSE excluded.next_attempt_at END"
+ ).bind(id,priority,ptt_day,nowIso,nowIso,nowIso).run();
+ return await db.prepare('SELECT video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error FROM public_video_metadata_recovery_demand WHERE video_id=? LIMIT 1').bind(id).first();
+}
+
 async function readCatalog(db,id){
  const today=await db.prepare('SELECT video_id,title,publisher_channel_id AS channel_id,channel_name,lifecycle_state,scheduled_start,actual_start,actual_end,source_label FROM public_today_canonical WHERE video_id=? LIMIT 1').bind(id).first();
  if(today){
@@ -47,7 +74,7 @@ async function readCatalog(db,id){
  return {video_id:legacy.video_id,channel_id:legacy.channel_id??'',title:legacy.title??'',channel_name:legacy.channel_name??'',lifecycle_state:legacy.lifecycle_state??'unknown',scheduled_start:validTime(legacy.scheduled_start)?legacy.scheduled_start:null,actual_start:null,actual_end:null};
 }
 
-export async function handleVideoMetadataRead(request,env){
+export async function handleVideoMetadataRead(request,env,{ctx=null,now=new Date(),fetchImpl=fetch}={}){
  if(!request||request.method!=='GET')return json({error:'method_not_allowed'},405,0);
  let url;
  try{url=new URL(request.url)}catch{return json({error:'bad_request'},400,0)}
@@ -59,6 +86,20 @@ export async function handleVideoMetadataRead(request,env){
  const catalog=await readCatalog(env.DB,id);
  if(catalog){const membership=await managedMembership(env.DB,catalog.channel_id);return json({...catalog,managed_channel:Boolean(membership),source:'catalog'},200,15);}
  const cached=await env.DB.prepare('SELECT video_id,channel_id,title,channel_name,lifecycle_state,scheduled_start,actual_start,actual_end,managed_channel,source,observed_at FROM public_video_metadata_cache WHERE video_id=? LIMIT 1').bind(id).first();
- if(!cached)return json({error:'metadata_not_cached',video_id:id,lifecycle_state:'unknown'},404,0);
- return json({...cached,managed_channel:Boolean(cached.managed_channel),source:'youtube-fallback'},200,15);
+ if(cached)return json({...cached,managed_channel:Boolean(cached.managed_channel),source:'youtube-fallback'},200,15);
+
+ const ptt=await verifiedPttPriority(env.DB,url);
+ const demand=await registerDemand(env.DB,id,{...ptt,now});
+ if(demand?.status==='not_found'&&Date.parse(demand.next_attempt_at)>now.getTime()){
+  return json({error:'metadata_not_found_cached',status:'not_found',video_id:id,lifecycle_state:'unknown',
+   retry_after_seconds:Math.max(1,Math.ceil((Date.parse(demand.next_attempt_at)-now.getTime())/1000)),
+   priority:Number(demand.priority),ptt_priority:Boolean(Number(demand.priority)===1)},404,0);
+ }
+ const work=processVideoMetadataDemands(env,{fetchImpl,now,limit:1,preferredVideoId:id});
+ if(ctx?.waitUntil)ctx.waitUntil(work);
+ else work.catch(()=>{});
+ return json({status:'metadata_pending',video_id:id,lifecycle_state:'unknown',
+  retry_after_seconds:2,priority:Number(demand?.priority??ptt.priority),
+  ptt_priority:Boolean(Number(demand?.priority??ptt.priority)===1),
+  demand_state:String(demand?.status||'pending')},202,0);
 }
