@@ -28,7 +28,8 @@ _FORBIDDEN_KEY_FRAGMENTS=(
     "hmac_secret","hmacsecret","secret","cookie","wrangler_credential",
     "credential","signed_url","signedurl","private_key","access_key",
     "stderr","stdout","raw_exception","exception_text","traceback",
-    "subprocess_output",
+    "subprocess_output","password","token","refresh_token","client_secret",
+    "bearer_token",
 )
 _SIGNED_URL_MARKERS=(
     "x-amz-signature=","x-goog-signature=","signature=","sig=",
