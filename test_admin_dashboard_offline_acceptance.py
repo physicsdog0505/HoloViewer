@@ -5,6 +5,29 @@ from admin_dashboard.coverage import project_coverage
 from admin_dashboard.render import render_dashboard
 
 
+def full_target_evidence(*, missing=0, verified=True):
+    return {
+        "schema_version": "holoviewer-d1-sanitized-snapshot-v1",
+        "sanitized": True,
+        "job_binding": {
+            "job_id": "job-1",
+            "manifest_digest": "sha256:" + "a" * 64,
+            "source_revision": "fixture-r1",
+        },
+        "coverage": {
+            "complete_partition_proven": True,
+            "missing_identities": missing,
+        },
+        "verification": {
+            "mode": "full_partition",
+            "job_verified": verified,
+            "manifest_digest_match": True,
+            "identity_match": True,
+            "count_match": missing == 0,
+        },
+    }
+
+
 class OfflineAdminAcceptance(unittest.TestCase):
     def test_missing_date_is_visible_and_unknown(self):
         data = project_coverage([{"date": "2026-10-01", "sources": [{
@@ -24,15 +47,49 @@ class OfflineAdminAcceptance(unittest.TestCase):
              "expected_set": ["day"], "actual_set": ["day"], "source_line_gaps": {"day": [4, 5]}}]},
             {"date": "2026-10-03", "sources": [{"source": "ptt", "completeness_status": "COMPLETE",
              "expected_set": ["day"], "actual_set": ["day"],
-             "target_evidence": {"verified": True, "all_expected_present": False}}]},
+             "target_evidence": full_target_evidence(missing=1, verified=False)}]},
             {"date": "2026-10-04", "sources": [{"source": "ptt", "completeness_status": "COMPLETE",
              "expected_set": ["day"], "actual_set": ["day"],
-             "target_evidence": {"verified": True, "all_expected_present": True}}]},
+             "target_evidence": full_target_evidence()}]},
         ]
         data = project_coverage(rows, start_day="2026-10-01", end_day="2026-10-04")
         self.assertEqual([x["status"] for x in data["days"]],
                          ["LOCAL_MISSING", "PARTIAL", "PENDING_SYNC", "COMPLETE"])
         self.assertEqual(data["days"][1]["source_line_gaps"], {"day": [4, 5]})
+
+    def test_bounded_sample_never_promotes_complete(self):
+        rows = [{"date": "2026-10-01", "sources": [{
+            "source": "ptt", "completeness_status": "COMPLETE",
+            "expected_set": ["day"], "actual_set": ["day"],
+            "target_evidence": {
+                "schema_version": "holoviewer-d1-sanitized-snapshot-v1",
+                "sanitized": True,
+                "job_binding": {
+                    "job_id": "job-1",
+                    "manifest_digest": "sha256:" + "a" * 64,
+                    "source_revision": "fixture-r1",
+                },
+                "coverage": {"complete_partition_proven": False, "missing_identities": 0},
+                "verification": {
+                    "mode": "bounded_sample",
+                    "job_verified": False,
+                    "manifest_digest_match": True,
+                    "identity_match": True,
+                    "count_match": True,
+                },
+            },
+        }]}]
+        data = project_coverage(rows, start_day="2026-10-01", end_day="2026-10-01")
+        self.assertEqual(data["days"][0]["status"], "UNKNOWN")
+
+    def test_legacy_self_asserted_verified_target_is_not_authority(self):
+        rows = [{"date": "2026-10-01", "sources": [{
+            "source": "ptt", "completeness_status": "COMPLETE",
+            "expected_set": ["day"], "actual_set": ["day"],
+            "target_evidence": {"verified": True, "all_expected_present": True},
+        }]}]
+        data = project_coverage(rows, start_day="2026-10-01", end_day="2026-10-01")
+        self.assertEqual(data["days"][0]["status"], "UNKNOWN")
 
     def test_duplicate_day_or_excess_range_rejected(self):
         with self.assertRaises(ValueError):
