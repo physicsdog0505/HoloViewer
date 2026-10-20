@@ -272,3 +272,80 @@ test('global durable budget caps provider calls at 30 per 10-minute window',asyn
  assert.equal(ledger.calls,30);
  db.close();
 });
+
+
+test('1500 unique public misses admit at most 120 new rows in one 10-minute window',async()=>{
+ const db=sqliteD1({managed:false});
+ const env={DB:db,YOUTUBE_API_KEY:'key'};
+ const now=new Date('2026-10-20T03:00:00Z');
+ let pending=0,busy=0;
+ for(let i=0;i<1500;i++){
+  const id=i.toString(36).padStart(11,'0').slice(-11);
+  const res=await handleVideoMetadataRead(getReq(id),env,{now});
+  if(res.status===202)pending++;
+  else if(res.status===429){
+   const body=await res.json();
+   assert.equal(body.error,'recovery_queue_busy');
+   busy++;
+  }else assert.fail('unexpected status '+res.status);
+ }
+ assert.equal(pending,120);
+ assert.equal(busy,1380);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_demand').get().n,120);
+ assert.equal(db.raw.prepare('SELECT admissions FROM public_video_metadata_recovery_admission_budget').get().admissions,120);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_cache').get().n,0);
+ db.close();
+});
+
+test('existing demand reuse remains allowed after admission budget is exhausted',async()=>{
+ const db=sqliteD1({managed:false});
+ const env={DB:db,YOUTUBE_API_KEY:'key'};
+ const now=new Date('2026-10-20T03:00:00Z');
+ for(let i=0;i<120;i++){
+  const id=i.toString(36).padStart(11,'0').slice(-11);
+  assert.equal((await handleVideoMetadataRead(getReq(id),env,{now})).status,202);
+ }
+ const reused=await handleVideoMetadataRead(getReq('00000000000'),env,{now});
+ assert.equal(reused.status,202);
+ const body=await reused.json();
+ assert.equal(body.status,'metadata_pending');
+ assert.equal(body.demand_reused,true);
+ assert.equal(db.raw.prepare('SELECT admissions FROM public_video_metadata_recovery_admission_budget').get().admissions,120);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_demand').get().n,120);
+ db.close();
+});
+
+test('active queue cap rejects a new unique demand without inserting or spending admission',async()=>{
+ const db=sqliteD1({managed:false});
+ const env={DB:db,YOUTUBE_API_KEY:'key'};
+ const now='2026-10-20T03:00:00Z';
+ const insert=db.raw.prepare("INSERT INTO public_video_metadata_recovery_demand(video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error) VALUES(?,2,'pending',NULL,?,?,?,0,NULL)");
+ for(let i=0;i<1000;i++){
+  const id=('q'+i.toString(36).padStart(10,'0')).slice(-11);
+  insert.run(id,now,now,now);
+ }
+ const res=await handleVideoMetadataRead(getReq('zzzzzzzzzzz'),env,{now:new Date(now)});
+ assert.equal(res.status,429);
+ const body=await res.json();
+ assert.equal(body.error,'recovery_queue_busy');
+ assert.equal(body.reason,'active_queue_cap');
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_demand').get().n,1000);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_admission_budget').get().n,0);
+ db.close();
+});
+
+test('terminal demand retention cleanup removes old resolved and expired not-found rows',async()=>{
+ const db=sqliteD1({managed:false});
+ const env={DB:db,YOUTUBE_API_KEY:'key'};
+ const old='2026-10-18T00:00:00Z';
+ const expired='2026-10-20T02:59:59Z';
+ const insert=db.raw.prepare("INSERT INTO public_video_metadata_recovery_demand(video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error) VALUES(?,2,?,NULL,?,?,?,?,?)");
+ insert.run('oldresolved','resolved',old,old,old,1,null);
+ insert.run('oldnotfound','not_found',old,old,expired,1,'youtube_video_not_found');
+ db.raw.prepare("INSERT INTO public_video_metadata_recovery_admission_budget(window_start,admissions,updated_at) VALUES(?,?,?)").run('2026-10-18T00:00:00Z',10,old);
+ const res=await handleVideoMetadataRead(getReq(VID),env,{now:new Date('2026-10-20T03:00:00Z')});
+ assert.equal(res.status,202);
+ assert.equal(db.raw.prepare("SELECT COUNT(*) n FROM public_video_metadata_recovery_demand WHERE video_id IN ('oldresolved','oldnotfound')").get().n,0);
+ assert.equal(db.raw.prepare("SELECT COUNT(*) n FROM public_video_metadata_recovery_admission_budget WHERE window_start='2026-10-18T00:00:00Z'").get().n,0);
+ db.close();
+});
