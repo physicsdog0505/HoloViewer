@@ -27,3 +27,5 @@ Documents:
 - [independent-review.md](independent-review.md) — PR #147 adversarial review.
 - [snapshot-integration.md](snapshot-integration.md) — adapter contracts and
   contract-derived reconciliation evidence.
+- [admin-dashboard.md](admin-dashboard.md) — internal read-only Data Coverage,
+  Sync Monitor and System Health contracts, refresh policy and monitoring gaps.

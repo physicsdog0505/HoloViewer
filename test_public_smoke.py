@@ -23,6 +23,10 @@ EXPECTED |= {
     "docs/data-lifecycle/snapshot-integration.md",
     "fixtures/data-lifecycle/youtube-2026-10-15.sanitized.json",
     "fixtures/data-lifecycle/ptt-2026-10-01.sanitized.json",
+    "admin_dashboard/__init__.py", "admin_dashboard/contracts.py",
+    "admin_dashboard/dashboard.py", "admin_dashboard/http.py",
+    "admin_dashboard/render.py", "test_admin_dashboard.py",
+    "docs/data-lifecycle/admin-dashboard.md",
 }
 
 class PublicSmokeTests(unittest.TestCase):
