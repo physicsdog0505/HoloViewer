@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import inspect
 import json
 from pathlib import Path
@@ -108,6 +109,18 @@ class ArchiveJobEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ArchiveEvidenceError,"manifest digest mismatch"):
             build_archive_job_evidence(readback_receipt=receipt,**job)
 
+    def test_manifest_digest_verification_false_fails_closed(self):
+        job=self.fixture["static_success_full"]["job"]
+        read=self.fixture["static_success_full"]["readback"]
+        receipt=build_readback_receipt(
+            target=job["target"],job_id=job["job_id"],
+            manifest_digest=job["manifest"]["digest"],
+            source_revision=job["source_revision"],scope=job["scope"],
+            **{**read,"manifest_digest_match":False,"snapshot_id":"7"*64},
+        )
+        self.assertFalse(receipt["job_verified"])
+        self.assertEqual(receipt["error_code"],"manifest_digest_mismatch")
+
     def test_case7_object_hash_mismatch_fails_closed(self):
         job=self.fixture["static_success_full"]["job"]
         read=self.fixture["static_success_full"]["readback"]
@@ -171,14 +184,26 @@ class ArchiveJobEvidenceTests(unittest.TestCase):
                     reject_sensitive(value)
 
     def test_case11_contract_projection_modules_have_no_runtime_io_surface(self):
-        source=inspect.getsource(archive_module)+inspect.getsource(projection_module)
-        forbidden=(
-            "subprocess","urllib","requests","http.client","socket",
-            "wrangler","r2 object","urlopen","sqlite3","open(",
-        )
-        for token in forbidden:
-            with self.subTest(token=token):
-                self.assertNotIn(token,source)
+        for module in (archive_module,projection_module):
+            tree=ast.parse(inspect.getsource(module))
+            imports=set()
+            calls=[]
+            for node in ast.walk(tree):
+                if isinstance(node,ast.Import):
+                    imports.update(alias.name.split(".")[0] for alias in node.names)
+                elif isinstance(node,ast.ImportFrom) and node.module:
+                    imports.add(node.module.split(".")[0])
+                elif isinstance(node,ast.Call):
+                    if isinstance(node.func,ast.Name):
+                        calls.append(node.func.id)
+                    elif isinstance(node.func,ast.Attribute):
+                        calls.append(node.func.attr)
+            self.assertTrue(
+                imports.isdisjoint({"subprocess","urllib","requests","http","socket","sqlite3"})
+            )
+            self.assertNotIn("open",calls)
+            self.assertNotIn("run",calls)
+            self.assertNotIn("Popen",calls)
 
     def test_object_identity_is_manifest_key_sha_not_timestamp(self):
         identity=archive_object_identity(
