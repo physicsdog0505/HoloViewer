@@ -36,7 +36,7 @@ class FixtureReaders:
                 ptt["target_evidence"] = deepcopy(snapshot) if snapshot else None
         return project_coverage(days, start_day=self._start, end_day=self._end)
 
-    def _read_d1(self):
+    def _read_d1_with_cache(self):
         try:
             data = self._fixture("d1-job-readback.sanitized.json")
             validate_d1_snapshot(data)
@@ -44,12 +44,17 @@ class FixtureReaders:
             key = (data["schema_version"], json.dumps(data["target"], sort_keys=True),
                    json.dumps(binding["scope"], sort_keys=True),
                    binding["manifest_digest"], data["verification"]["mode"])
-            return self._cache.read(key, lambda: data)[0]
+            value, hit = self._cache.read(key, lambda: data)
+            return value, ("hit" if hit else "miss")
         except (OSError, ValueError, KeyError, TypeError):
-            return None
+            return None, "unavailable"
+
+    def _read_d1(self):
+        return self._read_d1_with_cache()[0]
 
     def sync_monitor(self):
-        return {"d1_snapshot": self._read_d1()}
+        snapshot, cache_status = self._read_d1_with_cache()
+        return {"d1_snapshot": snapshot, "d1_cache_status": cache_status}
 
     def system_health(self):
         try:
