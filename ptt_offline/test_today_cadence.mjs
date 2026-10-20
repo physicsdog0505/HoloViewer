@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {refreshKnownTodayLifecycle,mountTodayCadence,shouldRunLifecycleRefresh,PROVIDER_MISS_RETIRE_THRESHOLD} from './worker_host/today/cadence-refresh.mjs';
 import {readFileSync} from 'node:fs';
+import {readToday} from './worker_host/today/store.mjs';
 import {DatabaseSync} from 'node:sqlite';
 
 function fakeDb(rows){
@@ -162,6 +163,27 @@ test('unchanged 50-video heartbeat rotates fairly without changing evidence prov
  assert.equal(untouched,0);
  assert.equal(raw.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,0);
  raw.close();
+});
+
+
+test('consumer live freshness follows checked_at, not evidence observation time',async()=>{
+ const db=retirementDb();const cid=seedSteadyLive(db,1);
+ db.raw.prepare(`INSERT INTO public_today_approved_channels(channel_id,roster_version,activated_at,channel_group)
+  VALUES(?,?,?,?)`).run(cid,'v85','2026-10-18T07:00:00Z','hololive');
+ db.raw.prepare(`INSERT INTO public_today_catalog_meta
+  (singleton,roster_version,last_success_at,expected_channels,scanned_channels,gap,checkpoint)
+  VALUES(1,?,?,?,?,?,?)`).run('v85','2026-10-18T09:00:00Z',1,1,0,'test');
+ db.raw.prepare('UPDATE public_today_canonical SET checked_at=? WHERE video_id=?')
+  .run('2026-10-18T09:00:00Z','v0000000000');
+ const out=await readToday(db,{day:'2026-10-18',now:new Date('2026-10-18T09:10:00Z')});
+ assert.equal(out.streams.length,1);
+ assert.equal(out.streams[0].stale,false);
+ assert.equal(out.streams[0].observed_at,'2026-10-18T08:00:00Z');
+ db.raw.prepare('UPDATE public_today_canonical SET checked_at=? WHERE video_id=?')
+  .run('2026-10-18T08:00:00Z','v0000000000');
+ const expired=await readToday(db,{day:'2026-10-18',now:new Date('2026-10-18T09:10:00Z')});
+ assert.equal(expired.streams[0].stale,true);
+ db.close();
 });
 
 test('provider miss cleanup is one bounded delete only when preloaded miss rows exist',async()=>{
