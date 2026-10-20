@@ -23,7 +23,7 @@ jobs:
       - name: Check compile and boundary tests
         run: |
           python -B -m py_compile app.py public_snapshot.py test_public_smoke.py
-          python -B -m unittest -v test_public_smoke test_4174_ui_parity
+          python -B -m unittest -v test_public_smoke test_4174_ui_parity test_watchalong_assets
       - name: Static JS syntax and request policy
         run: |
           node --check site/assets/app.js

@@ -11,6 +11,9 @@ const HOST_ID=validVideoId(params.get('host'));
 const SOURCE_ID=validVideoId(params.get('source'));
 const PLAYLIST_ID=validPlaylistId(params.get('playlist'));
 const EVENT_ID=String(params.get('event')||'').trim();
+const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';
+const WATCHALONG_EVENT_SCHEMA='holoviewer-watchalong-event-v1';
+const WATCHALONG_MANIFEST_SCHEMA='holoviewer-watchalong-manifest-v1';
 
 const workspace=document.getElementById('watchalongWorkspace');
 const linkedPlayback=document.getElementById('linkedPlayback');
@@ -65,6 +68,7 @@ let pttFollowing=true;
 let archiveManifestCache=null;
 let segments=[];
 let subtitles=[];
+let subtitleTimeline='source';
 let activeSegmentIndex=-1;
 let activeSourceVideoId=SOURCE_ID||'';
 let sourceStandbyActive=false;
@@ -345,7 +349,7 @@ function startSyncLoop(){
 function startSubtitleLoop(){
  if(subtitleTimer)return;
  subtitleTimer=setInterval(()=>{
-  let current=null;try{current=sourcePlayer?.getCurrentTime?.()}catch{}
+  let current=null;try{current=(subtitleTimeline==='host'?hostPlayer:sourcePlayer)?.getCurrentTime?.()}catch{}
   if(sourceStandbyActive||!Number.isFinite(current)||!subtitles.length){subtitleOverlay.hidden=true;return}
   const row=subtitles.find(item=>current>=item.start&&current<item.end);
   if(!row){subtitleOverlay.hidden=true;return}
@@ -372,6 +376,48 @@ function normalizeSubtitles(payload){
   start:Number(item?.start??item?.start_seconds),end:Number(item?.end??item?.end_seconds),
   original:String(item?.original||item?.text||''),translation:String(item?.translation||item?.translated||'')
  })).filter(item=>Number.isFinite(item.start)&&Number.isFinite(item.end)&&item.end>item.start):[];
+}
+async function sha256Hex(buffer){
+ if(!crypto?.subtle)throw new Error('SHA-256 verification unavailable');
+ const digest=await crypto.subtle.digest('SHA-256',buffer);
+ return [...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+}
+function validateStaticEvent(payload,entry){
+ if(payload?.schema_version!==WATCHALONG_EVENT_SCHEMA||payload?.event_id!==EVENT_ID)throw new Error('Watchalong event identity mismatch');
+ if(payload?.master_video_id!==HOST_ID)throw new Error('Watchalong master identity mismatch');
+ const sourceIds=Array.isArray(payload?.source_video_ids)?payload.source_video_ids:[];
+ if(SOURCE_ID&&!sourceIds.includes(SOURCE_ID))throw new Error('Watchalong source identity mismatch');
+ const rawSegments=Array.isArray(payload?.segments)?payload.segments:[];
+ const rawSubtitles=Array.isArray(payload?.subtitles)?payload.subtitles:[];
+ if(rawSegments.length!==Number(entry?.source_count)||rawSubtitles.length!==Number(entry?.cue_count))throw new Error('Watchalong artifact coverage mismatch');
+ const transcript=payload?.artifacts?.transcript,translation=payload?.artifacts?.translation;
+ if(transcript?.cue_count!==rawSubtitles.length||transcript?.content_hash!==entry?.transcript_hash||translation?.transcript_hash!==entry?.transcript_hash||translation?.artifact_id!==entry?.translation_artifact_id)throw new Error('Watchalong transcript fingerprint coverage mismatch');
+ if(rawSegments.some((item,index)=>item?.source_video_id!==sourceIds[index]))throw new Error('Watchalong segment/source order mismatch');
+ const cueIds=new Set();let lastStart=-1;
+ for(const cue of rawSubtitles){
+  const id=String(cue?.cue_id||''),start=Number(cue?.start_ms),end=Number(cue?.end_ms);
+  if(!id||cueIds.has(id)||!Number.isInteger(start)||!Number.isInteger(end)||start<lastStart||end<=start)throw new Error('Watchalong cue identity/timing mismatch');
+  if(!String(cue?.original||'').trim())throw new Error('Watchalong transcript cue missing');
+  if(entry?.translation_status==='COMPLETE'&&!String(cue?.translation||'').trim())throw new Error('Watchalong translation is partial');
+  cueIds.add(id);lastStart=start;
+ }
+ return payload;
+}
+async function loadStaticEvent(){
+ let response;
+ try{response=await fetch(WATCHALONG_MANIFEST_PATH,{credentials:'omit',headers:{Accept:'application/json'}})}catch{return null}
+ if(!response.ok)return null;
+ const manifest=await response.json();
+ if(manifest?.schema_version!==WATCHALONG_MANIFEST_SCHEMA||!Array.isArray(manifest?.events))return null;
+ const entry=manifest.events.find(item=>item?.event_id===EVENT_ID);
+ if(!entry)return null;
+ if(!/^\/data\/watchalong\/events\/[A-Za-z0-9_-]{11}\.json$/.test(String(entry.path||''))||!/^[a-f0-9]{64}$/.test(String(entry.sha256||'')))throw new Error('Watchalong manifest entry invalid');
+ const artifactResponse=await fetch(entry.path,{credentials:'omit',headers:{Accept:'application/json'}});
+ if(!artifactResponse.ok)throw new Error('Watchalong static artifact unavailable');
+ const bytes=await artifactResponse.arrayBuffer();
+ if(await sha256Hex(bytes)!==entry.sha256)throw new Error('Watchalong artifact SHA-256 mismatch');
+ const payload=JSON.parse(new TextDecoder().decode(bytes));
+ return validateStaticEvent(payload,entry);
 }
 function renderSegments(){
  if(!segments.length){
@@ -408,13 +454,15 @@ nextSegment.onclick=()=>jumpToSegmentIndex(activeSegmentIndex+1);
 async function loadReadOnlyArtifacts(){
  if(!EVENT_ID)return;
  try{
-  const data=await api('/v1/watchalong/events/'+encodeURIComponent(EVENT_ID));
-  const payload=data?.event||data;
+  const staticPayload=await loadStaticEvent();
+  const data=staticPayload?null:await api('/v1/watchalong/events/'+encodeURIComponent(EVENT_ID));
+  const payload=staticPayload||(data?.event||data);
   segments=normalizeSegments(payload);
   subtitles=normalizeSubtitles(payload);
+  subtitleTimeline=payload?.subtitle_timeline==='host'?'host':'source';
   renderSegments();
  }catch{
-  segments=[];subtitles=[];activeSegmentIndex=-1;renderSegments();
+  segments=[];subtitles=[];subtitleTimeline='source';activeSegmentIndex=-1;renderSegments();
   segmentStatus.textContent='段點資料不可用';
  }
 }
