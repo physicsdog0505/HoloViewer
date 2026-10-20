@@ -31,6 +31,22 @@ async function managedMembership(db,channelId){
   'WHERE ac.channel_id=? LIMIT 1'
  ).bind(channelId).first();
 }
+async function readCatalog(db,id){
+ const today=await db.prepare('SELECT video_id,title,publisher_channel_id AS channel_id,channel_name,lifecycle_state,scheduled_start,actual_start,actual_end,source_label FROM public_today_canonical WHERE video_id=? LIMIT 1').bind(id).first();
+ if(today){
+  const bounds=trustedBounds(today,today.source_label===TRUSTED_TODAY);
+  return {video_id:today.video_id,channel_id:today.channel_id??'',title:today.title??'',channel_name:today.channel_name??'',lifecycle_state:today.lifecycle_state??'unknown',scheduled_start:validTime(today.scheduled_start)?today.scheduled_start:null,...bounds};
+ }
+ const history=await db.prepare('SELECT video_id,title,channel_id,channel_name,scheduled_start,actual_start,actual_end,source_revision FROM public_history WHERE video_id=? LIMIT 1').bind(id).first();
+ if(history){
+  const bounds=trustedBounds(history,TRUSTED_HISTORY.has(history.source_revision));
+  return {video_id:history.video_id,channel_id:history.channel_id??'',title:history.title??'',channel_name:history.channel_name??'',lifecycle_state:'ended',scheduled_start:validTime(history.scheduled_start)?history.scheduled_start:null,...bounds};
+ }
+ const legacy=await db.prepare('SELECT video_id,title,channel_id,channel_name,lifecycle_state,scheduled_start FROM public_catalog WHERE video_id=? LIMIT 1').bind(id).first();
+ if(!legacy)return null;
+ return {video_id:legacy.video_id,channel_id:legacy.channel_id??'',title:legacy.title??'',channel_name:legacy.channel_name??'',lifecycle_state:legacy.lifecycle_state??'unknown',scheduled_start:validTime(legacy.scheduled_start)?legacy.scheduled_start:null,actual_start:null,actual_end:null};
+}
+
 export async function handleVideoMetadataRead(request,env){
  if(!request||request.method!=='GET')return json({error:'method_not_allowed'},405,0);
  let url;
