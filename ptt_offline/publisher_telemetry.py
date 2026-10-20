@@ -37,20 +37,16 @@ def load_existing(path: str | Path) -> dict[str, Any]:
     return body
 
 
-def update_publisher_telemetry(
-    path: str | Path,
+def build_publisher_telemetry(
     result: dict[str, Any],
     *,
+    previous: dict[str, Any] | None = None,
     observed_at: str | None = None,
 ) -> dict[str, Any]:
-    """Persist one sanitized Publisher job-evidence snapshot.
-
-    attempt_count is local durable process evidence. There is no automatic retry
-    contract, so retry_after/backoff_seconds remain null.
-    """
+    """Build one sanitized Publisher job-evidence snapshot without I/O."""
     if not isinstance(result, dict):
         raise TypeError("result must be a mapping")
-    previous = load_existing(path)
+    previous = previous if isinstance(previous,dict) else {}
     prior_item = (
         previous.get("components", {}).get("Publisher", {})
         if isinstance(previous.get("components"), dict) else {}
@@ -122,10 +118,23 @@ def update_publisher_telemetry(
         },
         "contract_gaps": sorted(set(contract_gaps)),
     }
-    body = {
+    return {
         "schema_version": SCHEMA_VERSION,
         "observed_at": stamp,
         "components": {"Publisher": item},
     }
+
+
+def update_publisher_telemetry(
+    path: str | Path,
+    result: dict[str, Any],
+    *,
+    observed_at: str | None = None,
+) -> dict[str, Any]:
+    """Persist one sanitized Publisher job-evidence snapshot atomically."""
+    previous = load_existing(path)
+    body = build_publisher_telemetry(
+        result, previous=previous, observed_at=observed_at
+    )
     _atomic_json(Path(path), body)
     return body
