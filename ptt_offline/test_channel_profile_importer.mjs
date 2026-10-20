@@ -28,7 +28,7 @@ function d1(){
  };
 }
 function profile(i,overrides={}){
- const suffix=(i.toString(36).toUpperCase()+'A'.repeat(22)).slice(0,22);
+ const suffix=i.toString(36).toUpperCase().padStart(22,'0');
  return {
   channel_id:'UC'+suffix,
   channel_name:'Channel '+i,
