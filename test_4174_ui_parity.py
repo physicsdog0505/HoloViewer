@@ -812,6 +812,7 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn("loadTodayPtt(taipeiDay())},10000",watch)
         self.assertNotIn("if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();\n},10000)",app)
         self.assertNotIn("10 秒後重試",app)
+        self.assertNotIn("每 10 秒自動重試",app)
         self.assertNotIn("10 秒後重試",ptt_today)
         self.assertNotIn("loadPtt()},10000",ptt_today)
         # Non-PTT timers (collab lifecycle, local VOD timeline rendering, etc.)
