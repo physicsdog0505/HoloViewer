@@ -59,11 +59,12 @@ jobs:
             ptt_offline.test_production_publisher_budget \
             ptt_offline.test_restart_production_publisher \
             ptt_offline.test_r2_archive_export \
-            ptt_offline.test_archive_job_evidence
+            ptt_offline.test_archive_job_evidence \
+            ptt_offline.test_month_static_publish
       - name: Archive evidence focused checks
         run: |
-          python3 -B -m unittest -v ptt_offline.test_archive_job_evidence
-          python3 -m compileall -q ptt_offline/archive_job_evidence.py ptt_offline/archive_pr147_projection.py ptt_offline/test_archive_job_evidence.py
+          python3 -B -m unittest -v ptt_offline.test_archive_job_evidence ptt_offline.test_month_static_publish
+          python3 -m compileall -q ptt_offline/archive_job_evidence.py ptt_offline/archive_pr147_projection.py ptt_offline/month_static_publish.py ptt_offline/test_archive_job_evidence.py ptt_offline/test_month_static_publish.py
           git diff --check
       - name: Indexed PTT 1000-row capacity receipt (synthetic, offline only)
         run: python3 -B -m ptt_offline.capacity_probe
