@@ -232,6 +232,29 @@ class OfflineAdminAcceptance(unittest.TestCase):
         self.assertEqual(unknown["archive"]["package_status"], "UNKNOWN")
         self.assertIn("source-completeness-evidence-unavailable", unknown["contract_gaps"])
 
+    def test_daily_finalization_complete_without_final_verification_stays_unknown(self):
+        coverage = {"days": [{
+            "date": "2026-10-20", "local_status": "COMPLETE",
+            "expected_aids": ["day"], "actual_aids": ["day"],
+            "contract_gaps": [],
+        }]}
+        run = build_daily_finalization({
+            "target_day": "2026-10-20", "coverage": coverage,
+        })["runs"][0]
+        self.assertEqual(run["source_completeness"]["status"], "UNKNOWN")
+        self.assertIsNone(run["source_completeness"]["final_verification_at"])
+        self.assertIn("final-verification-timestamp-unavailable", run["contract_gaps"])
+
+    def test_daily_finalization_rejects_unbounded_error_code(self):
+        run = build_daily_finalization({
+            "target_day": "2026-10-20",
+            "coverage": {"days": []},
+            "error_code": "secret token=" + "x" * 200,
+        })["runs"][0]
+        self.assertIsNone(run["error_code"])
+        self.assertIn("invalid-error-code", run["contract_gaps"])
+        self.assertNotIn("secret token", str(run["error_code"]))
+
     def test_daily_finalization_explicit_target_day_beats_latest_coverage_day(self):
         coverage = {"days": [
             {"date": "2026-10-20", "local_status": "COMPLETE",
