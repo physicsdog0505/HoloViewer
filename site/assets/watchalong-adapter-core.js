@@ -45,11 +45,12 @@
   invariant(Array.isArray(event.segments)&&event.segments.length===entry.source_count,'watchalong segment count mismatch');
   let previousHost=-1;
   const segmentIds=new Set();
-  event.segments.forEach(segment=>{
+  event.segments.forEach((segment,index)=>{
    invariant(segment&&typeof segment.segment_id==='string'&&segment.segment_id,'watchalong segment_id missing');
    invariant(!segmentIds.has(segment.segment_id),'watchalong duplicate segment_id');
    segmentIds.add(segment.segment_id);
    invariant(event.source_video_ids.includes(String(segment.source_video_id||'')),'watchalong segment source linkage mismatch');
+   invariant(String(segment.source_video_id||'')===String(event.source_video_ids[index]||''),'watchalong segment/source order mismatch');
    invariant(finite(segment.host_start_ms)&&Number(segment.host_start_ms)>=0,'watchalong host_start_ms invalid');
    invariant(finite(segment.source_start_ms)&&Number(segment.source_start_ms)>=0,'watchalong source_start_ms invalid');
    invariant(Number(segment.host_start_ms)>previousHost,'watchalong segments not strictly sorted');
@@ -68,6 +69,7 @@
   invariant(Array.isArray(event.subtitles)&&event.subtitles.length===entry.cue_count,'watchalong subtitle cue count mismatch');
   const cueIds=new Set();
   let previousStart=-1;
+  if(entry.translation_status)invariant(String(event.completeness?.translation||'')===String(entry.translation_status),'watchalong translation status mismatch');
   const complete=String(entry.translation_status||'')==='COMPLETE'||String(event.completeness?.translation||'')==='COMPLETE';
   event.subtitles.forEach(cue=>{
    const cueId=String(cue?.cue_id||'');
