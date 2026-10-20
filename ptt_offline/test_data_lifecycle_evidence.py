@@ -9,6 +9,7 @@ from ptt_offline.data_lifecycle_evidence import (
     build_collector_semantic_evidence,
     build_expected_aid_contract,
     build_source_coverage,
+    expected_aids_for_pr147,
 )
 from ptt_offline.publisher_telemetry import update_publisher_telemetry
 
@@ -31,6 +32,12 @@ class DataLifecyclePttEvidenceTests(unittest.TestCase):
         self.assertEqual(body["contract_gaps"],[])
         self.assertEqual(body["conflicts"],[])
 
+        projected=expected_aids_for_pr147(body)
+        self.assertEqual(projected["expected_aids"],["1grg4Pag","1grNight"])
+        self.assertEqual(projected["expected_authority"]["day"],src["day"])
+        self.assertEqual(projected["expected_authority"]["version"],"fixture-v1")
+        self.assertEqual(projected["contract_gaps"],[])
+
     def test_expected_aids_partial_and_contradictory_fail_closed(self):
         src=self.fixture["expected_aids"]
         partial=build_expected_aid_contract(
@@ -38,6 +45,11 @@ class DataLifecyclePttEvidenceTests(unittest.TestCase):
             authority={"verified":False})
         self.assertEqual(partial["status"],"UNKNOWN")
         self.assertIn("expected-night-aid-missing",partial["contract_gaps"])
+
+        projected=expected_aids_for_pr147(partial)
+        self.assertIsNone(projected["expected_aids"])
+        self.assertEqual(projected["contract_gaps"],
+                         ["expected-AID-contract-not-complete-for-pr147"])
         duplicate=build_expected_aid_contract(
             day=src["day"],
             entries=[src["entries"][0],{**src["entries"][0],"aid":"1dupAid","part":1},
