@@ -48,6 +48,7 @@ jobs:
           test -s site/ptt-today/index.html
           test -s site/assets/ptt-today.css
           test -s site/assets/ptt-today.js
+          test -s site/data/watchalong/manifest.json
           grep -F 'https://holoviewer-public-api.singlebagel.workers.dev' site/assets/config.js
           ! grep -R -E 'http://(localhost|127\.0\.0\.1)' site || exit 1
       - name: Validate public client JavaScript and request policy
@@ -55,10 +56,11 @@ jobs:
           node --check site/assets/app.js
           node --check site/assets/config.js
           node --check site/assets/viewer-standalone.js
+          node --check site/assets/watchalong-standalone.js
           node --check site/assets/ptt-today.js
           ! grep -E 'setTimeout|location.reload|eval\(|innerHTML|document.write\(' site/assets/app.js
           test "$(grep -o 'setInterval(' site/assets/app.js | wc -l | tr -d ' ')" = "2"
-          python -B -m unittest -v test_public_smoke test_4174_ui_parity
+          python -B -m unittest -v test_public_smoke test_4174_ui_parity test_watchalong_assets
       - name: Validate Wrangler static assets config (no script, D1, KV or routes)
         run: |
           python - <<'PY'

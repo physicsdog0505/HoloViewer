@@ -99,7 +99,7 @@ function trustedArchiveWindow(item){
 function archiveScheduledStart(item,window){
  const scheduledStart=String(item?.scheduled_start||'');
  const scheduledMs=Date.parse(scheduledStart),actualMs=Date.parse(String(window?.start||''));
- return Number.isFinite(scheduledMs)&&Number.isFinite(actualMs)&&scheduledMs<=actualMs?scheduledStart:'';
+ return Number.isFinite(scheduledMs)&&Number.isFinite(actualMs)&&Math.abs(scheduledMs-actualMs)<=43200000?scheduledStart:'';
 }
 function appendArchiveWindow(query,window){
  if(!window)return;
@@ -1336,11 +1336,27 @@ document.getElementById('displayMode').onclick=()=>{
 audio.addEventListener('change',()=>{audioId=items[Number(audio.value)]||null;});
 document.getElementById('add').onclick=()=>{const value=input.value.trim();if(!value){document.getElementById('custom-error').textContent='請先貼上 YouTube 網址或影片 ID。';document.getElementById('custom-error').hidden=false;return;}if(addStream(value))input.value='';input.focus();};
 input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();document.getElementById('add').click();}});
-document.getElementById('start').onclick=()=>{
+document.getElementById('start').onclick=async()=>{
   if(!items.length){alert('請先加入至少一個影片。');return;}
+  const missing=items.filter(id=>!historyVodWindows.has(id));
+  if(missing.length){
+    await Promise.all(missing.map(async id=>{
+      try{
+        const row=await api('/v1/catalog/videos/'+encodeURIComponent(id));
+        if(String(row?.lifecycle_state||row?.state||'').toLowerCase()!=='ended')return;
+        const window=trustedArchiveWindow(row);
+        if(!window)return;
+        window.scheduledStart=archiveScheduledStart(row,window);
+        historyVodWindows.set(id,window);
+      }catch{}
+    }));
+  }
   const q=new URLSearchParams();items.forEach(v=>q.append('stream',v));
   q.set('layout',items.length===1?'equal':document.getElementById('layout').value);
-  q.set('ptt',document.getElementById('pttMode').value);
+  const selectedHistory=items.length>0&&items.every(id=>historyVodWindows.has(id));
+  const pttMode=selectedHistory?'video':document.getElementById('pttMode').value;
+  q.set('ptt',pttMode);
+  if(selectedHistory)items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)));
   q.set('primary',String(Math.max(0,items.indexOf(primaryId))));
   q.set('audio',String(Math.max(0,items.indexOf(audioId))));
   q.set('mode',items.length>1?'multi':'single');
@@ -1381,6 +1397,12 @@ window.hvCustomHistory=function(rows,day){
   if(at!==null&&bt===null)return -1;
   if(at!==null&&bt!==null&&at!==bt)return bt-at;
   return homeStableId(b).localeCompare(homeStableId(a));
+ });
+ historyRows.forEach(row=>{
+  const window=trustedArchiveWindow(row);
+  if(!window)return;
+  window.scheduledStart=archiveScheduledStart(row,window);
+  historyVodWindows.set(window.videoId,window);
  });
  renderCustomLibraryRows(historyRows,box,empty);
  if(!box.childElementCount){empty.hidden=false;empty.textContent=day.replaceAll('-','/')+' 沒有歷史影片。'}
@@ -1440,11 +1462,22 @@ watchForm.addEventListener('submit',event=>{
  const master=videoId(String(form.get('master')||''));
  const error=document.getElementById('watch-error');
  if(!master){error.textContent='Hololive 主影片無法辨識，請確認 YouTube URL 或 Video ID。';error.hidden=false;return}
- if(form.get('source_kind')==='youtube'&&form.get('youtube_mode')==='single'&&!videoId(String(form.get('source')||''))){error.textContent='請提供有效的 YouTube 片源網址或 Video ID。';error.hidden=false;return}
  if(form.get('source_kind')==='external'){
-  try{const u=new URL(String(form.get('external_source')||''));if(!['https:','http:'].includes(u.protocol))throw Error('invalid')}catch{error.textContent='外部片源網址無法辨識，請提供 http(s) 網址。';error.hidden=false;return}
+  error.textContent='第一版同時視聽先支援 YouTube 片源；外部平台仍保留在 4174 規格，但 Public 暫不啟動。';error.hidden=false;return;
  }
- error.textContent='4174 同時視聽播放器的同步與對齊引擎尚未移植完成，因此這個版本暫不啟動未驗證的同步播放。';error.hidden=false;
+ const q=new URLSearchParams();q.set('host',master);
+ if(form.get('youtube_mode')==='playlist'){
+  let playlist='';
+  try{const u=new URL(String(form.get('playlist')||''));playlist=u.searchParams.get('list')||''}catch{}
+  if(!/^[A-Za-z0-9_-]{10,64}$/.test(playlist)){error.textContent='請提供有效的 YouTube Playlist URL。';error.hidden=false;return}
+  q.set('playlist',playlist);
+  const start=Math.max(1,Number(form.get('playlist_start'))||1);q.set('playlist_start',String(start));
+ }else{
+  const source=videoId(String(form.get('source')||''));
+  if(!source){error.textContent='請提供有效的 YouTube 片源網址或 Video ID。';error.hidden=false;return}
+  q.set('source',source);
+ }
+ error.hidden=true;location.href='/watchalong-viewer/?'+q.toString();
 });
 })();
 

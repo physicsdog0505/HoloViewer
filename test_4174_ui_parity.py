@@ -203,7 +203,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.source-choice{display:grid', css)
         self.assertIn('.manual-shell{padding:20px}', css)
         self.assertIn("const youtubePanel=document.getElementById('youtubePanel')", js)
-        self.assertIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
+        self.assertIn("location.href='/watchalong-viewer/?'+q.toString();", js)
+        self.assertIn("第一版同時視聽先支援 YouTube 片源", js)
         self.assertNotIn("watch-add').onclick", js)
 
     def test_original_4174_collab_hub_structure(self):
@@ -224,6 +225,24 @@ class ParityContract(unittest.TestCase):
         self.assertIn("q.set('collab_kind',isLive?'live':'vod');", js)
         self.assertIn("location.href='/viewer/?'+q.toString();", js)
         self.assertIn("if(event.target.closest('.stream-collab-entry'))return", js)
+
+    def test_viewer_resolves_ptt_source_from_lifecycle_not_entry_mode(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("function verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("pttMeta.textContent='判定影片狀態中'",viewer)
+        self.assertIn("const row=await api('/v1/catalog/videos/'+encodeURIComponent(id))",viewer)
+        self.assertIn("if(lifecycle==='live')",viewer)
+        self.assertIn("if(lifecycle==='ended')",viewer)
+        self.assertIn("const sameDayWindow=verifiedSameDayVodWindow(row)",viewer)
+        self.assertIn("const archiveWindow=verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("archiveWindows.set(id,cached)",viewer)
+        self.assertIn("await loadSameDayVodPtt(pttContext,token)",viewer)
+        self.assertIn("await loadArchivePtt(pttContext,token)",viewer)
+        self.assertIn("const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode)",viewer)
+        resolver=viewer.split("async function resolvePrimaryPtt(){",1)[1].split("async function loadPtt(){",1)[0]
+        self.assertNotIn("if(archiveVodEntry)",resolver)
+        self.assertNotIn("requestedPttMode==='live'&&todayState==='live'",resolver)
+        self.assertNotIn("歷史 VOD 請由 History 提供 verified window",resolver)
 
     def test_vod_history_ptt_uses_static_assets_and_verified_windows(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
@@ -274,10 +293,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn("el.append(kindEl,time,floorEl,body);",viewer)
         self.assertIn("if(floor!==null)el.classList.add('has-floor');",viewer)
         self.assertIn("const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);",viewer)
-        self.assertIn("if(requestedPttMode==='live'&&todayState==='live')",viewer)
         self.assertIn("function verifiedSameDayVodWindow(row)",viewer)
         self.assertIn("lifecycle!=='ended'",viewer)
-        self.assertIn("taipeiDayForDate(start)!==today",viewer)
+        self.assertIn("function verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("if(taipeiDayForDate(window.start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null",viewer)
         self.assertIn("taipeiDayForDate(new Date(endMs-1))!==today",viewer)
         self.assertIn("async function loadTodayPttPayload(day)",viewer)
         self.assertIn("&limit=1000",viewer)
@@ -287,7 +306,6 @@ class ParityContract(unittest.TestCase):
         self.assertIn("[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||'']",viewer)
         self.assertIn("今日暫存 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整",viewer)
         self.assertIn("mode:'same-day'",viewer)
-        self.assertIn("這支影片沒有被今日 catalog 驗證為 LIVE",viewer)
 
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
@@ -580,14 +598,45 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.custom-content-grid:has(#stage > .player-card:only-child)',fix)
         self.assertNotIn('viewerPttPanel.remove()',fix)
 
+    def test_custom_history_start_preserves_verified_ptt_windows(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("const historyVodWindows=new Map()",js)
+        self.assertIn("const window=trustedArchiveWindow(row)",js)
+        self.assertIn("window.scheduledStart=archiveScheduledStart(row,window)",js)
+        self.assertIn("historyVodWindows.set(window.videoId,window)",js)
+        self.assertIn("document.getElementById('start').onclick=async()=>",js)
+        self.assertIn("const missing=items.filter(id=>!historyVodWindows.has(id))",js)
+        self.assertIn("api('/v1/catalog/videos/'+encodeURIComponent(id))",js)
+        self.assertIn("if(String(row?.lifecycle_state||row?.state||'').toLowerCase()!=='ended')return",js)
+        self.assertIn("const window=trustedArchiveWindow(row)",js)
+        self.assertIn("historyVodWindows.set(id,window)",js)
+        self.assertIn("const selectedHistory=items.length>0&&items.every(id=>historyVodWindows.has(id))",js)
+        self.assertIn("const pttMode=selectedHistory?'video':document.getElementById('pttMode').value",js)
+        self.assertIn("if(selectedHistory)items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)))",js)
+
+    def test_vod_ptt_preloads_before_actual_start_when_scheduled_hint_is_missing(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("const anchorMs=hasScheduled?Math.min(startMs,scheduledMs):startMs",viewer)
+        self.assertIn("return anchorMs-3600000",viewer)
+        self.assertIn("Math.abs(scheduledMs-startMs)<=43200000",viewer)
+        helper_start=viewer.index("function vodPttFetchStartMs(context){")
+        helper_end=viewer.index("function pttVodPlaybackMs(){",helper_start)
+        helper=viewer[helper_start:helper_end]
+        script=helper+"\nprocess.stdout.write(JSON.stringify([vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:''}),vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:'2026-10-17T06:00:00Z'}),vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:'2026-10-17T06:01:00Z'})]));"
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        values=json.loads(result.stdout)
+        self.assertEqual(values[0],1792213212000)
+        self.assertEqual(values[1],1792213200000)
+        self.assertEqual(values[2],1792213212000)
+
     def test_vod_ptt_preloads_scheduled_start_before_first_play(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("parts.length!==4&&parts.length!==5",viewer)
-        self.assertIn("scheduledStart:Number.isFinite(scheduledMs)&&scheduledMs<=startMs?scheduledStart:''",viewer)
+        self.assertIn("scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''",viewer)
         self.assertIn("function vodPttCutoffMs(context,seconds,hasPlayed)",viewer)
-        self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&scheduledMs<=startMs)return scheduledMs",viewer)
-        self.assertIn("scheduledMs-3600000",viewer)
+        self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000)return scheduledMs",viewer)
+        self.assertIn("return anchorMs-3600000",viewer)
         self.assertIn("if(state===YT.PlayerState.PLAYING)pttVodHasPlayed=true",viewer)
         self.assertIn("scheduledStart:archiveWindow.scheduledStart||''",viewer)
         helper_start=viewer.index("function vodPttCutoffMs(context,seconds,hasPlayed){")
