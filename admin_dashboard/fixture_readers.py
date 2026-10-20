@@ -103,8 +103,11 @@ class FixtureReaders:
             overall = "unknown"
         else:
             overall = "healthy"
+        health_statuses = [item.get("http_status") for item in reachability
+                           if isinstance(item.get("http_status"), int)]
+        component_http_status = health_statuses[0] if len(health_statuses) == 1 else None
         return {"components": {"Production API": {
-            "observed_at": data["observed_at"], "http_status": 200,
+            "observed_at": data["observed_at"], "http_status": component_http_status,
             "semantic_check": {
                 "status": overall,
                 "semantic_probe_statuses": semantic_statuses,
