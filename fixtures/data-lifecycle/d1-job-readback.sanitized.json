@@ -1,0 +1,74 @@
+{
+  "schema_version": "holoviewer-d1-sanitized-snapshot-v1",
+  "sanitized": true,
+  "snapshot_id": "sha256:cacd715cfb209d2c630fc2545a35df51c18f3cb7c18c00e52f9fba2a58b348e4",
+  "observed_at": "2026-10-20T11:30:00Z",
+  "target": {
+    "kind": "cloudflare-d1",
+    "database": "holoviewer-public-v1",
+    "binding": "DB",
+    "dataset": "ptt"
+  },
+  "job_binding": {
+    "job_id": "publisher:2026-10-20:1grg4Pag:225",
+    "manifest_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "ptt-publisher-v1:2026-10-20T11:29:00Z",
+    "scope": {
+      "day": "2026-10-20",
+      "aids": ["1grg4Pag"]
+    },
+    "expected_count": 1
+  },
+  "watermark": {
+    "kind": "source_record_key",
+    "value": "1grg4Pag:225",
+    "observed_at": "2026-10-20T11:30:00Z"
+  },
+  "pagination": {
+    "mode": "keyset",
+    "page_size": 100,
+    "page_count": 1,
+    "returned_rows": 1,
+    "has_more": false,
+    "next_cursor": null
+  },
+  "coverage": {
+    "mode": "bounded_sample",
+    "requested_identities": 1,
+    "returned_identities": 1,
+    "missing_identities": 0,
+    "complete_partition_proven": false
+  },
+  "query_budget": {
+    "max_queries": 3,
+    "queries_used": 2,
+    "max_pages": 5,
+    "max_rows_returned": 500,
+    "rows_returned": 1,
+    "rows_read_reported": 3,
+    "cache_ttl_seconds": 60
+  },
+  "verification": {
+    "mode": "bounded_sample",
+    "job_verified": false,
+    "manifest_digest_match": true,
+    "identity_match": true,
+    "count_match": true,
+    "contract_gaps": ["bounded-sample-does-not-prove-full-job-completion"]
+  },
+  "rows": [
+    {
+      "identity": {
+        "source": "ptt",
+        "day": "2026-10-20",
+        "aid": "1grg4Pag",
+        "source_line": 225,
+        "push_id": "ptt:1grg4Pag:225",
+        "source_record_key": "1grg4Pag:225"
+      },
+      "revision": "2026-10-20T11:29:00Z",
+      "content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "verified": true
+    }
+  ]
+}
