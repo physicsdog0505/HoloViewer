@@ -176,7 +176,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("pttLoadInFlight", js)
         self.assertIn("homeLoadInFlight", js)
         self.assertIn("pttLastGoodDay&&pttLastGoodDay!==today", js)
-        self.assertIn("10 秒後重試", js)
+        self.assertIn("60 秒後重試", js)
         self.assertIn('id="ptt-newest"', html)
         self.assertIn('id="ptt-show-floor"', html)
         self.assertIn("function pttAtBottom()", js)
