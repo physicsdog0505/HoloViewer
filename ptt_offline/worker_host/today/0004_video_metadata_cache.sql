@@ -46,3 +46,12 @@ CREATE TABLE IF NOT EXISTS public_video_metadata_recovery_demand (
 );
 CREATE INDEX IF NOT EXISTS public_video_metadata_recovery_demand_ready
   ON public_video_metadata_recovery_demand(status,priority,next_attempt_at,requested_at);
+
+
+-- Durable admission bound for unauthenticated public recovery demand creation.
+-- Provider quota remains separately bounded by public_video_metadata_recovery_budget.
+CREATE TABLE IF NOT EXISTS public_video_metadata_recovery_admission_budget (
+  window_start TEXT PRIMARY KEY NOT NULL,
+  admissions INTEGER NOT NULL CHECK(admissions >= 0),
+  updated_at TEXT NOT NULL
+);
