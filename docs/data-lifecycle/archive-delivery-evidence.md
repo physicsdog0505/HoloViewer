@@ -133,6 +133,17 @@ UNKNOWN even when archive coverage and delivery readback are both verified.
 
 ## PR #147 projection
 
+Canonical handoff is frozen at the producer boundary:
+
+- `project_archive_job_for_pr147()`
+- `project_archive_as_sync_job()`
+
+PR #147 should consume the normalized output of `project_archive_as_sync_job()`
+rather than independently reinterpret raw `holoviewer-archive-job-evidence-v1`
+fields. Producer semantics for job status, verification mode, coverage summary,
+expected-AID authority and contract gaps live here.
+
+
 `ptt_offline/archive_pr147_projection.py` exposes a pure producer-side
 projection for Sync Monitor. It does not modify the Admin UI.
 
