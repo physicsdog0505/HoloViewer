@@ -56,6 +56,8 @@ jobs:
             ptt_offline.test_realtime_capture_candidate \
             ptt_offline.test_live_capture_publisher \
             ptt_offline.test_recurring_publisher \
+            ptt_offline.test_publisher_telemetry \
+            ptt_offline.test_diagnose_current_day \
             ptt_offline.test_production_publisher_budget \
             ptt_offline.test_restart_production_publisher
       - name: Indexed PTT 1000-row capacity receipt (synthetic, offline only)
