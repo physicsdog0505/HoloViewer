@@ -534,6 +534,8 @@ function setAudioMaster(index){
 }
 function setPrimary(index){
  if(index<0||index>=streams.length)return;
+ const previousIndex=primaryIndex;
+ const primaryChanged=index!==previousIndex;
  const wasFollowing=pttFollowing||pttAtBottom();
  primaryIndex=index;
  secondaryOffset=0;
@@ -541,7 +543,9 @@ function setPrimary(index){
  setAudioMaster(index);
  applyLayout();
  mountCallOverlay();
- resolvePrimaryPtt();
+ // Locking the already-primary stream is a layout-only transition. Re-resolving
+ // PTT here resets the live/VOD feed even though the timeline source did not change.
+ if(primaryChanged)resolvePrimaryPtt();
  if(wasFollowing){
   pttFollowing=true;
   repinPttAfterLayout({force:true});
@@ -554,7 +558,8 @@ function handleFocusAvatarClick(index){
   return;
  }
  if(currentLayoutPreset()!=='focus'){
-  setPrimary(index);
+  // Entering Lock on the current carousel primary must not reload or re-resolve PTT.
+  if(index!==primaryIndex)setPrimary(index);
   setLayoutPreset('focus');
   return;
  }
