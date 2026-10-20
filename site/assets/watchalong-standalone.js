@@ -30,6 +30,8 @@ const offsetPlus=document.getElementById('offsetPlus');
 const previousSegment=document.getElementById('previousSegment');
 const nextSegment=document.getElementById('nextSegment');
 const segmentStatus=document.getElementById('segmentStatus');
+const immersiveToolbarTrigger=document.getElementById('immersiveToolbarTrigger');
+const topbar=document.querySelector('.watchalong-topbar');
 const subtitleOverlay=document.getElementById('subtitleOverlay');
 const subtitleOriginal=document.getElementById('subtitleOriginal');
 const subtitleTranslation=document.getElementById('subtitleTranslation');
@@ -51,6 +53,7 @@ let segments=[];
 let subtitles=[];
 let activeSegmentIndex=-1;
 let activeSourceVideoId=SOURCE_ID||'';
+let immersiveToolbarTimer=null;
 
 function validVideoId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{11}$/.test(id)?id:''}
 function validPlaylistId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{10,64}$/.test(id)?id:''}
@@ -116,8 +119,40 @@ pttFeed.addEventListener('scroll',()=>{
  pttFollowing=pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48;
  pttNewest.hidden=pttFollowing;
 },{passive:true});
+function clearImmersiveToolbarTimer(){clearTimeout(immersiveToolbarTimer);immersiveToolbarTimer=null}
+function hideImmersiveToolbar(){
+ clearImmersiveToolbarTimer();
+ if(!document.fullscreenElement)return;
+ document.body.classList.remove('toolbar-visible');
+}
+function scheduleImmersiveToolbarHide(delay=3000){
+ clearImmersiveToolbarTimer();
+ if(!document.fullscreenElement)return;
+ immersiveToolbarTimer=setTimeout(hideImmersiveToolbar,delay);
+}
+function showImmersiveToolbar({sticky=false}={}){
+ if(!document.fullscreenElement)return;
+ document.body.classList.add('toolbar-visible');
+ clearImmersiveToolbarTimer();
+ if(!sticky)scheduleImmersiveToolbarHide();
+}
 document.getElementById('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch{}};
-document.addEventListener('fullscreenchange',()=>document.body.classList.toggle('immersive',Boolean(document.fullscreenElement)));
+immersiveToolbarTrigger.addEventListener('mouseenter',()=>showImmersiveToolbar({sticky:true}));
+topbar.addEventListener('mouseenter',()=>showImmersiveToolbar({sticky:true}));
+topbar.addEventListener('mouseleave',()=>scheduleImmersiveToolbarHide());
+topbar.addEventListener('click',()=>scheduleImmersiveToolbarHide());
+topbar.addEventListener('input',()=>scheduleImmersiveToolbarHide());
+document.addEventListener('fullscreenchange',()=>{
+ const immersive=Boolean(document.fullscreenElement);
+ document.body.classList.toggle('immersive',immersive);
+ if(immersive){
+  document.body.classList.add('toolbar-visible');
+  scheduleImmersiveToolbarHide();
+ }else{
+  clearImmersiveToolbarTimer();
+  document.body.classList.remove('toolbar-visible');
+ }
+});
 
 function onHostStateChange(event){
  if(!linkedPlayback.checked||!timelineAligned||!sourcePlayer||suppressLinkedCommand)return;
