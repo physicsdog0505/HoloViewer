@@ -86,6 +86,48 @@ function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
  return fetch(API_BASE+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}}).then(r=>{if(!r.ok)throw new Error('API HTTP '+r.status);return r.json()});
 }
+const WATCHALONG_MEMBER_ACCENTS=[
+ [['ロボ子','ROBOCO'],'#d85a8a'],
+ [['ときのそら','TOKINO SORA'],'#397fc4'],
+ [['AZKI'],'#c94a52'],
+ [['さくらみこ','SAKURA MIKO'],'#dc6f9f'],
+ [['アキ・ローゼンタール','AKI ROSENTHAL'],'#69a56f'],
+ [['白上フブキ','SHIRAKAMI FUBUKI'],'#4b97c8'],
+ [['夏色まつり','NATSUIRO MATSURI'],'#d87932'],
+ [['百鬼あやめ','NAKIRI AYAME'],'#c84b55'],
+ [['癒月ちょこ','YUZUKI CHOCO','CHOCO CH.'],'#d85a8a'],
+ [['大空スバル','OOZORA SUBARU'],'#a68118'],
+ [['大神ミオ','OOKAMI MIO'],'#69a56f'],
+ [['兎田ぺこら','USADA PEKORA','PEKORA CH.'],'#4b97c8'],
+ [['不知火フレア','SHIRANUI FLARE'],'#d87932'],
+ [['白銀ノエル','SHIROGANE NOEL'],'#7d7d7d'],
+ [['宝鐘マリン','HOUSHOU MARINE'],'#c84b55'],
+ [['天音かなた','AMANE KANATA'],'#4b97c8'],
+ [['常闇トワ','TOKOYAMI TOWA'],'#7751a8'],
+ [['雪花ラミィ','YUKIHANA LAMY'],'#4b97c8'],
+ [['獅白ぼたん','SHISHIRO BOTAN'],'#7d7d7d'],
+ [['尾丸ポルカ','OMARU POLKA'],'#c84b55']
+];
+function watchalongHostAccent(row){
+ const audited=String(row?.member_accent||'');
+ if(/^#[0-9a-fA-F]{6}$/.test(audited))return audited;
+ const title=String(row?.channel_title||row?.channel_name||'').toUpperCase();
+ for(const [needles,accent] of WATCHALONG_MEMBER_ACCENTS){
+  if(needles.some(word=>title.includes(word.toUpperCase())))return accent;
+ }
+ return '#4b97c8';
+}
+function applyWatchalongHostAccent(row){
+ document.documentElement.style.setProperty('--watchalong-host-accent',watchalongHostAccent(row));
+}
+function syncPttFromHostNow(){
+ if(!hostPlayer||!hostWindow||!pttRows.length)return;
+ try{
+  const host=hostPlayer.getCurrentTime?.();
+  if(Number.isFinite(host))syncPttToHost(host);
+ }catch{}
+}
+
 function taipeiDay(value=new Date()){
  const date=value instanceof Date?value:new Date(value);
  if(!Number.isFinite(date.getTime()))return '';
@@ -418,8 +460,7 @@ function spawnDanmaku(row){
  item.textContent=text;
  const lane=(Number(row.index)||0)%4;
  item.style.setProperty('--danmaku-top',(8+lane*18)+'%');
- const palette=['#6faec9','#A65788','#B8A6D8','#c85d67','#856C86','#4f7f93'];
- item.style.setProperty('--danmaku-color',palette[(Number(row.index)||0)%palette.length]);
+ item.style.setProperty('--danmaku-color','var(--watchalong-host-accent,#4b97c8)');
  const duration=Math.max(6,Math.min(12,6+text.length*0.06));
  item.style.setProperty('--danmaku-duration',duration.toFixed(1)+'s');
  item.addEventListener('animationend',()=>item.remove(),{once:true});
@@ -649,6 +690,7 @@ async function loadTodayPtt(day,windowInfo=null){
   if(!Array.isArray(data?.pushes))throw new Error('資料格式錯誤');
   const rows=windowInfo?data.pushes.filter(row=>{const t=Date.parse(String(row?.occurred_at||''));return Number.isFinite(t)&&t>=Date.parse(windowInfo.start)-3600000&&t<Date.parse(windowInfo.end)}):data.pushes;
   setPttRows(rows);pttMeta.textContent=day.replaceAll('-','/')+' · '+rows.length+' 則'+(windowInfo?' · 對齊播放時間':' · 即時');
+  if(windowInfo)syncPttFromHostNow();
   if(!windowInfo){pttFeed.replaceChildren(...pttRows.slice(-300).map(pttRow));pttFollowing=true;requestAnimationFrame(()=>{pttFeed.scrollTop=pttFeed.scrollHeight})}
  }catch(e){pttFeed.replaceChildren();const m=document.createElement('div');m.className='ptt-empty';m.textContent='PTT 暫時無法讀取：'+String(e?.message||e);pttFeed.append(m)}
 }
@@ -675,7 +717,7 @@ async function loadArchivePtt(windowInfo){
   const manifest=await fetchArchiveManifest(),objects=new Map(manifest.objects.map(item=>[item.key,item]));
   const startMs=Date.parse(windowInfo.start),endMs=Date.parse(windowInfo.end),rows=[];
   for(const key of archiveHourKeys(startMs-3600000,endMs)){const item=objects.get(key);if(!item)continue;for(const row of await fetchArchiveChunk(item)){const t=Date.parse(String(row?.occurred_at||''));if(Number.isFinite(t)&&t>=startMs-3600000&&t<endMs)rows.push(row)}}
-  setPttRows(rows);pttMeta.textContent=taipeiDay(windowInfo.start).replaceAll('-','/')+' · '+rows.length+' 則 · VOD · 對齊播放時間';
+  setPttRows(rows);pttMeta.textContent=taipeiDay(windowInfo.start).replaceAll('-','/')+' · '+rows.length+' 則 · VOD · 對齊播放時間';syncPttFromHostNow();
  }catch(e){pttFeed.replaceChildren();const m=document.createElement('div');m.className='ptt-empty';m.textContent='歷史 PTT 暫時無法讀取：'+String(e?.message||e);pttFeed.append(m)}
 }
 async function resolveHostPtt(){
@@ -683,6 +725,7 @@ async function resolveHostPtt(){
  try{
   const row=await api('/v1/catalog/videos/'+encodeURIComponent(hostVideoId));
   const state=String(row?.lifecycle_state||row?.state||'').toLowerCase();
+  applyWatchalongHostAccent(row);
   hostStatus.textContent=state||'unknown';
   if(state==='live'){hostWindow=null;await loadTodayPtt(taipeiDay());pttTimer=setInterval(()=>{if(!document.hidden)loadTodayPtt(taipeiDay())},10000);return}
   const start=String(row?.actual_start||''),end=String(row?.actual_end||'');
