@@ -43,6 +43,22 @@ class _Creds:
         return source in self.allowed
 
 
+
+
+def _process_cached_d1(path, value, fail_reader, queue):
+    admission = SQLiteReadAdmissionController(Path(path), source_limits={"d1": (6, 600)})
+    failures = {"d1": "reader-should-not-run"} if fail_reader else {}
+    fake = FakeProductionEvidenceReader(d1=value, failures=failures)
+    config = ProductionReaderConfig(d1=SourceGate(True, True))
+    shell = ProductionReadOnlyShell(fake, admission, config=config, credentials=_Creds({"d1"}))
+    result = shell.read_d1(D1ReadScope("2026-10-20", ()))
+    queue.put({
+        "available": result["available"],
+        "error_code": result["error_code"],
+        "reader_calls": list(fake.calls),
+        "cache_hit": bool((result.get("admission") or {}).get("cache_hit")),
+    })
+
 class _ExplodingAuth:
     def authenticate(self, request_context):
         raise RuntimeError("secret auth backend detail")
@@ -180,6 +196,49 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertFalse(admitted)
         self.assertEqual(reason, "budget_exceeded")
         self.assertEqual(used, 1)
+
+    def test_two_processes_reuse_validated_shared_d1_result_cache(self):
+        fixture = json.loads(
+            (Path(__file__).parent / "fixtures" / "data-lifecycle" /
+             "d1-job-readback.sanitized.json").read_text(encoding="utf-8"))
+        ctx = multiprocessing.get_context("spawn")
+        q1, q2 = ctx.Queue(), ctx.Queue()
+        p1 = ctx.Process(target=_process_cached_d1,
+                         args=(str(self.state), fixture, False, q1))
+        p1.start(); p1.join(10)
+        self.assertEqual(p1.exitcode, 0)
+        first = q1.get(timeout=2)
+        self.assertTrue(first["available"])
+        self.assertEqual(first["reader_calls"], ["d1"])
+        self.assertFalse(first["cache_hit"])
+
+        p2 = ctx.Process(target=_process_cached_d1,
+                         args=(str(self.state), fixture, True, q2))
+        p2.start(); p2.join(10)
+        self.assertEqual(p2.exitcode, 0)
+        second = q2.get(timeout=2)
+        self.assertTrue(second["available"])
+        self.assertEqual(second["reader_calls"], [])
+        self.assertTrue(second["cache_hit"])
+
+    def test_corrupt_cached_d1_evidence_fails_closed_without_reader_fallback(self):
+        fixture = json.loads(
+            (Path(__file__).parent / "fixtures" / "data-lifecycle" /
+             "d1-job-readback.sanitized.json").read_text(encoding="utf-8"))
+        fake = FakeProductionEvidenceReader(d1=fixture)
+        shell = ProductionReadOnlyShell(
+            fake, self.admission(), config=self.config(d1=True), credentials=_Creds({"d1"}))
+        first = shell.read_d1(D1ReadScope("2026-10-20", ()))
+        self.assertTrue(first["available"])
+        con = shell._admission._connect()
+        con.execute("UPDATE read_result_cache SET value_json=?",
+                    ('{"schema_version":"broken"}',))
+        con.close()
+        fake.calls.clear()
+        second = shell.read_d1(D1ReadScope("2026-10-20", ()))
+        self.assertFalse(second["available"])
+        self.assertEqual(second["error_code"], "cache_state_error")
+        self.assertEqual(fake.calls, [])
 
     def test_concurrent_same_key_is_coalesced(self):
         one = self.admission({"d1": (6, 600)})
