@@ -129,6 +129,72 @@ test('Watchalong host resolves channel_id from video identity and attaches same 
  db.close();
 });
 
+test('legacy migration data resolves identically across direct profile, Today, History, metadata, Collab and Watchalong',async()=>{
+ const db=sqliteD1();
+ db.raw.prepare("INSERT INTO public_catalog(video_id,title,channel_id,channel_name,avatar_url,lifecycle_state,scheduled_start,actual_start,actual_end) VALUES(?,?,?,?,?,?,?,?,?)")
+  .run(VIDEO,'Legacy',CHANNEL,'Legacy Channel','https://yt3.ggpht.com/legacy-avatar','ended','2026-10-20T10:00:00Z','2026-10-20T10:00:05Z','2026-10-20T11:00:00Z');
+ db.raw.prepare("INSERT INTO public_today_catalog_meta(singleton,roster_version,last_success_at,expected_channels,scanned_channels,gap,checkpoint) VALUES(1,'r1','2026-10-20T12:00:00Z',1,1,0,NULL)").run();
+ db.raw.prepare("INSERT INTO public_today_approved_channels(channel_id,roster_version,activated_at,channel_group) VALUES(?,?,?,?)")
+  .run(CHANNEL,'r1','2026-10-20T12:00:00Z','hololive');
+ db.raw.prepare("INSERT INTO public_today_canonical(video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+  .run(VIDEO,CHANNEL,'r1','hololive','Video','Today Name','ended','2026-10-20T12:00:00Z','2026-10-20T12:00:00Z','2026-10-20T10:00:00Z','2026-10-20T10:00:05Z','2026-10-20T11:00:00Z','YouTube liveStreamingDetails','x');
+ db.raw.prepare("INSERT INTO public_history(video_id,taipei_day,title,channel_id,channel_name,avatar_url,scheduled_start,actual_start,actual_end,source_revision,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+  .run(VIDEO,'2026-10-20','VOD',CHANNEL,'History Name','','2026-10-20T10:00:00Z','2026-10-20T10:00:05Z','2026-10-20T11:00:00Z','youtube-videos-list:liveStreamingDetails','2026-10-20T12:00:00Z');
+ db.raw.prepare("INSERT INTO public_watchalong_events(event_id,aid,article_title,source_url,article_datetime,day,scheduled_time,description,member_only,imported_at,source) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+  .run(EVENT,'#a','Article','https://example.invalid','2026-10-20T12:00:00Z','2026-10-20','20:00','Watchalong',0,'2026-10-20T12:00:00Z','ptt_watchalong_parser');
+ db.raw.prepare("INSERT INTO public_watchalong_streams(event_id,ordinal,label,video_id) VALUES(?,?,?,?)").run(EVENT,0,'Any label',VIDEO);
+
+ const direct=(await (await handleChannelProfileRead(new Request('https://api.example/v1/channels/'+CHANNEL+'/profile'),{DB:db})).json()).profile;
+ const metadata=await (await handleVideoMetadataRead(new Request('https://api.example/v1/videos/'+VIDEO+'/metadata'),{DB:db})).json();
+ const watch=await (await handleExperienceRead(new Request('https://api.example/v1/watchalong/events/'+EVENT),{DB:db,WATCHALONG_EVENTS_ENABLED:'true'})).json();
+ const collab=await (await handleExperienceRead(new Request('https://api.example/v1/collab/history?day=2026-10-20'),{DB:db})).json();
+ const {readToday}=await import('./worker_host/today/store.mjs');
+ const {legacyHistory}=await import('./worker_host/today/legacy-compat.mjs');
+ const today=(await readToday(db,{day:'2026-10-20',now:new Date('2026-10-20T12:00:00Z')})).streams[0].channel;
+ const history=(await (await legacyHistory(new Request('https://api.example/v1/history?day=2026-10-20'),{DB:db})).json()).items[0].channel;
+
+ for(const candidate of [today,history,metadata.channel,watch.event.hosts[0].channel]){
+  assert.equal(candidate.avatar_url,direct.avatar_url);
+  assert.equal(candidate.group,direct.group);
+  assert.equal(candidate.channel_name,direct.channel_name);
+  assert.equal(candidate.support_mode,direct.support_mode);
+  assert.deepEqual(candidate.member_accent_dual,direct.member_accent_dual);
+ }
+ assert.equal(direct.avatar_url,'https://yt3.ggpht.com/legacy-avatar');
+ assert.equal(direct.group,'hololive');
+ assert.equal(Array.isArray(collab.events),true);
+ db.close();
+});
+
+test('canonical row overrides transitional legacy sources everywhere',async()=>{
+ const db=sqliteD1();
+ db.raw.prepare("INSERT INTO public_catalog(video_id,title,channel_id,channel_name,avatar_url,lifecycle_state,scheduled_start,actual_start,actual_end) VALUES(?,?,?,?,?,?,?,?,?)")
+  .run(VIDEO,'Legacy',CHANNEL,'Legacy Channel','https://yt3.ggpht.com/legacy-avatar','ended',null,null,null);
+ db.raw.prepare("INSERT INTO public_today_approved_channels(channel_id,roster_version,activated_at,channel_group) VALUES(?,?,?,?)")
+  .run(CHANNEL,'r1','2026-10-20T12:00:00Z','other');
+ await upsertChannelProfiles(db,[profile()]);
+ const direct=await readChannelProfile(db,CHANNEL);
+ assert.equal(direct.avatar_url,'https://yt3.ggpht.com/avatar');
+ assert.equal(direct.group,'hololive');
+ assert.equal(direct.channel_name,'Canonical Channel');
+ db.close();
+});
+
+test('equal timestamp different canonical profile revision fails closed and identical replay is idempotent',async()=>{
+ const db=sqliteD1();
+ const first=profile();
+ assert.equal((await upsertChannelProfiles(db,[first])).profiles_written,1);
+ assert.equal((await upsertChannelProfiles(db,[first])).profiles_written,0);
+ await assert.rejects(
+  ()=>upsertChannelProfiles(db,[{...first,display_name:'Different',profile_revision:'profile-r2'}]),
+  /same-timestamp profile conflict/
+ );
+ const stored=await readChannelProfile(db,CHANNEL);
+ assert.equal(stored.display_name,'Canonical Member');
+ assert.equal(stored.profile_revision,'profile-r1');
+ db.close();
+});
+
 test('Watchalong unknown video keeps channel_id null and neutral profile instead of label inference',async()=>{
  const db=sqliteD1();
  db.raw.prepare("INSERT INTO public_watchalong_events(event_id,aid,article_title,source_url,article_datetime,day,scheduled_time,description,member_only,imported_at,source) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
