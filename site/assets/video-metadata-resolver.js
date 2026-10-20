@@ -32,7 +32,10 @@
   }
 
   for(let attempt=1;attempt<=maxAttempts;attempt++){
-   const result=await fetchJson(apiBase,'/v1/videos/'+encodeURIComponent(id)+'/metadata');
+   const query=new URLSearchParams();
+   if(/^\d{4}-\d{2}-\d{2}$/.test(String(options.pttDay||'')))query.set('ptt_day',String(options.pttDay));
+   const suffix=query.toString()?'?'+query.toString():'';
+   const result=await fetchJson(apiBase,'/v1/videos/'+encodeURIComponent(id)+'/metadata'+suffix);
    if(signal?.aborted)return {status:'aborted',videoId:id,row:null,httpStatus:0};
    const payload=result.payload||{};
    if(result.status===200)return {status:'ready',videoId:id,row:payload,httpStatus:200,source:'metadata',attempt};
