@@ -197,6 +197,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn('id="sourcePlayer"', html)
         self.assertIn('id="pttPanel"', html)
         self.assertIn('id="subtitleOverlay"', html)
+        self.assertIn('id="sourceStandby"', html)
         self.assertIn('id="previousSegment"', html)
         self.assertIn('id="nextSegment"', html)
         self.assertIn('id="segmentStatus"', html)
@@ -221,6 +222,11 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("content.className='ptt-content'", js)
         self.assertIn("function showImmersiveToolbar({sticky=false}={})", js)
         self.assertIn("scheduleImmersiveToolbarHide(delay=3000)", js)
+        self.assertIn("function sourceExpectedTime(hostSeconds)", js)
+        self.assertIn("function setSourceStandby(active)", js)
+        self.assertIn("if(expected<0){", js)
+        self.assertIn("setSourceStandby(true);", js)
+        self.assertIn("if(sourceStandbyActive||!Number.isFinite(current)||!subtitles.length)", js)
         self.assertIn("immersiveToolbarTrigger.addEventListener('mouseenter'", js)
         self.assertIn("fullscreenButton.blur();", js)
         self.assertIn("topbar.addEventListener('focusin'", js)
@@ -239,6 +245,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertNotIn("body.immersive .watchalong-topbar:focus-within", css)
         self.assertIn("transform:translateY(calc(-100% - 2px))", css)
         self.assertIn("body.immersive .immersive-toolbar-trigger{", css)
+        self.assertIn(".source-standby{", css)
+        self.assertIn(".source-standby[hidden]{display:none}", css)
         self.assertIn("location.href='/watchalong-viewer/?'+q.toString();", app)
 
     def test_standalone_ptt_today_contract(self):
