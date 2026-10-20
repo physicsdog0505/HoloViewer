@@ -139,3 +139,37 @@ A sanitized consumer fixture derived from PR #154 exact HEAD `d1651e96654c982959
 `fixtures/data-lifecycle/archive-sync-jobs.sanitized.json`.
 
 Regression coverage includes the eight #45 integration cases: COMPLETE manifest without a job, completed delivery with PARTIAL coverage, full-partition job verification, bounded-sample non-verification, missing expected-AID authority, Static Assets labeling, missing evidence, and browser privacy scrub.
+
+
+## Daily PTT finalization monitoring
+
+Owner-approved closeout time: **07:30 Asia/Taipei** for the previous Taipei day.
+
+The Admin surface exposes a fourth read-only section, **Daily Finalization**, with three independent facts:
+
+1. **Source/data completeness**
+   - VERIFIED_COMPLETE
+   - REPAIR_NEEDED
+   - CONFLICT
+   - UNKNOWN
+2. **Repair job outcome**
+   - attempted / succeeded / failed / bounded error
+   - remains UNKNOWN until an explicit repair-job producer supplies sanitized evidence
+3. **Archive outcome**
+   - package coverage
+   - delivery job status
+   - independent readback verification
+
+The projection does not infer one fact from another. Archive manifest/package COMPLETE does not imply a delivery job succeeded. Delivery success does not promote source completeness. A bounded readback sample never becomes VERIFIED.
+
+`VERIFIED_COMPLETE` requires:
+- source/local completeness = COMPLETE;
+- explicit expected and actual AID sets with exact equality;
+- no missing AIDs or source-line ranges;
+- an explicit `final_verification_at` timestamp.
+
+A generic `last_updated_at` is not treated as final verification proof.
+
+The fixture monitor binds the explicit closeout target to the previous day of the fixture range. The future Production host must supply the target day explicitly; the Admin projection never guesses from the latest row.
+
+No repair/archive/deploy/write controls are present.
