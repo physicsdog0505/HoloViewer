@@ -346,10 +346,13 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .selection-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.selection-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;padding:8px 12px;background:#fff;color:var(--text);font-size:12px;font-weight:750;text-decoration:none}.selection-link:hover{background:var(--surface-2)}
 .watchalong-static-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:8px}
 .watchalong-static-card{
- display:flex;flex-direction:column;gap:10px;min-height:148px;padding:16px;border:1px solid var(--line);border-radius:16px;
+ display:flex;flex-direction:column;min-height:0;padding:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;
  background:var(--surface);color:var(--text);text-decoration:none;transition:.15s ease
 }
 .watchalong-static-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.watchalong-static-thumb{width:100%;aspect-ratio:16/9;background:#ece9e4;overflow:hidden}
+.watchalong-static-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.watchalong-static-body{display:flex;flex:1;flex-direction:column;gap:10px;padding:14px 16px 16px}
 .watchalong-static-card strong{font-size:15px;line-height:1.5}
 .watchalong-static-meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:11px;font-weight:750}
 .watchalong-static-action{margin-top:auto;color:#4f7f93;font-size:12px;font-weight:800}
