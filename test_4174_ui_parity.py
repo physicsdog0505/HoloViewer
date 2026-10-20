@@ -787,6 +787,17 @@ class ParityContract(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
 
+    def test_all_vod_entries_use_metadata_fallback_for_timing(self):
+        app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        viewer=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("async function resolveVideoMetadata(id)", app)
+        self.assertIn("api('/v1/videos/'+encodeURIComponent(videoId)+'/metadata')", app)
+        self.assertIn("async function resolveVodWindow(id)", app)
+        self.assertIn("const window=await resolveVodWindow(id);", app)
+        self.assertIn("async function videoMetadata(id)", viewer)
+        self.assertIn("api('/v1/videos/'+encodeURIComponent(id)+'/metadata')", viewer)
+        self.assertIn("const row=await videoMetadata(id);", viewer)
+
     def test_viewer_lock_is_behavior_not_ptt_workspace_geometry(self):
         js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
         self.assertIn("let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;", js)
