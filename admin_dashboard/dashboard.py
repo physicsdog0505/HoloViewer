@@ -40,6 +40,11 @@ class DashboardController:
             if elapsed < self._cooldown:
                 result = deepcopy(previous["public"])
                 result["refresh"] = {"status": "cooldown", "retry_after_seconds": self._cooldown - elapsed}
+                last_success_dt = previous.get("last_success_dt")
+                result["last_good_age_seconds"] = (
+                    max(0.0, (now - last_success_dt).total_seconds())
+                    if last_success_dt is not None else None
+                )
                 return result
         reader = self._readers.get(section)
         read_at = now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -55,15 +60,25 @@ class DashboardController:
                 payload = build_system_health(raw, now=now, stale_after_seconds=self._stale_after)
             payload = sanitize_for_browser(payload)
             result = {"section": section, "availability": "available", "read_at": read_at,
-                      "last_successful_read_at": read_at,
+                      "last_successful_read_at": read_at, "last_good_age_seconds": 0.0,
                       "error": None, "payload": payload,
                       "refresh": {"status": "refreshed", "retry_after_seconds": self._cooldown}}
         except Exception as exc:  # retain last-good data while exposing the read failure
+            last_success_dt = previous.get("last_success_dt") if previous else None
             result = {"section": section, "availability": "unavailable", "read_at": read_at,
                       "last_successful_read_at": previous["public"].get("last_successful_read_at") if previous else None,
+                      "last_good_age_seconds": (
+                          max(0.0, (now - last_success_dt).total_seconds())
+                          if last_success_dt is not None else None
+                      ),
                       "error": {"code": type(exc).__name__,
                                 "message": "read-only monitor source failed"},
                       "payload": deepcopy(previous["public"].get("payload")) if previous else None,
                       "refresh": {"status": "failed", "retry_after_seconds": self._cooldown}}
-        self._cache[section] = {"read_at_dt": now, "public": deepcopy(result)}
+        self._cache[section] = {
+            "read_at_dt": now,
+            "last_success_dt": now if result["availability"] == "available"
+                               else (previous.get("last_success_dt") if previous else None),
+            "public": deepcopy(result),
+        }
         return result
