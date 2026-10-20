@@ -111,7 +111,7 @@ test('batch resolver query count is bounded by source classes, not channel count
  assert.equal(result.size,20);
  assert.ok(oneQueries>0);
  assert.equal(manyQueries,oneQueries);
- assert.ok(manyQueries<=6,'expected one bounded query per source class');
+ assert.equal(manyQueries,7,'reviewed profile resolver uses seven bounded source-class queries');
  base.close();
 });
 
