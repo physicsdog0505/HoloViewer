@@ -56,6 +56,9 @@ export async function recoverVideoMetadataServerOwned(env,videoId,{fetchImpl=fet
 export async function processVideoMetadataDemands(env,{fetchImpl=fetch,now=new Date(),limit=4,preferredVideoId=''}={}){
  if(!env?.DB||!env?.YOUTUBE_API_KEY)return {processed:0,resolved:0,pending:0,budget_exhausted:false};
  const nowIso=stamp(now.getTime());
+ const staleBefore=stamp(now.getTime()-2*60_000);
+ await env.DB.prepare("UPDATE public_video_metadata_recovery_demand SET status='pending',updated_at=?,next_attempt_at=?,last_error='stale_processing_requeued' WHERE status='processing' AND updated_at<?")
+  .bind(nowIso,nowIso,staleBefore).run();
  let rows=[];
  if(preferredVideoId){
   const row=await env.DB.prepare("SELECT * FROM public_video_metadata_recovery_demand WHERE video_id=? AND status='pending' AND next_attempt_at<=? LIMIT 1").bind(preferredVideoId,nowIso).first();
