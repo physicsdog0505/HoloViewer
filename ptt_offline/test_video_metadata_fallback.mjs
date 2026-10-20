@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {handleVideoMetadataRead} from './worker_host/today/video-metadata-read.mjs';
-import {handleVideoMetadataRecovery} from './worker_host/today/video-metadata-recovery.mjs';
+import {handleVideoMetadataRecovery,processVideoMetadataDemands} from './worker_host/today/video-metadata-recovery.mjs';
 import {signature} from './worker_host/today/today-private-post.mjs';
 
 const MANAGED='UC'+'A'.repeat(22);
@@ -32,6 +32,7 @@ function sqliteD1({managed=true}={}){
  sqlite.exec(readFileSync(new URL('./worker_host/today/0004_video_metadata_cache.sql',import.meta.url),'utf8'));
  sqlite.exec("CREATE TABLE public_history(video_id TEXT PRIMARY KEY,taipei_day TEXT,title TEXT,channel_id TEXT,channel_name TEXT,avatar_url TEXT,scheduled_start TEXT,actual_start TEXT,actual_end TEXT,source_revision TEXT,published_at TEXT);");
  sqlite.exec("CREATE TABLE public_catalog(video_id TEXT PRIMARY KEY,title TEXT,channel_id TEXT,channel_name TEXT,lifecycle_state TEXT,scheduled_start TEXT,actual_start TEXT,avatar_url TEXT);");
+ sqlite.exec("CREATE TABLE ptt_threads(day TEXT NOT NULL,aid TEXT NOT NULL,source_url TEXT,verified_at TEXT,PRIMARY KEY(day,aid));");
  sqlite.prepare("INSERT INTO public_today_catalog_meta(singleton,roster_version,last_success_at,expected_channels,scanned_channels,gap,checkpoint) VALUES(1,?,?,?,?,?,NULL)")
   .run('fixture-v1','2026-10-19T00:00:00Z',managed?1:0,managed?1:0,0);
  if(managed)sqlite.prepare("INSERT INTO public_today_approved_channels(channel_id,roster_version,activated_at,channel_group) VALUES(?,?,?,?)")
@@ -72,16 +73,97 @@ test('A catalog hit returns source=catalog without provider dependency',async()=
  db.close();
 });
 
-test('public cache miss is fail-closed and never invokes provider or writes',async()=>{
- const db=sqliteD1();
- const before=db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_cache').get().n;
- const res=await handleVideoMetadataRead(getReq(),{DB:db,YOUTUBE_API_KEY:'key'});
+test('public cache miss registers one bounded demand and never calls provider synchronously',async()=>{
+ const db=sqliteD1();let fetches=0;const background=[];
+ const env={DB:db,YOUTUBE_API_KEY:'key'};
+ const res=await handleVideoMetadataRead(getReq(),env,{
+  now:new Date('2026-10-20T03:00:00Z'),
+  fetchImpl:async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()},
+  ctx:{waitUntil(promise){background.push(promise)}}
+ });
  const body=await res.json();
- assert.equal(res.status,404);assert.equal(body.error,'metadata_not_cached');assert.equal(body.lifecycle_state,'unknown');
- assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_cache').get().n,before);
+ assert.equal(res.status,202);assert.equal(body.status,'metadata_pending');assert.equal(body.priority,2);
+ assert.equal(fetches,0);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_demand').get().n,1);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_cache').get().n,0);
  assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_today_evidence').get().n,0);
+ assert.equal(background.length,1);
+ await background[0];
+ assert.equal(fetches,1);
+ const follow=await handleVideoMetadataRead(getReq(),env,{now:new Date('2026-10-20T03:00:03Z')});
+ const followBody=await follow.json();
+ assert.equal(follow.status,200);assert.equal(followBody.source,'youtube-fallback');
  db.close();
 });
+
+test('verified PTT day raises demand priority without bypassing provider budget',async()=>{
+ const db=sqliteD1();const background=[];
+ db.raw.prepare("INSERT INTO ptt_threads(day,aid,verified_at) VALUES(?,?,?)").run('2026-10-18','#fixture','2026-10-20T00:00:00Z');
+ const req=new Request('https://api.example/v1/videos/'+VID+'/metadata?ptt_day=2026-10-18');
+ const res=await handleVideoMetadataRead(req,{DB:db,YOUTUBE_API_KEY:'key'},{
+  now:new Date('2026-10-20T03:00:00Z'),fetchImpl:fetchBody([youtubeItem({channelId:EXTERNAL})]),
+  ctx:{waitUntil(promise){background.push(promise)}}
+ });
+ const body=await res.json();
+ assert.equal(res.status,202);assert.equal(body.priority,1);assert.equal(body.ptt_priority,true);
+ const row=db.raw.prepare('SELECT priority,ptt_day FROM public_video_metadata_recovery_demand WHERE video_id=?').get(VID);
+ assert.equal(row.priority,1);assert.equal(row.ptt_day,'2026-10-18');
+ await background[0];
+ db.close();
+});
+
+test('twenty public misses for the same video dedupe to one provider lookup',async()=>{
+ const db=sqliteD1({managed:false});let fetches=0;const background=[];
+ const env={DB:db,YOUTUBE_API_KEY:'key'};
+ const fetchImpl=async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()};
+ for(let i=0;i<20;i++){
+  const res=await handleVideoMetadataRead(getReq(),env,{
+   now:new Date('2026-10-20T03:00:00Z'),fetchImpl,
+   ctx:{waitUntil(promise){background.push(promise)}}
+  });
+  assert.equal(res.status,202);
+ }
+ await Promise.all(background);
+ assert.equal(fetches,1);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_demand').get().n,1);
+ assert.equal(db.raw.prepare('SELECT calls FROM public_video_metadata_recovery_budget').get().calls,1);
+ db.close();
+});
+
+test('31 distinct public demands never exceed 30 provider calls and keep excess pending',async()=>{
+ const db=sqliteD1({managed:false});let fetches=0;
+ const env={DB:db,YOUTUBE_API_KEY:'key'};
+ const now=new Date('2026-10-20T03:00:00Z');
+ for(let i=0;i<31;i++){
+  const id=('0000000000'+i.toString(36)).slice(-11);
+  await handleVideoMetadataRead(getReq(id),env,{now,ctx:{waitUntil(){}}});
+ }
+ const result=await processVideoMetadataDemands(env,{
+  now,limit:31,fetchImpl:async()=>{fetches++;return fetchBody([])()}
+ });
+ assert.equal(fetches,30);assert.equal(result.budget_exhausted,true);
+ assert.equal(db.raw.prepare("SELECT COUNT(*) n FROM public_video_metadata_recovery_demand WHERE status='pending'").get().n,1);
+ assert.equal(db.raw.prepare('SELECT calls FROM public_video_metadata_recovery_budget').get().calls,30);
+ db.close();
+});
+
+test('pending demand resumes automatically after budget window renewal',async()=>{
+ const db=sqliteD1({managed:false});let fetches=0;
+ const env={DB:db,YOUTUBE_API_KEY:'key'};
+ const first=new Date('2026-10-20T03:00:00Z');
+ db.raw.prepare("INSERT INTO public_video_metadata_recovery_budget(window_start,calls,updated_at) VALUES(?,?,?)")
+  .run('2026-10-20T03:00:00Z',30,'2026-10-20T03:00:00Z');
+ await handleVideoMetadataRead(getReq(),env,{now:first,ctx:{waitUntil(){}}});
+ const blocked=await processVideoMetadataDemands(env,{now:first,limit:1,fetchImpl:async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()}});
+ assert.equal(blocked.budget_exhausted,true);assert.equal(fetches,0);
+ const later=new Date('2026-10-20T03:10:01Z');
+ db.raw.prepare("UPDATE public_video_metadata_recovery_demand SET next_attempt_at=? WHERE video_id=?").run('2026-10-20T03:10:00Z',VID);
+ const resumed=await processVideoMetadataDemands(env,{now:later,limit:1,fetchImpl:async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()}});
+ assert.equal(resumed.resolved,1);assert.equal(fetches,1);
+ assert.equal(db.raw.prepare('SELECT status FROM public_video_metadata_recovery_demand WHERE video_id=?').get(VID).status,'resolved');
+ db.close();
+});
+
 
 test('B owner recovery resolves managed livestream, fills cache, and ingests Today without History',async()=>{
  const db=sqliteD1();
