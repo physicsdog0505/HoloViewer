@@ -2,13 +2,13 @@
 
 Issue: [#148](https://github.com/physicsdog0505/HoloViewer/issues/148)
 
-Status: **READY FOR #45 REVIEW / READY FOR PUBLIC DEPLOY** (not deployed)
+Status: **READY FOR #45 DATA REVIEW / NOT READY FOR PUBLIC DEPLOY**
 
 ## Scope and delivery architecture
 
-This change extends the existing Public standalone Watchalong data seam. It does not add a Worker, D1 table, writer, collector, scheduler, or provider call. The browser first reads `/data/watchalong/manifest.json`, verifies the selected event payload with SHA-256, validates identity and cue coverage, and then passes its existing `segments` and `subtitles` shapes to the current player. Unknown events retain the existing read-only API fallback.
+This PR is the **data-only package** split required by #45. It does not add a second Watchalong player, frontend adapter, Worker, D1 table, writer, collector, scheduler, or provider call. It publishes only the reviewed static manifest/event payloads plus the offline exporter/integrity tests. The Public frontend owner must separately add an event-gated read-only Adapter to the existing `/viewer/` shell and must fail closed when a selected static event is missing/corrupt.
 
-Subtitle cues use the Hololive/master clock, matching the accepted 8501 behavior. The player implementation and synchronization controls are otherwise unchanged.
+Subtitle cues use the Hololive/master clock, matching the accepted 8501 behavior. Player synchronization, initial source offset application, host-clock segment transition, and browser smoke are frontend-owner acceptance items and are intentionally outside this data-only PR.
 
 ## Inventory and source-to-Public mapping
 
@@ -45,11 +45,26 @@ The authoritative full values are in `site/data/watchalong/manifest.json`:
 Regenerate or verify against the private source without any provider call:
 
 ```sh
-python3 scripts/export_watchalong_assets.py --source-root /path/to/Hololive-PTT-Viewer
-python3 scripts/export_watchalong_assets.py --source-root /path/to/Hololive-PTT-Viewer --check
+python3 scripts/export_watchalong_assets.py \
+  --source-root "$HOME/Downloads/Hololive-PTT-Viewer" \
+  --output-root site/data/watchalong
+
+python3 scripts/export_watchalong_assets.py \
+  --source-root "$HOME/Downloads/Hololive-PTT-Viewer" \
+  --output-root site/data/watchalong \
+  --check
 ```
 
 ## Review and deployment boundary
+
+Before running the exporter on the owner Mac, verify the expected private source inputs exist under `$HOME/Downloads/Hololive-PTT-Viewer`:
+
+- `data/watchalong/watchalong_archive.sqlite3`
+- `data/watchalong/transcripts/youtube/<master>/transcripts/<transcript_id>/metadata.json`
+- matching `segments.json`
+- the pinned translation artifacts referenced by the exporter
+
+The exporter opens the archive DB using SQLite immutable read-only mode and performs no provider/network call.
 
 Review must confirm the approved right to publish the three transcript/translation payloads because they contain full browser-facing subtitle text. No API, D1, Worker script, PTT database, 8501 runtime, or 4174 behavior changes are required.
 
