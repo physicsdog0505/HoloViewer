@@ -119,3 +119,23 @@ Still HOLD:
 - uploader/repair/write controls.
 
 Independent #45 / PR #147 review is still required before any real mount.
+
+
+## Archive integration convergence (#48 PR #154)
+
+#147 no longer parses raw Archive delivery evidence or legacy R2 manifests. The injected reader now supplies the canonical normalized row produced by #48's `project_archive_as_sync_job()` contract.
+
+Consumer boundary:
+- input key: `archive_sync_job`
+- component must be `Archive`
+- generic Sync Monitor fields are consumed directly
+- producer-specific details remain nested under `evidence_source_fields`
+- coverage comes only from `coverage_summary.status`
+- expected-AID completeness comes only from `expected_aid_completeness.status`
+- verification comes only from the producer projection's `verification_mode` / `job_verified`
+- missing or invalid normalized evidence remains UNKNOWN with explicit contract gaps
+
+A sanitized consumer fixture derived from PR #154 exact HEAD `d1651e96654c982959ede7678ac6b6582f1f50e7` is stored at:
+`fixtures/data-lifecycle/archive-sync-jobs.sanitized.json`.
+
+Regression coverage includes the eight #45 integration cases: COMPLETE manifest without a job, completed delivery with PARTIAL coverage, full-partition job verification, bounded-sample non-verification, missing expected-AID authority, Static Assets labeling, missing evidence, and browser privacy scrub.
