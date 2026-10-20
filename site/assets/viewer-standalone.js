@@ -21,9 +21,9 @@ const collabEventId=String(params.get('collab_event')||'');
 const collabKind=['live','vod'].includes(params.get('collab_kind'))?params.get('collab_kind'):'';
 const collabDay=/^\d{4}-\d{2}-\d{2}$/.test(String(params.get('collab_day')||''))?String(params.get('collab_day')):'';
 const collabSyncVerified=collabKind==='vod'&&params.get('collab_sync')==='verified';
-const collabManaged=Boolean(collabEventId&&collabKind);
 const watchalongEventId=String(params.get('watchalong_event')||'').trim();
-const watchalongManaged=/^[A-Za-z0-9_-]{11}$/.test(watchalongEventId);
+const watchalongManaged=params.has('watchalong_event');
+const collabManaged=!watchalongManaged&&Boolean(collabEventId&&collabKind);
 const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';
 function parseArchiveWindows(){
  const map=new Map();
