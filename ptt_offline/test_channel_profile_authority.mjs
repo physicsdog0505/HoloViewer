@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 
-import {readChannelProfile,neutralChannelProfile} from './worker_host/today/channel-profile.mjs';
+import {readChannelProfile,readChannelProfiles,neutralChannelProfile} from './worker_host/today/channel-profile.mjs';
 import {upsertChannelProfiles} from './worker_host/today/channel-profile-write.mjs';
 import {handleChannelProfileRead} from './worker_host/today/channel-profile-read.mjs';
 import {handleVideoMetadataRead} from './worker_host/today/video-metadata-read.mjs';
@@ -68,6 +68,39 @@ test('canonical profile round-trips through one shared projection',async()=>{
  assert.equal(out.member_accent,'#123456');
  assert.equal(out.support_mode,'solid');
  assert.equal(out.profile_revision,'profile-r1');
+ db.close();
+});
+
+test('batch resolver query count is bounded by source classes, not channel count',async()=>{
+ const base=sqliteD1();
+ let queries=0;
+ const counted={
+  ...base,
+  prepare(sql){queries++;return base.prepare(sql)}
+ };
+ const one='UC'+'Q'.repeat(22);
+ await readChannelProfiles(counted,[one]);
+ const oneQueries=queries;
+ queries=0;
+ const many=Array.from({length:20},(_,i)=>'UC'+String(i).padStart(22,'A').slice(-22).replace(/[^A-Za-z0-9_-]/g,'A'));
+ // ensure valid, distinct 24-char channel IDs
+ const ids=many.map((_,i)=>'UC'+(i.toString(36).toUpperCase()+'A'.repeat(22)).slice(0,22));
+ const result=await readChannelProfiles(counted,ids);
+ const manyQueries=queries;
+ assert.equal(result.size,20);
+ assert.ok(oneQueries>0);
+ assert.equal(manyQueries,oneQueries);
+ assert.ok(manyQueries<=6,'expected one bounded query per source class');
+ base.close();
+});
+
+test('batch result equals single-profile result for canonical and unknown channels',async()=>{
+ const db=sqliteD1();
+ await upsertChannelProfiles(db,[profile()]);
+ const unknown='UC'+'Z'.repeat(22);
+ const batch=await readChannelProfiles(db,[CHANNEL,unknown]);
+ assert.deepEqual(batch.get(CHANNEL),await readChannelProfile(db,CHANNEL));
+ assert.deepEqual(batch.get(unknown),await readChannelProfile(db,unknown));
  db.close();
 });
 
