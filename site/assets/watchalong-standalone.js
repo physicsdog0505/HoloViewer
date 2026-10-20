@@ -61,6 +61,7 @@ let suppressLinkedCommand=false;
 let syncTimer=null;
 let subtitleTimer=null;
 let pttTimer=null;
+let pttPrimeTimers=[];
 let hostWindow=null;
 let pttRows=[];
 let pttVisible=0;
@@ -122,11 +123,23 @@ function applyWatchalongHostAccent(row){
  document.documentElement.style.setProperty('--watchalong-host-accent',watchalongHostAccent(row));
 }
 function syncPttFromHostNow(){
- if(!hostPlayer||!hostWindow||!pttRows.length)return;
+ if(!hostPlayer||!hostWindow||!pttRows.length)return false;
  try{
   const host=hostPlayer.getCurrentTime?.();
-  if(Number.isFinite(host))syncPttToHost(host);
+  if(Number.isFinite(host)){syncPttToHost(host);return true}
  }catch{}
+ return false;
+}
+function primePttToHost(){
+ pttPrimeTimers.forEach(clearTimeout);pttPrimeTimers=[];
+ const delays=[0,120,400,1000];
+ delays.forEach(delay=>{
+  pttPrimeTimers.push(setTimeout(()=>{
+   if(syncPttFromHostNow()&&pttVisible>0){
+    pttPrimeTimers.forEach(clearTimeout);pttPrimeTimers=[];
+   }
+  },delay));
+ });
 }
 
 function taipeiDay(value=new Date()){
@@ -706,7 +719,7 @@ async function loadTodayPtt(day,windowInfo=null){
   if(!Array.isArray(data?.pushes))throw new Error('資料格式錯誤');
   const rows=windowInfo?data.pushes.filter(row=>{const t=Date.parse(String(row?.occurred_at||''));return Number.isFinite(t)&&t>=Date.parse(windowInfo.start)-3600000&&t<Date.parse(windowInfo.end)}):data.pushes;
   setPttRows(rows);pttMeta.textContent=day.replaceAll('-','/')+' · '+rows.length+' 則'+(windowInfo?' · 對齊播放時間':' · 即時');
-  if(windowInfo)syncPttFromHostNow();
+  if(windowInfo)primePttToHost();
   if(!windowInfo){pttFeed.replaceChildren(...pttRows.slice(-300).map(pttRow));pttFollowing=true;requestAnimationFrame(()=>{pttFeed.scrollTop=pttFeed.scrollHeight})}
  }catch(e){pttFeed.replaceChildren();const m=document.createElement('div');m.className='ptt-empty';m.textContent='PTT 暫時無法讀取：'+String(e?.message||e);pttFeed.append(m)}
 }
@@ -733,7 +746,7 @@ async function loadArchivePtt(windowInfo){
   const manifest=await fetchArchiveManifest(),objects=new Map(manifest.objects.map(item=>[item.key,item]));
   const startMs=Date.parse(windowInfo.start),endMs=Date.parse(windowInfo.end),rows=[];
   for(const key of archiveHourKeys(startMs-3600000,endMs)){const item=objects.get(key);if(!item)continue;for(const row of await fetchArchiveChunk(item)){const t=Date.parse(String(row?.occurred_at||''));if(Number.isFinite(t)&&t>=startMs-3600000&&t<endMs)rows.push(row)}}
-  setPttRows(rows);pttMeta.textContent=taipeiDay(windowInfo.start).replaceAll('-','/')+' · '+rows.length+' 則 · VOD · 對齊播放時間';syncPttFromHostNow();
+  setPttRows(rows);pttMeta.textContent=taipeiDay(windowInfo.start).replaceAll('-','/')+' · '+rows.length+' 則 · VOD · 對齊播放時間';primePttToHost();
  }catch(e){pttFeed.replaceChildren();const m=document.createElement('div');m.className='ptt-empty';m.textContent='歷史 PTT 暫時無法讀取：'+String(e?.message||e);pttFeed.append(m)}
 }
 async function resolveHostPtt(){
@@ -761,4 +774,7 @@ staticArtifactsPromise.then(()=>{
  if(!staticArtifactsFailed)resolveHostPtt();
 });
 
-window.addEventListener('pagehide',()=>{clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer)});
+window.addEventListener('pagehide',()=>{
+ clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);
+ pttPrimeTimers.forEach(clearTimeout);pttPrimeTimers=[];
+});
