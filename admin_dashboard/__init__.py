@@ -4,9 +4,11 @@ from .auth import AdminAuthenticator, AuthResult
 from .contracts import build_sync_monitor, build_system_health
 from .dashboard import DashboardController
 from .http import DashboardApplication
+from .finalization import build_daily_finalization
 from .integration import build_internal_admin_application
 
 __all__ = [
     "AdminAuthenticator", "AuthResult", "DashboardApplication", "DashboardController",
-    "build_internal_admin_application", "build_sync_monitor", "build_system_health",
+    "build_daily_finalization", "build_internal_admin_application",
+    "build_sync_monitor", "build_system_health",
 ]
