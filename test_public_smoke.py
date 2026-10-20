@@ -34,6 +34,7 @@ EXPECTED |= {
     "admin_dashboard/capabilities.py",
     "admin_dashboard/coverage.py",
     "admin_dashboard/fixture_readers.py",
+    "admin_dashboard/finalization.py",
     "admin_dashboard/host_boundary.py",
     "admin_dashboard/integration.py",
     "admin_dashboard/isolated.py",
