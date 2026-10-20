@@ -201,6 +201,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("const HOST_ID=validVideoId(params.get('host'));", js)
         self.assertIn("const SOURCE_ID=validVideoId(params.get('source'));", js)
         self.assertIn("const PLAYLIST_ID=validPlaylistId(params.get('playlist'));", js)
+        self.assertIn("const playlistStart=Math.max(1,Number(params.get('playlist_start'))||1);", js)
+        self.assertIn("vars.index=playlistStart-1;", js)
         self.assertIn("api('/v1/watchalong/events/'+encodeURIComponent(EVENT_ID))", js)
         self.assertIn("function jumpToSegment(segment,button)", js)
         self.assertIn("hostPlayer?.seekTo?.(Math.max(0,segment.host),true)", js)
