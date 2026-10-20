@@ -787,6 +787,15 @@ class ParityContract(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
 
+    def test_viewer_lock_is_behavior_not_ptt_workspace_geometry(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;", js)
+        self.assertIn("workspaceLayout='sidebar';", js)
+        self.assertIn("return lockedIndex!==null?'focus':'primary';", js)
+        self.assertIn("else if(preset==='focus'){layout='primary';lockedIndex=primaryIndex}", js)
+        self.assertIn("workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+streams.length;", js)
+        self.assertIn("q.set('workspace',currentLayoutPreset()==='focus'?'focus':'sidebar');", js)
+
     def test_viewer_ptt_follow_changes_only_on_user_scroll_intent(self):
         js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
         self.assertIn("let pttUserScrollIntentUntil=0;", js)
