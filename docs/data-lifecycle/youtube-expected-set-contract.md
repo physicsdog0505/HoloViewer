@@ -233,3 +233,65 @@ display what the producer contract supplies.
 6. No full API recrawl is authorized by this contract.
 
 These are evidence gaps, not permission to infer data.
+
+
+## PR #147 semantic-health handoff
+
+Current PR #147 consumes sanitized semantic evidence under schema:
+
+`holoviewer-api-semantic-health-v1`
+
+#47 supplies an offline/read-only projection in:
+
+- `data_lifecycle/youtube_semantic_health.py`
+- `fixtures/data-lifecycle/youtube-api-semantic-health.sanitized.json`
+- `test_youtube_semantic_health.py`
+
+This slice performs no live HTTP request, D1 query, YouTube provider call,
+route registration, deployment or scheduling.
+
+### Reachability is not semantic health
+
+`/health HTTP 200` is recorded only as reachability and MUST remain semantic
+`unknown`.
+
+Today/History may be `healthy` only when all are explicit:
+
+- expected schema matches observed schema;
+- semantic watermark exists and is fresh under the reviewed threshold;
+- source freshness is `fresh`;
+- gap is false;
+- coverage is not partial;
+- semantic authority is not unknown.
+
+Schema mismatch => unhealthy.
+Stale watermark/source => degraded.
+Gap/partial => degraded.
+Missing watermark or unknown authority => unknown.
+
+The fixture contains no title/body/content/author/cookie/header/secret/token
+payload.
+
+### Mapping expected-set authority into #147
+
+`expected_set_authority_envelope()` exports:
+
+- `day`
+- stable `version = scope_version + source_revision`
+- `issuer`
+- `evidence_hash = source_hash`
+- `scope.kind/version/hash`
+- `late_metadata_watermark`
+- `completeness_authority`
+- `unknown_cases`
+- `verified` only when completeness authority is VERIFIED
+
+History-66 and Today-85 remain distinct and non-interchangeable.
+
+### Remaining UNKNOWN
+
+- no production expected-set issuer emits v1 yet;
+- reviewed late-metadata `required_after` policy is still not selected;
+- no live semantic-health producer/query is authorized by this PR;
+- History semantic samples do not prove full-day History completeness;
+- no YouTube recrawl is authorized.
