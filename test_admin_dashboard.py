@@ -95,16 +95,15 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(coverage_sync_consistency(coverage, monitor),
                          [{"code": "coverage-complete-sync-failed", "severity": "warning"}])
 
-    def test_complete_manifest_does_not_mark_archive_job_completed(self):
+    def test_legacy_manifest_is_not_parsed_as_archive_delivery_job(self):
         monitor = build_sync_monitor({"r2_manifest": {
             "schema_version": "ptt-r2-archive-v1", "generated_at": "2026-10-20T07:59:30Z",
             "total_pushes": 3, "days": [{"coverage_status": "COMPLETE", "finalized": True}],
         }}, now=NOW)
         archive = next(job for job in monitor["jobs"] if job["component"] == "Archive")
-        self.assertEqual(archive["archive_coverage_status"], "COMPLETE")
-        self.assertIsNone(archive["verified_count"])
+        self.assertIsNone(archive["archive_coverage_status"])
         self.assertEqual(archive["status"], "unknown")
-        self.assertIn("manifest-is-coverage-evidence-not-delivery-job", archive["contract_gaps"])
+        self.assertIn("archive-delivery-job-evidence-unavailable", archive["contract_gaps"])
 
     def test_only_explicitly_sanitized_error_is_displayed_and_bounded(self):
         monitor = build_sync_monitor({"publisher_checkpoint": {"state": "failed"},
