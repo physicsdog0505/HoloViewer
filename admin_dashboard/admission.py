@@ -115,7 +115,12 @@ class SQLiteReadAdmissionController:
               cache_hit: bool = False) -> AdmissionReceipt:
         observed = time.time() if now is None else float(now)
         req_id = str(uuid.uuid4())
-        scope_hash = self.scope_hash(request.scope)
+        try:
+            scope_hash = self.scope_hash(request.scope)
+        except (TypeError, ValueError):
+            scope_hash = "sha256:unavailable"
+            return self._receipt(req_id, request, scope_hash, False, "admission_denied",
+                                 None, 0, 0, cache_hit, False, observed)
         limit_spec = self._limits.get(request.source)
         request_allowed = (
             request.request_class in DEFAULT_REQUEST_CLASSES.get(request.source, set())
@@ -191,6 +196,11 @@ class SQLiteReadAdmissionController:
               scope_hash: str, admitted: bool, cache_hit: bool, duration_bucket: str,
               result_class: str, error_code: str | None, observed_at: str | None = None) -> None:
         stamp = observed_at or _iso(time.time())
+        principal = _safe_label(principal, 128)
+        source = _safe_label(source, 64) or "unknown"
+        operation_class = _safe_label(operation_class, 64) or "unknown"
+        result_class = _safe_label(result_class, 32) or "unknown"
+        error_code = _safe_label(error_code, 64)
         try:
             con = self._connect()
             con.execute(
@@ -216,3 +226,10 @@ class SQLiteReadAdmissionController:
 
 def _iso(value: float) -> str:
     return datetime.fromtimestamp(value, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _safe_label(value: str | None, limit: int) -> str | None:
+    if value is None:
+        return None
+    cleaned = "".join(ch for ch in str(value) if ch.isalnum() or ch in "._:@-/")[:limit]
+    return cleaned or None
