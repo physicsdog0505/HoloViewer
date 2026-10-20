@@ -82,7 +82,7 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
     WHERE lifecycle_state!='ended'
        OR (lifecycle_state='ended' AND actual_end>=?
            AND (source_label!=? OR actual_start IS NULL OR actual_end IS NULL))
-    ORDER BY COALESCE(checked_at,lifecycle_observed_at) ASC,video_id ASC
+    ORDER BY checked_at ASC,video_id ASC
     LIMIT ?`).bind(recentTaipeiCutoff(now),YOUTUBE_LIVE_SOURCE,limit).all();
   const rows=got.results??[];
   const ids=rows.map(r=>r.video_id).filter(id=>ID.test(id??''));
