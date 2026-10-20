@@ -126,6 +126,28 @@ class DailyPttFinalizationTests(unittest.TestCase):
         self.assertEqual(attempts[0]["repair_ranges"],[[2,2],[5,5]])
         self.assertEqual(body["threads"][0]["repair_result"],"VERIFIED_COMPLETE")
 
+    def test_repair_executor_failure_emits_receipt_and_stays_repair_needed(self):
+        calls=[]
+        def repair(request):
+            calls.append(request)
+            raise RuntimeError("sensitive details must not leak")
+        body=finalize_day(
+            day=DAY,expected_contract=expected(),
+            coverage_by_aid={AID:coverage(missing=[3,4])},
+            repair_executor=repair,
+        )
+        self.assertEqual(body["state"],"REPAIR_NEEDED")
+        self.assertFalse(body["archive_ready"])
+        self.assertEqual(body["summary"]["repair_attempts"],1)
+        self.assertEqual(len(calls),1)
+        self.assertEqual(calls[0]["missing_source_lines"],[3,4])
+        self.assertEqual(calls[0]["repair_ranges"],[[3,4]])
+        thread=body["threads"][0]
+        self.assertTrue(thread["repair_attempted"])
+        self.assertEqual(thread["repair_result"],"FAILED")
+        self.assertEqual(thread["repair_failure_code"],"repair-executor-RuntimeError")
+        self.assertNotIn("sensitive details",str(body))
+
     def test_repair_still_incomplete_remains_repair_needed(self):
         def repair(_request):
             return coverage(missing=[5])
