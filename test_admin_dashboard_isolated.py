@@ -151,6 +151,40 @@ class IsolatedPilotTests(unittest.TestCase):
         self.assertEqual(health["semantic_check"]["status"], "healthy")
         self.assertEqual(health["http_status"], 200)
 
+    def test_http_status_comes_from_health_probe(self):
+        readers = FixtureReaders(ROOT)
+        original = readers._fixture
+        def fixture_503(name):
+            value = original(name)
+            if name == "api-semantic-health.sanitized.json":
+                value = json.loads(json.dumps(value))
+                health = next(x for x in value["probes"] if x["name"] == "health")
+                health["http_status"] = 503
+                health["reachable"] = False
+            return value
+        readers._fixture = fixture_503
+        component = readers.system_health()["components"]["Production API"]
+        self.assertEqual(component["http_status"], 503)
+        self.assertNotEqual(component["semantic_check"]["status"], "healthy")
+
+    def test_missing_health_probe_exposes_null_http_status(self):
+        readers = FixtureReaders(ROOT)
+        original = readers._fixture
+        def fixture_no_health(name):
+            value = original(name)
+            if name == "api-semantic-health.sanitized.json":
+                value = json.loads(json.dumps(value))
+                value["probes"] = [x for x in value["probes"] if x["name"] != "health"]
+            return value
+        readers._fixture = fixture_no_health
+        component = readers.system_health()["components"]["Production API"]
+        self.assertIsNone(component["http_status"])
+
+    def test_current_health_probe_200_is_preserved(self):
+        readers = FixtureReaders(ROOT)
+        component = readers.system_health()["components"]["Production API"]
+        self.assertEqual(component["http_status"], 200)
+
     def test_health_only_fixture_cannot_certify_healthy(self):
         readers = FixtureReaders(ROOT)
         original = readers._fixture
