@@ -118,8 +118,9 @@ export function applyChannelProfile(row,profile,{includeNested=true}={}){
   avatar_url:base.avatar_url??safeAvatar(row?.trusted_channel_avatar)??safeAvatar(row?.avatar_url),
   group:base.group??fallbackGroup
  };
+ const {trusted_channel_avatar:_trusted,channel_group:_group,...publicRow}=row??{};
  return {
-  ...row,
+  ...publicRow,
   channel_id:merged.channel_id,
   channel_name:merged.channel_name??row?.channel_name??null,
   display_name:merged.display_name,
