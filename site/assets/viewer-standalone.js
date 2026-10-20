@@ -73,7 +73,10 @@ const playerCards=[];
 let catalogRows=[];
 const syncExpected=new WeakMap();
 let carouselTimer=null;
-let lockedIndex=null;
+let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;
+// "focus" is accepted only as a legacy URL marker for Lock. Runtime geometry
+// stays sidebar for both Carousel and Lock so PTT never changes containers/rows.
+workspaceLayout='sidebar';
 let secondaryOffset=0;
 let pttFollowing=true;
 let pttLoaded=false;
@@ -158,7 +161,7 @@ function applyFocusAccent(button,stream){
 }
 function currentLayoutPreset(){
  if(layout==='equal')return 'equal';
- return workspaceLayout==='focus'?'focus':'primary';
+ return lockedIndex!==null?'focus':'primary';
 }
 function setLayoutPreset(preset){
  // Snapshot follow before ANY lock/carousel geometry mutation. renderControls()
@@ -167,11 +170,11 @@ function setLayoutPreset(preset){
  const wasFollowing=pttFollowing||pttAtBottom();
  pttLayoutTransitionDepth+=1;
  try{
-  if(preset==='equal'){layout='equal';workspaceLayout='sidebar'}
-  else if(preset==='focus'){layout='primary';workspaceLayout='focus'}
-  else{layout='primary';workspaceLayout='sidebar'}
+  if(preset==='equal'){layout='equal';lockedIndex=null}
+  else if(preset==='focus'){layout='primary';lockedIndex=primaryIndex}
+  else{layout='primary';lockedIndex=null}
+  workspaceLayout='sidebar';
   carousel.checked=preset!=='equal';
-  lockedIndex=preset==='focus'?primaryIndex:null;
   secondaryOffset=0;
   renderControls();
   applyLayout();
@@ -201,7 +204,7 @@ function updateUrl(){
  const q=new URLSearchParams();
  streams.forEach(stream=>q.append('stream',stream.videoId));
  q.set('layout',layout);
- q.set('workspace',workspaceLayout);
+ q.set('workspace',currentLayoutPreset()==='focus'?'focus':'sidebar');
  const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode);
  q.set('ptt',resolvedPttMode);
  archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|')));
@@ -520,7 +523,7 @@ function applyLayout(){
  const wasFollowing=pttFollowing||pttAtBottom();
  const effective=watchMode==='multi'&&streams.length>1?layout:'equal';
  stage.className='viewer-stage layout-'+effective+' count-'+streams.length;
- workspace.className='viewer-workspace workspace-'+workspaceLayout+' layout-'+effective+' count-'+streams.length;
+ workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+streams.length;
  const count=streams.length;
  const cols=count<=1?1:count<=4?2:count<=9?3:4;
  const rows=Math.max(1,Math.ceil(count/cols));
@@ -1695,7 +1698,6 @@ document.addEventListener('fullscreenchange',()=>{
 
 readSettings();
 carousel.checked=currentLayoutPreset()!=='equal';
-if(currentLayoutPreset()==='focus')lockedIndex=primaryIndex;
 renderShell();
 applyModeClass();
 startCarousel();
