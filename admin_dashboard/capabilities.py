@@ -18,6 +18,7 @@ class D1ReadScope:
     aids: tuple[str, ...]
     page_size: int = 100
     max_pages: int = 5
+    query_groups: int = 3
     verification_mode: str = "bounded_sample"
 
     def __post_init__(self):
@@ -29,6 +30,8 @@ class D1ReadScope:
             raise ValueError("page_size out of bounds")
         if not (1 <= self.max_pages <= 5):
             raise ValueError("max_pages out of bounds")
+        if not (1 <= self.query_groups <= 3):
+            raise ValueError("query_groups out of bounds")
         if self.page_size * self.max_pages > 500:
             raise ValueError("row budget exceeded")
         if self.verification_mode not in {"bounded_sample", "full_partition"}:
