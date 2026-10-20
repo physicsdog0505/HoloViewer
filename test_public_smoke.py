@@ -347,6 +347,15 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".subtitle-mode-controls{", css)
         self.assertIn("location.href='/watchalong-viewer/?'+q.toString();", app)
         self.assertIn("fetch('/data/watchalong/manifest.json'", app)
+        self.assertIn("id=\"watchalong-today\"", html)
+        self.assertIn("id=\"watchalong-past\"", html)
+        self.assertIn("id=\"watchalong-completed\"", html)
+        self.assertIn("detail:String(entry.source_count||0)+' 集'", app)
+        self.assertNotIn("+' 段 · '+String(entry.cue_count||0)+' 字幕'", app)
+        self.assertIn("function watchalongCandidateTitle(title)", app)
+        self.assertIn("api('/v1/catalog/today').catch(()=>null)", app)
+        self.assertIn("https://i.ytimg.com/vi/", app)
+        self.assertIn(".watchalong-static-thumb{", css)
         self.assertIn("card.href='/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId);", app)
 
     def test_watchalong_static_assets_integrity(self):
