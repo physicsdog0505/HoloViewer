@@ -18,6 +18,6 @@ export async function handleChannelProfileRead(request,env){
  if(!url.pathname.startsWith(prefix)||!url.pathname.endsWith(suffix))return json({error:'not_found'},404,0);
  const channelId=decodeURIComponent(url.pathname.slice(prefix.length,-suffix.length));
  if(!CHANNEL.test(channelId))return json({error:'invalid_channel_id'},400,0);
- const profile=await readChannelProfile(env.DB,channelId);
+ const profile=await readChannelProfile(env.DB,channelId,{env});
  return json({schema_version:'holoviewer-channel-profile-v1',profile},200,300);
 }
