@@ -124,6 +124,10 @@ function api(path){
   return response.json();
  });
 }
+async function videoMetadata(id){
+ try{return await api('/v1/catalog/videos/'+encodeURIComponent(id))}
+ catch{return api('/v1/videos/'+encodeURIComponent(id)+'/metadata')}
+}
 function node(tag,text,className){
  const el=document.createElement(tag);
  if(text!==undefined&&text!==null)el.textContent=String(text);
@@ -1472,7 +1476,7 @@ async function resolvePrimaryPtt(){
 
  pttMeta.textContent='判定影片狀態中';
  try{
-  const row=await api('/v1/catalog/videos/'+encodeURIComponent(id));
+  const row=await videoMetadata(id);
   if(token!==pttResolveToken)return;
   const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
   if(lifecycle==='live'){
