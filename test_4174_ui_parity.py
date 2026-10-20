@@ -787,6 +787,14 @@ class ParityContract(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
 
+    def test_viewer_lock_transition_preserves_follow_before_geometry_mutation(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let pttLayoutTransitionDepth=0;", js)
+        self.assertIn("const wasFollowing=pttFollowing||pttAtBottom();\n pttLayoutTransitionDepth+=1;", js)
+        self.assertIn("pttLayoutTransitionDepth=Math.max(0,pttLayoutTransitionDepth-1);", js)
+        self.assertIn("if(pttLayoutTransitionDepth>0)return;", js)
+        self.assertIn("if(wasFollowing){\n  pttFollowing=true;\n  repinPttAfterLayout({force:true});\n }", js)
+
     def test_viewer_locking_current_primary_does_not_reload_ptt(self):
         js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
         self.assertIn("const previousIndex=primaryIndex;", js)
