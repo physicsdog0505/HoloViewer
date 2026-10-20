@@ -13,12 +13,15 @@ from .admission import AdmissionRequest
 from .capabilities import (
     ArchiveReadScope, D1ReadScope, NoProductionCredentials, ProductionReaderConfig,
 )
+from .request_context import current_admin_request_context
+from data_lifecycle.readback_contracts import validate_d1_snapshot
 
 
 _ERROR_CODES = {
     "source_disabled", "credential_missing", "admission_denied", "budget_exceeded",
     "reader_timeout", "source_unavailable", "schema_mismatch", "sanitization_failed",
     "readback_incomplete", "admission_state_error", "coalesced_inflight",
+    "cache_state_error",
 }
 
 
@@ -26,12 +29,18 @@ class ProductionReadOnlyShell:
     """Applies source gates, admission, one bounded attempt and sanitized audit."""
 
     def __init__(self, reader, admission, *, config: ProductionReaderConfig | None = None,
-                 credentials=None, principal: str | None = None):
+                 credentials=None, principal: str | None = None, cache_ttl_seconds: int = 60,
+                 cache_validators=None):
         self._reader = reader
         self._admission = admission
         self._config = config or ProductionReaderConfig()
         self._credentials = credentials or NoProductionCredentials()
         self._principal = principal
+        if cache_ttl_seconds < 60:
+            raise ValueError("production cache TTL must be >=60 seconds")
+        self._cache_ttl = int(cache_ttl_seconds)
+        self._cache_validators = {"d1": validate_d1_snapshot}
+        self._cache_validators.update(dict(cache_validators or {}))
 
     def _gate(self, source: str):
         return getattr(self._config, source)
@@ -59,6 +68,33 @@ class ProductionReadOnlyShell:
             source=source, scope=scope, verification_mode=mode,
             request_class=operation, cost_class="bounded_read", coalesce_key=coalesce_key,
         )
+
+        validator = self._cache_validators.get(source)
+        if validator is not None:
+            try:
+                cached, hit = self._admission.cache_get(coalesce_key)
+            except Exception:
+                return self._unavailable(source, "cache_state_error")
+            if hit:
+                try:
+                    cached = validator(cached)
+                except Exception:
+                    return self._unavailable(source, "cache_state_error")
+                scope_hash = self._admission.scope_hash(scope)
+                if not self._safe_audit(source, operation, scope_hash, True, True,
+                                        "short", "cache_hit", None):
+                    return self._unavailable(source, "source_unavailable")
+                return {
+                    "available": True,
+                    "value": cached,
+                    "error_code": None,
+                    "admission": {
+                        "source": source, "scope_hash": scope_hash, "mode": mode,
+                        "admitted": True, "reason": "cache_hit",
+                        "cache_hit": True, "coalesced": False,
+                    },
+                }
+
         try:
             receipt = self._admission.admit(request)
         except Exception:
@@ -83,10 +119,20 @@ class ProductionReadOnlyShell:
             error_code = "source_unavailable"
             result_class = "error"
 
+        if value is not None and error_code is None and validator is not None:
+            try:
+                value = validator(value)
+                self._admission.cache_put(
+                    coalesce_key, source, value, ttl_seconds=self._cache_ttl)
+            except Exception:
+                error_code = "cache_state_error"
+                result_class = "error"
+                value = None
+
         duration = monotonic() - started
         bucket = "short" if duration < 1 else "medium" if duration < 5 else "long"
         audit_ok = self._safe_audit(
-            source, operation, receipt.scope_hash, True, receipt.cache_hit,
+            source, operation, receipt.scope_hash, True, False,
             bucket, result_class, error_code)
         self._admission.release(request.coalesce_key)
         if not audit_ok:
@@ -102,7 +148,8 @@ class ProductionReadOnlyShell:
                     duration_bucket, result_class, error_code):
         try:
             self._admission.audit(
-                principal=self._principal, source=source, operation_class=operation,
+                principal=(current_admin_request_context().principal or self._principal),
+                source=source, operation_class=operation,
                 scope_hash=scope_hash, admitted=admitted, cache_hit=cache_hit,
                 duration_bucket=duration_bucket, result_class=result_class,
                 error_code=error_code,
