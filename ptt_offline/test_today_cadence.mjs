@@ -9,15 +9,16 @@ function fakeDb(rows){
     writes:[],
     prepare(sql){
       const self=this;
+      const selected=/FROM\s+public_today_canonical/i.test(sql)?rows:[];
       return {
         bind(...args){
           return {
-            all:async()=>({results:rows}),
+            all:async()=>({results:selected}),
             first:async()=>null,
             run:async()=>{self.writes.push({sql,args});return {success:true}}
           };
         },
-        all:async()=>({results:rows}),
+        all:async()=>({results:selected}),
         first:async()=>null
       };
     },
