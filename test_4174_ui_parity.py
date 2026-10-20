@@ -811,7 +811,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("let pttLayoutTransitionDepth=0;", js)
         self.assertIn("const wasFollowing=pttFollowing||pttAtBottom();\n pttLayoutTransitionDepth+=1;", js)
         self.assertIn("pttLayoutTransitionDepth=Math.max(0,pttLayoutTransitionDepth-1);", js)
-        self.assertIn("if(pttLayoutTransitionDepth>0)return;", js)
+        self.assertIn("if(pttLayoutTransitionDepth>0||!hasPttUserScrollIntent())return;", js)
         self.assertIn("if(wasFollowing){\n  pttFollowing=true;\n  repinPttAfterLayout({force:true});\n }", js)
 
     def test_viewer_locking_current_primary_does_not_reload_ptt(self):
