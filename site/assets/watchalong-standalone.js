@@ -29,6 +29,8 @@ const offsetMinus=document.getElementById('offsetMinus');
 const offsetPlus=document.getElementById('offsetPlus');
 const previousSegment=document.getElementById('previousSegment');
 const nextSegment=document.getElementById('nextSegment');
+const mobileSwapHost=document.getElementById('mobileSwapHost');
+const mobileSwapSource=document.getElementById('mobileSwapSource');
 const segmentStatus=document.getElementById('segmentStatus');
 const immersiveToolbarTrigger=document.getElementById('immersiveToolbarTrigger');
 const topbar=document.querySelector('.watchalong-topbar');
@@ -89,13 +91,24 @@ function setOffset(value,{persist=true}={}){
 }
 refreshOffsetUi();
 
+function setMobilePrimary(kind){
+ const primary=kind==='host'?'host':'source';
+ workspace.classList.toggle('mobile-primary-host',primary==='host');
+ workspace.classList.toggle('mobile-primary-source',primary==='source');
+ mobileSwapHost.setAttribute('aria-pressed',String(primary==='host'));
+ mobileSwapSource.setAttribute('aria-pressed',String(primary==='source'));
+}
 document.querySelectorAll('[data-watch-layout]').forEach(button=>button.addEventListener('click',()=>{
  const mode=button.dataset.watchLayout==='source'?'source':'equal';
- workspace.className='watchalong-workspace layout-'+mode;
+ workspace.classList.toggle('layout-source',mode==='source');
+ workspace.classList.toggle('layout-equal',mode==='equal');
  document.querySelectorAll('[data-watch-layout]').forEach(item=>{
   const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));
  });
 }));
+mobileSwapHost.onclick=()=>setMobilePrimary('host');
+mobileSwapSource.onclick=()=>setMobilePrimary('source');
+setMobilePrimary('source');
 offsetMinus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds-1)};
 offsetPlus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds+1)};
 document.getElementById('captureOffset').onclick=()=>{
