@@ -6,6 +6,9 @@ on:
       - 'site/**'
       - 'cloudflare/**'
       - 'test_public_smoke.py'
+      - 'test_watchalong_assets.py'
+      - 'scripts/export_watchalong_assets.py'
+      - 'docs/handoffs/WATCHALONG_PUBLIC_ASSET_HANDOFF_20261020.md'
       - '.github/workflows/**'
 permissions:
   contents: read
@@ -22,8 +25,8 @@ jobs:
           python-version: '3.11'
       - name: Check compile and boundary tests
         run: |
-          python -B -m py_compile app.py public_snapshot.py test_public_smoke.py
-          python -B -m unittest -v test_public_smoke test_4174_ui_parity
+          python -B -m py_compile app.py public_snapshot.py test_public_smoke.py test_watchalong_assets.py scripts/export_watchalong_assets.py
+          python -B -m unittest -v test_public_smoke test_4174_ui_parity test_watchalong_assets
       - name: Static JS syntax and request policy
         run: |
           node --check site/assets/app.js
