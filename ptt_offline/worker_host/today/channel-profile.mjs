@@ -86,38 +86,69 @@ function applyRuntimeColor(profile,channelId,env){
  };
 }
 
+async function legacyProfileCandidate(db,channelId){
+ const candidate=neutralChannelProfile(channelId);
+ try{
+  const catalog=await db.prepare(`SELECT avatar_url,channel_name FROM public_catalog
+    WHERE channel_id=? AND avatar_url IS NOT NULL
+    ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1`).bind(channelId).first();
+  candidate.avatar_url=safeAvatar(catalog?.avatar_url);
+  candidate.channel_name=typeof catalog?.channel_name==='string'&&catalog.channel_name?catalog.channel_name:null;
+ }catch{}
+ try{
+  const approved=await db.prepare('SELECT channel_group FROM public_today_approved_channels WHERE channel_id=? LIMIT 1').bind(channelId).first();
+  if(GROUPS.has(approved?.channel_group))candidate.group=approved.channel_group;
+ }catch{}
+ if(candidate.group==null){
+  try{
+   const today=await db.prepare('SELECT channel_group,channel_name FROM public_today_canonical WHERE publisher_channel_id=? ORDER BY lifecycle_observed_at DESC LIMIT 1').bind(channelId).first();
+   if(GROUPS.has(today?.channel_group))candidate.group=today.channel_group;
+   if(!candidate.channel_name&&typeof today?.channel_name==='string'&&today.channel_name)candidate.channel_name=today.channel_name;
+  }catch{}
+ }
+ if(!candidate.channel_name){
+  try{
+   const history=await db.prepare('SELECT channel_name,avatar_url FROM public_history WHERE channel_id=? ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1').bind(channelId).first();
+   candidate.channel_name=typeof history?.channel_name==='string'&&history.channel_name?history.channel_name:null;
+   if(!candidate.avatar_url)candidate.avatar_url=safeAvatar(history?.avatar_url);
+  }catch{}
+ }
+ candidate.support_color_source=candidate.avatar_url||candidate.group||candidate.channel_name?'legacy-migration-projection':null;
+ return candidate;
+}
+function mergeCanonicalOverLegacy(canonical,legacy){
+ if(!canonical)return legacy;
+ return {
+  ...legacy,
+  ...canonical,
+  channel_id:canonical.channel_id??legacy.channel_id,
+  channel_name:canonical.channel_name??legacy.channel_name,
+  display_name:canonical.display_name??legacy.display_name,
+  avatar_url:canonical.avatar_url??legacy.avatar_url,
+  group:canonical.group??legacy.group,
+  profile_revision:canonical.profile_revision??legacy.profile_revision,
+  updated_at:canonical.updated_at??legacy.updated_at
+ };
+}
 export async function readChannelProfile(db,channelId,{env=null}={}){
  if(!CHANNEL.test(channelId??''))return neutralChannelProfile(null);
+ const legacy=await legacyProfileCandidate(db,channelId);
  try{
   const row=await db.prepare('SELECT channel_id,channel_name,display_name,avatar_url,channel_group,member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at FROM public_channel_profiles WHERE channel_id=? LIMIT 1').bind(channelId).first();
-  const profile=row?normalizeChannelProfile(row,channelId):neutralChannelProfile(channelId);
-  return applyRuntimeColor(profile,channelId,env);
+  const canonical=row?normalizeChannelProfile(row,channelId):null;
+  return applyRuntimeColor(mergeCanonicalOverLegacy(canonical,legacy),channelId,env);
  }catch{
-  return applyRuntimeColor(neutralChannelProfile(channelId),channelId,env);
+  return applyRuntimeColor(legacy,channelId,env);
  }
 }
 export async function readChannelProfiles(db,channelIds,{env=null}={}){
  const ids=[...new Set((Array.isArray(channelIds)?channelIds:[]).filter(x=>CHANNEL.test(x)))];
- const out=new Map(ids.map(id=>[id,applyRuntimeColor(neutralChannelProfile(id),id,env)]));
- if(!ids.length)return out;
- try{
-  const placeholders=ids.map(()=>'?').join(',');
-  const rows=await db.prepare(`SELECT channel_id,channel_name,display_name,avatar_url,channel_group,member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at FROM public_channel_profiles WHERE channel_id IN (${placeholders})`).bind(...ids).all();
-  for(const row of rows.results??[])out.set(row.channel_id,applyRuntimeColor(normalizeChannelProfile(row,row.channel_id),row.channel_id,env));
- }catch{}
+ const out=new Map();
+ for(const id of ids)out.set(id,await readChannelProfile(db,id,{env}));
  return out;
 }
 export function applyChannelProfile(row,profile,{includeNested=true}={}){
- const base=profile??neutralChannelProfile(row?.channel_id??'');
- const rowHasGroup=Object.prototype.hasOwnProperty.call(row??{},'channel_group')||Object.prototype.hasOwnProperty.call(row??{},'group');
- const fallbackGroup=GROUPS.has(row?.channel_group??row?.group)?(row.channel_group??row.group):(rowHasGroup?'other':null);
- const merged={
-  ...base,
-  channel_id:base.channel_id??(CHANNEL.test(row?.channel_id??'')?row.channel_id:null),
-  channel_name:base.channel_name??(typeof row?.channel_name==='string'&&row.channel_name?row.channel_name:null),
-  avatar_url:base.avatar_url??safeAvatar(row?.trusted_channel_avatar)??safeAvatar(row?.avatar_url),
-  group:base.group??fallbackGroup
- };
+ const merged=profile??neutralChannelProfile(row?.channel_id??'');
  const {trusted_channel_avatar:_trusted,channel_group:_group,...publicRow}=row??{};
  return {
   ...publicRow,
