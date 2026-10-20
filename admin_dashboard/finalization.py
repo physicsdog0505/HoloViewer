@@ -35,11 +35,14 @@ def _source_state(day: dict) -> str:
     conflicts = day.get("conflicts") or []
     missing = day.get("missing_aids") or []
     gaps = day.get("source_line_gaps") or {}
+    expected = day.get("expected_aids")
+    actual = day.get("actual_aids")
     if conflicts or local == "CONFLICT":
         return "CONFLICT"
     if local == "REPAIR_NEEDED" or missing or _count_gap_ranges(gaps):
         return "REPAIR_NEEDED"
-    if local == "COMPLETE":
+    if (local == "COMPLETE" and isinstance(expected, list) and isinstance(actual, list)
+            and set(expected) == set(actual)):
         return "VERIFIED_COMPLETE"
     return "UNKNOWN"
 
@@ -104,7 +107,11 @@ def build_daily_finalization(evidence: dict) -> dict:
     coverage = evidence.get("coverage") if isinstance(evidence.get("coverage"), dict) else {}
     days = coverage.get("days") if isinstance(coverage.get("days"), list) else []
     normalized_days = [item for item in days if isinstance(item, dict) and isinstance(item.get("date"), str)]
-    day = max(normalized_days, key=lambda item: item["date"]) if normalized_days else {}
+    target_day = evidence.get("target_day") if isinstance(evidence.get("target_day"), str) else None
+    if target_day is not None:
+        day = next((item for item in normalized_days if item.get("date") == target_day), {})
+    else:
+        day = max(normalized_days, key=lambda item: item["date"]) if normalized_days else {}
 
     expected = day.get("expected_aids") if isinstance(day.get("expected_aids"), list) else None
     missing = day.get("missing_aids") if isinstance(day.get("missing_aids"), list) else []
@@ -129,7 +136,7 @@ def build_daily_finalization(evidence: dict) -> dict:
         "read_only": True,
         "closeout_schedule": {"local_time": "07:30", "timezone": "Asia/Taipei"},
         "runs": [{
-            "target_day": day.get("date"),
+            "target_day": target_day or day.get("date"),
             "source_completeness": {
                 "status": source_status,
                 "expected_aid_count": len(expected) if expected is not None else None,
