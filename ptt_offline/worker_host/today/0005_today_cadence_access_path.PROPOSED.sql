@@ -10,7 +10,7 @@ CREATE INDEX IF NOT EXISTS public_today_canonical_cadence_active
   WHERE lifecycle_state!='ended';
 
 CREATE INDEX IF NOT EXISTS public_today_canonical_cadence_ended_reverify
-  ON public_today_canonical(checked_at, video_id, actual_end)
+  ON public_today_canonical(actual_end, checked_at, video_id)
   WHERE lifecycle_state='ended'
     AND (source_label!='YouTube liveStreamingDetails' OR actual_start IS NULL OR actual_end IS NULL);
 
