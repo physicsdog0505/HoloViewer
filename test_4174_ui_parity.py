@@ -203,7 +203,9 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.source-choice{display:grid', css)
         self.assertIn('.manual-shell{padding:20px}', css)
         self.assertIn("const youtubePanel=document.getElementById('youtubePanel')", js)
-        self.assertIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
+        self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", js)
+        self.assertIn("loadVerifiedWatchalong();", js)
+        self.assertIn("這組主影片沒有已驗證的同時視聽資料，因此不會啟動未驗證同步。", js)
         self.assertNotIn("watch-add').onclick", js)
 
     def test_original_4174_collab_hub_structure(self):

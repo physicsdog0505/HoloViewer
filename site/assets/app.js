@@ -1394,6 +1394,8 @@ window.hvCustomAdd=addStream;
 // Accepted 4174 watchalong landing mode/tab interactions.
 (function(){
 
+const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';
+const WATCHALONG_MANIFEST_SCHEMA='holoviewer-watchalong-manifest-v1';
 const recentWatchSearch=document.getElementById('recentWatchSearch');
 let activeWatchGroup='all';
 function filterRecentWatchalong(){
@@ -1407,6 +1409,60 @@ function filterRecentWatchalong(){
   });
   const empty=document.getElementById('recentWatchNoMatches');
   if(empty)empty.hidden=visible!==0;
+}
+function watchalongEntryValid(row){
+ return Boolean(row&&/^[A-Za-z0-9_-]{11}$/.test(String(row.event_id||''))&&
+  row.event_id===row.master_video_id&&row.source_count===6&&Number(row.cue_count)>0&&
+  row.translation_status==='COMPLETE'&&/^[a-f0-9]{64}$/.test(String(row.sha256||''))&&
+  row.path==='/data/watchalong/events/'+row.event_id+'.json');
+}
+function openVerifiedWatchalong(row){
+ const q=new URLSearchParams();
+ q.set('stream',String(row.master_video_id));
+ q.set('mode','multi');
+ q.set('layout','primary');
+ q.set('workspace','sidebar');
+ q.set('primary','0');
+ q.set('ptt','video');
+ q.set('watchalong',String(row.event_id));
+ location.href='/viewer/?'+q.toString();
+}
+function renderVerifiedWatchalong(rows){
+ const grid=document.getElementById('recentWatchGrid');
+ const status=document.getElementById('recentWatchStatus');
+ if(!grid)return;
+ grid.replaceChildren();
+ rows.forEach(row=>{
+  const card=node('article',undefined,'card recent-watch-card');
+  card.dataset.group='verified';
+  card.dataset.search=[row.session_day,row.title,row.event_id].join(' ');
+  card.append(node('strong',String(row.title||row.event_id)));
+  card.append(node('p',String(row.session_day||'')+' · 6 段片源 · '+String(row.cue_count)+' 字幕','sub'));
+  const button=node('button','開始同時視聽','primary-action');
+  button.type='button';
+  button.addEventListener('click',()=>openVerifiedWatchalong(row));
+  card.append(button);
+  grid.append(card);
+ });
+ if(status)status.hidden=Boolean(rows.length);
+ filterRecentWatchalong();
+}
+async function loadVerifiedWatchalong(){
+ const status=document.getElementById('recentWatchStatus');
+ try{
+  const response=await fetch(WATCHALONG_MANIFEST_PATH,{credentials:'omit',cache:'no-store',headers:{Accept:'application/json'}});
+  if(!response.ok)throw Error('manifest HTTP '+response.status);
+  const manifest=await response.json();
+  if(manifest?.schema_version!==WATCHALONG_MANIFEST_SCHEMA||manifest?.event_count!==3||
+     !Array.isArray(manifest?.events)||manifest.events.length!==3||!manifest.events.every(watchalongEntryValid)){
+   throw Error('manifest contract mismatch');
+  }
+  renderVerifiedWatchalong(manifest.events);
+ }catch{
+  const grid=document.getElementById('recentWatchGrid');
+  grid?.replaceChildren();
+  if(status){status.hidden=false;status.textContent='已驗證的同時視聽資料目前無法使用。';}
+ }
 }
 recentWatchSearch?.addEventListener('input',filterRecentWatchalong);
 document.querySelectorAll('[data-watch-group]').forEach(button=>button.addEventListener('click',()=>{
@@ -1434,18 +1490,26 @@ document.querySelectorAll('[data-youtube-mode]').forEach(button=>button.addEvent
 applySourceKind();
 
 const watchForm=document.getElementById('watchalongBuilder');
-watchForm.addEventListener('submit',event=>{
+watchForm.addEventListener('submit',async event=>{
  event.preventDefault();
  const form=new FormData(watchForm);
  const master=videoId(String(form.get('master')||''));
  const error=document.getElementById('watch-error');
  if(!master){error.textContent='Hololive 主影片無法辨識，請確認 YouTube URL 或 Video ID。';error.hidden=false;return}
+ try{
+  const response=await fetch(WATCHALONG_MANIFEST_PATH,{credentials:'omit',cache:'no-store',headers:{Accept:'application/json'}});
+  if(!response.ok)throw Error('manifest unavailable');
+  const manifest=await response.json();
+  const row=Array.isArray(manifest?.events)?manifest.events.find(item=>item?.event_id===master&&watchalongEntryValid(item)):null;
+  if(row){error.hidden=true;openVerifiedWatchalong(row);return}
+ }catch{}
  if(form.get('source_kind')==='youtube'&&form.get('youtube_mode')==='single'&&!videoId(String(form.get('source')||''))){error.textContent='請提供有效的 YouTube 片源網址或 Video ID。';error.hidden=false;return}
  if(form.get('source_kind')==='external'){
   try{const u=new URL(String(form.get('external_source')||''));if(!['https:','http:'].includes(u.protocol))throw Error('invalid')}catch{error.textContent='外部片源網址無法辨識，請提供 http(s) 網址。';error.hidden=false;return}
  }
- error.textContent='4174 同時視聽播放器的同步與對齊引擎尚未移植完成，因此這個版本暫不啟動未驗證的同步播放。';error.hidden=false;
+ error.textContent='這組主影片沒有已驗證的同時視聽資料，因此不會啟動未驗證同步。';error.hidden=false;
 });
+loadVerifiedWatchalong();
 })();
 
 // Recover the last explicitly opened session after a tab reload/deep link.

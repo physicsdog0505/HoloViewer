@@ -25,8 +25,8 @@ jobs:
           python-version: '3.11'
       - name: Check compile and boundary tests
         run: |
-          python -B -m py_compile app.py public_snapshot.py test_public_smoke.py test_watchalong_assets.py scripts/export_watchalong_assets.py
-          python -B -m unittest -v test_public_smoke test_4174_ui_parity test_watchalong_assets
+          python -B -m py_compile app.py public_snapshot.py test_public_smoke.py test_watchalong_assets.py test_watchalong_viewer_adapter.py scripts/export_watchalong_assets.py
+          python -B -m unittest -v test_public_smoke test_4174_ui_parity test_watchalong_assets test_watchalong_viewer_adapter
       - name: Static JS syntax and request policy
         run: |
           node --check site/assets/app.js
