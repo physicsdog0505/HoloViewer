@@ -74,7 +74,8 @@ let sourceStandbyActive=false;
 let staticArtifactsReady=!STATIC_EVENT_MODE;
 let staticArtifactsFailed=false;
 let subtitleTimeline='source';
-let subtitleMode='standard';
+let subtitleEnabled=true;
+let danmakuEnabled=false;
 let activeSubtitleCueId='';
 let lastDanmakuCueId='';
 let immersiveToolbarTimer=null;
@@ -154,8 +155,11 @@ function setOffset(value,{persist=true}={}){
 }
 refreshOffsetUi();
 
-function subtitleModeLabel(mode=subtitleMode){
- return mode==='danmaku'?'彈幕':mode==='off'?'關閉':'一般';
+function subtitleModeLabel(){
+ if(subtitleEnabled&&danmakuEnabled)return '字幕＋彈幕';
+ if(subtitleEnabled)return '字幕';
+ if(danmakuEnabled)return '彈幕';
+ return '關閉';
 }
 function clearDanmaku(){
  danmakuLayer?.replaceChildren();
@@ -163,24 +167,35 @@ function clearDanmaku(){
 }
 function refreshSubtitleModeUi(){
  document.querySelectorAll('[data-subtitle-mode]').forEach(button=>{
-  const active=button.dataset.subtitleMode===subtitleMode;
+  const mode=button.dataset.subtitleMode;
+  const active=mode==='standard'?subtitleEnabled:mode==='danmaku'?danmakuEnabled:(!subtitleEnabled&&!danmakuEnabled);
   button.classList.toggle('active',active);
   button.setAttribute('aria-pressed',String(active));
  });
  if(mobileSubtitleMode)mobileSubtitleMode.textContent='字幕：'+subtitleModeLabel();
- if(subtitleMode!=='standard')subtitleOverlay.hidden=true;
- if(subtitleMode!=='danmaku')clearDanmaku();
+ if(!subtitleEnabled)subtitleOverlay.hidden=true;
+ if(!danmakuEnabled)clearDanmaku();
 }
-function setSubtitleMode(mode,{persist=true}={}){
- subtitleMode=['standard','danmaku','off'].includes(mode)?mode:'standard';
+function persistSubtitleMode(){
+ try{
+  localStorage.setItem('holoviewer-watchalong-subtitle-standard',subtitleEnabled?'1':'0');
+  localStorage.setItem('holoviewer-watchalong-subtitle-danmaku',danmakuEnabled?'1':'0');
+ }catch{}
+}
+function setSubtitleDisplay(mode,{persist=true}={}){
+ if(mode==='standard')subtitleEnabled=!subtitleEnabled;
+ else if(mode==='danmaku')danmakuEnabled=!danmakuEnabled;
+ else if(mode==='off'){subtitleEnabled=false;danmakuEnabled=false}
  activeSubtitleCueId='';
  lastDanmakuCueId='';
- if(persist){try{localStorage.setItem('holoviewer-watchalong-subtitle-mode',subtitleMode)}catch{}}
+ if(persist)persistSubtitleMode();
  refreshSubtitleModeUi();
 }
 try{
- const saved=localStorage.getItem('holoviewer-watchalong-subtitle-mode');
- if(['standard','danmaku','off'].includes(saved))subtitleMode=saved;
+ const standard=localStorage.getItem('holoviewer-watchalong-subtitle-standard');
+ const danmaku=localStorage.getItem('holoviewer-watchalong-subtitle-danmaku');
+ if(standard==='0'||standard==='1')subtitleEnabled=standard==='1';
+ if(danmaku==='0'||danmaku==='1')danmakuEnabled=danmaku==='1';
 }catch{}
 function closeMobileControls(){
  if(!mobileWatchMedia.matches)return;
@@ -258,8 +273,14 @@ mobilePrevSegment.onclick=()=>{if(!mobileWatchMedia.matches||previousSegment.dis
 mobileNextSegment.onclick=()=>{if(!mobileWatchMedia.matches||nextSegment.disabled)return;nextSegment.click();refreshMobileControls()};
 mobileSubtitleMode.onclick=()=>{
  if(!mobileWatchMedia.matches)return;
- const next=subtitleMode==='standard'?'danmaku':subtitleMode==='danmaku'?'off':'standard';
- setSubtitleMode(next);
+ if(subtitleEnabled&&!danmakuEnabled)danmakuEnabled=true;
+ else if(subtitleEnabled&&danmakuEnabled)subtitleEnabled=false;
+ else if(!subtitleEnabled&&danmakuEnabled)danmakuEnabled=false;
+ else subtitleEnabled=true;
+ persistSubtitleMode();
+ activeSubtitleCueId='';
+ lastDanmakuCueId='';
+ refreshSubtitleModeUi();
  refreshMobileControls();
 };
 mobileFullscreen.onclick=()=>{if(!mobileWatchMedia.matches)return;fullscreenButton.click();closeMobileControls()};
@@ -269,8 +290,8 @@ document.addEventListener('pointerdown',event=>{
  closeMobileControls();
 },{passive:true});
 mobileWatchMedia.addEventListener?.('change',event=>{if(!event.matches)mobileControlsPanel.hidden=true});
-document.querySelectorAll('[data-subtitle-mode]').forEach(button=>button.addEventListener('click',()=>setSubtitleMode(button.dataset.subtitleMode)));
-setSubtitleMode(subtitleMode,{persist:false});
+document.querySelectorAll('[data-subtitle-mode]').forEach(button=>button.addEventListener('click',()=>setSubtitleDisplay(button.dataset.subtitleMode)));
+refreshSubtitleModeUi();
 setMobilePrimary('source');
 refreshMobileControls();
 offsetMinus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds-1)};
@@ -469,28 +490,23 @@ function spawnDanmaku(row){
 }
 function renderSubtitleCue(row){
  const cueId=row?String(row.id||row.index||row.start):'';
- if(subtitleMode==='off'){
-  subtitleOverlay.hidden=true;
-  clearDanmaku();
-  activeSubtitleCueId=cueId;
-  return;
- }
- if(subtitleMode==='standard'){
-  clearDanmaku();
-  subtitleOverlay.hidden=false;
+ if(subtitleEnabled){
   subtitleTranslation.textContent=row?.translation||'';
-  activeSubtitleCueId=cueId;
-  return;
+  subtitleOverlay.hidden=!row?.translation;
+ }else{
+  subtitleOverlay.hidden=true;
  }
- subtitleOverlay.hidden=true;
- if(!row){
-  activeSubtitleCueId='';
-  lastDanmakuCueId='';
-  return;
- }
- if(cueId!==activeSubtitleCueId){
+ if(danmakuEnabled){
+  if(!row){
+   activeSubtitleCueId='';
+   lastDanmakuCueId='';
+  }else if(cueId!==activeSubtitleCueId){
+   activeSubtitleCueId=cueId;
+   spawnDanmaku(row);
+  }
+ }else{
+  clearDanmaku();
   activeSubtitleCueId=cueId;
-  spawnDanmaku(row);
  }
 }
 function startSubtitleLoop(){
