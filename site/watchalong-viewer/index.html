@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>同時視聽 · HoloViewer</title>
+<link rel="stylesheet" href="/assets/shared-shell.css">
+<link rel="stylesheet" href="/assets/watchalong-standalone.css">
+</head>
+<body>
+<aside class="client-rail" aria-label="主要功能">
+  <a class="rail-brand" href="/" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloViewer</span></a>
+  <nav class="rail-nav">
+    <a href="/"><span class="rail-icon">今</span><span class="rail-label">今日直播</span></a>
+    <a href="/history"><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
+    <a href="/watchalong" class="active" aria-current="page"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a>
+    <a href="/custom-view"><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a>
+    <a href="/collab"><span class="rail-icon">👥</span><span class="rail-label">多人連動</span></a>
+    <a href="/ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a>
+  </nav>
+</aside>
+
+<div class="watchalong-shell">
+  <header class="watchalong-topbar">
+    <div class="layout-segment" role="group" aria-label="同時視聽版型">
+      <button type="button" data-watch-layout="equal" class="active" aria-pressed="true">並排</button>
+      <button type="button" data-watch-layout="source" aria-pressed="false">動畫優先</button>
+    </div>
+    <label class="control-toggle" title="Hololive 播放、暫停與跳轉時讓片源跟著同步">
+      <input id="linkedPlayback" type="checkbox" checked>
+      <span class="toggle-ui" aria-hidden="true"></span>
+      <span>連動播放</span>
+    </label>
+    <div class="sync-controls">
+      <button id="offsetMinus" type="button" title="片源提早 1 秒">−1s</button>
+      <output id="offsetValue">Offset 0.0s</output>
+      <button id="offsetPlus" type="button" title="片源延後 1 秒">+1s</button>
+      <button id="captureOffset" type="button">以目前位置校準</button>
+    </div>
+    <div class="watchalong-actions">
+      <a href="/watchalong" class="watchalong-link">返回選擇</a>
+      <button id="fullscreen" type="button">沉浸模式</button>
+    </div>
+  </header>
+
+  <main class="watchalong-main">
+    <section id="watchalongWorkspace" class="watchalong-workspace layout-equal">
+      <section class="host-stack">
+        <article class="video-card host-card">
+          <div class="video-label"><strong>Hololive</strong><span id="hostStatus">判定中</span></div>
+          <div id="hostPlayer" class="player-host"></div>
+        </article>
+        <aside id="pttPanel" class="watchalong-ptt ptt-floor-hidden">
+          <div class="ptt-heading">
+            <strong id="pttTitle">PTT 專串</strong>
+            <label class="ptt-floor-control"><input id="pttShowFloor" type="checkbox"><span>樓數</span></label>
+            <small id="pttMeta">讀取中</small>
+          </div>
+          <div id="pttFeed" class="ptt-feed"></div>
+          <button id="pttNewest" class="ptt-newest" type="button" hidden>最新</button>
+        </aside>
+      </section>
+
+      <section class="source-stack">
+        <article class="video-card source-card">
+          <div class="video-label"><strong id="sourceLabel">同步片源</strong><span id="sourceStatus"></span></div>
+          <div id="sourcePlayer" class="player-host"></div>
+          <div id="subtitleOverlay" class="subtitle-overlay" hidden>
+            <div id="subtitleOriginal" class="subtitle-line original"></div>
+            <div id="subtitleTranslation" class="subtitle-line translation"></div>
+          </div>
+        </article>
+
+        <section id="segmentPanel" class="segment-panel">
+          <div class="segment-head">
+            <div><strong>段點</strong><span id="segmentMeta">唯讀資料</span></div>
+            <button id="segmentToggle" type="button" aria-expanded="true">收合</button>
+          </div>
+          <div id="segmentList" class="segment-list">
+            <div class="segment-empty">目前沒有可用段點；影片仍可正常播放。</div>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+</div>
+
+<script src="/assets/config.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="/assets/watchalong-standalone.js" defer></script>
+</body>
+</html>
