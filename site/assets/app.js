@@ -1438,6 +1438,7 @@ document.querySelectorAll('[data-watch-group]').forEach(button=>button.addEventL
 }));
 const watchalongStaticGrid=document.getElementById('watchalongStaticGrid');
 const watchalongStaticEmpty=document.getElementById('watchalongStaticEmpty');
+const watchalongTodaySection=document.getElementById('watchalong-today');
 const watchalongTodayGrid=document.getElementById('watchalongTodayGrid');
 const watchalongTodayEmpty=document.getElementById('watchalongTodayEmpty');
 const watchalongPastGrid=document.getElementById('watchalongPastGrid');
@@ -1445,27 +1446,52 @@ const watchalongPastEmpty=document.getElementById('watchalongPastEmpty');
 function watchalongCandidateTitle(title){
  return /(同時視聴|同時視聽|watch\s*along)/i.test(String(title||''));
 }
-function watchalongCardImage(videoId,title){
+function watchalongHostLabel(title){
+ const text=String(title||'');
+ const jp=text.match(/【[^】]*\/([^/【】]+)】\s*$/);
+ return jp?.[1]?.trim()||'Hololive';
+}
+function watchalongProfile(label,rows=[]){
+ const key=String(label||'').toLocaleLowerCase();
+ const matched=(Array.isArray(rows)?rows:[]).find(row=>{
+  const names=[row?.channel_name,row?.channel_title].map(x=>String(x||'').toLocaleLowerCase()).filter(Boolean);
+  return names.some(name=>name===key||name.includes(key)||key.includes(name));
+ });
+ return matched?{...matched,channel_name:matched.channel_name||matched.channel_title||label}:{channel_name:label};
+}
+function watchalongCardImage(videoId,title,badge=''){
  const thumb=document.createElement('div');thumb.className='watchalong-static-thumb';
  const img=document.createElement('img');
  img.src='https://i.ytimg.com/vi/'+encodeURIComponent(videoId)+'/hqdefault.jpg';
  img.alt=String(title||'');
- img.loading='lazy';thumb.append(img);return thumb;
+ img.loading='lazy';thumb.append(img);
+ if(badge){const pill=document.createElement('span');pill.className='watchalong-card-badge';pill.textContent=badge;thumb.append(pill)}
+ return thumb;
 }
-function watchalongLandingCard({videoId,title,day='',detail='',action='開始同時視聽 →',href='',onpick=null,status=''}) {
+function watchalongIdentity(profile,label){
+ const identity=document.createElement('div');identity.className='watchalong-card-identity';
+ const avatar=document.createElement('span');avatar.className='watchalong-card-avatar';
+ avatar.append(homeAvatarChild(profile,label));
+ const name=document.createElement('span');name.className='watchalong-card-host';name.textContent=String(label||'Hololive');
+ identity.append(avatar,name);return identity;
+}
+function watchalongLandingCard({videoId,title,day='',detail='',action='開始同時視聽 →',href='',onpick=null,status='',profile=null,hostLabel='',featured=false,badge=''}) {
  if(!/^[A-Za-z0-9_-]{11}$/.test(String(videoId||'')))return null;
- const card=document.createElement('a');card.className='watchalong-static-card';
+ const item=profile||{channel_name:hostLabel};
+ const label=hostLabel||item.channel_name||item.channel_title||'Hololive';
+ const card=document.createElement('a');card.className='watchalong-static-card'+(featured?' watchalong-featured-card':'');
+ applyHomeSupportStyle(card,{...item,channel_name:label});
  card.href=href||'#manual';
  if(typeof onpick==='function')card.onclick=event=>{event.preventDefault();onpick()};
- card.append(watchalongCardImage(videoId,title));
+ card.append(watchalongCardImage(videoId,title,badge));
  const body=document.createElement('div');body.className='watchalong-static-body';
  const meta=document.createElement('div');meta.className='watchalong-static-meta';
  if(day){const dayEl=document.createElement('span');dayEl.textContent=String(day);meta.append(dayEl)}
  if(detail){const detailEl=document.createElement('span');detailEl.textContent=String(detail);meta.append(detailEl)}
- if(status){const statusEl=document.createElement('span');statusEl.textContent=String(status);meta.append(statusEl)}
+ if(status){const statusEl=document.createElement('span');statusEl.className='watchalong-card-status';statusEl.textContent=String(status);meta.append(statusEl)}
  const titleEl=document.createElement('strong');titleEl.textContent=String(title||videoId);
  const actionEl=document.createElement('span');actionEl.className='watchalong-static-action';actionEl.textContent=action;
- body.append(meta,titleEl,actionEl);card.append(body);return card;
+ body.append(meta,watchalongIdentity(item,label),titleEl,actionEl);card.append(body);return card;
 }
 function pickWatchalongHost(videoId){
  const input=document.querySelector('#watchalongBuilder input[name="master"]');
@@ -1480,46 +1506,69 @@ async function loadWatchalongLanding(){
  watchalongTodayGrid?.replaceChildren();
  watchalongPastGrid?.replaceChildren();
  try{
-  const [manifestResponse,todayResult]=await Promise.all([
+  const [manifestResponse,todayResult,recentResult]=await Promise.all([
    fetch('/data/watchalong/manifest.json',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}}),
-   api('/v1/catalog/today').catch(()=>null)
+   api('/v1/catalog/today').catch(()=>null),
+   api('/v1/watchalong/recent?days=90&limit=100').catch(()=>null)
   ]);
   if(!manifestResponse.ok)throw new Error('HTTP '+manifestResponse.status);
   const manifest=await manifestResponse.json();
   if(manifest?.schema_version!=='holoviewer-watchalong-manifest-v1'||!Array.isArray(manifest.events))throw new Error('manifest');
+  const todayRows=Array.isArray(todayResult?.streams||todayResult?.items)?(todayResult.streams||todayResult.items):[];
+  const curatedHosts=new Set();
   const events=manifest.events.slice().sort((a,b)=>String(b.session_day||'').localeCompare(String(a.session_day||'')));
   for(const entry of events){
    const eventId=String(entry?.event_id||'');
    const videoId=String(entry?.master_video_id||eventId);
    if(!/^[A-Za-z0-9_-]{11}$/.test(eventId)||!/^[A-Za-z0-9_-]{11}$/.test(videoId))continue;
+   curatedHosts.add(videoId);
+   const hostLabel=watchalongHostLabel(entry.title);
+   const profile=watchalongProfile(hostLabel,todayRows);
    const card=watchalongLandingCard({
     videoId,title:String(entry.title||eventId),day:String(entry.session_day||''),
-    detail:String(entry.source_count||0)+' 集',
+    detail:String(entry.source_count||0)+' 集',hostLabel,profile,featured:true,badge:'HoloDocchi 精選',
+    action:'直接開始觀看 →',
     href:'/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId)
    });
    if(card)watchalongStaticGrid.append(card);
+  }
+  watchalongStaticEmpty.hidden=watchalongStaticGrid.childElementCount>0;
+  if(!watchalongStaticGrid.childElementCount)watchalongStaticEmpty.textContent='目前沒有可直接觀看的精選同時視聽。';
+
+  const recentEvents=recentResult?.schema_version==='public-experience-v1'&&recentResult?.kind==='watchalong'&&Array.isArray(recentResult.events)
+   ?recentResult.events:[];
+  for(const event of recentEvents){
+   const hosts=Array.isArray(event?.hosts)?event.hosts:[];
+   const host=hosts.find(row=>/^[A-Za-z0-9_-]{11}$/.test(String(row?.video_id||'')));
+   if(!host)continue;
+   const videoId=String(host.video_id);
+   const label=String(host.label||watchalongHostLabel(event.title)||'Hololive');
+   const profile=watchalongProfile(label,todayRows);
+   const isCurated=curatedHosts.has(videoId);
    const pastCard=watchalongLandingCard({
-    videoId,title:String(entry.title||eventId),day:String(entry.session_day||''),
-    status:'已結束',action:'開啟這場 →',
-    href:'/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId)
+    videoId,title:String(event.title||videoId),day:String(event.day||''),
+    status:isCurated?'精選已收錄':(event.member_only?'會員限定':'已結束'),
+    action:isCurated?'直接開始觀看 →':'使用這場建立 →',
+    hostLabel:label,profile,
+    href:isCurated?'/watchalong-viewer/?watchalong_event='+encodeURIComponent(videoId):'',
+    onpick:isCurated?null:()=>pickWatchalongHost(videoId)
    });
    if(pastCard)watchalongPastGrid?.append(pastCard);
   }
-  watchalongStaticEmpty.hidden=watchalongStaticGrid.childElementCount>0;
-  if(!watchalongStaticGrid.childElementCount)watchalongStaticEmpty.textContent='目前沒有已完成的同時視聽活動。';
   if(watchalongPastEmpty){
    watchalongPastEmpty.hidden=Boolean(watchalongPastGrid?.childElementCount);
-   if(!watchalongPastGrid?.childElementCount)watchalongPastEmpty.textContent='目前沒有過去同時視聽直播。';
+   if(!watchalongPastGrid?.childElementCount)watchalongPastEmpty.textContent=recentResult?'目前沒有過去同時視聽直播。':'過去直播暫時無法載入。';
   }
-  const rows=Array.isArray(todayResult?.streams||todayResult?.items)?(todayResult.streams||todayResult.items):[];
-  const candidates=rows.filter(row=>watchalongCandidateTitle(row?.title));
+
+  const candidates=todayRows.filter(row=>watchalongCandidateTitle(row?.title));
   for(const row of candidates){
    const videoId=String(row?.video_id||'');
    const state=String(row?.lifecycle_state||'');
    const status=state==='live'?'直播中':(['upcoming','waiting'].includes(state)?'稍後':'今天');
+   const label=String(row?.channel_name||row?.channel_title||'Hololive');
    const card=watchalongLandingCard({
     videoId,title:String(row?.title||videoId),day:taipeiDay(),status,
-    action:'使用這場建立 →',onpick:()=>pickWatchalongHost(videoId)
+    hostLabel:label,profile:row,action:'使用這場建立 →',onpick:()=>pickWatchalongHost(videoId)
    });
    if(card)watchalongTodayGrid?.append(card);
   }
@@ -1527,10 +1576,11 @@ async function loadWatchalongLanding(){
    watchalongTodayEmpty.hidden=Boolean(watchalongTodayGrid?.childElementCount);
    if(!watchalongTodayGrid?.childElementCount)watchalongTodayEmpty.textContent='今天目前沒有符合同時視聽辨識規則的直播。';
   }
+  if(watchalongTodaySection)watchalongTodaySection.hidden=!watchalongTodayGrid?.childElementCount;
  }catch{
   watchalongStaticGrid.replaceChildren();
   watchalongStaticEmpty.hidden=false;
-  watchalongStaticEmpty.textContent='已完成活動暫時無法載入。';
+  watchalongStaticEmpty.textContent='精選同時視聽暫時無法載入。';
   if(watchalongPastEmpty){watchalongPastEmpty.hidden=false;watchalongPastEmpty.textContent='過去同時視聽直播暫時無法載入。'}
   if(watchalongTodayEmpty){watchalongTodayEmpty.hidden=false;watchalongTodayEmpty.textContent='今日同時視聽暫時無法載入。'}
  }
