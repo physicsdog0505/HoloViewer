@@ -53,7 +53,7 @@ class DashboardTests(unittest.TestCase):
         failed = controller.refresh("data_coverage", now=NOW + timedelta(seconds=1))["data_coverage"]
         self.assertEqual(failed["availability"], "unavailable")
         self.assertEqual(failed["payload"], good["payload"])
-        self.assertEqual(failed["error"]["code"], "OSError")
+        self.assertEqual(failed["error"]["code"], "source_unavailable")
         self.assertEqual(failed["error"]["message"], "read-only monitor source failed")
         self.assertEqual(failed["last_successful_read_at"], good["last_successful_read_at"])
         self.assertNotEqual(failed["read_at"], failed["last_successful_read_at"])
