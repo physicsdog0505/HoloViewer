@@ -61,6 +61,7 @@ jobs:
             ptt_offline.test_data_lifecycle_evidence \
             ptt_offline.test_data_lifecycle_bundle \
             ptt_offline.test_expected_aid_discovery_adapter \
+            ptt_offline.test_daily_ptt_finalization \
             ptt_offline.test_pr147_monitor_adapter \
             ptt_offline.test_diagnose_current_day \
             ptt_offline.test_production_publisher_budget \
