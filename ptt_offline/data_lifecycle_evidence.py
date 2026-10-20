@@ -119,6 +119,37 @@ def build_expected_aid_contract(*, day: str, entries: list[dict[str,Any]],
     return body
 
 
+
+def expected_aids_for_pr147(contract: dict[str,Any]) -> dict[str,Any]:
+    """Project the authority into PR #147's existing adapter envelope.
+
+    Verification remains injected by PR #147; this function never promotes an
+    UNKNOWN/CONFLICT contract into a usable expected set.
+    """
+    if not isinstance(contract,dict) or contract.get("schema_version")!=AID_SCHEMA:
+        raise ValueError("expected AID contract required")
+    authority=contract.get("authority") if isinstance(contract.get("authority"),dict) else {}
+    usable=(
+        contract.get("status")=="COMPLETE" and
+        authority.get("verified") is True and
+        isinstance(authority.get("version"),str) and bool(authority.get("version")) and
+        authority.get("day")==contract.get("day")
+    )
+    return {
+        "expected_authority":{
+            "verified":authority.get("verified") is True,
+            "day":authority.get("day"),
+            "version":authority.get("version"),
+            "issuer":authority.get("issuer"),
+            "evidence_hash":authority.get("evidence_hash"),
+        },
+        "expected_aids":[row.get("aid") for row in contract.get("expected",[])]
+                        if usable else None,
+        "contract_gaps":[] if usable else [
+            "expected-AID-contract-not-complete-for-pr147"
+        ],
+    }
+
 def build_source_coverage(*, day: str, aid: str, article_start_line: int,
                           final_source_line: int | None,
                           lines: list[dict[str,Any]]) -> dict[str,Any]:
