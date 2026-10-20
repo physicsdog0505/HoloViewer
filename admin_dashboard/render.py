@@ -1,24 +1,46 @@
-"""Dependency-free internal dashboard shell; intentionally outside site/**."""
+"""Internal offline admin UI, deliberately independent of site/**."""
 
 
 def render_dashboard() -> str:
-    return """<!doctype html>
-<html lang="zh-Hant"><meta charset="utf-8"><title>PTT History Admin</title>
-<style>body{font:14px system-ui;margin:2rem;max-width:1200px}nav button,button{margin:.25rem;padding:.55rem}.panel{display:none}.panel.active{display:block}pre{white-space:pre-wrap;background:#f5f5f5;padding:1rem}.warn{color:#9b4b00}</style>
-<h1>PTT History Admin Dashboard</h1>
-<p class="warn">唯讀監控；HTTP 200 或程序存活不代表資料完整。重新執行同步尚未開放。</p>
-<nav><button data-tab="data_coverage">Data Coverage</button><button data-tab="sync_monitor">Sync Monitor</button><button data-tab="system_health">System Health</button></nav>
-<button id="refresh-all">重新整理全部狀態</button>
-<button disabled title="future design only">重新執行同步（未来功能）</button>
-<section id="data_coverage" class="panel active"><h2>Data Coverage</h2><label>篩選 <select id="coverage-filter"><option value="all">全部</option><option value="COMPLETE">完整</option><option value="REPAIR_NEEDED">缺漏／待同步</option><option value="CONFLICT">衝突</option><option value="UNKNOWN">未知</option></select></label><button data-refresh="data_coverage">重新整理狀態</button><pre></pre></section>
-<section id="sync_monitor" class="panel"><h2>Sync Monitor</h2><button data-refresh="sync_monitor">重新整理狀態</button><pre></pre></section>
-<section id="system_health" class="panel"><h2>System Health</h2><button data-refresh="system_health">重新整理狀態</button><pre></pre></section>
+    return r"""<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HoloViewer · Data Lifecycle</title>
+<style>
+body{font:14px/1.5 system-ui;max-width:1280px;margin:2rem auto;padding:0 1rem}
+nav,.tools,.filters{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}
+button,input,select{padding:.55rem;border:1px solid #999;border-radius:6px;background:transparent;color:inherit}
+button{cursor:pointer}button[disabled]{opacity:.5;cursor:not-allowed}button.active{outline:2px solid #777}
+.panel{display:none}.panel.active{display:block}.warning{padding:.6rem;border-left:3px solid #bd861e}
+.error{border-left-color:#bc4444}table{width:100%;border-collapse:collapse;margin:.75rem 0}
+th,td{border-bottom:1px solid #8885;padding:.6rem;text-align:left;vertical-align:top}
+th{white-space:nowrap}details{max-width:34rem}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.muted{opacity:.7}.table-scroll{overflow-x:auto}
+</style></head><body>
+<header><h1>PTT 歷史資料管理</h1><p class="warning">離線／唯讀。UNKNOWN 不代表完整；HTTP 200 不代表資料完整；不執行補抓或同步。</p></header>
+<nav aria-label="管理頁籤"><button data-tab="data_coverage" class="active">Data Coverage</button><button data-tab="sync_monitor">Sync Monitor</button><button data-tab="system_health">System Health</button></nav>
+<div class="tools"><button id="refresh-all">重新整理全部狀態</button><button disabled title="需另行審核寫入與授權">重新執行同步（未開放）</button></div>
+<section id="data_coverage" class="panel active"><h2>Data Coverage</h2><div class="filters">
+<label>狀態 <select id="coverage-filter"><option value="all">全部</option><option value="action">待處理</option><option value="COMPLETE">完整</option><option value="LOCAL_MISSING">缺少本地資料</option><option value="PENDING_SYNC">待同步</option><option value="PARTIAL">部分缺漏</option><option value="CONFLICT">衝突</option><option value="UNKNOWN">未知</option></select></label>
+<label>起始 <input type="date" id="from-day"></label><label>結束 <input type="date" id="through-day"></label>
+<label>搜尋日期／AID <input id="coverage-search" type="search" placeholder="YYYY-MM-DD / AID"></label>
+<label>排序 <select id="coverage-sort"><option value="desc">日期新到舊</option><option value="asc">日期舊到新</option></select></label>
+<button id="clear-filters">清除篩選</button></div>
+<p id="coverage-summary" aria-live="polite"></p><div class="table-scroll"><table><thead><tr><th>日期</th><th>資料狀態</th><th>本地證據</th><th>預期 AID</th><th>缺少 AID</th><th>Source-line 缺漏</th><th>細節</th></tr></thead><tbody id="coverage-rows"></tbody></table></div>
+<button data-refresh="data_coverage">重新整理狀態</button><div id="data_coverage-meta" aria-live="polite"></div></section>
+<section id="sync_monitor" class="panel"><h2>Sync Monitor</h2><div class="table-scroll"><table><thead><tr><th>工作／來源 → 目的</th><th>狀態</th><th>進度</th><th>最近執行</th><th>Retry／Backoff</th><th>錯誤</th><th>資料證據／缺口</th></tr></thead><tbody id="sync-rows"></tbody></table></div><div id="sync-consistency"></div><button data-refresh="sync_monitor">重新整理狀態</button><div id="sync_monitor-meta"></div></section>
+<section id="system_health" class="panel"><h2>System Health</h2><div class="table-scroll"><table><thead><tr><th>元件</th><th>語義健康</th><th>Process</th><th>HTTP</th><th>資料時間／freshness</th><th>證據</th></tr></thead><tbody id="health-rows"></tbody></table></div><button data-refresh="system_health">重新整理狀態</button><div id="system_health-meta"></div></section>
 <script>
-const cache={};
-const show=(name,data)=>{cache[name]=data;let shown=data;if(name==='data_coverage'){const filter=document.querySelector('#coverage-filter').value;if(filter!=='all'){shown=JSON.parse(JSON.stringify(data));const payload=shown?.payload;if(Array.isArray(payload?.sources))payload.sources=payload.sources.filter(row=>JSON.stringify(row).includes(filter));}}document.querySelector('#'+name+' pre').textContent=JSON.stringify(shown,null,2);};
-async function refresh(section){const q=section?'?section='+encodeURIComponent(section):'';try{const r=await fetch('/admin/status'+q,{method:'GET',credentials:'omit'});const data=await r.json();if(section)show(section,data[section]);else Object.entries(data).forEach(([k,v])=>show(k,v));}catch(error){if(section)show(section,{availability:'unavailable',error:String(error)});}}
-document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===b.dataset.tab));});
-document.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=()=>refresh(b.dataset.refresh));
-document.querySelector('#coverage-filter').onchange=()=>show('data_coverage',cache.data_coverage||{});
-document.querySelector('#refresh-all').onclick=()=>refresh();refresh();
-</script></html>"""
+"use strict";
+const cache={};const $=id=>document.getElementById(id);const str=v=>v==null?'—':typeof v==='object'?JSON.stringify(v):String(v);
+const elem=(tag,value)=>{const el=document.createElement(tag);el.textContent=str(value);return el};
+function tableRow(tbody,values){const tr=document.createElement('tr');values.forEach(v=>tr.appendChild(elem('td',v)));tbody.appendChild(tr);return tr}
+function details(value){const d=document.createElement('details'),s=document.createElement('summary'),p=document.createElement('pre');s.textContent='檢視證據';p.textContent=JSON.stringify(value,null,2);d.append(s,p);return d}
+function meta(name,data){const status=data?.refresh?.status||'unknown',err=data?.error?.message;const box=$(name+'-meta');box.textContent='讀取狀態：'+status+' ｜ availability：'+str(data?.availability)+' ｜ 最後讀取：'+str(data?.read_at)+(err?' ｜ 錯誤：'+err+'（顯示 last-good，非即時）':'')+(status==='cooldown'?' ｜ 冷卻剩餘 '+str(data?.refresh?.retry_after_seconds)+' 秒':'');box.className=err?'warning error':'muted'}
+function coverageRows(payload){if(Array.isArray(payload?.days))return payload.days;if(Array.isArray(payload?.sources))return [payload];if(Array.isArray(payload?.inventories))return payload.inventories;return []}
+function normalize(item){if(item.status&&item.expected_aids!==undefined)return item;const p=(item.sources||[]).find(x=>x.source==='ptt')||{};const gaps=p.source_line_gaps||{},missing=p.missing_ids||[],base=p.completeness_status||'UNKNOWN',target=p.target_evidence;let status='UNKNOWN';if(base==='CONFLICT'||(p.conflicts||[]).length)status='CONFLICT';else if(base==='REPAIR_NEEDED')status=missing.length?'LOCAL_MISSING':'PARTIAL';else if(base==='COMPLETE'&&target?.verified===true)status=target.all_expected_present?'COMPLETE':'PENDING_SYNC';return {date:item.date,status,local_status:base,expected_aids:p.expected_set,actual_aids:p.actual_set,missing_aids:missing,source_line_gaps:gaps,contract_gaps:p.contract_gaps||[],source_version:p.source_version,target_evidence:target}}
+function renderCoverage(){const payload=cache.data_coverage?.payload,all=coverageRows(payload).map(normalize),filter=$('coverage-filter').value,search=$('coverage-search').value.trim().toLowerCase(),from=$('from-day').value,to=$('through-day').value;let rows=all.filter(r=>(filter==='all'||(filter==='action'?r.status!=='COMPLETE':r.status===filter))&&(!from||r.date>=from)&&(!to||r.date<=to)&&(!search||r.date.includes(search)||(r.expected_aids||[]).some(x=>String(x).toLowerCase().includes(search))||(r.actual_aids||[]).some(x=>String(x).toLowerCase().includes(search))));rows.sort((a,b)=>$('coverage-sort').value==='asc'?a.date.localeCompare(b.date):b.date.localeCompare(a.date));$('coverage-summary').textContent='顯示 '+rows.length+'／'+all.length+' 天；狀態統計：'+Object.entries(all.reduce((acc,r)=>(acc[r.status]=(acc[r.status]||0)+1,acc),{})).map(([k,n])=>k+' '+n).join('、');const tbody=$('coverage-rows');tbody.replaceChildren();rows.forEach(r=>{const tr=tableRow(tbody,[r.date,r.status,r.local_status,(r.expected_aids||[]).join(', ')||'UNKNOWN',(r.missing_aids||[]).join(', ')||'—',Object.entries(r.source_line_gaps||{}).map(([k,v])=>k+': '+v.join(',')).join('；')||'—','']);tr.lastChild.replaceChildren(details(r))});if(!rows.length)tableRow(tbody,['沒有符合的資料。缺少日期範圍 inventory 時不可推斷完整。'])}
+function renderSync(payload){const tbody=$('sync-rows');tbody.replaceChildren();(payload?.jobs||[]).forEach(j=>{const tr=tableRow(tbody,[j.component+'／'+str(j.job_id)+' | '+str(j.source)+' → '+str(j.target),j.status,str(j.published_count)+' / '+str(j.input_count)+' （verified '+str(j.verified_count)+'）',str(j.last_attempted_at)+'；成功 '+str(j.last_successful_at),str(j.retry_after)+'／'+str(j.backoff_seconds),str(j.error_code)+' '+str(j.error_message),'']);tr.lastChild.replaceChildren(details({freshness:j.evidence_freshness,observed_at:j.evidence_observed_at,evidence_source:j.evidence_source,contract_gaps:j.contract_gaps,job:j}))});if(!tbody.children.length)tableRow(tbody,['無監控資料／UNAVAILABLE']);$('sync-consistency').textContent='資料覆蓋與同步結果差異：'+JSON.stringify(payload?.coverage_consistency||[])}
+function renderHealth(payload){const tbody=$('health-rows');tbody.replaceChildren();(payload?.components||[]).forEach(r=>{const tr=tableRow(tbody,[r.component,r.status,str(r.process_alive),str(r.http_status),str(r.observed_at)+'／'+str(r.freshness),'']);tr.lastChild.replaceChildren(details(r))});if(!tbody.children.length)tableRow(tbody,['無健康證據／UNAVAILABLE'])}
+function show(name,data){cache[name]=data;meta(name,data);if(name==='data_coverage')renderCoverage();else if(name==='sync_monitor')renderSync(data?.payload);else renderHealth(data?.payload)}
+async function refresh(section){const query=section?'?section='+encodeURIComponent(section):'';try{const response=await fetch('/admin/status'+query,{method:'GET',credentials:'same-origin',cache:'no-store'});if(!response.ok)throw Error('status '+response.status);const data=await response.json();if(section)show(section,data[section]);else Object.entries(data).forEach(([k,v])=>show(k,v))}catch(e){const names=section?[section]:['data_coverage','sync_monitor','system_health'];names.forEach(name=>show(name,{...(cache[name]||{}),availability:'unavailable',error:{message:'讀取失敗，顯示上次資料'},refresh:{status:'failed'}}))}}
+document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===b.dataset.tab));document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b))}));document.querySelectorAll('[data-refresh]').forEach(b=>b.addEventListener('click',()=>refresh(b.dataset.refresh)));['coverage-filter','coverage-search','from-day','through-day','coverage-sort'].forEach(id=>$(id).addEventListener('input',renderCoverage));$('clear-filters').addEventListener('click',()=>{['from-day','through-day','coverage-search'].forEach(id=>$(id).value='');$('coverage-filter').value='all';$('coverage-sort').value='desc';renderCoverage()});$('refresh-all').addEventListener('click',()=>refresh());refresh();
+</script></body></html>"""
