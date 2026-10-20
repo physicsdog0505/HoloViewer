@@ -126,8 +126,13 @@ function api(path){
  });
 }
 async function videoMetadata(id){
- try{return await api('/v1/catalog/videos/'+encodeURIComponent(id))}
- catch{return api('/v1/videos/'+encodeURIComponent(id)+'/metadata')}
+ const result=await window.HoloViewerVideoMetadata?.resolve(id,{
+  apiBase:API_BASE,preferCatalog:true,waitForRecovery:true,maxAttempts:6
+ });
+ if(result?.status==='ready')return result.row;
+ const error=new Error(result?.status||'metadata unavailable');
+ error.metadataResult=result||null;
+ throw error;
 }
 function node(tag,text,className){
  const el=document.createElement(tag);
