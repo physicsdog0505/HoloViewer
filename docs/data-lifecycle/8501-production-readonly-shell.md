@@ -104,6 +104,8 @@ Every gate defaults `enabled=false`. Disabled or credential-missing sources surf
 
 The Admin consumer never receives credential bytes. Future credentials must remain server-side in environment/secret-store ownership and must never be committed, logged, stored in fixture data, or returned to browser payloads.
 
+The authenticated principal is carried in a server-side ContextVar for the lifetime of one WSGI request and is read only by the audit path. It is reset when the request exits and is never serialized into Admin JSON/HTML.
+
 `NoProductionCredentials` is the Phase 1 default. Credential-required sources remain unavailable without calling the source reader.
 
 ## Admission / quota
@@ -121,6 +123,20 @@ Default D1 admission:
 - source not configured => deny.
 
 The UI 30-second refresh cooldown is still UX only and is not quota enforcement.
+
+### Shared sanitized result cache
+
+The same process-shared SQLite state contains a result cache keyed by the canonical source/scope/verification-mode/operation identity used for admission/coalescing.
+
+For D1:
+- TTL is >=60 seconds;
+- a cache hit returns before admission and before the Production reader, so no new D1 quota/read is consumed;
+- the cached value is revalidated by the reviewed `validate_d1_snapshot()` contract on both write and hit;
+- malformed/tampered cached evidence fails closed with `cache_state_error` and does not fall back to a fresh source read;
+- only JSON-serializable bounded evidence is persisted; credentials, raw response bodies and secrets are never part of the cache contract;
+- cache hits still emit a full non-consuming AdmissionReceipt and a sanitized audit event.
+
+Other Production sources may opt into the same shared result cache only when their reviewed source validator is supplied; Phase 1 does not invent a generic cache validator.
 
 The admission request contains:
 - source;
