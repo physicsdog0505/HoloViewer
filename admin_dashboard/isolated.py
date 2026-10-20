@@ -10,6 +10,7 @@ from threading import Condition, Lock
 from time import monotonic
 
 from .auth import AuthResult
+from .request_context import reset_admin_request_context, set_admin_request_context
 
 
 class AuthenticatedDashboard:
@@ -45,7 +46,11 @@ class AuthenticatedDashboard:
         child = dict(environ)
         child["holoviewer.admin.principal"] = result.principal
         child["holoviewer.admin.auth_method"] = result.auth_method
-        return self._app(child, start_response)
+        token = set_admin_request_context(result.principal, result.auth_method)
+        try:
+            return self._app(child, start_response)
+        finally:
+            reset_admin_request_context(token)
 
 
 class SharedFixtureCache:
