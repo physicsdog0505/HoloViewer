@@ -6,6 +6,7 @@ const PTT_ARCHIVE_BASE=String(config.pttArchiveBase||'').replace(/\/$/,'');
 const PTT_ARCHIVE_MANIFEST=String(config.pttArchiveManifest||'/ptt/v1/manifests/static-assets-full-2026-10.json');
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
 const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';
+const PTT_POLL_MS=60000;
 const params=new URLSearchParams(location.search);
 let hostVideoId=validVideoId(params.get('host'));
 let sourceVideoId=validVideoId(params.get('source'));
@@ -922,7 +923,7 @@ async function resolveHostPtt(){
    hostWindow=null;
    await loadTodayPtt(taipeiDay());
    clearInterval(pttTimer);
-   pttTimer=setInterval(()=>{if(!document.hidden)loadTodayPtt(taipeiDay())},10000);
+   pttTimer=setInterval(()=>{if(!document.hidden)loadTodayPtt(taipeiDay())},PTT_POLL_MS);
    return;
   }
   const start=String(row?.actual_start||''),end=String(row?.actual_end||'');
@@ -942,6 +943,9 @@ staticArtifactsPromise.then(()=>{
  if(!staticArtifactsFailed)resolveHostPtt();
 });
 
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden&&hostStatus.textContent==='live')loadTodayPtt(taipeiDay());
+});
 window.addEventListener('pagehide',()=>{
  saveCheckpoint();
  clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);clearInterval(checkpointTimer);clearTimeout(metadataRetryTimer);
