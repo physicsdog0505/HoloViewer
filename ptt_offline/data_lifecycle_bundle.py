@@ -15,13 +15,13 @@ from .data_lifecycle_evidence import (
     build_expected_aid_contract,
     build_source_coverage,
 )
-from .publisher_telemetry import update_publisher_telemetry
+from .publisher_telemetry import build_publisher_telemetry
 
 
 BUNDLE_SCHEMA="holoviewer-ptt-data-lifecycle-bundle-v1"
 
 
-def build_bundle(raw: dict[str,Any], *, publisher_path: str | Path) -> dict[str,Any]:
+def build_bundle(raw: dict[str,Any]) -> dict[str,Any]:
     if not isinstance(raw,dict):
         raise TypeError("sanitized input mapping required")
 
@@ -42,7 +42,7 @@ def build_bundle(raw: dict[str,Any], *, publisher_path: str | Path) -> dict[str,
         final_source_line=coverage_raw.get("final_source_line"),
         lines=coverage_raw.get("lines",[]),
     )
-    publisher=update_publisher_telemetry(publisher_path,publisher_raw)
+    publisher=build_publisher_telemetry(publisher_raw)
     collector=build_collector_semantic_evidence(
         observed_at=collector_raw.get("observed_at"),
         active_aid=collector_raw.get("active_aid"),
@@ -75,12 +75,11 @@ def build_bundle(raw: dict[str,Any], *, publisher_path: str | Path) -> dict[str,
 def main(argv=None):
     p=argparse.ArgumentParser(description="Build sanitized PTT Data Lifecycle bundle")
     p.add_argument("--input",required=True)
-    p.add_argument("--publisher-state",required=True)
     p.add_argument("--out",required=True)
     args=p.parse_args(argv)
 
     raw=json.loads(Path(args.input).read_text(encoding="utf-8"))
-    bundle=build_bundle(raw,publisher_path=args.publisher_state)
+    bundle=build_bundle(raw)
     out=Path(args.out)
     with out.open("x",encoding="utf-8") as handle:
         json.dump(bundle,handle,ensure_ascii=False,sort_keys=True,indent=2)
