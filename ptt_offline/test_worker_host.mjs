@@ -88,8 +88,8 @@ test('combined host serves #47 Today consumer envelope directly to 4174 preload'
  assert.equal(body.schema_version,'public-consumer-v1');
  assert.equal(body.streams.length,1);
  assert.deepEqual(Object.keys(body.streams[0]).sort(),[
-  'actual_end','actual_start','anchor_source','avatar_url','channel_id','channel_name','group','lifecycle_state','member_accent','member_accent_dual',
-  'observed_at','source_label','stale','start_at','support_color_source','support_mode','title','video_id'
+  'actual_end','actual_start','anchor_source','avatar_url','channel','channel_id','channel_name','display_name','group','lifecycle_state','member_accent','member_accent_dual',
+  'observed_at','profile_revision','profile_updated_at','source_label','stale','start_at','support_color_source','support_mode','title','video_id'
  ].sort());
  assert.equal(body.streams[0].video_id,'abcdefghijk');
  assert.equal(body.streams[0].lifecycle_state,'live'); // lifecycle identity is preserved even when freshness is stale
