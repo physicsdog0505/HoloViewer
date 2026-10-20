@@ -6,7 +6,7 @@ from datetime import date, timedelta
 STATES = ("COMPLETE", "LOCAL_MISSING", "PENDING_SYNC", "PARTIAL", "CONFLICT", "UNKNOWN")
 
 
-def _target_readback_state(evidence: object) -> str:
+def _target_readback_state(evidence: object, *, day: str, expected_aids: object) -> str:
     """Interpret only the strong job-bound D1 readback contract.
 
     Returns COMPLETE only for independently verified full-partition readback.
@@ -25,6 +25,13 @@ def _target_readback_state(evidence: object) -> str:
         return "UNKNOWN"
     if not binding.get("job_id") or not binding.get("manifest_digest") or not binding.get("source_revision"):
         return "UNKNOWN"
+    scope = binding.get("scope")
+    if not isinstance(scope, dict) or scope.get("day") != day:
+        return "UNKNOWN"
+    scoped_aids = scope.get("aids")
+    if isinstance(expected_aids, list):
+        if not isinstance(scoped_aids, list) or set(scoped_aids) != set(expected_aids):
+            return "UNKNOWN"
 
     mode = verification.get("mode")
     if mode == "bounded_sample":
@@ -78,7 +85,7 @@ def project_coverage(days: list[dict], *, start_day: str, end_day: str) -> dict:
         elif base != "COMPLETE":
             status = "LOCAL_MISSING" if missing else "PARTIAL" if gaps or base == "REPAIR_NEEDED" else "UNKNOWN"
         else:
-            status = _target_readback_state(evidence)
+            status = _target_readback_state(evidence, day=key, expected_aids=expected)
         rows.append({
             "date": key, "status": status, "local_status": base,
             "expected_aids": expected, "actual_aids": actual,
