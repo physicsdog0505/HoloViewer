@@ -843,6 +843,47 @@ class ParityContract(unittest.TestCase):
         self.assertIn("window.HoloViewerVideoMetadata?.resolve(videoId",watch)
         self.assertIn("pttDay:/^\\d{4}-\\d{2}-\\d{2}$/.test(watchalongSessionDay)",watch)
 
+    def test_metadata_transport_fallback_is_bounded(self):
+        resolver=(ROOT / "site/assets/video-metadata-resolver.js").read_text(encoding="utf-8")
+        app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        script = """
+global.window={HOLOVIEWER_CONFIG:{apiBase:'https://api.example'}};
+let calls=[];
+global.fetch=async(url,options)=>{
+  calls.push(url);
+  if(url.includes('/v1/catalog/videos/'))throw new TypeError('catalog transport');
+  return {status:200,json:async()=>({video_id:'abcdefghijk',lifecycle_state:'ended',actual_start:'2026-10-18T15:00:06Z',actual_end:'2026-10-18T16:04:31Z'})};
+};
+eval(RESOLVER_SOURCE);
+const first=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',maxAttempts:1});
+global.fetch=async(url,options)=>{
+  calls.push(url);
+  if(url.includes('/v1/catalog/videos/'))return {status:404,json:async()=>({error:'not_found'})};
+  throw new TypeError('metadata transport');
+};
+const second=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',maxAttempts:1});
+const controller=new AbortController();controller.abort();
+const third=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',signal:controller.signal,maxAttempts:1});
+process.stdout.write(JSON.stringify({first,second,third,calls}));
+""".replace("RESOLVER_SOURCE", json.dumps(resolver))
+        result=subprocess.run(
+            ["node","--input-type=module","-e",script],
+            check=True,capture_output=True,text=True
+        )
+        payload=json.loads(result.stdout)
+        self.assertEqual(payload["first"]["status"],"ready")
+        self.assertEqual(payload["first"]["source"],"metadata")
+        self.assertTrue(any("/v1/videos/abcdefghijk/metadata" in url for url in payload["calls"]))
+        self.assertEqual(payload["second"]["status"],"error")
+        self.assertEqual(payload["second"]["httpStatus"],0)
+        self.assertEqual(payload["second"]["row"]["error"],"transport_error")
+        self.assertEqual(payload["third"]["status"],"aborted")
+        start=app.index("async function resolveVideoMetadata(id){")
+        end=app.index("async function resolveVodWindow(id){",start)
+        wrapper=app[start:end]
+        self.assertIn("try{",wrapper)
+        self.assertIn("catch{return null}",wrapper)
+
     def test_public_viewing_entries_use_standalone_surfaces_not_spa(self):
         app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("function standaloneViewerUrl(ids,{vodWindows=null,pttMode=''}={})",app)
