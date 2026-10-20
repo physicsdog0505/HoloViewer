@@ -71,9 +71,17 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority,limits={
     requireTrue(!keys.has(key),'duplicate source identity'); keys.add(key);
     requireTrue(await verifyAuthority(row)===true,'unverified source event timestamp');
   }
+  const conflictWhere=batch.rows.map(()=>'(day=? AND aid=? AND source_record_key=?)').join(' OR ');
+  const conflictArgs=batch.rows.flatMap(row=>[row.day,row.aid,row.source_record_key]);
+  const conflictPreload=await DB.prepare(
+    'SELECT day,aid,source_record_key,push_id FROM ptt_source_evidence WHERE '+conflictWhere
+  ).bind(...conflictArgs).all();
+  requireTrue(Array.isArray(conflictPreload?.results),'D1 conflict preload failure');
+  const existingBySource=new Map(conflictPreload.results.map(existing=>[
+    existing.day+':'+existing.aid+':'+existing.source_record_key,existing
+  ]));
   for(const row of batch.rows) {
-    const existing=await DB.prepare('SELECT push_id FROM ptt_source_evidence WHERE day=? AND aid=? AND source_record_key=?')
-      .bind(row.day,row.aid,row.source_record_key).first();
+    const existing=existingBySource.get(row.day+':'+row.aid+':'+row.source_record_key);
     requireTrue(!existing || existing.push_id===row.push_id,'existing source evidence conflict');
   }
   // Idempotent re-observation must not create account-level D1 writes. The
@@ -90,7 +98,7 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority,limits={
   // A bounded write acknowledges observation, never full historical coverage.
   // Until a separately verified gap repair, Public completeness stays partial.
   for(const aid of aids)statements.push(DB.prepare(SQL_STATE).bind(batch.day,aid));
-  const queries=statements.length+3*batch.rows.length;
+  const queries=statements.length+3;
   // Conservative pre-dispatch upper bound for this single-writer transaction:
   // at most one thread insert per AID plus one push and evidence mutation per
   // logical row. Must not rely only on post-commit meta.changes.
@@ -100,12 +108,29 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority,limits={
   const results=await DB.batch(statements);
   requireTrue(Array.isArray(results) && results.length===statements.length,'D1 transaction failure');
   // A successful transaction response is not sufficient proof of canonical
-  // visibility. Perform two exact readbacks per pushed source before ACK.
+  // visibility. Preserve exact per-row verification, but fetch each readback
+  // family once for the bounded batch instead of issuing N point SELECTs.
+  const pushIds=batch.rows.map(row=>row.push_id);
+  const pushReadback=await DB.prepare(
+    'SELECT push_id,aid,day,source_line,author,content,occurred_at,source_url FROM ptt_pushes WHERE push_id IN ('+
+      pushIds.map(()=>'?').join(',')+')'
+  ).bind(...pushIds).all();
+  requireTrue(Array.isArray(pushReadback?.results),'D1 push readback failure; remote state uncertain, do not retry');
+  const pushesById=new Map(pushReadback.results.map(push=>[push.push_id,push]));
+
+  const evidenceWhere=batch.rows.map(()=>'(day=? AND aid=? AND source_record_key=?)').join(' OR ');
+  const evidenceArgs=batch.rows.flatMap(row=>[row.day,row.aid,row.source_record_key]);
+  const evidenceReadback=await DB.prepare(
+    'SELECT day,aid,source_record_key,push_id,source_line FROM ptt_source_evidence WHERE '+evidenceWhere
+  ).bind(...evidenceArgs).all();
+  requireTrue(Array.isArray(evidenceReadback?.results),'D1 evidence readback failure; remote state uncertain, do not retry');
+  const evidenceBySource=new Map(evidenceReadback.results.map(evidence=>[
+    evidence.day+':'+evidence.aid+':'+evidence.source_record_key,evidence
+  ]));
+
   for(const row of batch.rows){
-    const push=await DB.prepare('SELECT aid,day,source_line,author,content,occurred_at,source_url FROM ptt_pushes WHERE push_id=?')
-      .bind(row.push_id).first();
-    const evidence=await DB.prepare('SELECT push_id,source_line FROM ptt_source_evidence WHERE day=? AND aid=? AND source_record_key=?')
-      .bind(row.day,row.aid,row.source_record_key).first();
+    const push=pushesById.get(row.push_id);
+    const evidence=evidenceBySource.get(row.day+':'+row.aid+':'+row.source_record_key);
     requireTrue(push && evidence && push.aid===row.aid && push.day===row.day &&
       push.source_line===row.source_line && push.author===row.author &&
       push.content===row.content && push.occurred_at===row.occurred_at &&
