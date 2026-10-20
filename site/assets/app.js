@@ -1471,15 +1471,23 @@ function watchalongCardImage(videoId,title,badge=''){
 function watchalongIdentity(profile,label){
  const identity=document.createElement('div');identity.className='watchalong-card-identity';
  const avatar=document.createElement('span');avatar.className='watchalong-card-avatar';
- avatar.append(homeAvatarChild(profile,label));
+ const avatarUrl=homeAvatarUrl(profile||{});
+ if(avatarUrl){
+  const img=document.createElement('img');img.className='channel-avatar-img';img.src=avatarUrl;img.alt='';img.loading='lazy';avatar.append(img);
+ }else{
+  const fallback=document.createElement('span');fallback.className='watchalong-avatar-fallback';
+  const name=String(label||profile?.channel_name||profile?.channel_title||'Holo').trim();
+  fallback.textContent=([...[...name]].find(c=>/[A-Za-z0-9一-龠ぁ-んァ-ヶ]/.test(c))||'H').toUpperCase();
+  avatar.append(fallback);
+ }
  const name=document.createElement('span');name.className='watchalong-card-host';name.textContent=String(label||'Hololive');
  identity.append(avatar,name);return identity;
 }
-function watchalongLandingCard({videoId,title,day='',detail='',action='開始同時視聽 →',href='',onpick=null,status='',profile=null,hostLabel='',featured=false,badge=''}) {
+function watchalongLandingCard({videoId,title,day='',detail='',action='開始同時視聽 →',href='',onpick=null,status='',profile=null,hostLabel='',featured=false,compact=false,badge=''}) {
  if(!/^[A-Za-z0-9_-]{11}$/.test(String(videoId||'')))return null;
  const item=profile||{channel_name:hostLabel};
  const label=hostLabel||item.channel_name||item.channel_title||'Hololive';
- const card=document.createElement('a');card.className='watchalong-static-card'+(featured?' watchalong-featured-card':'');
+ const card=document.createElement('a');card.className='watchalong-static-card'+(featured?' watchalong-featured-card':'')+(compact?' watchalong-compact-card':'');
  applyHomeSupportStyle(card,{...item,channel_name:label});
  card.href=href||'#manual';
  if(typeof onpick==='function')card.onclick=event=>{event.preventDefault();onpick()};
@@ -1549,7 +1557,7 @@ async function loadWatchalongLanding(){
     videoId,title:String(event.title||videoId),day:String(event.day||''),
     status:isCurated?'精選已收錄':(event.member_only?'會員限定':'已結束'),
     action:isCurated?'直接開始觀看 →':'使用這場建立 →',
-    hostLabel:label,profile,
+    hostLabel:label,profile,compact:true,
     href:isCurated?'/watchalong-viewer/?watchalong_event='+encodeURIComponent(videoId):'',
     onpick:isCurated?null:()=>pickWatchalongHost(videoId)
    });
@@ -1568,7 +1576,7 @@ async function loadWatchalongLanding(){
    const label=String(row?.channel_name||row?.channel_title||'Hololive');
    const card=watchalongLandingCard({
     videoId,title:String(row?.title||videoId),day:taipeiDay(),status,
-    hostLabel:label,profile:row,action:'使用這場建立 →',onpick:()=>pickWatchalongHost(videoId)
+    hostLabel:label,profile:row,compact:true,action:'使用這場建立 →',onpick:()=>pickWatchalongHost(videoId)
    });
    if(card)watchalongTodayGrid?.append(card);
   }
