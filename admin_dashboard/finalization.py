@@ -67,6 +67,10 @@ def _repair_projection(raw: object) -> dict:
             "contract_gaps": ["repair-job-evidence-unavailable"],
         }
     status = raw.get("status") if raw.get("status") in JOB_STATES else "unknown"
+    error_code = _bounded_error_code(raw.get("error_code"))
+    gaps = list(raw.get("contract_gaps") or [])
+    if raw.get("error_code") is not None and error_code is None:
+        gaps.append("invalid-repair-error-code")
     return {
         "status": status,
         "attempted": raw.get("attempted") if isinstance(raw.get("attempted"), bool) else None,
@@ -74,8 +78,8 @@ def _repair_projection(raw: object) -> dict:
         "failed": raw.get("failed") if isinstance(raw.get("failed"), bool) else None,
         "attempted_at": raw.get("attempted_at"),
         "succeeded_at": raw.get("succeeded_at"),
-        "error_code": _bounded_error_code(raw.get("error_code")),
-        "contract_gaps": list(raw.get("contract_gaps") or []),
+        "error_code": error_code,
+        "contract_gaps": gaps,
     }
 
 
@@ -94,6 +98,10 @@ def _archive_projection(raw: object) -> dict:
     coverage = fields.get("coverage_summary") if isinstance(fields.get("coverage_summary"), dict) else {}
     package_status = coverage.get("status") if coverage.get("status") in PACKAGE_STATES else "UNKNOWN"
     delivery = raw.get("status") if raw.get("status") in JOB_STATES else "unknown"
+    error_code = _bounded_error_code(raw.get("error_code"))
+    archive_gaps = list(raw.get("contract_gaps") or []) + list(fields.get("contract_gaps") or [])
+    if raw.get("error_code") is not None and error_code is None:
+        archive_gaps.append("invalid-archive-error-code")
     # False does not mean failure for bounded samples; only explicit whole-job proof is VERIFIED.
     readback = "VERIFIED" if fields.get("job_verified") is True else "UNKNOWN"
     return {
@@ -104,8 +112,8 @@ def _archive_projection(raw: object) -> dict:
         "target": raw.get("target"),
         "readback_at": fields.get("readback_observed_at"),
         "verification_mode": fields.get("verification_mode"),
-        "contract_gaps": list(raw.get("contract_gaps") or []) +
-                         list(fields.get("contract_gaps") or []),
+        "error_code": error_code,
+        "contract_gaps": archive_gaps,
     }
 
 
