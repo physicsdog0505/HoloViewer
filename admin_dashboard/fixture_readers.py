@@ -57,9 +57,21 @@ class FixtureReaders:
     def _read_d1(self):
         return self._read_d1_with_cache()[0]
 
+    def _read_archive_sync_job(self):
+        try:
+            data = self._fixture("archive-sync-jobs.sanitized.json")
+            if data.get("schema_version") != "holoviewer-pr147-archive-monitor-fixture-set-v1" or data.get("sanitized") is not True:
+                return None
+            case = data.get("default_case")
+            row = data.get("cases", {}).get(case) if isinstance(data.get("cases"), dict) else None
+            return deepcopy(row) if isinstance(row, dict) else None
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+
     def sync_monitor(self):
         snapshot, cache_status = self._read_d1_with_cache()
-        return {"d1_snapshot": snapshot, "d1_cache_status": cache_status}
+        return {"d1_snapshot": snapshot, "d1_cache_status": cache_status,
+                "archive_sync_job": self._read_archive_sync_job()}
 
     def system_health(self):
         try:
