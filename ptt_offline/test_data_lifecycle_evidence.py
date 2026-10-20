@@ -40,10 +40,27 @@ class DataLifecyclePttEvidenceTests(unittest.TestCase):
         self.assertIn("expected-night-aid-missing",partial["contract_gaps"])
         duplicate=build_expected_aid_contract(
             day=src["day"],
-            entries=[src["entries"][0],{**src["entries"][0],"aid":"1dupAid"}],
+            entries=[src["entries"][0],{**src["entries"][0],"aid":"1dupAid","part":1},
+                     src["entries"][1]],
             authority=src["authority"])
         self.assertEqual(duplicate["status"],"CONFLICT")
-        self.assertIn("duplicate-day-aid",duplicate["conflicts"])
+        self.assertIn("duplicate-day-part",duplicate["conflicts"])
+
+    def test_expected_aids_support_contiguous_split_parts(self):
+        src=self.fixture["expected_aids"]
+        entries=[
+            {**src["entries"][0],"part":1},
+            {**src["entries"][0],"part":2,"aid":"1dayPart2",
+             "authority_record_id":"fixture-day-2"},
+            {**src["entries"][1],"part":1},
+        ]
+        body=build_expected_aid_contract(
+            day=src["day"],entries=entries,authority=src["authority"])
+        self.assertEqual(body["status"],"COMPLETE")
+        self.assertEqual(
+            [(x["period"],x["part"]) for x in body["expected"]],
+            [("day",1),("day",2),("night",1)],
+        )
 
     def test_coverage_preserves_non_push_and_legal_empty_push(self):
         src=self.fixture["coverage"]
