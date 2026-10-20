@@ -158,6 +158,7 @@ class OfflineAdminAcceptance(unittest.TestCase):
             "missing_aids": [],
             "source_line_gaps": {},
             "last_updated_at": "2026-10-21T00:01:00Z",
+            "final_verification_at": "2026-10-21T00:01:00Z",
             "contract_gaps": [],
         }]}
         archive = {
@@ -234,7 +235,8 @@ class OfflineAdminAcceptance(unittest.TestCase):
     def test_daily_finalization_explicit_target_day_beats_latest_coverage_day(self):
         coverage = {"days": [
             {"date": "2026-10-20", "local_status": "COMPLETE",
-             "expected_aids": ["day"], "actual_aids": ["day"]},
+             "expected_aids": ["day"], "actual_aids": ["day"],
+             "final_verification_at": "2026-10-21T00:01:00Z"},
             {"date": "2026-10-21", "local_status": "UNKNOWN",
              "expected_aids": None, "actual_aids": []},
         ]}
