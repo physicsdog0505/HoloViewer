@@ -1394,6 +1394,42 @@ window.hvCustomAdd=addStream;
 // Accepted 4174 watchalong landing mode/tab interactions.
 (function(){
 
+const watchalongStaticGrid=document.getElementById('watchalongStaticGrid');
+const watchalongStaticEmpty=document.getElementById('watchalongStaticEmpty');
+async function loadStaticWatchalongs(){
+ if(!watchalongStaticGrid||!watchalongStaticEmpty)return;
+ try{
+  const response=await fetch('/data/watchalong/manifest.json',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  const manifest=await response.json();
+  if(manifest?.schema_version!=='holoviewer-watchalong-manifest-v1'||!Array.isArray(manifest.events))throw new Error('manifest schema');
+  const entries=manifest.events.slice().sort((a,b)=>String(b.session_day||'').localeCompare(String(a.session_day||'')));
+  watchalongStaticGrid.replaceChildren();
+  entries.forEach(entry=>{
+   const eventId=String(entry?.event_id||'');
+   if(!/^[A-Za-z0-9_-]{11}$/.test(eventId))return;
+   const card=document.createElement('a');
+   card.className='watchalong-static-card';
+   card.href='/viewer/?watchalong_event='+encodeURIComponent(eventId);
+   const meta=document.createElement('div');meta.className='watchalong-static-meta';
+   const day=document.createElement('span');day.textContent=String(entry.session_day||'');
+   const counts=document.createElement('span');counts.textContent=String(entry.source_count||0)+' 段 · '+String(entry.cue_count||0)+' 字幕';
+   meta.append(day,counts);
+   const title=document.createElement('strong');title.textContent=String(entry.title||eventId);
+   const action=document.createElement('span');action.className='watchalong-static-action';action.textContent='進入同時視聽 →';
+   card.append(meta,title,action);
+   watchalongStaticGrid.append(card);
+  });
+  watchalongStaticEmpty.hidden=watchalongStaticGrid.childElementCount>0;
+  if(!watchalongStaticGrid.childElementCount)watchalongStaticEmpty.textContent='目前沒有已完成的同時視聽活動。';
+ }catch{
+  watchalongStaticGrid.replaceChildren();
+  watchalongStaticEmpty.hidden=false;
+  watchalongStaticEmpty.textContent='已完成活動暫時無法載入。';
+ }
+}
+loadStaticWatchalongs();
+
 const recentWatchSearch=document.getElementById('recentWatchSearch');
 let activeWatchGroup='all';
 function filterRecentWatchalong(){
