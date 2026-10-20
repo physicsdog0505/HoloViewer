@@ -68,10 +68,22 @@ button,input,select,output{font:inherit}
 .ptt-empty{display:grid;place-items:center;height:100%;color:#aab1b6;font-size:12px;padding:20px;text-align:center}
 .ptt-newest{position:absolute;right:12px;bottom:12px;z-index:3;border:1px solid #454a50;border-radius:999px;background:#171a1e;color:#fff;padding:6px 10px;cursor:pointer}
 
+.immersive-toolbar-trigger{display:none}
 body.immersive .client-rail{display:none}
 body.immersive .watchalong-shell{margin-left:0}
-body.immersive .watchalong-topbar{opacity:.25;transition:opacity .18s ease}
-body.immersive .watchalong-topbar:hover,body.immersive .watchalong-topbar:focus-within{opacity:1}
+body.immersive .watchalong-topbar{
+ position:fixed;left:0;right:0;top:0;z-index:80;
+ transform:translateY(calc(-100% - 2px));
+ opacity:0;
+ transition:transform .18s ease,opacity .18s ease;
+ box-shadow:0 8px 24px rgba(0,0,0,.18)
+}
+body.immersive.toolbar-visible .watchalong-topbar,
+body.immersive .watchalong-topbar:focus-within{transform:translateY(0);opacity:1}
+body.immersive .watchalong-main{height:100vh;padding-top:6px}
+body.immersive .immersive-toolbar-trigger{
+ display:block;position:fixed;left:0;right:0;top:0;height:14px;z-index:79;background:transparent
+}
 
 @media(max-width:1120px){
  .segment-controls{display:none}
