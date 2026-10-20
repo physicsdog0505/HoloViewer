@@ -12,9 +12,9 @@ const VID='abcdefghijk';
 const SECRET='s'.repeat(32);
 
 function getReq(id=VID){return new Request('https://api.example/v1/videos/'+id+'/metadata');}
-function youtubeItem({channelId=MANAGED,actualStart='2026-10-18T15:00:06Z',actualEnd='2026-10-18T16:04:31Z',scheduled='2026-10-18T15:00:00Z',live='none',livestream=true}={}){
+function youtubeItem({id=VID,channelId=MANAGED,actualStart='2026-10-18T15:00:06Z',actualEnd='2026-10-18T16:04:31Z',scheduled='2026-10-18T15:00:00Z',live='none',livestream=true}={}){
  return {
-  id:VID,
+  id,
   snippet:{channelId,title:'Fallback video',channelTitle:'Channel',liveBroadcastContent:live},
   ...(livestream?{liveStreamingDetails:{
    ...(scheduled?{scheduledStartTime:scheduled}:{}),
@@ -145,5 +145,56 @@ test('owner recovery requires valid HMAC before provider access',async()=>{
   now:new Date('2026-10-20T03:00:00Z'),fetchImpl:async()=>{fetches++;return fetchBody([])()}
  });
  assert.equal(res.status,401);assert.equal(fetches,0);
+ db.close();
+});
+
+
+test('signed replay is durable-suppressed before a second provider call',async()=>{
+ const db=sqliteD1();let fetches=0;
+ const env={DB:db,YOUTUBE_API_KEY:'key',TODAY_PUBLISH_ENABLED:'true',TODAY_PUBLISH_HMAC_SECRET:SECRET};
+ const fetchImpl=async()=>{fetches++;return fetchBody([youtubeItem()])()};
+ const now=new Date('2026-10-20T03:00:00Z');
+ const first=await signedRecovery({video_id:VID},env,{now,fetchImpl});
+ assert.equal(first.status,200);
+ const second=await signedRecovery({video_id:VID},env,{now,fetchImpl});
+ assert.equal(second.status,200);
+ assert.equal((await second.json()).status,'replay_suppressed');
+ assert.equal(fetches,1);
+ assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_replay').get().n,1);
+ db.close();
+});
+
+test('same video within cooldown reuses cache even with a fresh valid signature',async()=>{
+ const db=sqliteD1();let fetches=0;
+ const env={DB:db,YOUTUBE_API_KEY:'key',TODAY_PUBLISH_ENABLED:'true',TODAY_PUBLISH_HMAC_SECRET:SECRET};
+ const fetchImpl=async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()};
+ const first=await signedRecovery({video_id:VID},env,{now:new Date('2026-10-20T03:00:00Z'),fetchImpl});
+ assert.equal(first.status,200);
+ const second=await signedRecovery({video_id:VID},env,{now:new Date('2026-10-20T03:00:01Z'),fetchImpl});
+ assert.equal(second.status,200);
+ const body=await second.json();
+ assert.equal(body.status,'cached');
+ assert.equal(body.cooldown_seconds,60);
+ assert.equal(fetches,1);
+ db.close();
+});
+
+test('global durable budget caps provider calls at 30 per 10-minute window',async()=>{
+ const db=sqliteD1({managed:false});let fetches=0;
+ const env={DB:db,YOUTUBE_API_KEY:'key',TODAY_PUBLISH_ENABLED:'true',TODAY_PUBLISH_HMAC_SECRET:SECRET};
+ const now=new Date('2026-10-20T03:00:00Z');
+ for(let i=0;i<30;i++){
+  const id=('0000000000'+i.toString(36)).slice(-11);
+  const res=await signedRecovery({video_id:id},env,{now,fetchImpl:async()=>{fetches++;return fetchBody([])()}});
+  assert.equal(res.status,404);
+ }
+ const id31='zzzzzzzzzzz';
+ const blocked=await signedRecovery({video_id:id31},env,{now,fetchImpl:async()=>{fetches++;return fetchBody([])()}});
+ assert.equal(blocked.status,429);
+ const body=await blocked.json();
+ assert.equal(body.error,'recovery_budget_exhausted');
+ assert.equal(fetches,30);
+ const ledger=db.raw.prepare('SELECT calls FROM public_video_metadata_recovery_budget').get();
+ assert.equal(ledger.calls,30);
  db.close();
 });
