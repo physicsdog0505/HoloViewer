@@ -9,13 +9,13 @@ from ptt_offline.daily_static_assets_archive import (
     DailyArchiveError,
     build_archive_delivery_evidence,
     build_daily_static_package,
+    compute_source_snapshot_hash,
     prepare_static_assets_delivery,
     verify_http_readback,
 )
 
 
 DAY="2026-10-20"
-SOURCE_HASH="a"*64
 SOURCE_REVISION="ptt-finalized-2026-10-20-r1"
 JOB_ID="archive-2026-10-20-attempt-1"
 
@@ -70,14 +70,21 @@ def _object(aid="1abcDAY",floor=1):
 
 class DailyStaticAssetsArchiveTests(unittest.TestCase):
     def _build(self,root: Path,receipt=None,source_objects=None):
-        return build_daily_static_package(
-            finalization_receipt=receipt or _receipt(),
+        receipt=receipt or _receipt()
+        source_objects=source_objects or [
+            ("0100.json",_object("1abcDAY",1)),
+            ("0200.json",_object("1abcNIGHT",2)),
+        ]
+        source_hash=compute_source_snapshot_hash(
+            finalization_receipt=receipt,
             source_revision=SOURCE_REVISION,
-            source_hash=SOURCE_HASH,
-            source_objects=source_objects or [
-                ("0100.json",_object("1abcDAY",1)),
-                ("0200.json",_object("1abcNIGHT",2)),
-            ],
+            source_objects=source_objects,
+        )
+        return build_daily_static_package(
+            finalization_receipt=receipt,
+            source_revision=SOURCE_REVISION,
+            source_hash=source_hash,
+            source_objects=source_objects,
             out_dir=root,
         )
 
@@ -205,6 +212,17 @@ class DailyStaticAssetsArchiveTests(unittest.TestCase):
             )
             self.assertFalse(bad["job_verified"])
             self.assertEqual(bad["error_code"],"manifest_digest_mismatch")
+
+    def test_source_hash_must_bind_exact_input_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(DailyArchiveError,"source_hash does not bind"):
+                build_daily_static_package(
+                    finalization_receipt=_receipt(),
+                    source_revision=SOURCE_REVISION,
+                    source_hash="a"*64,
+                    source_objects=[("0100.json",_object("1abcDAY",1))],
+                    out_dir=Path(tmp),
+                )
 
     def test_package_rejects_rows_outside_verified_identity_scope(self):
         with tempfile.TemporaryDirectory() as tmp:
