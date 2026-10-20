@@ -32,6 +32,7 @@ const nextSegment=document.getElementById('nextSegment');
 const segmentStatus=document.getElementById('segmentStatus');
 const immersiveToolbarTrigger=document.getElementById('immersiveToolbarTrigger');
 const topbar=document.querySelector('.watchalong-topbar');
+const sourceStandby=document.getElementById('sourceStandby');
 const subtitleOverlay=document.getElementById('subtitleOverlay');
 const subtitleOriginal=document.getElementById('subtitleOriginal');
 const subtitleTranslation=document.getElementById('subtitleTranslation');
@@ -53,6 +54,7 @@ let segments=[];
 let subtitles=[];
 let activeSegmentIndex=-1;
 let activeSourceVideoId=SOURCE_ID||'';
+let sourceStandbyActive=false;
 let immersiveToolbarTimer=null;
 
 function validVideoId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{11}$/.test(id)?id:''}
@@ -165,8 +167,30 @@ document.addEventListener('fullscreenchange',()=>{
  }
 });
 
+function sourceExpectedTime(hostSeconds){
+ if(!timelineAligned||!Number.isFinite(hostSeconds))return null;
+ return hostSeconds+sourceOffsetSeconds;
+}
+function setSourceStandby(active){
+ const next=Boolean(active);
+ if(sourceStandbyActive===next)return;
+ sourceStandbyActive=next;
+ sourceStandby.hidden=!next;
+ if(next){
+  subtitleOverlay.hidden=true;
+  try{
+   const state=sourcePlayer?.getPlayerState?.();
+   if(state===YT.PlayerState.PLAYING||state===YT.PlayerState.BUFFERING)sourcePlayer.pauseVideo();
+   const current=sourcePlayer?.getCurrentTime?.();
+   if(Number.isFinite(current)&&current>0.75)sourcePlayer.seekTo(0,true);
+  }catch{}
+ }
+}
 function onHostStateChange(event){
  if(!linkedPlayback.checked||!timelineAligned||!sourcePlayer||suppressLinkedCommand)return;
+ let host=null;try{host=hostPlayer?.getCurrentTime?.()}catch{}
+ if(Number.isFinite(host)&&sourceExpectedTime(host)<0){setSourceStandby(true);return}
+ setSourceStandby(false);
  try{
   suppressLinkedCommand=true;
   if(event.data===YT.PlayerState.PLAYING)sourcePlayer.playVideo();
@@ -208,11 +232,17 @@ function startSyncLoop(){
   try{host=hostPlayer.getCurrentTime()}catch{return}
   if(!Number.isFinite(host))return;
   syncPttToHost(host);
-  if(!linkedPlayback.checked||!timelineAligned)return;
+  if(!linkedPlayback.checked||!timelineAligned){setSourceStandby(false);return}
+  const expected=sourceExpectedTime(host);
+  if(!Number.isFinite(expected))return;
+  if(expected<0){
+   setSourceStandby(true);
+   return;
+  }
+  setSourceStandby(false);
   let source,state;
   try{source=sourcePlayer.getCurrentTime();state=hostPlayer.getPlayerState()}catch{return}
   if(!Number.isFinite(source))return;
-  const expected=Math.max(0,host+sourceOffsetSeconds);
   if(Math.abs(source-expected)>2.5){
    try{sourcePlayer.seekTo(expected,true)}catch{}
   }
@@ -227,7 +257,7 @@ function startSubtitleLoop(){
  if(subtitleTimer)return;
  subtitleTimer=setInterval(()=>{
   let current=null;try{current=sourcePlayer?.getCurrentTime?.()}catch{}
-  if(!Number.isFinite(current)||!subtitles.length){subtitleOverlay.hidden=true;return}
+  if(sourceStandbyActive||!Number.isFinite(current)||!subtitles.length){subtitleOverlay.hidden=true;return}
   const row=subtitles.find(item=>current>=item.start&&current<item.end);
   if(!row){subtitleOverlay.hidden=true;return}
   subtitleOriginal.textContent=row.original||'';
