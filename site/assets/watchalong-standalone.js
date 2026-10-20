@@ -50,7 +50,6 @@ const immersiveToolbarTrigger=document.getElementById('immersiveToolbarTrigger')
 const topbar=document.querySelector('.watchalong-topbar');
 const sourceStandby=document.getElementById('sourceStandby');
 const subtitleOverlay=document.getElementById('subtitleOverlay');
-const subtitleOriginal=document.getElementById('subtitleOriginal');
 const subtitleTranslation=document.getElementById('subtitleTranslation');
 const danmakuLayer=document.getElementById('danmakuLayer');
 
@@ -313,7 +312,6 @@ function setSourceStandby(active){
  sourceStandbyActive=next;
  sourceStandby.hidden=!next;
  if(next){
-  subtitleOverlay.hidden=true;
   clearDanmaku();
   try{
    const state=sourcePlayer?.getPlayerState?.();
@@ -413,13 +411,15 @@ function spawnDanmaku(row){
  const cueId=String(row.id||row.index||row.start);
  if(cueId===lastDanmakuCueId)return;
  lastDanmakuCueId=cueId;
- const text=String(row.translation||row.original||'').trim();
+ const text=String(row.translation||'').trim();
  if(!text)return;
  const item=document.createElement('div');
  item.className='danmaku-item';
  item.textContent=text;
- const lane=(Number(row.index)||0)%5;
- item.style.setProperty('--danmaku-top',(12+lane*15)+'%');
+ const lane=(Number(row.index)||0)%4;
+ item.style.setProperty('--danmaku-top',(8+lane*10)+'%');
+ const palette=['#6faec9','#A65788','#B8A6D8','#c85d67','#856C86','#4f7f93'];
+ item.style.setProperty('--danmaku-color',palette[(Number(row.index)||0)%palette.length]);
  const duration=Math.max(6,Math.min(12,6+text.length*0.06));
  item.style.setProperty('--danmaku-duration',duration.toFixed(1)+'s');
  item.addEventListener('animationend',()=>item.remove(),{once:true});
@@ -437,11 +437,8 @@ function renderSubtitleCue(row){
  if(subtitleMode==='standard'){
   clearDanmaku();
   if(!row){subtitleOverlay.hidden=true;activeSubtitleCueId='';return}
-  subtitleOriginal.textContent=row.original||'';
   subtitleTranslation.textContent=row.translation||'';
-  subtitleOriginal.hidden=!row.original;
-  subtitleTranslation.hidden=!row.translation;
-  subtitleOverlay.hidden=!row.original&&!row.translation;
+  subtitleOverlay.hidden=!row.translation;
   activeSubtitleCueId=cueId;
   return;
  }
