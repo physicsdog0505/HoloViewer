@@ -49,6 +49,10 @@ def build_expected_aid_contract(*, day: str, entries: list[dict[str,Any]],
         gaps.append("expected-aid-authority-unverified")
     if not isinstance(authority.get("evidence_id") if isinstance(authority,dict) else None,str):
         gaps.append("expected-aid-authority-evidence-id-missing")
+    if not isinstance(authority.get("version") if isinstance(authority,dict) else None,str):
+        gaps.append("expected-aid-authority-version-missing")
+    if not isinstance(authority.get("issuer") if isinstance(authority,dict) else None,str):
+        gaps.append("expected-aid-authority-issuer-missing")
     normalized=[]
     seen_period=Counter()
     seen_aid=Counter()
@@ -101,11 +105,17 @@ def build_expected_aid_contract(*, day: str, entries: list[dict[str,Any]],
             "evidence_id":authority.get("evidence_id") if isinstance(authority,dict) else None,
             "observed_at":authority.get("observed_at") if isinstance(authority,dict) else None,
             "verified":authority.get("verified") is True if isinstance(authority,dict) else False,
+            "day":day,
+            "version":authority.get("version") if isinstance(authority,dict) else None,
+            "issuer":authority.get("issuer") if isinstance(authority,dict) else None,
+            "evidence_hash":authority.get("evidence_hash") if isinstance(authority,dict) else None,
         },
         "contract_gaps":sorted(set(gaps)),
         "conflicts":sorted(set(conflicts)),
     }
     body["evidence_digest"]=_digest(body)
+    if body["authority"]["evidence_hash"] is None:
+        body["authority"]["evidence_hash"]=body["evidence_digest"]
     return body
 
 
