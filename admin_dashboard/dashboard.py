@@ -5,9 +5,10 @@ from copy import deepcopy
 from datetime import datetime, timezone
 
 from .contracts import build_sync_monitor, build_system_health, coverage_sync_consistency
+from .finalization import build_daily_finalization
 from .privacy import sanitize_for_browser
 
-SECTIONS = ("data_coverage", "sync_monitor", "system_health")
+SECTIONS = ("data_coverage", "daily_finalization", "sync_monitor", "system_health")
 
 
 class DashboardController:
@@ -54,6 +55,8 @@ class DashboardController:
             raw = reader()
             if section == "data_coverage":
                 payload = raw
+            elif section == "daily_finalization":
+                payload = build_daily_finalization(raw)
             elif section == "sync_monitor":
                 payload = build_sync_monitor(raw, now=now, stale_after_seconds=self._stale_after)
             else:
