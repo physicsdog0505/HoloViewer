@@ -98,9 +98,11 @@ class DashboardTests(unittest.TestCase):
             "schema_version": "ptt-r2-archive-v1", "generated_at": "2026-10-20T07:59:30Z",
             "total_pushes": 3, "days": [{"coverage_status": "COMPLETE", "finalized": True}],
         }}, now=NOW)
-        archive = next(job for job in monitor["jobs"] if job["component"] == "R2 Archive")
-        self.assertEqual(archive["verified_count"], 3)
+        archive = next(job for job in monitor["jobs"] if job["component"] == "Archive")
+        self.assertEqual(archive["archive_coverage_status"], "COMPLETE")
+        self.assertIsNone(archive["verified_count"])
         self.assertEqual(archive["status"], "unknown")
+        self.assertIn("manifest-is-coverage-evidence-not-delivery-job", archive["contract_gaps"])
 
     def test_only_explicitly_sanitized_error_is_displayed_and_bounded(self):
         monitor = build_sync_monitor({"publisher_checkpoint": {"state": "failed"},
@@ -121,9 +123,10 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(captured["status"], "405 Method Not Allowed")
         self.assertEqual(json.loads(body)["error"], "read-only endpoint")
         html = render_dashboard()
-        for label in ("Data Coverage", "Sync Monitor", "System Health", "重新整理全部狀態"):
+        for label in ("Data Coverage", "Sync Monitor", "System Health", "重新整理全部"):
             self.assertIn(label, html)
-        self.assertIn("disabled", html)
+        for forbidden_control in ("Retry Publisher", "Replay", "Re-sync", "Upload", "Deploy", "Restart Collector", "Restart Publisher"):
+            self.assertNotIn(forbidden_control, html)
         self.assertIn('id="coverage-filter"', html)
         self.assertNotIn("method:'POST'", html)
 
