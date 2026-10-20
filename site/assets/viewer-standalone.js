@@ -5,6 +5,7 @@ const PTT_ARCHIVE_BASE=String(window.HOLOVIEWER_CONFIG?.pttArchiveBase||'').repl
 const PTT_ARCHIVE_MANIFEST=String(window.HOLOVIEWER_CONFIG?.pttArchiveManifest||'/ptt/v1/manifests/static-assets-full-2026-10.json');
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
 const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';
+const PTT_POLL_MS=60000;
 const params=new URLSearchParams(location.search);
 const MAX_STREAMS=16;
 const FOCUS_VISIBLE_SLOTS=4;
@@ -1684,8 +1685,11 @@ window.addEventListener('blur',()=>{
  if(!callEnabled)return;
  clearTimeout(callWaveTimer);callWaveTimer=null;callHeldDirection='';callSpaceHeld=false;callClearMotion();callUpdateHud('待機');
 });
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden&&pttContext.mode==='live')loadPtt();
+});
 window.addEventListener('pagehide',()=>{
- clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);
+ clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);clearInterval(pttPollTimer);
  clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);
  pttResizeObserver?.disconnect();
 });
@@ -1719,7 +1723,7 @@ function tryMountPlayers(){
  tryMountPlayers();
  resolvePrimaryPtt();
 })();
-setInterval(loadPtt,10000);
+const pttPollTimer=setInterval(()=>{if(!document.hidden)loadPtt()},PTT_POLL_MS);
 
 if(window.YT?.Player)tryMountPlayers();
 else window.onYouTubeIframeAPIReady=tryMountPlayers;
