@@ -367,11 +367,14 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("action:'直接開始觀看 →'", app)
         self.assertIn("status:isCurated?'精選已收錄'", app)
         self.assertIn("applyHomeSupportStyle(card", app)
-        self.assertIn("homeAvatarChild(profile,label)", app)
+        self.assertIn("watchalong-avatar-fallback", app)
+        self.assertIn("compact:true", app)
         self.assertIn("https://i.ytimg.com/vi/", app)
         self.assertIn(".watchalong-static-thumb{", app_css)
         self.assertIn(".watchalong-featured-section{", app_css)
         self.assertIn(".watchalong-card-avatar{", app_css)
+        self.assertIn(".watchalong-compact-card{", app_css)
+        self.assertIn("#watchalong .section{background:#efede8", app_css)
         self.assertIn("href:'/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId)", app)
 
     def test_watchalong_static_assets_integrity(self):
