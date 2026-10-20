@@ -32,10 +32,15 @@
       <span>連動播放</span>
     </label>
     <div class="sync-controls">
-      <button id="offsetMinus" type="button" title="片源提早 1 秒">−1s</button>
-      <output id="offsetValue">Offset 0.0s</output>
-      <button id="offsetPlus" type="button" title="片源延後 1 秒">+1s</button>
+      <button id="offsetMinus" type="button" title="片源提早 1 秒" disabled>−1s</button>
+      <output id="offsetValue">尚未對齊</output>
+      <button id="offsetPlus" type="button" title="片源延後 1 秒" disabled>+1s</button>
       <button id="captureOffset" type="button">以目前位置校準</button>
+    </div>
+    <div class="segment-controls" role="group" aria-label="段點切換">
+      <button id="previousSegment" type="button" disabled>上一集</button>
+      <output id="segmentStatus">無段點</output>
+      <button id="nextSegment" type="button" disabled>下一集</button>
     </div>
     <div class="watchalong-actions">
       <a href="/watchalong" class="watchalong-link">返回選擇</a>
@@ -54,6 +59,10 @@
           <div class="ptt-heading">
             <strong id="pttTitle">PTT 專串</strong>
             <label class="ptt-floor-control"><input id="pttShowFloor" type="checkbox"><span>樓數</span></label>
+            <label class="ptt-font-control">字體
+              <input id="pttFontSize" type="range" min="12" max="26" step="1" value="14">
+              <output id="pttFontValue">14px</output>
+            </label>
             <small id="pttMeta">讀取中</small>
           </div>
           <div id="pttFeed" class="ptt-feed"></div>
@@ -71,15 +80,6 @@
           </div>
         </article>
 
-        <section id="segmentPanel" class="segment-panel">
-          <div class="segment-head">
-            <div><strong>段點</strong><span id="segmentMeta">唯讀資料</span></div>
-            <button id="segmentToggle" type="button" aria-expanded="true">收合</button>
-          </div>
-          <div id="segmentList" class="segment-list">
-            <div class="segment-empty">目前沒有可用段點；影片仍可正常播放。</div>
-          </div>
-        </section>
       </section>
     </section>
   </main>
