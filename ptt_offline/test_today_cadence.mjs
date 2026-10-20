@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {refreshKnownTodayLifecycle,mountTodayCadence,shouldRunLifecycleRefresh,PROVIDER_MISS_RETIRE_THRESHOLD} from './worker_host/today/cadence-refresh.mjs';
+import {refreshKnownTodayLifecycle,mountTodayCadence,shouldRunLifecycleRefresh,PROVIDER_MISS_RETIRE_THRESHOLD,LIFECYCLE_CANDIDATE_SQL} from './worker_host/today/cadence-refresh.mjs';
 import {readFileSync} from 'node:fs';
 import {readToday} from './worker_host/today/store.mjs';
 import {DatabaseSync} from 'node:sqlite';
@@ -69,7 +69,7 @@ function instrumentDb(base){
  return {
   raw:base.raw,
   prepare(sql){
-   if(/^\s*SELECT\b/i.test(sql))readQueries++;
+   if(/^\s*(?:SELECT|WITH)\b/i.test(sql))readQueries++;
    if(/^\s*DELETE\s+FROM\s+public_today_provider_misses\b/i.test(sql))providerMissDeletes++;
    if(/^\s*UPDATE\s+public_today_canonical\b/i.test(sql)&&/checked_at=\?/i.test(sql))heartbeatUpdates++;
    return base.prepare(sql);
@@ -117,6 +117,58 @@ function steadyProvider(cid,count=50,{changedIndex=-1,endedIndex=-1}={}){
  }
  return async()=>new Response(JSON.stringify({items}),{status:200,headers:{'content-type':'application/json'}});
 }
+
+test('cadence selector keeps legacy eligibility/order and uses proposed access-path indexes',async()=>{
+ const db=retirementDb();
+ const cid='UC'+'Q'.repeat(22);
+ const insert=db.raw.prepare(`INSERT INTO public_today_canonical
+  (video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,
+   lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum)
+  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+ for(let i=0;i<80;i++){
+  const id='a'+String(i).padStart(10,'0');
+  const checked=new Date(Date.parse('2026-10-18T08:00:00Z')+i*60000).toISOString().replace(/\.000Z$/,'Z');
+  insert.run(id,cid,'v85','hololive','A'+i,'Channel','upcoming',
+   '2026-10-18T08:00:00Z',checked,'2026-10-18T10:00:00Z',null,null,'YouTube liveStreamingDetails','a');
+ }
+ for(let i=0;i<80;i++){
+  const id='e'+String(i).padStart(10,'0');
+  const checked=new Date(Date.parse('2026-10-18T08:00:30Z')+i*60000).toISOString().replace(/\.000Z$/,'Z');
+  insert.run(id,cid,'v85','hololive','E'+i,'Channel','ended',
+   '2026-10-18T08:00:00Z',checked,'2026-10-17T07:00:00Z','2026-10-17T07:01:00Z','2026-10-17T08:00:00Z','YouTube','e');
+ }
+ for(let i=0;i<120;i++){
+  const id='z'+String(i).padStart(10,'0');
+  const checked=new Date(Date.parse('2026-10-10T00:00:00Z')+i*60000).toISOString().replace(/\.000Z$/,'Z');
+  insert.run(id,cid,'v85','hololive','Z'+i,'Channel','ended',
+   '2026-10-10T00:00:00Z',checked,'2026-10-10T01:00:00Z','2026-10-10T01:01:00Z','2026-10-10T02:00:00Z','YouTube liveStreamingDetails','z');
+ }
+ const cutoff='2026-10-11T16:00:00Z';
+ const legacy=db.raw.prepare(`SELECT video_id FROM public_today_canonical
+  WHERE lifecycle_state!='ended'
+     OR (lifecycle_state='ended' AND actual_end>=?
+         AND (source_label!=? OR actual_start IS NULL OR actual_end IS NULL))
+  ORDER BY checked_at ASC,video_id ASC LIMIT 50`)
+  .all(cutoff,'YouTube liveStreamingDetails').map(r=>r.video_id);
+ let requested=[];
+ const fetchImpl=async url=>{
+  requested=new URL(url).searchParams.get('id').split(',');
+  return new Response(JSON.stringify({items:[]}),{status:200,headers:{'content-type':'application/json'}});
+ };
+ const out=await refreshKnownTodayLifecycle(
+  {TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:db},
+  {now:new Date('2026-10-18T09:00:00Z'),fetchImpl}
+ );
+ assert.equal(out.selected,50);
+ assert.deepEqual(requested,legacy);
+ const plan=db.raw.prepare('EXPLAIN QUERY PLAN '+LIFECYCLE_CANDIDATE_SQL)
+  .all(50,cutoff,'YouTube liveStreamingDetails',50,50)
+  .map(r=>String(r.detail));
+ assert.ok(plan.some(x=>x.includes('public_today_canonical_cadence_active')));
+ assert.ok(plan.some(x=>x.includes('public_today_canonical_cadence_ended_reverify')));
+ assert.ok(plan.some(x=>x.includes('public_today_websub_processed_video')));
+ db.close();
+});
 
 test('steady-state 50-video cadence uses two bounded D1 reads and no evidence churn',async()=>{
  const raw=retirementDb();const cid=seedSteadyLive(raw,50);const d=instrumentDb(raw);
@@ -302,7 +354,7 @@ test('cadence includes recent ended rows needing authoritative re-verification f
   );
   assert.match(selectSql,/lifecycle_state='ended'/);
   assert.match(selectSql,/actual_end>=\?/);
-  assert.equal(selectArgs[1],'YouTube liveStreamingDetails');
+  assert.equal(selectArgs[2],'YouTube liveStreamingDetails');
   assert.equal(out.updated,1);
 });
 
@@ -312,6 +364,7 @@ function retirementDb(){
  sqlite.exec(readFileSync(new URL('./worker_host/today/0002_today_canonical.sql',import.meta.url),'utf8'));
  sqlite.exec(readFileSync(new URL('./worker_host/today/0003_provider_missing_retirement.sql',import.meta.url),'utf8'));
  sqlite.exec(readFileSync(new URL('./worker_host/today/websub-event-queue.PROPOSED.sql',import.meta.url),'utf8'));
+ sqlite.exec(readFileSync(new URL('./worker_host/today/0005_today_cadence_access_path.PROPOSED.sql',import.meta.url),'utf8'));
  sqlite.exec('CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)');
  sqlite.exec(`CREATE TABLE public_history(
    video_id TEXT PRIMARY KEY NOT NULL,taipei_day TEXT NOT NULL,title TEXT NOT NULL,
