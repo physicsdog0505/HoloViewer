@@ -98,7 +98,7 @@ export async function readChannelProfile(db,channelId,{env=null}={}){
 }
 export async function readChannelProfiles(db,channelIds,{env=null}={}){
  const ids=[...new Set((Array.isArray(channelIds)?channelIds:[]).filter(x=>CHANNEL.test(x)))];
- const out=new Map(ids.map(id=>[id,neutralChannelProfile(id)]));
+ const out=new Map(ids.map(id=>[id,applyRuntimeColor(neutralChannelProfile(id),id,env)]));
  if(!ids.length)return out;
  try{
   const placeholders=ids.map(()=>'?').join(',');
