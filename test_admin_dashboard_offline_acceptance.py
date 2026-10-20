@@ -5,7 +5,7 @@ from admin_dashboard.coverage import project_coverage
 from admin_dashboard.render import render_dashboard
 
 
-def full_target_evidence(*, missing=0, verified=True):
+def full_target_evidence(*, day, aids, missing=0, verified=True):
     return {
         "schema_version": "holoviewer-d1-sanitized-snapshot-v1",
         "sanitized": True,
@@ -13,6 +13,7 @@ def full_target_evidence(*, missing=0, verified=True):
             "job_id": "job-1",
             "manifest_digest": "sha256:" + "a" * 64,
             "source_revision": "fixture-r1",
+            "scope": {"day": day, "aids": aids},
         },
         "coverage": {
             "complete_partition_proven": True,
@@ -47,15 +48,26 @@ class OfflineAdminAcceptance(unittest.TestCase):
              "expected_set": ["day"], "actual_set": ["day"], "source_line_gaps": {"day": [4, 5]}}]},
             {"date": "2026-10-03", "sources": [{"source": "ptt", "completeness_status": "COMPLETE",
              "expected_set": ["day"], "actual_set": ["day"],
-             "target_evidence": full_target_evidence(missing=1, verified=False)}]},
+             "target_evidence": full_target_evidence(day="2026-10-03", aids=["day"], missing=1, verified=False)}]},
             {"date": "2026-10-04", "sources": [{"source": "ptt", "completeness_status": "COMPLETE",
              "expected_set": ["day"], "actual_set": ["day"],
-             "target_evidence": full_target_evidence()}]},
+             "target_evidence": full_target_evidence(day="2026-10-04", aids=["day"])}]},
         ]
         data = project_coverage(rows, start_day="2026-10-01", end_day="2026-10-04")
         self.assertEqual([x["status"] for x in data["days"]],
                          ["LOCAL_MISSING", "PARTIAL", "PENDING_SYNC", "COMPLETE"])
         self.assertEqual(data["days"][1]["source_line_gaps"], {"day": [4, 5]})
+
+
+    def test_full_readback_for_wrong_day_or_aid_never_promotes_complete(self):
+        rows = [{"date": "2026-10-04", "sources": [{"source": "ptt",
+            "completeness_status": "COMPLETE", "expected_set": ["day"], "actual_set": ["day"],
+            "target_evidence": full_target_evidence(day="2026-10-03", aids=["day"])}]}]
+        result = project_coverage(rows, start_day="2026-10-04", end_day="2026-10-04")
+        self.assertEqual(result["days"][0]["status"], "UNKNOWN")
+        rows[0]["sources"][0]["target_evidence"] = full_target_evidence(day="2026-10-04", aids=["night"])
+        result = project_coverage(rows, start_day="2026-10-04", end_day="2026-10-04")
+        self.assertEqual(result["days"][0]["status"], "UNKNOWN")
 
     def test_bounded_sample_never_promotes_complete(self):
         rows = [{"date": "2026-10-01", "sources": [{
