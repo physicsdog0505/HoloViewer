@@ -27,6 +27,8 @@ _FORBIDDEN_KEY_FRAGMENTS=(
     "authorization","api_token","apitoken","account_id","accountid",
     "hmac_secret","hmacsecret","secret","cookie","wrangler_credential",
     "credential","signed_url","signedurl","private_key","access_key",
+    "stderr","stdout","raw_exception","exception_text","traceback",
+    "subprocess_output",
 )
 _SIGNED_URL_MARKERS=(
     "x-amz-signature=","x-goog-signature=","signature=","sig=",
@@ -411,6 +413,7 @@ def build_archive_job_evidence(*, job_id: str | None, target: dict[str,Any],
         gaps.append("archive-readback-receipt-unavailable")
 
     coverage=_coverage_summary(coverage_days)
+    coverage["object_count"]=scope_s.get("object_count") if scope_s else None
     gaps.extend(coverage.get("contract_gaps",[]))
 
     if expected_aid_completeness is None:
@@ -451,6 +454,8 @@ def build_archive_job_evidence(*, job_id: str | None, target: dict[str,Any],
         "contract_gaps":sorted(set(gaps)),
     }
     reject_sensitive(result)
+    if source_hash is not None and manifest_digest is not None and source_hash==manifest_digest:
+        raise ArchiveEvidenceError("source_hash and manifest_digest must not be overloaded")
     if job_id is not None and manifest_digest is not None and job_id==manifest_digest:
         raise ArchiveEvidenceError("job_id and manifest_digest must be distinct")
     if result["snapshot_id"] is not None and (
