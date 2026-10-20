@@ -787,5 +787,17 @@ class ParityContract(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
 
+    def test_viewer_ptt_follow_survives_immersive_layout_and_resize(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("function repinPttAfterLayout({force=false}={})", js)
+        self.assertIn("if(pttVodMode())syncVodPttTimeline({forceFollow:true});", js)
+        self.assertIn("const wasFollowing=pttFollowing||pttAtBottom();", js)
+        self.assertIn("document.addEventListener('fullscreenchange'", js)
+        self.assertIn("window.addEventListener('resize'", js)
+        self.assertIn("window.addEventListener('orientationchange'", js)
+        self.assertIn("if(wasFollowing){\n  pttFollowing=true;\n  repinPttAfterLayout({force:true});\n }", js)
+        self.assertIn("clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);", js)
+
+
 if __name__ == "__main__":
     unittest.main()
