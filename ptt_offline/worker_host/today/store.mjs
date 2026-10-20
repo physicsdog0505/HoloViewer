@@ -164,8 +164,6 @@ function consumerRow(row,nowStamp,profile){
  const stale=state==='live'&&!fresh;
  return applyChannelProfile({
   video_id,title:consumerText(row.title),channel_id,channel_name:consumerText(row.channel_name),
-  channel_group:groups.has(row.channel_group)?row.channel_group:'other',
-  trusted_channel_avatar:row.trusted_channel_avatar,
   lifecycle_state,observed_at:observed,
   start_at:actual_start??consumerTime(row.scheduled_start),
   actual_start,actual_end,
