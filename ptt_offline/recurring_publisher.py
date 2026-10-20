@@ -14,6 +14,7 @@ from .collector_source_preview import open_source
 from .live_capture_publisher import active_article_ids,inspect_latest_article,run_live_once,state_for_source
 from .owner_http_transport import owner_signed_http_executor
 from .publisher_cli import exclusive_lock
+from .publisher_telemetry import update_publisher_telemetry
 from .public_today_contract import ContractError
 
 TAIPEI=ZoneInfo('Asia/Taipei')
@@ -223,6 +224,7 @@ def main(argv=None):
               if args.send else None)
     metric=Path(args.metrics)
     metric.parent.mkdir(parents=True,exist_ok=True)
+    telemetry=metric.parent/"publisher-telemetry.json"
     with exclusive_lock(Path(args.state_dir)/".single-publisher.lock"):
         iteration=0
         while args.iterations==0 or iteration<args.iterations:
@@ -239,11 +241,13 @@ def main(argv=None):
                     handle.write(json.dumps(failure,sort_keys=True)+"\n")
                     handle.flush()
                     os.fsync(handle.fileno())
+                update_publisher_telemetry(telemetry,failure)
                 raise
             with metric.open("a",encoding="utf-8") as handle:
                 handle.write(json.dumps(result,ensure_ascii=False,sort_keys=True)+"\n")
                 handle.flush()
                 os.fsync(handle.fileno())
+            update_publisher_telemetry(telemetry,result)
             print(json.dumps(result,ensure_ascii=False,sort_keys=True),flush=True)
             iteration+=1
             if args.iterations!=0 and iteration>=args.iterations:
