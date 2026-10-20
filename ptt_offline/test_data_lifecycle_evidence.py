@@ -74,6 +74,32 @@ class DataLifecyclePttEvidenceTests(unittest.TestCase):
             [("day",1),("day",2),("night",1)],
         )
 
+    def test_expected_aids_support_single_all_day_thread(self):
+        src=self.fixture["expected_aids"]
+        body=build_expected_aid_contract(
+            day=src["day"],
+            entries=[{**src["entries"][0],"period":"all_day","part":1}],
+            authority=src["authority"],
+        )
+        self.assertEqual(body["status"],"COMPLETE")
+        self.assertEqual(body["contract_gaps"],[])
+        self.assertEqual(body["conflicts"],[])
+        projected=expected_aids_for_pr147(body)
+        self.assertEqual(projected["expected_aids"],["1grg4Pag"])
+
+    def test_all_day_cannot_mix_with_split_day_night(self):
+        src=self.fixture["expected_aids"]
+        body=build_expected_aid_contract(
+            day=src["day"],
+            entries=[
+                {**src["entries"][0],"period":"all_day","part":1},
+                {**src["entries"][1],"period":"night","part":1},
+            ],
+            authority=src["authority"],
+        )
+        self.assertEqual(body["status"],"CONFLICT")
+        self.assertIn("all-day-cannot-mix-with-day-night",body["conflicts"])
+
     def test_coverage_preserves_non_push_and_legal_empty_push(self):
         src=self.fixture["coverage"]
         body=build_source_coverage(**src)
