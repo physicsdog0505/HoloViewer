@@ -201,6 +201,7 @@ class PublicSmokeTests(unittest.TestCase):
 
         self.assertIn('src="/assets/watchalong-adapter-core.js"', html)
         self.assertIn("const watchalongEventId=String(params.get('watchalong_event')||'').trim();", viewer)
+        self.assertIn("const watchalongManaged=params.has('watchalong_event');", viewer)
         self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", viewer)
         self.assertIn("response.arrayBuffer()", viewer)
         self.assertIn("crypto.subtle.digest('SHA-256',buffer)", viewer)
@@ -223,7 +224,7 @@ class PublicSmokeTests(unittest.TestCase):
         for entry in manifest["events"]:
             event_id = entry["event_id"]
             self.assertIn(event_id, expected)
-            event_path = ROOT / entry["path"].lstrip("/")
+            event_path = ROOT / "site" / entry["path"].lstrip("/")
             raw = event_path.read_bytes()
             self.assertEqual(hashlib.sha256(raw).hexdigest(), entry["sha256"])
             event = json.loads(raw)
