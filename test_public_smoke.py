@@ -2,15 +2,17 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py", "site/data/watchalong/manifest.json", "site/data/watchalong/events/eFYByyw5AJc.json", "site/data/watchalong/events/U2o13h1Oib4.json", "site/data/watchalong/events/8pF4qHcshDc.json", "scripts/export_watchalong_assets.py", "test_watchalong_assets.py", "docs/handoffs/WATCHALONG_PUBLIC_ASSET_HANDOFF_20261020.md"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/assets/watchalong-adapter-core.js", "site/viewer/index.html", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py", "site/data/watchalong/manifest.json", "site/data/watchalong/events/eFYByyw5AJc.json", "site/data/watchalong/events/U2o13h1Oib4.json", "site/data/watchalong/events/8pF4qHcshDc.json", "scripts/export_watchalong_assets.py", "test_watchalong_assets.py", "docs/handoffs/WATCHALONG_PUBLIC_ASSET_HANDOFF_20261020.md"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
@@ -175,13 +177,110 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("row?.source_record_key||row?.push_id", js)
         self.assertIn("Number.isInteger(row?.floor)&&row.floor>0", js)
         self.assertNotIn("/v1/ptt/history?day=", js)
-        self.assertIn("if(!archiveVodEntry)await loadCatalog();", js)
+        self.assertIn("if(!archiveVodEntry&&!watchalongManaged)await loadCatalog();", js)
         self.assertIn("q.set('mode',clean.length>1?'multi':'single');", app)
         self.assertIn("$('multiWatch').onclick=()=>{const ids=[...selectedHomeVideos];if(!ids.length)return;openStandaloneViewer(ids)};", app)
         self.assertIn("function standaloneViewerUrl(ids,{vodWindows=null,pttMode=''}={})", app)
         self.assertIn("entry.setAttribute('role','button')", app)
         self.assertIn("開啟多人連動", app)
         self.assertFalse((ROOT / "site/custom-view/index.html").exists())
+
+    def test_watchalong_adapter_verified_static_events(self):
+        html = (ROOT / "site/viewer/index.html").read_text(encoding="utf-8")
+        viewer = (ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        core_path = ROOT / "site/assets/watchalong-adapter-core.js"
+        app = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        landing = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        manifest_path = ROOT / "site/data/watchalong/manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        expected = {
+            "eFYByyw5AJc": 838,
+            "U2o13h1Oib4": 1438,
+            "8pF4qHcshDc": 1461,
+        }
+
+        self.assertIn('src="/assets/watchalong-adapter-core.js"', html)
+        self.assertIn("const watchalongEventId=String(params.get('watchalong_event')||'').trim();", viewer)
+        self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", viewer)
+        self.assertIn("response.arrayBuffer()", viewer)
+        self.assertIn("crypto.subtle.digest('SHA-256',buffer)", viewer)
+        self.assertIn("HoloViewerWatchalongCore.verifyDigest(digest,entry.sha256)", viewer)
+        self.assertIn("HoloViewerWatchalongCore.validateEvent(entry,eventResult.payload)", viewer)
+        self.assertIn("watchalongSetSegment(0,{forceSeek:true});", viewer)
+        self.assertIn("watchalongTimer=setInterval(()=>{if(!document.hidden)watchalongTick()},250);", viewer)
+        self.assertIn("sourcePlayer.loadVideoById(spec)", viewer)
+        self.assertIn("sourcePlayer.cueVideoById(spec)", viewer)
+        self.assertIn("HoloViewerWatchalongCore.subtitleAt(watchalongSubtitles,hostSeconds)", viewer)
+        self.assertIn("if(watchalongManaged)q.set('watchalong_event',watchalongEventId);", viewer)
+        self.assertNotIn("/v1/watchalong/", viewer)
+        runtime = viewer[viewer.index("async function watchalongSha256Hex"):viewer.index("function supportStyle(button,row)")]
+        self.assertNotIn(".destroy()", runtime)
+        self.assertIn('id="watchalongStaticGrid"', landing)
+        self.assertIn("fetch('/data/watchalong/manifest.json'", app)
+        self.assertIn("card.href='/viewer/?watchalong_event='+encodeURIComponent(eventId);", app)
+        self.assertNotIn("/watchalong-viewer/", app)
+
+        for entry in manifest["events"]:
+            event_id = entry["event_id"]
+            self.assertIn(event_id, expected)
+            event_path = ROOT / entry["path"].lstrip("/")
+            raw = event_path.read_bytes()
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), entry["sha256"])
+            event = json.loads(raw)
+            self.assertEqual(len(event["segments"]), 6)
+            self.assertEqual(len(event["subtitles"]), expected[event_id])
+            self.assertTrue(all(str(cue.get("translation", "")).strip() for cue in event["subtitles"]))
+
+        node_script = r"""
+const fs=require('fs');
+eval(fs.readFileSync('site/assets/watchalong-adapter-core.js','utf8'));
+const C=globalThis.HoloViewerWatchalongCore;
+const manifest=JSON.parse(fs.readFileSync('site/data/watchalong/manifest.json','utf8'));
+const expected={eFYByyw5AJc:838,U2o13h1Oib4:1438,'8pF4qHcshDc':1461};
+const out={events:{},missing:false,corrupt:false};
+for(const eventId of Object.keys(expected)){
+  const entry=C.manifestEntry(manifest,eventId);
+  const event=JSON.parse(fs.readFileSync(entry.path.replace(/^\//,'site/'),'utf8'));
+  const v=C.validateEvent(entry,event);
+  if(v.segments.length!==6||v.subtitles.length!==expected[eventId])throw new Error('count '+eventId);
+  const first=v.segments[0];
+  const expectedOffset=(first.source_start_ms-first.host_start_ms)/1000;
+  if(Math.abs(v.initial_offset_seconds-expectedOffset)>1e-9)throw new Error('initial offset '+eventId);
+  const checks=[];
+  for(let i=0;i<v.segments.length;i++){
+    const host=v.segments[i].host_start_ms/1000+0.1;
+    const idx=C.segmentIndexAt(v.segments,host);
+    if(idx!==i)throw new Error('segment index '+eventId+' '+i+' got '+idx);
+    const target=C.sourceTargetSeconds(v.segments[i],host);
+    const want=v.segments[i].source_start_ms/1000+0.1;
+    if(Math.abs(target-want)>0.001)throw new Error('target '+eventId+' '+i);
+    checks.push({idx,target});
+  }
+  const cue=v.subtitles[0];
+  const picked=C.subtitleAt(v.subtitles,(cue.start_ms+1)/1000);
+  if(!picked||picked.cue_id!==cue.cue_id)throw new Error('subtitle host clock '+eventId);
+  out.events[eventId]={segments:checks.length,cues:v.subtitles.length,offset:v.initial_offset_seconds};
+}
+try{C.manifestEntry(manifest,'missing00000')}catch{out.missing=true}
+try{
+ const entry=C.manifestEntry(manifest,'eFYByyw5AJc');
+ C.verifyDigest('0'.repeat(64),entry.sha256);
+}catch{out.corrupt=true}
+if(!out.missing||!out.corrupt)throw new Error('fail closed checks');
+process.stdout.write(JSON.stringify(out));
+"""
+        result = subprocess.run(
+            ["node", "-e", node_script],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["missing"])
+        self.assertTrue(payload["corrupt"])
+        self.assertEqual(set(payload["events"]), set(expected))
+        self.assertTrue(all(item["segments"] == 6 for item in payload["events"].values()))
 
     def test_standalone_ptt_today_contract(self):
         html = (ROOT / "site/ptt-today/index.html").read_text(encoding="utf-8")
