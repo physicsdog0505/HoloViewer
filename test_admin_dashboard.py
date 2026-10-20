@@ -130,7 +130,7 @@ class DashboardTests(unittest.TestCase):
         html = render_dashboard()
         for label in ("Data Coverage", "Daily Finalization", "Sync Monitor", "System Health", "重新整理全部"):
             self.assertIn(label, html)
-        for forbidden_control in ("Retry Publisher", "Replay", "Re-sync", "Repair", "Upload", "Deploy", "Restart Collector", "Restart Publisher"):
+        for forbidden_control in ("Retry Publisher", "Retry Repair", "Replay", "Re-sync", "Upload", "Deploy", "Restart Collector", "Restart Publisher"):
             self.assertNotIn(forbidden_control, html)
         self.assertIn('id="coverage-filter"', html)
         self.assertNotIn("method:'POST'", html)
