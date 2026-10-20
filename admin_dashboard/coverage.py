@@ -6,6 +6,45 @@ from datetime import date, timedelta
 STATES = ("COMPLETE", "LOCAL_MISSING", "PENDING_SYNC", "PARTIAL", "CONFLICT", "UNKNOWN")
 
 
+def _target_readback_state(evidence: object) -> str:
+    """Interpret only the strong job-bound D1 readback contract.
+
+    Returns COMPLETE only for independently verified full-partition readback.
+    Bounded samples can never promote local COMPLETE.
+    """
+    if not isinstance(evidence, dict):
+        return "UNKNOWN"
+    if evidence.get("schema_version") != "holoviewer-d1-sanitized-snapshot-v1":
+        return "UNKNOWN"
+    if evidence.get("sanitized") is not True:
+        return "UNKNOWN"
+    verification = evidence.get("verification")
+    coverage = evidence.get("coverage")
+    binding = evidence.get("job_binding")
+    if not isinstance(verification, dict) or not isinstance(coverage, dict) or not isinstance(binding, dict):
+        return "UNKNOWN"
+    if not binding.get("job_id") or not binding.get("manifest_digest") or not binding.get("source_revision"):
+        return "UNKNOWN"
+
+    mode = verification.get("mode")
+    if mode == "bounded_sample":
+        return "UNKNOWN"
+    if mode != "full_partition" or coverage.get("complete_partition_proven") is not True:
+        return "UNKNOWN"
+
+    missing = coverage.get("missing_identities")
+    if isinstance(missing, int) and missing > 0:
+        return "PENDING_SYNC"
+
+    if (verification.get("job_verified") is True
+            and verification.get("manifest_digest_match") is True
+            and verification.get("identity_match") is True
+            and verification.get("count_match") is True
+            and missing == 0):
+        return "COMPLETE"
+    return "UNKNOWN"
+
+
 def project_coverage(days: list[dict], *, start_day: str, end_day: str) -> dict:
     """Create every expected date, even when no inventory was supplied.
 
@@ -38,12 +77,8 @@ def project_coverage(days: list[dict], *, start_day: str, end_day: str) -> dict:
             status = "CONFLICT"
         elif base != "COMPLETE":
             status = "LOCAL_MISSING" if missing else "PARTIAL" if gaps or base == "REPAIR_NEEDED" else "UNKNOWN"
-        elif evidence.get("verified") is True and evidence.get("all_expected_present") is True:
-            status = "COMPLETE"
-        elif evidence.get("verified") is True and evidence.get("all_expected_present") is False:
-            status = "PENDING_SYNC"
         else:
-            status = "UNKNOWN"  # local completeness alone does not prove target completeness
+            status = _target_readback_state(evidence)
         rows.append({
             "date": key, "status": status, "local_status": base,
             "expected_aids": expected, "actual_aids": actual,
