@@ -14,6 +14,14 @@ import sqlite3
 import time
 import uuid
 
+DEFAULT_SOURCE_LIMITS = {
+    "d1": (6, 600),
+    "archive": (6, 600),
+    "api_semantic": (12, 600),
+    "publisher": (12, 600),
+    "collector": (12, 600),
+}
+
 
 @dataclass(frozen=True)
 class AdmissionRequest:
@@ -44,10 +52,10 @@ class AdmissionReceipt:
 class SQLiteReadAdmissionController:
     """Atomic process-shared rolling-window admission with fail-closed corruption handling."""
 
-    def __init__(self, state_path: Path, *, source_limits: dict[str, tuple[int, int]],
+    def __init__(self, state_path: Path, *, source_limits: dict[str, tuple[int, int]] | None = None,
                  lease_seconds: int = 15):
         self._path = Path(state_path)
-        self._limits = dict(source_limits)
+        self._limits = dict(source_limits or DEFAULT_SOURCE_LIMITS)
         self._lease = max(1, int(lease_seconds))
         if not self._limits:
             raise ValueError("source limits required")
