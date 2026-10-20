@@ -1,0 +1,107 @@
+{
+  "schema_version": "holoviewer-youtube-expected-set-fixture-v1",
+  "sanitized": true,
+  "documents": [
+    {
+      "schema_version": "holoviewer-youtube-expected-set-v1",
+      "day": "2026-10-15",
+      "scope": {
+        "kind": "history-review-66",
+        "version": "history66-prototype-reviewed",
+        "channel_count": 66,
+        "hash": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "issuer": "#47-history-review-offline",
+      "issued_at": "2026-10-18T00:00:00Z",
+      "source": {
+        "revision": "history66-sanitized-fixture-r1",
+        "hash": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "late_metadata_watermark": {
+        "observed_through": "2026-10-17T00:00:00Z",
+        "required_after": "2026-10-16T16:00:00Z",
+        "status": "SATISFIED"
+      },
+      "completeness_authority": "VERIFIED",
+      "expected_video_ids": ["hist0000001"],
+      "videos": [
+        {
+          "video_id": "hist0000001",
+          "channel_id": "UCHHHHHHHHHHHHHHHHHHHHHH",
+          "actual_start": "2026-10-15T12:00:16Z",
+          "actual_start_verified": true,
+          "actual_start_source": "YouTube liveStreamingDetails.actualStartTime",
+          "revision": "youtube-videos-list:r1",
+          "content_hash": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      ],
+      "unknown_cases": []
+    },
+    {
+      "schema_version": "holoviewer-youtube-expected-set-v1",
+      "day": "2026-10-15",
+      "scope": {
+        "kind": "today-approved-85",
+        "version": "today85-20261016-d0e326c0496b",
+        "channel_count": 85,
+        "hash": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "issuer": "#47-today-offline",
+      "issued_at": "2026-10-18T00:00:00Z",
+      "source": {
+        "revision": "today85-sanitized-fixture-r1",
+        "hash": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      "late_metadata_watermark": {
+        "observed_through": "2026-10-17T00:00:00Z",
+        "required_after": "2026-10-16T16:00:00Z",
+        "status": "SATISFIED"
+      },
+      "completeness_authority": "VERIFIED",
+      "expected_video_ids": ["today000001"],
+      "videos": [
+        {
+          "video_id": "today000001",
+          "channel_id": "UCTTTTTTTTTTTTTTTTTTTTTT",
+          "actual_start": "2026-10-15T15:30:00Z",
+          "actual_start_verified": true,
+          "actual_start_source": "YouTube liveStreamingDetails.actualStartTime",
+          "revision": "youtube-videos-list:r2",
+          "content_hash": "6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      ],
+      "unknown_cases": []
+    },
+    {
+      "schema_version": "holoviewer-youtube-expected-set-v1",
+      "day": "2026-10-16",
+      "scope": {
+        "kind": "today-approved-85",
+        "version": "today85-20261016-d0e326c0496b",
+        "channel_count": 85,
+        "hash": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "issuer": "#47-today-offline",
+      "issued_at": "2026-10-17T00:00:00Z",
+      "source": {
+        "revision": "today85-sanitized-fixture-r2",
+        "hash": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "late_metadata_watermark": {
+        "observed_through": "2026-10-17T00:00:00Z",
+        "required_after": "2026-10-17T16:00:00Z",
+        "status": "PENDING"
+      },
+      "completeness_authority": "UNKNOWN",
+      "expected_video_ids": [],
+      "videos": [],
+      "unknown_cases": [
+        {
+          "video_id": null,
+          "reason": "late_metadata_pending",
+          "note": "Sanitized fixture: authoritative late-metadata watermark has not closed."
+        }
+      ]
+    }
+  ]
+}
