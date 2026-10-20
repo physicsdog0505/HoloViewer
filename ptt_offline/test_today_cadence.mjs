@@ -132,8 +132,35 @@ test('steady-state 50-video cadence uses two bounded D1 reads and no evidence ch
  assert.equal(d.metrics().heartbeatUpdates,1);
  assert.equal(raw.raw.prepare('SELECT COUNT(*) n FROM public_today_evidence').get().n,0);
  const row=raw.raw.prepare('SELECT lifecycle_observed_at,checked_at FROM public_today_canonical WHERE video_id=?').get('v0000000000');
- assert.equal(row.lifecycle_observed_at,'2026-10-18T09:00:00Z');
+ assert.equal(row.lifecycle_observed_at,'2026-10-18T08:00:00Z');
  assert.equal(row.checked_at,'2026-10-18T09:00:00Z');
+ assert.equal(raw.raw.prepare('SELECT source_checksum FROM public_today_canonical WHERE video_id=?').get('v0000000000').source_checksum,'steady');
+ raw.close();
+});
+
+
+test('unchanged 50-video heartbeat rotates fairly without changing evidence provenance',async()=>{
+ const raw=retirementDb();const cid=seedSteadyLive(raw,50);const d=instrumentDb(raw);
+ const env={TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d};
+ const first=await refreshKnownTodayLifecycle(env,{
+  now:new Date('2026-10-18T09:00:00Z'),fetchImpl:steadyProvider(cid,50),limit:25
+ });
+ assert.equal(first.selected,25);
+ assert.equal(first.updated,0);
+ assert.equal(d.metrics().readQueries,2);
+ const afterFirst=raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE checked_at='2026-10-18T09:00:00Z'").get().n;
+ assert.equal(afterFirst,25);
+ const second=await refreshKnownTodayLifecycle(env,{
+  now:new Date('2026-10-18T09:05:00Z'),fetchImpl:steadyProvider(cid,50),limit:25
+ });
+ assert.equal(second.selected,25);
+ assert.equal(second.updated,0);
+ assert.equal(d.metrics().readQueries,4);
+ const checked=raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE checked_at='2026-10-18T09:05:00Z'").get().n;
+ assert.equal(checked,25);
+ const untouched=raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE lifecycle_observed_at!='2026-10-18T08:00:00Z' OR source_checksum!='steady'").get().n;
+ assert.equal(untouched,0);
+ assert.equal(raw.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,0);
  raw.close();
 });
 
@@ -222,7 +249,7 @@ test('cadence includes recent ended rows needing authoritative re-verification f
   const db={
     writes:[],
     prepare(sql){
-      if(sql.includes('FROM public_today_canonical')&&sql.includes('ORDER BY lifecycle_observed_at')){
+      if(sql.includes('FROM public_today_canonical')&&sql.includes('ORDER BY COALESCE(checked_at,lifecycle_observed_at)')){
         selectSql=sql;
         return {bind(...args){selectArgs=args;return {all:async()=>({results:[row]})}}};
       }
