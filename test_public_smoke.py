@@ -299,6 +299,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("@keyframes watchalong-danmaku", css)
         self.assertIn(".subtitle-mode-controls{", css)
         self.assertIn("location.href='/watchalong-viewer/?'+q.toString();", app)
+        self.assertIn("fetch('/data/watchalong/manifest.json'", app)
+        self.assertIn("card.href='/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId);", app)
 
     def test_watchalong_static_assets_integrity(self):
         manifest = json.loads((ROOT / "site/data/watchalong/manifest.json").read_text(encoding="utf-8"))
