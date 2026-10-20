@@ -31,12 +31,12 @@ class DashboardTests(unittest.TestCase):
     def test_refresh_calls_readers_only_and_cooldown_bounds_reads(self):
         calls = []
         readers = {name: (lambda name=name: calls.append(name) or ({"sources": []} if name == "data_coverage" else {}))
-                   for name in ("data_coverage", "sync_monitor", "system_health")}
+                   for name in ("data_coverage", "daily_finalization", "sync_monitor", "system_health")}
         controller = DashboardController(readers, cooldown_seconds=30)
         first = controller.refresh(now=NOW)
         second = controller.refresh(now=NOW + timedelta(seconds=5))
         third = controller.refresh("sync_monitor", now=NOW + timedelta(seconds=31))
-        self.assertEqual(calls, ["data_coverage", "sync_monitor", "system_health", "sync_monitor"])
+        self.assertEqual(calls, ["data_coverage", "daily_finalization", "sync_monitor", "system_health", "sync_monitor"])
         self.assertTrue(all(value["refresh"]["status"] == "refreshed" for value in first.values()))
         self.assertTrue(all(value["refresh"]["status"] == "cooldown" for value in second.values()))
         self.assertEqual(third["sync_monitor"]["refresh"]["status"], "refreshed")
@@ -128,9 +128,9 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(captured["status"], "405 Method Not Allowed")
         self.assertEqual(json.loads(body)["error"], "read-only endpoint")
         html = render_dashboard()
-        for label in ("Data Coverage", "Sync Monitor", "System Health", "重新整理全部"):
+        for label in ("Data Coverage", "Daily Finalization", "Sync Monitor", "System Health", "重新整理全部"):
             self.assertIn(label, html)
-        for forbidden_control in ("Retry Publisher", "Replay", "Re-sync", "Upload", "Deploy", "Restart Collector", "Restart Publisher"):
+        for forbidden_control in ("Retry Publisher", "Replay", "Re-sync", "Repair", "Upload", "Deploy", "Restart Collector", "Restart Publisher"):
             self.assertNotIn(forbidden_control, html)
         self.assertIn('id="coverage-filter"', html)
         self.assertNotIn("method:'POST'", html)
