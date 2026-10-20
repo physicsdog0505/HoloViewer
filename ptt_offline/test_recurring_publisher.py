@@ -1,12 +1,41 @@
 import unittest
 from unittest.mock import patch
 from contextlib import nullcontext
-from ptt_offline.recurring_publisher import run_snapshot,snapshot_interval,seconds_until_next_snapshot
+from ptt_offline.recurring_publisher import main,run_snapshot,snapshot_interval,seconds_until_next_snapshot
 from datetime import datetime
+import tempfile
+from pathlib import Path
 from zoneinfo import ZoneInfo
 from ptt_offline.public_today_contract import ContractError
 
 class RecurringPublisherTests(unittest.TestCase):
+    def test_zero_iterations_is_continuous_until_external_stop(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            state=root/"state"
+            state.mkdir()
+            metrics=root/"metrics.jsonl"
+            result={
+                "status":"NO_NEW_ROWS","sent":0,"eligible":0,"http_posts":0,
+                "observed_at":"2026-10-20T04:00:00+00:00",
+                "publisher_mode":"DRY_RUN",
+            }
+            with patch("ptt_offline.recurring_publisher.exclusive_lock",
+                       return_value=nullcontext()), \
+                 patch("ptt_offline.recurring_publisher.run_snapshot",
+                       return_value=result) as snapshot, \
+                 patch("ptt_offline.recurring_publisher.time.sleep",
+                       side_effect=KeyboardInterrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    main([
+                        "--source","unused.sqlite3",
+                        "--state-dir",str(state),
+                        "--metrics",str(metrics),
+                        "--iterations","0",
+                        "--interval-seconds","60",
+                    ])
+        snapshot.assert_called_once()
+
     def test_taipei_overnight_snapshot_boundaries(self):
         tpe=ZoneInfo("Asia/Taipei")
         for hour,minute,seconds,expected in [
