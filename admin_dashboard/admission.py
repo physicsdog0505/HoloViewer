@@ -14,6 +14,14 @@ import sqlite3
 import time
 import uuid
 
+DEFAULT_REQUEST_CLASSES = {
+    "d1": {"d1_snapshot"},
+    "archive": {"archive_delivery"},
+    "api_semantic": {"api_semantic_health"},
+    "publisher": {"publisher_evidence"},
+    "collector": {"collector_evidence"},
+}
+
 DEFAULT_SOURCE_LIMITS = {
     "d1": (6, 600),
     "archive": (6, 600),
@@ -109,6 +117,17 @@ class SQLiteReadAdmissionController:
         req_id = str(uuid.uuid4())
         scope_hash = self.scope_hash(request.scope)
         limit_spec = self._limits.get(request.source)
+        request_allowed = (
+            request.request_class in DEFAULT_REQUEST_CLASSES.get(request.source, set())
+            and request.verification_mode in {"bounded_sample", "full_partition"}
+            and request.cost_class in {"bounded_read", "manual_full_partition"}
+            and not (request.verification_mode == "full_partition"
+                     and request.cost_class != "manual_full_partition")
+        )
+        if not request_allowed:
+            return self._receipt(req_id, request, scope_hash, False, "admission_denied",
+                                 None, 0, limit_spec[0] if limit_spec else 0,
+                                 cache_hit, False, observed)
         if limit_spec is None:
             return self._receipt(req_id, request, scope_hash, False, "source_disabled",
                                  None, 0, 0, cache_hit, False, observed)
