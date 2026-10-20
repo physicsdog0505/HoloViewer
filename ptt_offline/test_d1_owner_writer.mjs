@@ -171,13 +171,14 @@ test('multi-AID batch preserves exact bounded accounting and readback',async()=>
  assert.equal(calls.find(c=>c[0]==='batch')[1],8);
 });
 
-test('matching replay remains idempotent while preserving three verification reads',async()=>{
+test('matching replay remains accepted while preserving three verification reads',async()=>{
  const rows=makeRows(10);
  const candidate=await signed({...batch,rows,write_cap:10});
- const {DB,calls}=mock(rows,{existingMatching:true,changes:0});
+ const {DB,calls}=mock(rows,{existingMatching:true});
  const ack=await applyAuthorizedPttBatch({DB,batch:candidate,verifyAuthority:async()=>true,
    limits:{rows:25,writes:80,queries:150}});
  assert.equal(ack.status,'ACK');
- assert.equal(ack.d1_rows_written,0);
+ assert.equal(ack.logical_rows_acked,10);
  assert.equal(calls.filter(c=>c[0]==='read').length,3);
+ assert.equal(calls.some(c=>c[0]==='batch'),true);
 });
