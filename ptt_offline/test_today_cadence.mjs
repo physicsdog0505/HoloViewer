@@ -118,7 +118,9 @@ function steadyProvider(cid,count=50,{changedIndex=-1,endedIndex=-1}={}){
  return async()=>new Response(JSON.stringify({items}),{status:200,headers:{'content-type':'application/json'}});
 }
 
-test('cadence selector keeps legacy eligibility/order and uses proposed access-path indexes',async()=>{
+test('cadence selector keeps legacy eligibility/order and uses proposed access-path indexes',async(t)=>{
+ t.diagnostic('node='+process.version);
+
  const db=retirementDb();
  const cid='UC'+'Q'.repeat(22);
  const insert=db.raw.prepare(`INSERT INTO public_today_canonical
@@ -161,9 +163,12 @@ test('cadence selector keeps legacy eligibility/order and uses proposed access-p
  );
  assert.equal(out.selected,50);
  assert.deepEqual(requested,legacy);
+ const sqliteVersion=db.raw.prepare('SELECT sqlite_version() AS v').get().v;
+ t.diagnostic('sqlite='+sqliteVersion);
  const plan=db.raw.prepare('EXPLAIN QUERY PLAN '+LIFECYCLE_CANDIDATE_SQL)
   .all(50,cutoff,'YouTube liveStreamingDetails',50,50)
   .map(r=>String(r.detail));
+ for(const detail of plan)t.diagnostic('plan='+detail);
  assert.ok(plan.some(x=>x.includes('public_today_canonical_cadence_active')));
  assert.ok(plan.some(x=>x.includes('public_today_canonical_cadence_ended_reverify')));
  assert.ok(plan.some(x=>x.includes('public_today_websub_processed_video')));
