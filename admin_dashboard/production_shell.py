@@ -59,29 +59,33 @@ class ProductionReadOnlyShell:
             return self._unavailable(source, code, admission=asdict(receipt))
 
         started = monotonic()
+        value = None
         error_code = None
+        result_class = "error"
         try:
             # Exactly one attempt. Retry/scheduler behavior is intentionally absent.
             value = fn()
             result_class = "ok" if value is not None else "unavailable"
             if value is None:
                 error_code = "source_unavailable"
-            return {
-                "available": value is not None,
-                "value": value,
-                "error_code": error_code,
-                "admission": asdict(receipt),
-            }
         except Exception:
             error_code = "source_unavailable"
             result_class = "error"
-            return self._unavailable(source, error_code, admission=asdict(receipt))
-        finally:
-            duration = monotonic() - started
-            bucket = "short" if duration < 1 else "medium" if duration < 5 else "long"
-            self._safe_audit(source, operation, receipt.scope_hash, True, receipt.cache_hit,
-                             bucket, locals().get("result_class", "error"), error_code)
-            self._admission.release(request.coalesce_key)
+
+        duration = monotonic() - started
+        bucket = "short" if duration < 1 else "medium" if duration < 5 else "long"
+        audit_ok = self._safe_audit(
+            source, operation, receipt.scope_hash, True, receipt.cache_hit,
+            bucket, result_class, error_code)
+        self._admission.release(request.coalesce_key)
+        if not audit_ok:
+            return self._unavailable(source, "source_unavailable", admission=asdict(receipt))
+        return {
+            "available": value is not None and error_code is None,
+            "value": value if error_code is None else None,
+            "error_code": error_code,
+            "admission": asdict(receipt),
+        }
 
     def _safe_audit(self, source, operation, scope_hash, admitted, cache_hit,
                     duration_bucket, result_class, error_code):
@@ -92,9 +96,10 @@ class ProductionReadOnlyShell:
                 duration_bucket=duration_bucket, result_class=result_class,
                 error_code=error_code,
             )
+            return True
         except Exception:
             # Audit is sanitized local operational state. Never leak its exception.
-            pass
+            return False
 
     @staticmethod
     def _unavailable(source, error_code, *, admission=None):
