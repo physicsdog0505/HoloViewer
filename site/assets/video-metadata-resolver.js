@@ -54,5 +54,5 @@
   return {status:'pending',videoId:id,row:null,httpStatus:202,attempt:maxAttempts};
  }
 
- global.HoloViewerVideoMetadata=Object.freeze({resolve,retryDelaySeconds});
+ window.HoloViewerVideoMetadata=Object.freeze({resolve,retryDelaySeconds});
 })(window);
