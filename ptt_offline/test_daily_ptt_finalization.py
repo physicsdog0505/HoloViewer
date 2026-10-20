@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from datetime import datetime
 import unittest
 from zoneinfo import ZoneInfo
@@ -138,6 +137,21 @@ class DailyPttFinalizationTests(unittest.TestCase):
         self.assertEqual(body["state"],"REPAIR_NEEDED")
         self.assertEqual(body["threads"][0]["missing_source_lines"],[5])
         self.assertFalse(body["archive_ready"])
+
+    def test_non_authoritative_final_line_is_unknown_and_never_repairs(self):
+        weak=coverage(missing=[5])
+        weak["contract_gaps"]=sorted(set(
+            weak.get("contract_gaps",[])+["collector-article-last-source-line-unavailable"]
+        ))
+        calls=[]
+        body=finalize_day(
+            day=DAY,expected_contract=expected(),
+            coverage_by_aid={AID:weak},
+            repair_executor=lambda request:calls.append(request),
+        )
+        self.assertEqual(body["state"],"UNKNOWN")
+        self.assertEqual(calls,[])
+        self.assertFalse(body["threads"][0]["repairable"])
 
     def test_missing_coverage_is_unknown_and_never_repairs(self):
         calls=[]
