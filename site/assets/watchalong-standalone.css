@@ -28,7 +28,7 @@ button,input,select,output{font:inherit}
 .watchalong-main{height:calc(100vh - 58px);padding:6px;background:#080a0d}
 .watchalong-workspace{display:grid;gap:6px;width:100%;height:100%;min-width:0;min-height:0}
 .watchalong-workspace.layout-equal{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.watchalong-workspace.layout-source{grid-template-columns:minmax(280px,.48fr) minmax(0,1fr)}
+.watchalong-workspace.layout-source{grid-template-columns:minmax(280px,.30fr) minmax(0,1fr)}
 .host-stack,.source-stack{display:grid;gap:6px;min-width:0;min-height:0}
 .host-stack{grid-template-rows:minmax(0,1fr) auto}
 .source-stack{grid-template-rows:minmax(0,1fr)}
@@ -56,7 +56,7 @@ button,input,select,output{font:inherit}
 }
 .subtitle-overlay[hidden]{display:none}
 .subtitle-line{
- width:100%;padding:0;color:#b5d7e5;font-weight:850;line-height:1.35;
+ width:100%;padding:0;color:var(--watchalong-host-accent,#4b97c8);font-weight:850;line-height:1.35;
  text-shadow:0 1px 2px #000,0 0 5px rgba(0,0,0,.85);overflow-wrap:anywhere
 }
 .subtitle-line.translation{font-size:clamp(20px,1.55vw,28px)}
@@ -112,7 +112,7 @@ body.immersive .immersive-toolbar-trigger{
 }
 @media(max-width:980px){
  .sync-controls,.subtitle-mode-controls{display:none}
- .watchalong-workspace.layout-source{grid-template-columns:minmax(240px,.52fr) minmax(0,1fr)}
+ .watchalong-workspace.layout-source{grid-template-columns:minmax(240px,.38fr) minmax(0,1fr)}
 }
 @media(max-width:760px){
  body{overflow:auto}
