@@ -65,13 +65,7 @@ async function preloadCatalogAvatars(db,channelIds){
   return out;
 }
 
-export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Date(),limit=50}={}){
-  if(env?.TODAY_CADENCE_ENABLED!=='true')return {status:'disabled',requests:0,updated:0,read_queries:0};
-  if(!env?.DB?.prepare||!env?.YOUTUBE_API_KEY)throw Error('Today cadence configuration missing');
-  if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('invalid lifecycle refresh limit');
-
-  let read_queries=1;
-  const got=await env.DB.prepare(`
+export const LIFECYCLE_CANDIDATE_SQL=`
     WITH candidate_ids AS (
       SELECT video_id,checked_at FROM (
         SELECT video_id,checked_at
@@ -105,7 +99,15 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
       ) AS from_discovery
     FROM selected s
     JOIN public_today_canonical c ON c.video_id=s.video_id
-    ORDER BY s.checked_at ASC,s.video_id ASC`)
+    ORDER BY s.checked_at ASC,s.video_id ASC`;
+
+export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Date(),limit=50}={}){
+  if(env?.TODAY_CADENCE_ENABLED!=='true')return {status:'disabled',requests:0,updated:0,read_queries:0};
+  if(!env?.DB?.prepare||!env?.YOUTUBE_API_KEY)throw Error('Today cadence configuration missing');
+  if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('invalid lifecycle refresh limit');
+
+  let read_queries=1;
+  const got=await env.DB.prepare(LIFECYCLE_CANDIDATE_SQL)
     .bind(limit,recentTaipeiCutoff(now),YOUTUBE_LIVE_SOURCE,limit,limit).all();
   const rows=got.results??[];
   const ids=rows.map(r=>r.video_id).filter(id=>ID.test(id??''));
