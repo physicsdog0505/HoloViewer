@@ -1,0 +1,40 @@
+{
+  "schema_version": "holoviewer-api-semantic-health-source-v1",
+  "sanitized": true,
+  "observed_at": "2026-10-20T12:00:00Z",
+  "service": "holoviewer-public-api",
+  "base_url": "https://holoviewer-public-api.singlebagel.workers.dev",
+  "probes": {
+    "health": {
+      "path": "/health",
+      "http_status": 200,
+      "schema_version": "v1"
+    },
+    "today": {
+      "path": "/v1/catalog/today?limit=10",
+      "http_status": 200,
+      "expected_schema": "public-consumer-v1",
+      "schema_version": "public-consumer-v1",
+      "semantic_watermark": "2026-10-20T11:59:30Z",
+      "source_freshness": "fresh",
+      "gap": false,
+      "coverage_status": "complete",
+      "authority": "verified"
+    },
+    "history": {
+      "path": "/v1/history?day=2026-10-15&limit=10&offset=0",
+      "http_status": 200,
+      "expected_schema": "public-history-v1",
+      "schema_version": "public-history-v1",
+      "semantic_watermark": "2026-10-20T11:59:00Z",
+      "source_freshness": "fresh",
+      "gap": false,
+      "coverage_status": "sample",
+      "authority": "verified"
+    }
+  },
+  "contract_gaps": [
+    "fixture-only-no-production-read",
+    "history-sample-does-not-prove-full-day-completeness"
+  ]
+}
