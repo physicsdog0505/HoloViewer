@@ -787,6 +787,14 @@ class ParityContract(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
 
+    def test_viewer_locking_current_primary_does_not_reload_ptt(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("const previousIndex=primaryIndex;", js)
+        self.assertIn("const primaryChanged=index!==previousIndex;", js)
+        self.assertIn("if(primaryChanged)resolvePrimaryPtt();", js)
+        self.assertIn("if(index!==primaryIndex)setPrimary(index);", js)
+        self.assertIn("setLayoutPreset('focus');", js)
+
     def test_viewer_ptt_follow_survives_immersive_layout_and_resize(self):
         js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
         self.assertIn("function repinPttAfterLayout({force=false}={})", js)
