@@ -50,10 +50,11 @@
   </header>
 
   <main class="watchalong-main">
-    <section id="watchalongWorkspace" class="watchalong-workspace layout-equal">
+    <section id="watchalongWorkspace" class="watchalong-workspace layout-equal mobile-primary-source">
       <section class="host-stack">
         <article class="video-card host-card">
           <div class="video-label"><strong>Hololive</strong><span id="hostStatus">判定中</span></div>
+          <button id="mobileSwapHost" class="mobile-swap-button" type="button" aria-label="將 Hololive 切到主畫面">切到主畫面</button>
           <div id="hostPlayer" class="player-host"></div>
         </article>
         <aside id="pttPanel" class="watchalong-ptt ptt-floor-hidden">
@@ -74,6 +75,7 @@
       <section class="source-stack">
         <article class="video-card source-card">
           <div class="video-label"><strong id="sourceLabel">同步片源</strong><span id="sourceStatus"></span></div>
+          <button id="mobileSwapSource" class="mobile-swap-button" type="button" aria-label="將同步片源切到主畫面">切到主畫面</button>
           <div id="sourcePlayer" class="player-host"></div>
           <div id="sourceStandby" class="source-standby" hidden>
             <strong>等待同步片源</strong>
