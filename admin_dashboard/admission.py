@@ -193,6 +193,30 @@ class SQLiteReadAdmissionController:
             except Exception:
                 pass
 
+    def cache_hit_receipt(self, request: AdmissionRequest, *, now: float | None = None) -> AdmissionReceipt:
+        observed = time.time() if now is None else float(now)
+        req_id = str(uuid.uuid4())
+        try:
+            scope_hash = self.scope_hash(request.scope)
+            limit_spec = self._limits.get(request.source)
+            if limit_spec is None:
+                return self._receipt(req_id, request, scope_hash, False, "source_disabled",
+                                     None, 0, 0, True, False, observed)
+            limit, window_seconds = limit_spec
+            con = self._connect()
+            row = con.execute(
+                "SELECT window_started, requests_used FROM admission_windows WHERE source=?",
+                (request.source,)).fetchone()
+            con.close()
+            if row is None or observed - float(row[0]) >= window_seconds:
+                window_started, used = None, 0
+            else:
+                window_started, used = float(row[0]), int(row[1])
+            return self._receipt(req_id, request, scope_hash, True, "cache_hit",
+                                 window_started, used, limit, True, False, observed)
+        except (sqlite3.DatabaseError, OSError, ValueError, TypeError):
+            raise RuntimeError("cache_state_error")
+
     def cache_get(self, cache_key: str, *, now: float | None = None):
         observed = time.time() if now is None else float(now)
         try:
