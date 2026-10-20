@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "holoviewer-archive-job-evidence-v1",
+  "title": "HoloViewer Archive Delivery Job Evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sanitized",
+    "job_id",
+    "job_kind",
+    "target",
+    "source_revision",
+    "source_hash",
+    "manifest",
+    "scope",
+    "attempted_at",
+    "succeeded_at",
+    "attempt_count",
+    "retry_after",
+    "backoff_seconds",
+    "error_code",
+    "uploaded_count",
+    "independently_verified_count",
+    "readback_receipt",
+    "readback_observed_at",
+    "snapshot_id",
+    "verification_mode",
+    "job_verified",
+    "coverage_summary",
+    "job_status",
+    "expected_aid_completeness",
+    "contract_gaps"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "holoviewer-archive-job-evidence-v1"
+    },
+    "sanitized": {
+      "const": true
+    },
+    "job_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "job_kind": {
+      "const": "archive-delivery"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "identity"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "workers-static-assets",
+            "r2"
+          ]
+        },
+        "identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "source_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "manifest": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "scope": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "attempted_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "succeeded_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "attempt_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "retry_after": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "backoff_seconds": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "error_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "uploaded_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "independently_verified_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "readback_receipt": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "readback_observed_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "snapshot_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "verification_mode": {
+      "enum": [
+        "bounded_sample",
+        "full_partition",
+        null
+      ]
+    },
+    "job_verified": {
+      "type": "boolean"
+    },
+    "coverage_summary": {
+      "type": "object"
+    },
+    "job_status": {
+      "enum": [
+        "pending",
+        "attempted",
+        "succeeded",
+        "failed",
+        "unknown"
+      ]
+    },
+    "expected_aid_completeness": {
+      "type": "object"
+    },
+    "contract_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}
