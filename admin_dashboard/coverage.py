@@ -94,6 +94,13 @@ def project_coverage(days: list[dict], *, start_day: str, end_day: str) -> dict:
             "contract_gaps": source.get("contract_gaps", []),
             "source_version": source.get("source_version"),
             "last_updated_at": source.get("last_updated_at"),
+            "thread_evidence": source.get("thread_evidence") or source.get("threads"),
+            "source_line_ranges": source.get("source_line_ranges") or source.get("coverage_ranges"),
+            "legal_empty_push_evidence": source.get("legal_empty_push_evidence") or source.get("legal_empty_pushes"),
+            "expected_aid_authority": source.get("expected_authority"),
+            "target_readback_status": _target_readback_state(evidence, day=key, expected_aids=expected)
+                if base == "COMPLETE" else "UNKNOWN",
+            "evidence_freshness": source.get("evidence_freshness") or source.get("freshness"),
         })
         current += timedelta(days=1)
     return {"schema_version": "holoviewer-admin-coverage-v1", "from_day": start_day,
