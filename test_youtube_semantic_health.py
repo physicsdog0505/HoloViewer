@@ -112,6 +112,50 @@ class YouTubeSemanticHealthTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "forbidden sensitive/content field"):
             build_semantic_health(raw)
 
+    def test_sensitive_key_patterns_are_rejected(self):
+        for key in ("hmac_secret", "client_secret", "access_token", "wrangler_credential", "x_api_key"):
+            with self.subTest(key=key):
+                raw = copy.deepcopy(self.fixture)
+                raw["probes"]["today"][key] = "sensitive"
+                with self.assertRaisesRegex(ValueError, "forbidden sensitive/content field"):
+                    build_semantic_health(raw)
+
+    def test_base_url_rejects_userinfo_query_fragment_and_unapproved_host(self):
+        bad_values = (
+            "https://user:pass@holoviewer-public-api.singlebagel.workers.dev",
+            "https://holoviewer-public-api.singlebagel.workers.dev?token=abc",
+            "https://holoviewer-public-api.singlebagel.workers.dev/#frag",
+            "https://example.com",
+        )
+        for value in bad_values:
+            with self.subTest(value=value):
+                raw = copy.deepcopy(self.fixture)
+                raw["base_url"] = value
+                with self.assertRaises(ValueError):
+                    build_semantic_health(raw)
+
+    def test_probe_path_rejects_full_url_and_sensitive_query(self):
+        bad_values = (
+            "https://example.com/health",
+            "//example.com/health",
+            "/v1/catalog/today?token=abc",
+            "/v1/catalog/today?access_token=abc",
+            "/v1/catalog/today?api-key=abc",
+        )
+        for value in bad_values:
+            with self.subTest(value=value):
+                raw = copy.deepcopy(self.fixture)
+                raw["probes"]["today"]["path"] = value
+                with self.assertRaises(ValueError):
+                    build_semantic_health(raw)
+
+    def test_probe_path_allows_non_sensitive_query_parameters(self):
+        raw = copy.deepcopy(self.fixture)
+        raw["probes"]["today"]["path"] = "/v1/catalog/today?limit=10"
+        out = build_semantic_health(raw)
+        today = next(x for x in out["probes"] if x["name"] == "today")
+        self.assertEqual(today["path"], "/v1/catalog/today?limit=10")
+
 
 if __name__ == "__main__":
     unittest.main()
