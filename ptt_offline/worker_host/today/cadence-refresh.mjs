@@ -72,18 +72,41 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
 
   let read_queries=1;
   const got=await env.DB.prepare(`
-    SELECT video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,lifecycle_observed_at,
-      checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum,
+    WITH candidate_ids AS (
+      SELECT video_id,checked_at FROM (
+        SELECT video_id,checked_at
+        FROM public_today_canonical
+        WHERE lifecycle_state!='ended'
+        ORDER BY checked_at ASC,video_id ASC
+        LIMIT ?
+      )
+      UNION ALL
+      SELECT video_id,checked_at FROM (
+        SELECT video_id,checked_at
+        FROM public_today_canonical
+        WHERE lifecycle_state='ended'
+          AND actual_end>=?
+          AND (source_label!=? OR actual_start IS NULL OR actual_end IS NULL)
+        ORDER BY checked_at ASC,video_id ASC
+        LIMIT ?
+      )
+    ),
+    selected AS (
+      SELECT video_id,checked_at
+      FROM candidate_ids
+      ORDER BY checked_at ASC,video_id ASC
+      LIMIT ?
+    )
+    SELECT c.video_id,c.publisher_channel_id,c.roster_version,c.channel_group,c.title,c.channel_name,c.lifecycle_state,c.lifecycle_observed_at,
+      c.checked_at,c.scheduled_start,c.actual_start,c.actual_end,c.source_label,c.source_checksum,
       EXISTS(
         SELECT 1 FROM public_today_websub_events e
-        WHERE e.video_id=public_today_canonical.video_id AND e.status='processed'
+        WHERE e.video_id=c.video_id AND e.status='processed'
       ) AS from_discovery
-    FROM public_today_canonical
-    WHERE lifecycle_state!='ended'
-       OR (lifecycle_state='ended' AND actual_end>=?
-           AND (source_label!=? OR actual_start IS NULL OR actual_end IS NULL))
-    ORDER BY checked_at ASC,video_id ASC
-    LIMIT ?`).bind(recentTaipeiCutoff(now),YOUTUBE_LIVE_SOURCE,limit).all();
+    FROM selected s
+    JOIN public_today_canonical c ON c.video_id=s.video_id
+    ORDER BY s.checked_at ASC,s.video_id ASC`)
+    .bind(limit,recentTaipeiCutoff(now),YOUTUBE_LIVE_SOURCE,limit,limit).all();
   const rows=got.results??[];
   const ids=rows.map(r=>r.video_id).filter(id=>ID.test(id??''));
   if(!ids.length)return {status:'idle',requests:0,updated:0,selected:0,read_queries};
