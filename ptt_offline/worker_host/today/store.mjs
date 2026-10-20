@@ -171,7 +171,7 @@ function consumerRow(row,nowStamp,profile){
   source_label,stale
  },profile);
 }
-export async function readToday(db,{day,limit=200,offset=0,now=new Date(),env=null}={}) {
+export async function readToday(db,{day,limit=200,offset=0,now=new Date(),env=null,profileTableEnabled=false}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
     throw Error('invalid canonical Today day');
   if (!Number.isInteger(limit)||limit<1||limit>200) throw Error('invalid limit');
@@ -192,7 +192,11 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),env=nu
   const previous=previousStart.toISOString().replace(/\.\d{3}Z$/,'Z');
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const freshCutoff=new Date(now.getTime()-1200000).toISOString().replace(/\.\d{3}Z$/,'Z');
-  const rows=await db.prepare(`SELECT public_today_canonical.*
+  const legacyProfileExpr=profileTableEnabled?`(SELECT p.avatar_url FROM public_today_channel_profiles p WHERE p.channel_id=public_today_canonical.publisher_channel_id AND p.roster_version=ac.roster_version)`:null;
+  const rows=await db.prepare(`SELECT public_today_canonical.*,
+    ${legacyProfileExpr?`COALESCE(${legacyProfileExpr},`:''}(SELECT c.avatar_url FROM public_catalog c
+      WHERE c.channel_id=public_today_canonical.publisher_channel_id AND c.avatar_url IS NOT NULL
+      ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC LIMIT 1)${legacyProfileExpr?')':''} AS trusted_channel_avatar
     FROM public_today_canonical
     JOIN public_today_approved_channels ac
       ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
