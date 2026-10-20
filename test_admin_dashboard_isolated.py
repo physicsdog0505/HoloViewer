@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from admin_dashboard.dashboard import DashboardController
+from admin_dashboard.contracts import build_sync_monitor, coverage_sync_consistency
 from admin_dashboard.http import DashboardApplication
 from admin_dashboard.isolated import AuthenticatedDashboard, SharedFixtureCache
 from admin_dashboard.fixture_readers import FixtureReaders
@@ -81,6 +82,47 @@ class IsolatedPilotTests(unittest.TestCase):
         for thread in threads: thread.join(timeout=5)
         self.assertEqual(len(count), 1)
         self.assertEqual(len(results), 6)
+
+    def test_d1_monitor_uses_job_binding_not_snapshot_id_and_exposes_cost(self):
+        readers = FixtureReaders(ROOT)
+        evidence = readers.sync_monitor()
+        monitor = build_sync_monitor(evidence, now=datetime(2026, 10, 20, 11, 30, 30, tzinfo=timezone.utc))
+        d1 = next(x for x in monitor["jobs"] if x["component"] == "D1 Snapshot")
+        snapshot = evidence["d1_snapshot"]
+        self.assertEqual(d1["job_id"], snapshot["job_binding"]["job_id"])
+        self.assertNotEqual(d1["job_id"], snapshot["snapshot_id"])
+        self.assertEqual(d1["snapshot_id"], snapshot["snapshot_id"])
+        self.assertEqual(d1["manifest_digest"], snapshot["job_binding"]["manifest_digest"])
+        self.assertEqual(d1["source_revision"], snapshot["job_binding"]["source_revision"])
+        self.assertEqual(d1["verification_mode"], "bounded_sample")
+        self.assertEqual(d1["queries_used"], 2)
+        self.assertEqual(d1["max_queries"], 3)
+        self.assertIn(d1["cache_status"], {"hit", "miss"})
+
+    def test_multi_day_consistency_never_correlates_unscoped_jobs(self):
+        coverage = {"days": [{"date": "2026-10-20", "status": "COMPLETE"}]}
+        monitor = {"jobs": [{"component": "Publisher", "status": "failed", "scope": None}]}
+        self.assertEqual(coverage_sync_consistency(coverage, monitor),
+                         [{"code": "comparison-scope-unbound", "severity": "unknown"}])
+
+    def test_dashboard_payload_does_not_expose_sensitive_keys(self):
+        readers = FixtureReaders(ROOT).injected()
+        payload = DashboardController(readers, cooldown_seconds=0).refresh(
+            now=datetime(2026, 10, 20, 11, 30, 30, tzinfo=timezone.utc))
+        forbidden = {"author", "content", "cookie", "authorization", "api_key", "hmac_secret",
+                     "password", "raw_error", "wrangler_credential", "filesystem_secret_path"}
+        def walk(value):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    self.assertNotIn(str(key).lower(), forbidden)
+                    walk(item)
+            elif isinstance(value, list):
+                for item in value:
+                    walk(item)
+        walk(payload)
+        html = render_dashboard().lower()
+        for marker in ("hmac secret", "wrangler credential", "filesystem secret path", "api key"):
+            self.assertNotIn(marker, html)
 
     def test_missing_fixture_fails_closed(self):
         readers = FixtureReaders(ROOT / "nonexistent")
