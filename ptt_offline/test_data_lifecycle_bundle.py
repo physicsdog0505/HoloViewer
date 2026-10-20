@@ -19,6 +19,9 @@ class DataLifecycleBundleTests(unittest.TestCase):
         self.assertTrue(body["sanitized"])
         self.assertEqual(body["expected_aids"]["status"],"COMPLETE")
         self.assertEqual(body["source_coverage"]["status"],"COMPLETE")
+        self.assertEqual(body["pr147_expected_set"]["expected_aids"],
+                         ["1grg4Pag","1grNight"])
+        self.assertEqual(body["pr147_expected_set"]["contract_gaps"],[])
         self.assertEqual(
             body["system_health"]["components"]["Collector"]["semantic_check"]["status"],
             "healthy",
@@ -47,6 +50,7 @@ class DataLifecycleBundleTests(unittest.TestCase):
         body=build_bundle(raw)
         self.assertEqual(body["expected_aids"]["status"],"UNKNOWN")
         self.assertEqual(body["source_coverage"]["status"],"REPAIR_NEEDED")
+        self.assertIsNone(body["pr147_expected_set"]["expected_aids"])
         self.assertEqual(
             body["system_health"]["components"]["Collector"]["semantic_check"]["status"],
             "unknown",
