@@ -39,6 +39,11 @@ def _job(**values) -> dict:
         "last_attempted_at": None, "last_successful_at": None, "status": "unknown",
         "attempt_count": None, "retry_after": None, "backoff_seconds": None,
         "input_count": None, "published_count": None, "verified_count": None,
+        "manifest_digest": None, "source_revision": None, "snapshot_id": None,
+        "readback_at": None, "verification_mode": None,
+        "queries_used": None, "max_queries": None,
+        "rows_returned": None, "max_rows_returned": None, "rows_read_reported": None,
+        "page_count": None, "max_pages": None, "cache_status": None,
         "error_code": None, "error_message": None, "last_progress_at": None,
         "evidence_source": None, "evidence_observed_at": None,
         "evidence_freshness": "unknown", "contract_gaps": [],
@@ -60,7 +65,7 @@ def _telemetry(evidence: dict, component: str) -> dict:
     allowed = {
         "job_id", "last_attempted_at", "last_successful_at", "status", "attempt_count",
         "retry_after", "backoff_seconds", "input_count", "published_count", "verified_count",
-        "error_code", "last_progress_at",
+        "error_code", "last_progress_at", "manifest_digest", "source_revision", "readback_at",
     }
     result = {key: item.get(key) for key in allowed if key in item}
     # Error text is displayed only when its producer explicitly marks it sanitized.
@@ -127,9 +132,22 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
     if isinstance(target, dict) and target.get("sanitized") is True and isinstance(target.get("rows"), list):
         observed = target.get("observed_at")
         telemetry = _telemetry(evidence, "D1 Snapshot")
+        binding = target.get("job_binding") if isinstance(target.get("job_binding"), dict) else {}
+        budget = target.get("query_budget") if isinstance(target.get("query_budget"), dict) else {}
+        pagination = target.get("pagination") if isinstance(target.get("pagination"), dict) else {}
+        verification = target.get("verification") if isinstance(target.get("verification"), dict) else {}
         values = {
-            "job_id": target.get("snapshot_id"), "component": "D1 Snapshot", "source": "Publisher",
+            "job_id": binding.get("job_id"), "component": "D1 Snapshot", "source": "Publisher",
             "target": "D1", "status": "unknown", "published_count": len(target["rows"]),
+            "snapshot_id": target.get("snapshot_id"),
+            "manifest_digest": binding.get("manifest_digest"),
+            "source_revision": binding.get("source_revision"),
+            "readback_at": observed, "verification_mode": verification.get("mode"),
+            "queries_used": budget.get("queries_used"), "max_queries": budget.get("max_queries"),
+            "rows_returned": budget.get("rows_returned"), "max_rows_returned": budget.get("max_rows_returned"),
+            "rows_read_reported": budget.get("rows_read_reported"),
+            "page_count": pagination.get("page_count"), "max_pages": budget.get("max_pages"),
+            "cache_status": evidence.get("d1_cache_status"),
             "last_progress_at": observed, "evidence_source": "sanitized D1 snapshot",
             "evidence_observed_at": observed,
             "evidence_freshness": _freshness(observed, now=now, stale_after_seconds=stale_after_seconds),
@@ -151,18 +169,24 @@ def coverage_sync_consistency(inventory: object, monitor: object) -> list[dict]:
     """Report disagreement without letting either signal overwrite the other."""
     if not isinstance(inventory, dict) or not isinstance(monitor, dict):
         return [{"code": "comparison-unavailable", "severity": "unknown"}]
-    sources = inventory.get("sources") if isinstance(inventory.get("sources"), list) else []
-    ptt = next((item for item in sources if isinstance(item, dict) and item.get("source") == "ptt"), None)
     jobs = monitor.get("jobs") if isinstance(monitor.get("jobs"), list) else []
     statuses = {item.get("status") for item in jobs if isinstance(item, dict)
                 and item.get("component") in {"Publisher", "R2 Archive", "D1 Snapshot"}}
-    if not ptt:
+    coverage_states = []
+    if isinstance(inventory.get("days"), list):
+        coverage_states = [item.get("status") for item in inventory["days"] if isinstance(item, dict)]
+    else:
+        sources = inventory.get("sources") if isinstance(inventory.get("sources"), list) else []
+        ptt = next((item for item in sources if isinstance(item, dict) and item.get("source") == "ptt"), None)
+        if ptt:
+            coverage_states = [ptt.get("completeness_status")]
+    if not coverage_states:
         return [{"code": "ptt-coverage-unavailable", "severity": "unknown"}]
-    coverage = ptt.get("completeness_status")
     findings = []
-    if coverage == "COMPLETE" and "failed" in statuses:
+    if "COMPLETE" in coverage_states and "failed" in statuses:
         findings.append({"code": "coverage-complete-sync-failed", "severity": "warning"})
-    if coverage in {"UNKNOWN", "REPAIR_NEEDED"} and "completed" in statuses:
+    incomplete = {"UNKNOWN", "REPAIR_NEEDED", "LOCAL_MISSING", "PARTIAL", "CONFLICT", "PENDING_SYNC"}
+    if any(state in incomplete for state in coverage_states) and "completed" in statuses:
         findings.append({"code": "sync-completed-coverage-not-complete", "severity": "warning"})
     return findings
 
