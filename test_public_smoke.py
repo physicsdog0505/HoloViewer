@@ -11,6 +11,23 @@ from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
 EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
+EXPECTED |= {
+    "data_lifecycle/__init__.py", "data_lifecycle/common.py",
+    "data_lifecycle/inventory.py", "data_lifecycle/planner.py",
+    "data_lifecycle/checkpoint.py", "data_lifecycle/report.py",
+    "data_lifecycle/cli.py", "test_data_lifecycle.py",
+    "data_lifecycle/adapters.py", "test_snapshot_integration.py",
+    "docs/data-lifecycle/README.md", "docs/data-lifecycle/architecture-audit.md",
+    "docs/data-lifecycle/rfc.md", "docs/data-lifecycle/rollout.md",
+    "docs/data-lifecycle/independent-review.md",
+    "docs/data-lifecycle/snapshot-integration.md",
+    "fixtures/data-lifecycle/youtube-2026-10-15.sanitized.json",
+    "fixtures/data-lifecycle/ptt-2026-10-01.sanitized.json",
+    "admin_dashboard/__init__.py", "admin_dashboard/contracts.py",
+    "admin_dashboard/dashboard.py", "admin_dashboard/http.py",
+    "admin_dashboard/render.py", "test_admin_dashboard.py",
+    "docs/data-lifecycle/admin-dashboard.md",
+}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):

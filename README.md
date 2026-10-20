@@ -38,3 +38,11 @@ This is a smoke verification only; it does **not** publish live data or enable u
 6. Keep screenshots/logs with secrets redacted. If the page fails, check Streamlit Cloud app logs for entrypoint `app.py`, Python 3.11 and requirements resolution.
 
 The app has no runtime dependence on the user's Mac mini, private repository or private SQLite. Public site filesystem is ephemeral; any future snapshot must have a separate persistent origin. GitHub Release Assets remain a future **candidate** under #290–#292; not a blocker for Phase 1A.
+
+## Offline lifecycle administration prototype
+
+The `data_lifecycle` and `admin_dashboard` packages provide an offline-only,
+read-only reconciliation and PTT History administration foundation. The latter
+separates Data Coverage, Sync Monitor and System Health and has no production
+reader or writer configured by default. See
+[`docs/data-lifecycle/admin-dashboard.md`](docs/data-lifecycle/admin-dashboard.md).
