@@ -128,6 +128,11 @@ export function mountVideoMetadataRecoveryOnWorker(base,{fetchImpl=fetch}={}){
    if(path==='/internal/videos/metadata/recover')return handleVideoMetadataRecovery(request,env,{fetchImpl});
    return base.fetch(request,env,ctx);
   },
-  async scheduled(event,env,ctx){return typeof base.scheduled==='function'?base.scheduled(event,env,ctx):undefined;}
+  async scheduled(event,env,ctx){
+   const baseResult=typeof base.scheduled==='function'?await base.scheduled(event,env,ctx):undefined;
+   const now=Number.isFinite(event?.scheduledTime)?new Date(event.scheduledTime):new Date();
+   const recovery=await processVideoMetadataDemands(env,{now,limit:4});
+   return {base:baseResult,recovery};
+  }
  };
 }
