@@ -68,8 +68,31 @@ def update_publisher_telemetry(
     if status in SUCCESS_STATES:
         last_successful = stamp
 
+    job_id = prior_item.get("job_id")
+    if not isinstance(job_id,str) or not job_id:
+        job_id = "publisher-session:" + stamp
+
+    source_identity=result.get("source_identity")
+    target_identity=result.get("target_identity")
+    readback=result.get("readback") if isinstance(result.get("readback"),dict) else None
+    contract_gaps=[]
+    if not isinstance(source_identity,str):
+        contract_gaps.append("publisher-source-identity-unavailable")
+    if not isinstance(target_identity,str):
+        contract_gaps.append("publisher-target-identity-unavailable")
+    if readback is None:
+        contract_gaps.append("publisher-independent-readback-unavailable")
+    if result.get("retry_after") is None:
+        contract_gaps.append("publisher-retry-after-unavailable")
+    if result.get("backoff_seconds") is None:
+        contract_gaps.append("publisher-backoff-unavailable")
+    if result.get("input_count") is None and result.get("eligible") is None:
+        contract_gaps.append("publisher-input-count-unavailable")
+
     item = {
-        "job_id": result.get("batch_id"),
+        "job_id": job_id,
+        "source_identity": source_identity,
+        "target_identity": target_identity,
         "last_attempted_at": stamp,
         "last_successful_at": last_successful,
         "status": (
@@ -78,9 +101,9 @@ def update_publisher_telemetry(
             else "waiting"
         ),
         "attempt_count": attempt_count,
-        "retry_after": None,
-        "backoff_seconds": None,
-        "input_count": result.get("eligible"),
+        "retry_after": result.get("retry_after"),
+        "backoff_seconds": result.get("backoff_seconds"),
+        "input_count": result.get("input_count",result.get("eligible")),
         "published_count": result.get("sent"),
         "verified_count": result.get("sent") if status == "ACK" else None,
         "error_code": result.get("error_class") if status == "STOP_RECONCILE" else None,
@@ -92,6 +115,12 @@ def update_publisher_telemetry(
         "articles_checked": result.get("articles_checked"),
         "stale_fenced_rows": result.get("stale_fenced_rows"),
         "backlog_may_remain": result.get("backlog_may_remain"),
+        "readback_evidence": {
+            "receipt_digest": readback.get("receipt_digest") if readback else None,
+            "verified_count": readback.get("verified_count") if readback else None,
+            "observed_at": readback.get("observed_at") if readback else None,
+        },
+        "contract_gaps": sorted(set(contract_gaps)),
     }
     body = {
         "schema_version": SCHEMA_VERSION,
