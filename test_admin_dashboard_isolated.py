@@ -83,6 +83,14 @@ class IsolatedPilotTests(unittest.TestCase):
         self.assertEqual(len(count), 1)
         self.assertEqual(len(results), 6)
 
+
+    def test_archive_placeholder_is_target_neutral_and_unknown(self):
+        monitor = build_sync_monitor({})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertEqual(archive["status"], "unknown")
+        self.assertIsNone(archive["target"])
+        self.assertIn("archive-delivery-job-evidence-unavailable", archive["contract_gaps"])
+
     def test_d1_monitor_uses_job_binding_not_snapshot_id_and_exposes_cost(self):
         readers = FixtureReaders(ROOT)
         evidence = readers.sync_monitor()
