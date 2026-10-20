@@ -136,10 +136,21 @@ function showImmersiveToolbar({sticky=false}={}){
  clearImmersiveToolbarTimer();
  if(!sticky)scheduleImmersiveToolbarHide();
 }
-document.getElementById('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch{}};
+const fullscreenButton=document.getElementById('fullscreen');
+fullscreenButton.onclick=async()=>{
+ try{
+  if(document.fullscreenElement)await document.exitFullscreen();
+  else{
+   await document.documentElement.requestFullscreen();
+   fullscreenButton.blur();
+  }
+ }catch{}
+};
 immersiveToolbarTrigger.addEventListener('mouseenter',()=>showImmersiveToolbar({sticky:true}));
 topbar.addEventListener('mouseenter',()=>showImmersiveToolbar({sticky:true}));
 topbar.addEventListener('mouseleave',()=>scheduleImmersiveToolbarHide());
+topbar.addEventListener('focusin',()=>showImmersiveToolbar({sticky:true}));
+topbar.addEventListener('focusout',()=>scheduleImmersiveToolbarHide());
 topbar.addEventListener('click',()=>scheduleImmersiveToolbarHide());
 topbar.addEventListener('input',()=>scheduleImmersiveToolbarHide());
 document.addEventListener('fullscreenchange',()=>{
