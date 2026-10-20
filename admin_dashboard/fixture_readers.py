@@ -69,19 +69,47 @@ class FixtureReaders:
         # HTTP 200 is reachability only. The semantic status must be independently
         # grounded in schema, watermark, source freshness and gap checks.
         probes = data["probes"]
-        statuses = []
+        semantic_statuses = []
+        reachability = []
         for p in probes:
             c = p.get("content_health") or {}
-            valid = (p.get("name") != "health" and p.get("schema_version")
-                     and c.get("semantic_watermark") and c.get("source_freshness") == "fresh"
-                     and c.get("gap") is False and c.get("coverage_status") not in {"partial", "unknown"})
-            statuses.append("healthy" if valid and p.get("semantic_status") == "healthy"
-                            else "degraded" if c.get("gap") is True or c.get("source_freshness") == "stale"
-                            else "unknown")
-        overall = "degraded" if "degraded" in statuses else "healthy" if statuses and all(s == "healthy" for s in statuses) else "unknown"
+            if p.get("name") == "health":
+                reachability.append({
+                    "name": "health",
+                    "http_status": p.get("http_status"),
+                    "reachable": p.get("reachable"),
+                    "semantic_status": p.get("semantic_status"),
+                })
+                continue
+            if p.get("semantic_status") == "unhealthy":
+                status = "unhealthy"
+            elif c.get("gap") is True or c.get("source_freshness") == "stale":
+                status = "degraded"
+            else:
+                valid = (p.get("schema_version")
+                         and c.get("semantic_watermark")
+                         and c.get("source_freshness") == "fresh"
+                         and c.get("gap") is False
+                         and c.get("coverage_status") not in {"partial", "unknown"})
+                status = "healthy" if valid and p.get("semantic_status") == "healthy" else "unknown"
+            semantic_statuses.append(status)
+        if not semantic_statuses:
+            overall = "unknown"
+        elif "unhealthy" in semantic_statuses:
+            overall = "unhealthy"
+        elif "degraded" in semantic_statuses:
+            overall = "degraded"
+        elif "unknown" in semantic_statuses:
+            overall = "unknown"
+        else:
+            overall = "healthy"
         return {"components": {"Production API": {
             "observed_at": data["observed_at"], "http_status": 200,
-            "semantic_check": {"status": overall, "probe_statuses": statuses},
+            "semantic_check": {
+                "status": overall,
+                "semantic_probe_statuses": semantic_statuses,
+                "reachability_probes": reachability,
+            },
             "evidence_source": "sanitized fixture only",
         }}}
 
