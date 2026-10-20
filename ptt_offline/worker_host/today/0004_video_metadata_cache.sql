@@ -29,3 +29,20 @@ CREATE TABLE IF NOT EXISTS public_video_metadata_recovery_budget (
   calls INTEGER NOT NULL CHECK(calls >= 0),
   updated_at TEXT NOT NULL
 );
+
+
+-- Durable public recovery demand queue. Public reads may register/reuse demand,
+-- but provider access is performed only by the bounded server-owned consumer.
+CREATE TABLE IF NOT EXISTS public_video_metadata_recovery_demand (
+  video_id TEXT PRIMARY KEY NOT NULL,
+  priority INTEGER NOT NULL CHECK(priority IN (1,2,3)),
+  status TEXT NOT NULL CHECK(status IN ('pending','processing','resolved','not_found')),
+  ptt_day TEXT,
+  requested_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  next_attempt_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0),
+  last_error TEXT
+);
+CREATE INDEX IF NOT EXISTS public_video_metadata_recovery_demand_ready
+  ON public_video_metadata_recovery_demand(status,priority,next_attempt_at,requested_at);
