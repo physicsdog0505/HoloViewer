@@ -1436,6 +1436,41 @@ document.querySelectorAll('[data-watch-group]').forEach(button=>button.addEventL
   document.querySelectorAll('[data-watch-group]').forEach(item=>item.classList.toggle('active',item===button));
   filterRecentWatchalong();
 }));
+const watchalongStaticGrid=document.getElementById('watchalongStaticGrid');
+const watchalongStaticEmpty=document.getElementById('watchalongStaticEmpty');
+async function loadCompletedWatchalongs(){
+ if(!watchalongStaticGrid||!watchalongStaticEmpty)return;
+ try{
+  const response=await fetch('/data/watchalong/manifest.json',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  const manifest=await response.json();
+  if(manifest?.schema_version!=='holoviewer-watchalong-manifest-v1'||!Array.isArray(manifest.events))throw new Error('manifest');
+  watchalongStaticGrid.replaceChildren();
+  manifest.events.slice().sort((a,b)=>String(b.session_day||'').localeCompare(String(a.session_day||''))).forEach(entry=>{
+   const eventId=String(entry?.event_id||'');
+   if(!/^[A-Za-z0-9_-]{11}$/.test(eventId))return;
+   const card=document.createElement('a');
+   card.className='watchalong-static-card';
+   card.href='/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId);
+   const meta=document.createElement('div');meta.className='watchalong-static-meta';
+   const day=document.createElement('span');day.textContent=String(entry.session_day||'');
+   const detail=document.createElement('span');detail.textContent=String(entry.source_count||0)+' 段 · '+String(entry.cue_count||0)+' 字幕';
+   meta.append(day,detail);
+   const title=document.createElement('strong');title.textContent=String(entry.title||eventId);
+   const action=document.createElement('span');action.className='watchalong-static-action';action.textContent='開始同時視聽 →';
+   card.append(meta,title,action);
+   watchalongStaticGrid.append(card);
+  });
+  watchalongStaticEmpty.hidden=watchalongStaticGrid.childElementCount>0;
+  if(!watchalongStaticGrid.childElementCount)watchalongStaticEmpty.textContent='目前沒有已完成的同時視聽活動。';
+ }catch{
+  watchalongStaticGrid.replaceChildren();
+  watchalongStaticEmpty.hidden=false;
+  watchalongStaticEmpty.textContent='已完成活動暫時無法載入。';
+ }
+}
+loadCompletedWatchalongs();
+
 const youtubePanel=document.getElementById('youtubePanel');
 const externalPanel=document.getElementById('externalPanel');
 const youtubeMode=document.getElementById('youtubeMode');
