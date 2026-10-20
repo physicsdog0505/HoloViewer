@@ -94,6 +94,7 @@ def project_coverage(days: list[dict], *, start_day: str, end_day: str) -> dict:
             "contract_gaps": source.get("contract_gaps", []),
             "source_version": source.get("source_version"),
             "last_updated_at": source.get("last_updated_at"),
+            "final_verification_at": source.get("final_verification_at"),
             "thread_evidence": source.get("thread_evidence") or source.get("threads"),
             "source_line_ranges": source.get("source_line_ranges") or source.get("coverage_ranges"),
             "legal_empty_push_evidence": source.get("legal_empty_push_evidence") or source.get("legal_empty_pushes"),
