@@ -794,6 +794,27 @@ class ParityContract(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
 
+    def test_public_ptt_polling_matches_60s_publisher_cadence(self):
+        app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        viewer=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        watch=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        for js in (app,viewer,watch):
+            self.assertIn("const PTT_POLL_MS=60000;",js)
+        self.assertIn("},PTT_POLL_MS);",app)
+        self.assertIn("const pttPollTimer=setInterval(()=>{if(!document.hidden)loadPtt()},PTT_POLL_MS);",viewer)
+        self.assertIn("pttTimer=setInterval(()=>{if(!document.hidden)loadTodayPtt(taipeiDay())},PTT_POLL_MS);",watch)
+        self.assertIn("if($('ptt').classList.contains('active'))loadPtt();",app)
+        self.assertIn("if(!document.hidden&&pttContext.mode==='live')loadPtt();",viewer)
+        self.assertIn("if(!document.hidden&&hostStatus.textContent==='live')loadTodayPtt(taipeiDay());",watch)
+        self.assertNotIn("setInterval(loadPtt,10000)",viewer)
+        self.assertNotIn("loadTodayPtt(taipeiDay())},10000",watch)
+        self.assertNotIn("if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();\n},10000)",app)
+        self.assertNotIn("10 秒後重試",app)
+        # Non-PTT timers (collab lifecycle, local VOD timeline rendering, etc.)
+        # are intentionally outside this emergency mitigation.
+        self.assertIn("reconcileLiveCollab()},10000)",viewer)
+        self.assertIn("syncVodPttTimeline(),500)",viewer)
+
     def test_all_vod_entries_use_metadata_fallback_for_timing(self):
         app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         viewer=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
