@@ -3,10 +3,9 @@ from __future__ import annotations
 import ast
 import io
 import json
-import os
+import multiprocessing
 from pathlib import Path
 import tempfile
-import threading
 import unittest
 
 from admin_dashboard.admission import AdmissionRequest, SQLiteReadAdmissionController
@@ -18,11 +17,23 @@ from admin_dashboard.capabilities import (
 from admin_dashboard.dashboard import DashboardController
 from admin_dashboard.http import DashboardApplication
 from admin_dashboard.host_boundary import InternalExposureConfig, evaluate_internal_exposure
+from admin_dashboard.integration import build_internal_admin_application
 from admin_dashboard.isolated import AuthenticatedDashboard
 from admin_dashboard.production_shell import (
     EvidenceReaderSet, ProductionReadOnlyShell, select_reader_provider,
 )
 
+
+
+
+def _process_admit(path, key, now, queue):
+    ctrl = SQLiteReadAdmissionController(Path(path), source_limits={"d1": (1, 600)})
+    req = AdmissionRequest("d1", {"day": "2026-10-20"}, "bounded_sample",
+                           "d1_snapshot", "bounded_read", key)
+    receipt = ctrl.admit(req, now=now)
+    if receipt.admitted:
+        ctrl.release(key)
+    queue.put((receipt.admitted, receipt.reason, receipt.requests_used))
 
 class _Creds:
     def __init__(self, allowed=()):
@@ -155,14 +166,20 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertFalse(second.admitted)
         self.assertEqual(second.reason, "budget_exceeded")
 
-    def test_two_controller_instances_share_budget_state(self):
-        one = self.admission({"d1": (1, 600)})
-        two = SQLiteReadAdmissionController(self.state, source_limits={"d1": (1, 600)})
-        self.assertTrue(one.admit(self.request("p1"), now=1000).admitted)
-        one.release("p1")
-        receipt = two.admit(self.request("p2"), now=1001)
-        self.assertFalse(receipt.admitted)
-        self.assertEqual(receipt.reason, "budget_exceeded")
+    def test_two_processes_share_budget_state(self):
+        ctx = multiprocessing.get_context("spawn")
+        q1, q2 = ctx.Queue(), ctx.Queue()
+        p1 = ctx.Process(target=_process_admit, args=(str(self.state), "p1", 1000, q1))
+        p1.start(); p1.join(10)
+        self.assertEqual(p1.exitcode, 0)
+        self.assertEqual(q1.get(timeout=2)[0], True)
+        p2 = ctx.Process(target=_process_admit, args=(str(self.state), "p2", 1001, q2))
+        p2.start(); p2.join(10)
+        self.assertEqual(p2.exitcode, 0)
+        admitted, reason, used = q2.get(timeout=2)
+        self.assertFalse(admitted)
+        self.assertEqual(reason, "budget_exceeded")
+        self.assertEqual(used, 1)
 
     def test_concurrent_same_key_is_coalesced(self):
         one = self.admission({"d1": (6, 600)})
@@ -207,6 +224,31 @@ class ProductionShellPhase1Tests(unittest.TestCase):
             InternalExposureConfig(bind_host="127.0.0.1", public_route_exposed=True))
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.error_code, "public_route_forbidden")
+
+
+    def test_internal_composition_rejects_wildcard_before_mount(self):
+        controller = DashboardController({}, cooldown_seconds=0)
+        with self.assertRaises(RuntimeError):
+            build_internal_admin_application(
+                controller=controller,
+                authenticator=FixtureAdminAuthenticator(),
+                exposure_config=InternalExposureConfig(bind_host="0.0.0.0"))
+
+    def test_internal_composition_accepts_loopback_and_keeps_auth_first(self):
+        calls = []
+        controller = DashboardController({
+            "data_coverage": lambda: calls.append("reader") or {"days": []}
+        }, cooldown_seconds=0)
+        app = build_internal_admin_application(
+            controller=controller,
+            authenticator=FixtureAdminAuthenticator(allow=False),
+            exposure_config=InternalExposureConfig(bind_host="127.0.0.1"))
+        captured = {}
+        app({"REQUEST_METHOD": "GET", "PATH_INFO": "/admin/status",
+             "QUERY_STRING": "section=data_coverage"},
+            lambda status, headers: captured.update(status=status))
+        self.assertEqual(captured["status"], "401 Unauthorized")
+        self.assertEqual(calls, [])
 
     # Capability 11-15
     def test_reader_interface_has_no_arbitrary_sql(self):
