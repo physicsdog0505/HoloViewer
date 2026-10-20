@@ -89,6 +89,15 @@ class SQLiteReadAdmissionController:
               coalesce_key TEXT PRIMARY KEY,
               lease_until REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS read_result_cache(
+              cache_key TEXT PRIMARY KEY,
+              source TEXT NOT NULL,
+              stored_at REAL NOT NULL,
+              expires_at REAL NOT NULL,
+              value_json TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_read_result_cache_expires
+              ON read_result_cache(expires_at);
             CREATE TABLE IF NOT EXISTS admin_read_audit(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               observed_at TEXT NOT NULL,
@@ -183,6 +192,64 @@ class SQLiteReadAdmissionController:
                 con.close()
             except Exception:
                 pass
+
+    def cache_get(self, cache_key: str, *, now: float | None = None):
+        observed = time.time() if now is None else float(now)
+        try:
+            con = self._connect()
+            con.execute("BEGIN IMMEDIATE")
+            con.execute("DELETE FROM read_result_cache WHERE expires_at <= ?", (observed,))
+            row = con.execute(
+                "SELECT value_json FROM read_result_cache WHERE cache_key=? AND expires_at>?",
+                (cache_key, observed)).fetchone()
+            con.execute("COMMIT")
+            con.close()
+            if row is None:
+                return None, False
+            return json.loads(row[0]), True
+        except (sqlite3.DatabaseError, OSError, ValueError, TypeError, json.JSONDecodeError):
+            try:
+                con.execute("ROLLBACK")
+            except Exception:
+                pass
+            try:
+                con.close()
+            except Exception:
+                pass
+            raise RuntimeError("cache_state_error")
+
+    def cache_put(self, cache_key: str, source: str, value, *, ttl_seconds: int = 60,
+                  now: float | None = None) -> None:
+        if ttl_seconds < 60:
+            raise ValueError("production cache TTL must be >=60 seconds")
+        observed = time.time() if now is None else float(now)
+        try:
+            raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("cache_value_invalid") from exc
+        if len(raw.encode("utf-8")) > 1_000_000:
+            raise RuntimeError("cache_value_too_large")
+        try:
+            con = self._connect()
+            con.execute("BEGIN IMMEDIATE")
+            con.execute(
+                "INSERT INTO read_result_cache(cache_key,source,stored_at,expires_at,value_json) "
+                "VALUES(?,?,?,?,?) ON CONFLICT(cache_key) DO UPDATE SET "
+                "source=excluded.source, stored_at=excluded.stored_at, "
+                "expires_at=excluded.expires_at, value_json=excluded.value_json",
+                (cache_key, source, observed, observed + ttl_seconds, raw))
+            con.execute("COMMIT")
+            con.close()
+        except (sqlite3.DatabaseError, OSError):
+            try:
+                con.execute("ROLLBACK")
+            except Exception:
+                pass
+            try:
+                con.close()
+            except Exception:
+                pass
+            raise RuntimeError("cache_state_error")
 
     def release(self, coalesce_key: str) -> None:
         try:
