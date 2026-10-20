@@ -46,11 +46,24 @@ class ProductionReadOnlyShell:
         return getattr(self._config, source)
 
     def _read(self, source: str, operation: str, scope: dict, mode: str, fn):
+        key_data = {"source": source, "scope": scope, "mode": mode, "operation": operation}
+        try:
+            coalesce_key = "sha256:" + hashlib.sha256(
+                json.dumps(key_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            scope_hash = self._admission.scope_hash(scope)
+        except Exception:
+            return self._unavailable(source, "admission_denied")
+
         try:
             gate = self._gate(source)
         except Exception:
+            self._safe_audit(source, operation, scope_hash, False, False,
+                             "short", "denied", "source_disabled")
             return self._unavailable(source, "source_disabled")
         if not gate.enabled:
+            self._safe_audit(source, operation, scope_hash, False, False,
+                             "short", "denied", "source_disabled")
             return self._unavailable(source, "source_disabled")
         if gate.credential_required:
             try:
@@ -58,12 +71,9 @@ class ProductionReadOnlyShell:
             except Exception:
                 credential_available = False
             if not credential_available:
+                self._safe_audit(source, operation, scope_hash, False, False,
+                                 "short", "denied", "credential_missing")
                 return self._unavailable(source, "credential_missing")
-
-        key_data = {"source": source, "scope": scope, "mode": mode, "operation": operation}
-        coalesce_key = "sha256:" + hashlib.sha256(
-            json.dumps(key_data, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest()
         request = AdmissionRequest(
             source=source, scope=scope, verification_mode=mode,
             request_class=operation, cost_class="bounded_read", coalesce_key=coalesce_key,
@@ -80,19 +90,18 @@ class ProductionReadOnlyShell:
                     cached = validator(cached)
                 except Exception:
                     return self._unavailable(source, "cache_state_error")
-                scope_hash = self._admission.scope_hash(scope)
-                if not self._safe_audit(source, operation, scope_hash, True, True,
+                try:
+                    cache_receipt = self._admission.cache_hit_receipt(request)
+                except Exception:
+                    return self._unavailable(source, "cache_state_error")
+                if not self._safe_audit(source, operation, cache_receipt.scope_hash, True, True,
                                         "short", "cache_hit", None):
                     return self._unavailable(source, "source_unavailable")
                 return {
                     "available": True,
                     "value": cached,
                     "error_code": None,
-                    "admission": {
-                        "source": source, "scope_hash": scope_hash, "mode": mode,
-                        "admitted": True, "reason": "cache_hit",
-                        "cache_hit": True, "coalesced": False,
-                    },
+                    "admission": asdict(cache_receipt),
                 }
 
         try:
