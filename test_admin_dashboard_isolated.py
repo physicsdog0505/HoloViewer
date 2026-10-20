@@ -113,6 +113,32 @@ class IsolatedPilotTests(unittest.TestCase):
         self.assertEqual(coverage_sync_consistency(coverage, monitor),
                          [{"code": "comparison-scope-unbound", "severity": "unknown"}])
 
+    def test_browser_privacy_boundary_drops_secrets_but_keeps_content_hash(self):
+        controller = DashboardController({"data_coverage": lambda: {
+            "days": [{
+                "date": "2026-10-20",
+                "status": "UNKNOWN",
+                "author": "must-not-leak",
+                "content": "must-not-leak",
+                "api_key": "must-not-leak",
+                "nested": {
+                    "token": "must-not-leak",
+                    "content_hash": "sha256:" + "a" * 64,
+                    "sidecar": "/Users/example/private/sidecar.json",
+                    "api_path": "/health",
+                },
+            }]
+        }}, cooldown_seconds=0)
+        payload = controller.refresh("data_coverage", now=datetime(2026, 10, 20, 11, 30, 30, tzinfo=timezone.utc))
+        day = payload["data_coverage"]["payload"]["days"][0]
+        self.assertNotIn("author", day)
+        self.assertNotIn("content", day)
+        self.assertNotIn("api_key", day)
+        self.assertNotIn("token", day["nested"])
+        self.assertEqual(day["nested"]["content_hash"], "sha256:" + "a" * 64)
+        self.assertEqual(day["nested"]["sidecar"], "[redacted-local-path]")
+        self.assertEqual(day["nested"]["api_path"], "/health")
+
     def test_dashboard_payload_does_not_expose_sensitive_keys(self):
         readers = FixtureReaders(ROOT).injected()
         payload = DashboardController(readers, cooldown_seconds=0).refresh(
