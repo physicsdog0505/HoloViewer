@@ -284,6 +284,31 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertEqual(result["error_code"], "credential_missing")
         self.assertEqual(fake.calls, [])
 
+
+    def test_credential_provider_exception_fails_closed_without_reader_call(self):
+        class BadCreds:
+            def available(self, source):
+                raise RuntimeError("secret credential backend detail")
+        fake = FakeProductionEvidenceReader(d1={"safe": True})
+        shell = ProductionReadOnlyShell(
+            fake, self.admission(), config=self.config(d1=True), credentials=BadCreds())
+        result = shell.read_d1(D1ReadScope("2026-10-20", ()))
+        self.assertFalse(result["available"])
+        self.assertEqual(result["error_code"], "credential_missing")
+        self.assertEqual(fake.calls, [])
+
+    def test_shell_disabled_sources_render_unavailable_not_unknown(self):
+        shell = ProductionReadOnlyShell(
+            FakeProductionEvidenceReader(), self.admission(), config=self.config(),
+            credentials=_Creds())
+        raw = EvidenceReaderSet(shell).sync_monitor()
+        from admin_dashboard.contracts import build_sync_monitor
+        monitor = build_sync_monitor(raw)
+        states = {x["component"]: x["status"] for x in monitor["jobs"]}
+        self.assertEqual(states["Publisher"], "unavailable")
+        self.assertEqual(states["Archive"], "unavailable")
+        self.assertEqual(states["D1 Snapshot"], "unavailable")
+
     # Failure isolation 16-18
     def test_d1_failure_does_not_break_archive(self):
         fake = FakeProductionEvidenceReader(
@@ -340,6 +365,20 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertNotIn('"account_id"', encoded)
         self.assertNotIn("/users/name", encoded)
         self.assertIn("content_hash", encoded)
+
+
+    def test_audit_failure_turns_read_unavailable(self):
+        class BadAudit(SQLiteReadAdmissionController):
+            def audit(self, **kwargs):
+                raise RuntimeError("local audit failed")
+        admission = BadAudit(self.state, source_limits={"d1": (6, 600)})
+        fake = FakeProductionEvidenceReader(d1={"safe": True})
+        shell = ProductionReadOnlyShell(
+            fake, admission, config=self.config(d1=True), credentials=_Creds({"d1"}))
+        result = shell.read_d1(D1ReadScope("2026-10-20", ()))
+        self.assertFalse(result["available"])
+        self.assertEqual(result["error_code"], "source_unavailable")
+        self.assertEqual(fake.calls, ["d1"])
 
     def test_audit_schema_is_sanitized(self):
         ctrl = self.admission()
