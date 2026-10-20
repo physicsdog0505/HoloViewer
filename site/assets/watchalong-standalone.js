@@ -44,7 +44,10 @@ const mobileAlignNow=document.getElementById('mobileAlignNow');
 const mobilePrevSegment=document.getElementById('mobilePrevSegment');
 const mobileNextSegment=document.getElementById('mobileNextSegment');
 const mobileSubtitleMode=document.getElementById('mobileSubtitleMode');
+const mobileCopyCheckpoint=document.getElementById('mobileCopyCheckpoint');
 const mobileFullscreen=document.getElementById('mobileFullscreen');
+const copyCheckpoint=document.getElementById('copyCheckpoint');
+const resumeStatus=document.getElementById('resumeStatus');
 const segmentStatus=document.getElementById('segmentStatus');
 const immersiveToolbarTrigger=document.getElementById('immersiveToolbarTrigger');
 const topbar=document.querySelector('.watchalong-topbar');
@@ -82,7 +85,11 @@ let danmakuEnabled=false;
 let activeSubtitleCueId='';
 let lastDanmakuCueId='';
 let immersiveToolbarTimer=null;
+let checkpointTimer=null;
+let resumeApplied=false;
 const mobileWatchMedia=window.matchMedia('(max-width:760px)');
+const requestedResumeSeconds=parseCheckpointSeconds(params.get('t'));
+let pendingResumeSeconds=requestedResumeSeconds;
 
 function validVideoId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{11}$/.test(id)?id:''}
 function validPlaylistId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{10,64}$/.test(id)?id:''}
@@ -172,6 +179,115 @@ function clock(seconds){
  const s=Math.max(0,Math.floor(Number(seconds)||0)),m=Math.floor(s/60),r=s%60,h=Math.floor(m/60);
  return h?String(h).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+':'+String(r).padStart(2,'0'):String(m).padStart(2,'0')+':'+String(r).padStart(2,'0');
 }
+function parseCheckpointSeconds(value){
+ if(value==null||String(value).trim()==='')return null;
+ const seconds=Number(value);
+ return Number.isFinite(seconds)&&seconds>=0&&seconds<=604800?seconds:null;
+}
+function checkpointIdentity(){
+ if(EVENT_ID)return 'event:'+EVENT_ID;
+ if(hostVideoId)return 'host:'+hostVideoId;
+ return '';
+}
+function checkpointStorageKey(){
+ const identity=checkpointIdentity();
+ return identity?'holodocchi-watchalong-progress-v1:'+identity:'';
+}
+function readSavedCheckpoint(){
+ const key=checkpointStorageKey();if(!key)return null;
+ try{
+  const row=JSON.parse(localStorage.getItem(key)||'null');
+  const seconds=parseCheckpointSeconds(row?.t);
+  return seconds==null?null:seconds;
+ }catch{return null}
+}
+function currentHostSeconds(){
+ try{
+  const seconds=hostPlayer?.getCurrentTime?.();
+  return Number.isFinite(seconds)?Math.max(0,seconds):null;
+ }catch{return null}
+}
+function saveCheckpoint(){
+ const seconds=currentHostSeconds(),key=checkpointStorageKey();
+ if(seconds==null||!key||seconds<3)return false;
+ try{
+  localStorage.setItem(key,JSON.stringify({t:Math.round(seconds*10)/10,updated_at:new Date().toISOString()}));
+  return true;
+ }catch{return false}
+}
+function checkpointUrl(seconds){
+ const q=new URLSearchParams(location.search);
+ q.set('t',String(Math.round(Math.max(0,seconds)*10)/10));
+ return location.origin+location.pathname+'?'+q.toString();
+}
+async function copyCurrentCheckpoint(){
+ const seconds=currentHostSeconds();
+ if(seconds==null){
+  if(resumeStatus)resumeStatus.textContent='播放位置尚未就緒';
+  return;
+ }
+ const url=checkpointUrl(seconds);
+ try{
+  if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(url);
+  else{
+   const area=document.createElement('textarea');area.value=url;area.setAttribute('readonly','');
+   area.style.position='fixed';area.style.opacity='0';document.body.append(area);area.select();
+   document.execCommand('copy');area.remove();
+  }
+  saveCheckpoint();
+  if(resumeStatus)resumeStatus.textContent='已複製 '+clock(seconds);
+  if(mobileCopyCheckpoint)mobileCopyCheckpoint.textContent='已複製 '+clock(seconds);
+  setTimeout(()=>{
+   if(resumeStatus?.textContent.startsWith('已複製'))resumeStatus.textContent='';
+   if(mobileCopyCheckpoint?.textContent.startsWith('已複製'))mobileCopyCheckpoint.textContent='複製目前位置';
+  },2200);
+ }catch{
+  if(resumeStatus)resumeStatus.textContent='無法複製連結';
+ }
+}
+function seekWatchalongToHost(seconds){
+ if(!hostPlayer||!Number.isFinite(seconds))return false;
+ const hostSeconds=Math.max(0,seconds);
+ try{hostPlayer.seekTo(hostSeconds,true);hostPlayer.pauseVideo()}catch{return false}
+ if(STATIC_EVENT_MODE&&segments.length){
+  const index=segmentIndexForHost(hostSeconds);
+  if(index>=0){
+   activeSegmentIndex=index;
+   const segment=segments[index],offset=segment.source-segment.host,target=hostSeconds+offset;
+   setOffset(offset,{persist:false});renderSegments();
+   try{
+    if(segment.sourceVideoId&&segment.sourceVideoId!==activeSourceVideoId){
+     activeSourceVideoId=segment.sourceVideoId;sourceVideoId=segment.sourceVideoId;
+     sourcePlayer?.cueVideoById?.({videoId:segment.sourceVideoId,startSeconds:Math.max(0,target)});
+    }else if(sourcePlayer&&target>=0){
+     sourcePlayer.seekTo(Math.max(0,target),true);sourcePlayer.pauseVideo?.();
+    }
+   }catch{}
+  }
+ }else if(sourcePlayer&&timelineAligned){
+  const target=sourceExpectedTime(hostSeconds);
+  if(Number.isFinite(target)&&target>=0){try{sourcePlayer.seekTo(target,true);sourcePlayer.pauseVideo?.()}catch{}}
+ }
+ syncPttToHost(hostSeconds);
+ return true;
+}
+function maybeApplyResume(){
+ if(resumeApplied||!hostPlayer||!sourcePlayer)return;
+ if(pendingResumeSeconds==null){
+  pendingResumeSeconds=readSavedCheckpoint();
+  if(pendingResumeSeconds==null){resumeApplied=true;return}
+ }
+ if(seekWatchalongToHost(pendingResumeSeconds)){
+  resumeApplied=true;
+  if(resumeStatus)resumeStatus.textContent=(requestedResumeSeconds!=null?'已開啟分享位置 ':'繼續上次位置 ')+clock(pendingResumeSeconds);
+ }
+}
+function startCheckpointLoop(){
+ if(checkpointTimer)return;
+ checkpointTimer=setInterval(()=>{if(!document.hidden)saveCheckpoint()},5000);
+}
+copyCheckpoint?.addEventListener('click',copyCurrentCheckpoint);
+mobileCopyCheckpoint?.addEventListener('click',copyCurrentCheckpoint);
 function refreshOffsetUi(){
  offsetValue.textContent=timelineAligned?'Offset '+(sourceOffsetSeconds>=0?'+':'')+sourceOffsetSeconds.toFixed(1)+'s':'尚未對齊';
  offsetMinus.disabled=!timelineAligned;
@@ -417,6 +533,7 @@ function setSourceStandby(active){
  }
 }
 function onHostStateChange(event){
+ if(event.data===YT.PlayerState.PAUSED||event.data===YT.PlayerState.ENDED)saveCheckpoint();
  if(!linkedPlayback.checked||!timelineAligned||!sourcePlayer||suppressLinkedCommand)return;
  let host=null;try{host=hostPlayer?.getCurrentTime?.()}catch{}
  if(Number.isFinite(host)&&sourceExpectedTime(host)<0){setSourceStandby(true);return}
@@ -432,7 +549,7 @@ function mountPlayers(){
  if(hostVideoId&&!hostPlayer){
   hostPlayer=new YT.Player('hostPlayer',{
    videoId:hostVideoId,playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
-   events:{onStateChange:onHostStateChange,onReady:()=>{hostStatus.textContent='已就緒';startSyncLoop()}}
+   events:{onStateChange:onHostStateChange,onReady:()=>{hostStatus.textContent='已就緒';startSyncLoop();startCheckpointLoop();maybeApplyResume()}}
   });
  }else if(!hostVideoId){
   hostStatus.textContent='缺少 Hololive 主影片';
@@ -446,7 +563,7 @@ function mountPlayers(){
   }
   sourcePlayer=new YT.Player('sourcePlayer',{
    videoId:sourceVideoId||undefined,playerVars:vars,
-   events:{onReady:()=>{sourceStatus.textContent=PLAYLIST_ID?'Playlist 已就緒':'片源已就緒';startSyncLoop();startSubtitleLoop()}}
+   events:{onReady:()=>{sourceStatus.textContent=PLAYLIST_ID?'Playlist 已就緒':'片源已就緒';startSyncLoop();startSubtitleLoop();maybeApplyResume()}}
   });
  }else if(!sourceVideoId&&!PLAYLIST_ID){
   sourceStatus.textContent='缺少 YouTube 片源';
@@ -692,8 +809,12 @@ async function loadReadOnlyArtifacts(){
   subtitles=normalizeStaticSubtitles(payload);
   watchalongSessionDay=String(payload.session_day||'');
   subtitleTimeline='host';
-  activeSegmentIndex=0;
-  setOffset(segments[0].source-segments[0].host,{persist:false});
+  if(pendingResumeSeconds==null)pendingResumeSeconds=readSavedCheckpoint();
+  activeSegmentIndex=pendingResumeSeconds==null?0:Math.max(0,segmentIndexForHost(pendingResumeSeconds));
+  const initialSegment=segments[activeSegmentIndex]||segments[0];
+  sourceVideoId=validVideoId(initialSegment.sourceVideoId)||sourceVideoId;
+  activeSourceVideoId=sourceVideoId;
+  setOffset(initialSegment.source-initialSegment.host,{persist:false});
   renderSegments();
 
   staticArtifactsReady=true;
@@ -822,6 +943,7 @@ staticArtifactsPromise.then(()=>{
 });
 
 window.addEventListener('pagehide',()=>{
- clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);clearTimeout(metadataRetryTimer);
+ saveCheckpoint();
+ clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);clearInterval(checkpointTimer);clearTimeout(metadataRetryTimer);
  pttPrimeTimers.forEach(clearTimeout);pttPrimeTimers=[];
 });
