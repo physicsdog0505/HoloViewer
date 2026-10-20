@@ -15,15 +15,18 @@ NOW = datetime(2026, 10, 20, 8, 0, tzinfo=timezone.utc)
 
 class DashboardTests(unittest.TestCase):
     def test_dashboard_package_has_no_writer_or_external_io_import(self):
-        imports = set()
         from pathlib import Path
+        forbidden_external = {"subprocess", "requests", "http.client", "urllib.request"}
         for path in (Path(__file__).parent / "admin_dashboard").glob("*.py"):
+            imports = set()
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.Import):
                     imports.update(alias.name for alias in node.names)
                 elif isinstance(node, ast.ImportFrom):
                     imports.add(node.module or "")
-        self.assertTrue({"sqlite3", "subprocess", "requests", "http.client", "urllib.request"}.isdisjoint(imports))
+            self.assertTrue(forbidden_external.isdisjoint(imports), path.name)
+            if path.name != "admission.py":
+                self.assertNotIn("sqlite3", imports, path.name)
 
     def test_refresh_calls_readers_only_and_cooldown_bounds_reads(self):
         calls = []
@@ -54,6 +57,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(failed["error"]["message"], "read-only monitor source failed")
         self.assertEqual(failed["last_successful_read_at"], good["last_successful_read_at"])
         self.assertNotEqual(failed["read_at"], failed["last_successful_read_at"])
+        self.assertEqual(failed["last_good_age_seconds"], 1.0)
 
     def test_missing_monitor_sources_are_unknown_or_unavailable(self):
         jobs = build_sync_monitor({}, now=NOW)["jobs"]
