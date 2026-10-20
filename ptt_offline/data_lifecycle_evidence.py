@@ -37,7 +37,10 @@ def _digest(value: object) -> str:
 
 def build_expected_aid_contract(*, day: str, entries: list[dict[str,Any]],
                                 authority: dict[str,Any]) -> dict[str,Any]:
-    """Require one authoritative day and one night AID for the Taipei day."""
+    """Require authoritative day/night AID sets for the Taipei day.
+
+    Split threads are represented by contiguous part numbers starting at 1.
+    """
     gaps=[]
     conflicts=[]
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}",day):
@@ -55,22 +58,35 @@ def build_expected_aid_contract(*, day: str, entries: list[dict[str,Any]],
             continue
         period=item.get("period")
         aid=item.get("aid")
+        part=item.get("part",1)
         seen_period[period]+=1
         seen_aid[aid]+=1
         if period not in PERIODS:
             conflicts.append("unsupported-period")
         if not isinstance(aid,str) or not AID_RE.fullmatch(aid):
             conflicts.append("invalid-aid")
+        if type(part) is not int or part<1:
+            conflicts.append("invalid-part")
         normalized.append({
             "day":day,
             "period":period,
+            "part":part,
             "aid":aid,
             "source_url":item.get("source_url"),
             "authority_record_id":item.get("authority_record_id"),
         })
     for period in PERIODS:
-        if seen_period[period]==0:gaps.append(f"expected-{period}-aid-missing")
-        elif seen_period[period]>1:conflicts.append(f"duplicate-{period}-aid")
+        if seen_period[period]==0:
+            gaps.append(f"expected-{period}-aid-missing")
+            continue
+        parts=sorted(
+            item["part"] for item in normalized
+            if item.get("period")==period and type(item.get("part")) is int
+        )
+        if len(parts)!=len(set(parts)):
+            conflicts.append(f"duplicate-{period}-part")
+        elif parts!=list(range(1,len(parts)+1)):
+            conflicts.append(f"noncontiguous-{period}-parts")
     if any(n>1 for aid,n in seen_aid.items() if aid is not None):
         conflicts.append("duplicate-aid-across-periods")
     status="CONFLICT" if conflicts else "UNKNOWN" if gaps else "COMPLETE"
