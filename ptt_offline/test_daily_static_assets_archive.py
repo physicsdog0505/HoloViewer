@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 import tempfile
 import unittest
@@ -45,8 +46,11 @@ def _receipt(state="VERIFIED_COMPLETE"):
         "contract_gaps":[],
         "conflicts":[],
         "safety":{},
-        "evidence_digest":"c"*64,
     }
+    material=json.dumps(
+        body,ensure_ascii=False,sort_keys=True,separators=(",",":")
+    ).encode("utf-8")
+    body["evidence_digest"]=sha256(material).hexdigest()
     return body
 
 
@@ -100,6 +104,13 @@ class DailyStaticAssetsArchiveTests(unittest.TestCase):
             self.assertEqual(package["object_count"],2)
             self.assertTrue((Path(tmp)/package["manifest"]["key"]).is_file())
             self.assertEqual(set(package["expected_aids"]),{"1abcDAY","1abcNIGHT"})
+
+    def test_finalization_digest_tamper_fails_closed(self):
+        receipt=_receipt()
+        receipt["summary"]={"tampered":True}
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(DailyArchiveError,"evidence_digest mismatch"):
+                self._build(Path(tmp),receipt=receipt)
 
     def test_unknown_and_repair_needed_fail_closed(self):
         for state in ("UNKNOWN","REPAIR_NEEDED"):
