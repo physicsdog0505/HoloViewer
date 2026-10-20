@@ -110,23 +110,23 @@ class ProductionReadOnlyShell:
 
     def read_d1(self, scope: D1ReadScope):
         return self._read("d1", "d1_snapshot", asdict(scope), scope.verification_mode,
-                          lambda: self._reader.read_d1_snapshot(scope))
+                          lambda: self._reader.read_d1_snapshot(scope, timeouts=self._config.timeouts))
 
     def read_archive(self, scope: ArchiveReadScope):
         return self._read("archive", "archive_delivery", asdict(scope), "bounded_sample",
-                          lambda: self._reader.read_archive_delivery_evidence(scope))
+                          lambda: self._reader.read_archive_delivery_evidence(scope, timeouts=self._config.timeouts))
 
     def read_api_semantic(self):
         return self._read("api_semantic", "api_semantic_health", {}, "bounded_sample",
-                          self._reader.read_api_semantic_health)
+                          lambda: self._reader.read_api_semantic_health(timeouts=self._config.timeouts))
 
     def read_publisher(self):
         return self._read("publisher", "publisher_evidence", {}, "bounded_sample",
-                          self._reader.read_publisher_evidence)
+                          lambda: self._reader.read_publisher_evidence(timeouts=self._config.timeouts))
 
     def read_collector(self):
         return self._read("collector", "collector_evidence", {}, "bounded_sample",
-                          self._reader.read_collector_evidence)
+                          lambda: self._reader.read_collector_evidence(timeouts=self._config.timeouts))
 
 
 class EvidenceReaderSet:
