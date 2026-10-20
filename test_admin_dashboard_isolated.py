@@ -133,6 +133,24 @@ class IsolatedPilotTests(unittest.TestCase):
         self.assertTrue(semantic["reachability_probes"])
         self.assertNotIn("unknown", semantic["semantic_probe_statuses"])
 
+    def test_healthy_semantic_probes_can_aggregate_healthy(self):
+        readers = FixtureReaders(ROOT)
+        original = readers._fixture
+        def fixture(name):
+            value = original(name)
+            if name == "api-semantic-health.sanitized.json":
+                value = json.loads(json.dumps(value))
+                ptt = next(x for x in value["probes"] if x["name"] == "ptt_today")
+                ptt["semantic_status"] = "healthy"
+                ptt["reason"] = "schema-and-watermark-valid"
+                ptt["content_health"]["gap"] = False
+                ptt["content_health"]["coverage_status"] = "complete"
+            return value
+        readers._fixture = fixture
+        health = readers.system_health()["components"]["Production API"]
+        self.assertEqual(health["semantic_check"]["status"], "healthy")
+        self.assertEqual(health["http_status"], 200)
+
     def test_health_only_fixture_cannot_certify_healthy(self):
         readers = FixtureReaders(ROOT)
         original = readers._fixture
