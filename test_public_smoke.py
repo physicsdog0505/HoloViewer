@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -10,7 +11,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/watchalong-viewer/index.html", "site/assets/watchalong-standalone.css", "site/assets/watchalong-standalone.js", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/watchalong-viewer/index.html", "site/assets/watchalong-standalone.css", "site/assets/watchalong-standalone.js", "site/assets/watchalong-static-core.js", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py", "site/data/watchalong/manifest.json", "site/data/watchalong/events/eFYByyw5AJc.json", "site/data/watchalong/events/U2o13h1Oib4.json", "site/data/watchalong/events/8pF4qHcshDc.json"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
@@ -197,6 +198,12 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn('id="sourcePlayer"', html)
         self.assertIn('id="pttPanel"', html)
         self.assertIn('id="subtitleOverlay"', html)
+        self.assertIn('id="danmakuLayer"', html)
+        self.assertIn('data-subtitle-mode="standard"', html)
+        self.assertIn('data-subtitle-mode="danmaku"', html)
+        self.assertIn('data-subtitle-mode="off"', html)
+        self.assertIn('id="mobileSubtitleMode"', html)
+        self.assertIn('src="/assets/watchalong-static-core.js"', html)
         self.assertIn('id="sourceStandby"', html)
         self.assertIn('id="mobileSwapHost"', html)
         self.assertIn('id="mobileSwapSource"', html)
@@ -213,12 +220,14 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn('>對齊目前位置</button>', html)
         self.assertNotIn('>以目前位置校準</button>', html)
         self.assertNotIn('id="segmentPanel"', html)
-        self.assertIn("const HOST_ID=validVideoId(params.get('host'));", js)
-        self.assertIn("const SOURCE_ID=validVideoId(params.get('source'));", js)
+        self.assertIn("let hostVideoId=validVideoId(params.get('host'));", js)
+        self.assertIn("let sourceVideoId=validVideoId(params.get('source'));", js)
         self.assertIn("const PLAYLIST_ID=validPlaylistId(params.get('playlist'));", js)
         self.assertIn("const playlistStart=Math.max(1,Number(params.get('playlist_start'))||1);", js)
         self.assertIn("vars.index=playlistStart-1;", js)
-        self.assertIn("api('/v1/watchalong/events/'+encodeURIComponent(EVENT_ID))", js)
+        self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", js)
+        self.assertIn("HoloViewerWatchalongStatic.verifyDigest(digest,entry.sha256)", js)
+        self.assertIn("HoloViewerWatchalongStatic.validateEvent(entry,eventResult.payload)", js)
         self.assertIn("function jumpToSegmentIndex(index)", js)
         self.assertIn("hostPlayer?.seekTo?.(Math.max(0,segment.host),true)", js)
         self.assertIn("sourcePlayer?.seekTo?.(Math.max(0,segment.source),true)", js)
@@ -247,15 +256,23 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("function setSourceStandby(active)", js)
         self.assertIn("if(expected<0){", js)
         self.assertIn("setSourceStandby(true);", js)
-        self.assertIn("if(sourceStandbyActive||!Number.isFinite(current)||!subtitles.length)", js)
+        self.assertIn("try{current=subtitleTimeline==='host'?hostPlayer?.getCurrentTime?.():sourcePlayer?.getCurrentTime?.()}", js)
         self.assertIn("immersiveToolbarTrigger.addEventListener('mouseenter'", js)
         self.assertIn("fullscreenButton.blur();", js)
         self.assertIn("topbar.addEventListener('focusin'", js)
         self.assertIn("topbar.addEventListener('focusout'", js)
         self.assertIn("topbar.addEventListener('mouseleave'", js)
         self.assertIn("function normalizeSubtitles(payload)", js)
+        self.assertIn("function spawnDanmaku(row)", js)
+        self.assertIn("function setSubtitleMode(mode,{persist=true}={})", js)
+        self.assertIn("localStorage.setItem('holoviewer-watchalong-subtitle-mode'", js)
+        self.assertIn("subtitleTimeline='host';", js)
+        self.assertIn("function applyStaticSegment(index,{seek=true}={})", js)
+        self.assertIn("if(STATIC_EVENT_MODE&&segments.length)", js)
+        self.assertIn("sourcePlayer.loadVideoById(spec)", js)
+        self.assertIn("const staticArtifactsPromise=loadReadOnlyArtifacts();", js)
         self.assertIn("function resolveHostPtt()", js)
-        self.assertIn("api('/v1/catalog/videos/'+encodeURIComponent(HOST_ID))", js)
+        self.assertIn("api('/v1/catalog/videos/'+encodeURIComponent(hostVideoId))", js)
         self.assertIn("await loadArchivePtt(hostWindow)", js)
         self.assertIn(".watchalong-workspace.layout-equal{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}", css)
         self.assertIn(".watchalong-workspace.layout-source{grid-template-columns:minmax(280px,.72fr) minmax(0,1.55fr)}", css)
@@ -278,7 +295,27 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".mobile-controls-panel:not([hidden]){display:block}", css)
         self.assertIn(".mobile-controls-grid .mobile-sync-start{grid-column:1/-1", css)
         self.assertIn(".source-standby[hidden]{display:none}", css)
+        self.assertIn(".danmaku-layer{", css)
+        self.assertIn("@keyframes watchalong-danmaku", css)
+        self.assertIn(".subtitle-mode-controls{", css)
         self.assertIn("location.href='/watchalong-viewer/?'+q.toString();", app)
+
+    def test_watchalong_static_assets_integrity(self):
+        manifest = json.loads((ROOT / "site/data/watchalong/manifest.json").read_text(encoding="utf-8"))
+        expected = {"eFYByyw5AJc": 838, "U2o13h1Oib4": 1438, "8pF4qHcshDc": 1461}
+        self.assertEqual(manifest.get("schema_version"), "holoviewer-watchalong-manifest-v1")
+        self.assertEqual(manifest.get("event_count"), 3)
+        self.assertEqual({row["event_id"] for row in manifest["events"]}, set(expected))
+        for row in manifest["events"]:
+            path = ROOT / "site" / row["path"].lstrip("/")
+            raw = path.read_bytes()
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), row["sha256"])
+            event = json.loads(raw)
+            self.assertEqual(event.get("schema_version"), "holoviewer-watchalong-event-v1")
+            self.assertEqual(event.get("master_video_id"), row["master_video_id"])
+            self.assertEqual(len(event.get("segments", [])), 6)
+            self.assertEqual(len(event.get("subtitles", [])), expected[row["event_id"]])
+            self.assertTrue(all(str(cue.get("translation", "")).strip() for cue in event["subtitles"]))
 
     def test_standalone_ptt_today_contract(self):
         html = (ROOT / "site/ptt-today/index.html").read_text(encoding="utf-8")
