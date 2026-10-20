@@ -37,11 +37,19 @@ class ProductionReadOnlyShell:
         return getattr(self._config, source)
 
     def _read(self, source: str, operation: str, scope: dict, mode: str, fn):
-        gate = self._gate(source)
+        try:
+            gate = self._gate(source)
+        except Exception:
+            return self._unavailable(source, "source_disabled")
         if not gate.enabled:
             return self._unavailable(source, "source_disabled")
-        if gate.credential_required and not self._credentials.available(source):
-            return self._unavailable(source, "credential_missing")
+        if gate.credential_required:
+            try:
+                credential_available = self._credentials.available(source) is True
+            except Exception:
+                credential_available = False
+            if not credential_available:
+                return self._unavailable(source, "credential_missing")
 
         key_data = {"source": source, "scope": scope, "mode": mode, "operation": operation}
         coalesce_key = "sha256:" + hashlib.sha256(
@@ -51,7 +59,10 @@ class ProductionReadOnlyShell:
             source=source, scope=scope, verification_mode=mode,
             request_class=operation, cost_class="bounded_read", coalesce_key=coalesce_key,
         )
-        receipt = self._admission.admit(request)
+        try:
+            receipt = self._admission.admit(request)
+        except Exception:
+            return self._unavailable(source, "admission_state_error")
         if not receipt.admitted:
             code = receipt.reason if receipt.reason in _ERROR_CODES else "admission_denied"
             self._safe_audit(source, operation, receipt.scope_hash, False, False,
