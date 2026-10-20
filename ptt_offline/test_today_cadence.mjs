@@ -170,7 +170,8 @@ test('cadence selector keeps legacy eligibility/order and uses proposed access-p
   .map(r=>String(r.detail));
  for(const detail of plan)t.diagnostic('plan='+detail);
  assert.ok(plan.some(x=>x.includes('public_today_canonical_cadence_active')));
- assert.ok(plan.some(x=>x.includes('public_today_canonical_cadence_ended_reverify')));
+ assert.ok(plan.some(x=>x.includes('public_today_canonical_cadence_ended_reverify')&&x.includes('lifecycle_state=?')&&x.includes('actual_end>?')));
+ assert.equal(plan.some(x=>x.includes('public_today_canonical_state')),false);
  assert.ok(plan.some(x=>x.includes('public_today_websub_processed_video')));
  db.close();
 });
