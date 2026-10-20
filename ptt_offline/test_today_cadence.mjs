@@ -249,7 +249,7 @@ test('cadence includes recent ended rows needing authoritative re-verification f
   const db={
     writes:[],
     prepare(sql){
-      if(sql.includes('FROM public_today_canonical')&&sql.includes('ORDER BY COALESCE(checked_at,lifecycle_observed_at)')){
+      if(sql.includes('FROM public_today_canonical')&&sql.includes('ORDER BY checked_at')){
         selectSql=sql;
         return {bind(...args){selectArgs=args;return {all:async()=>({results:[row]})}}};
       }
