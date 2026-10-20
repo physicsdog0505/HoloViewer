@@ -73,59 +73,51 @@ test('A catalog hit returns source=catalog without provider dependency',async()=
  db.close();
 });
 
-test('public cache miss registers one bounded demand and never calls provider synchronously',async()=>{
- const db=sqliteD1();let fetches=0;const background=[];
+test('public cache miss registers one bounded demand and never calls provider in GET path',async()=>{
+ const db=sqliteD1();let fetches=0;
  const env={DB:db,YOUTUBE_API_KEY:'key'};
- const res=await handleVideoMetadataRead(getReq(),env,{
-  now:new Date('2026-10-20T03:00:00Z'),
-  fetchImpl:async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()},
-  ctx:{waitUntil(promise){background.push(promise)}}
- });
+ const res=await handleVideoMetadataRead(getReq(),env,{now:new Date('2026-10-20T03:00:00Z')});
  const body=await res.json();
  assert.equal(res.status,202);assert.equal(body.status,'metadata_pending');assert.equal(body.priority,2);
  assert.equal(fetches,0);
  assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_demand').get().n,1);
  assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_cache').get().n,0);
  assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_today_evidence').get().n,0);
- assert.equal(background.length,1);
- await background[0];
- assert.equal(fetches,1);
- const follow=await handleVideoMetadataRead(getReq(),env,{now:new Date('2026-10-20T03:00:03Z')});
+ const drained=await processVideoMetadataDemands(env,{
+  now:new Date('2026-10-20T03:00:30Z'),limit:1,
+  fetchImpl:async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()}
+ });
+ assert.equal(drained.resolved,1);assert.equal(fetches,1);
+ const follow=await handleVideoMetadataRead(getReq(),env,{now:new Date('2026-10-20T03:00:31Z')});
  const followBody=await follow.json();
  assert.equal(follow.status,200);assert.equal(followBody.source,'youtube-fallback');
  db.close();
 });
 
 test('verified PTT day raises demand priority without bypassing provider budget',async()=>{
- const db=sqliteD1();const background=[];
+ const db=sqliteD1();
  db.raw.prepare("INSERT INTO ptt_threads(day,aid,verified_at) VALUES(?,?,?)").run('2026-10-18','#fixture','2026-10-20T00:00:00Z');
  const req=new Request('https://api.example/v1/videos/'+VID+'/metadata?ptt_day=2026-10-18');
- const res=await handleVideoMetadataRead(req,{DB:db,YOUTUBE_API_KEY:'key'},{
-  now:new Date('2026-10-20T03:00:00Z'),fetchImpl:fetchBody([youtubeItem({channelId:EXTERNAL})]),
-  ctx:{waitUntil(promise){background.push(promise)}}
- });
+ const res=await handleVideoMetadataRead(req,{DB:db,YOUTUBE_API_KEY:'key'},{now:new Date('2026-10-20T03:00:00Z')});
  const body=await res.json();
  assert.equal(res.status,202);assert.equal(body.priority,1);assert.equal(body.ptt_priority,true);
  const row=db.raw.prepare('SELECT priority,ptt_day FROM public_video_metadata_recovery_demand WHERE video_id=?').get(VID);
  assert.equal(row.priority,1);assert.equal(row.ptt_day,'2026-10-18');
- await background[0];
  db.close();
 });
 
 test('twenty public misses for the same video dedupe to one provider lookup',async()=>{
- const db=sqliteD1({managed:false});let fetches=0;const background=[];
+ const db=sqliteD1({managed:false});let fetches=0;
  const env={DB:db,YOUTUBE_API_KEY:'key'};
  const fetchImpl=async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()};
  for(let i=0;i<20;i++){
-  const res=await handleVideoMetadataRead(getReq(),env,{
-   now:new Date('2026-10-20T03:00:00Z'),fetchImpl,
-   ctx:{waitUntil(promise){background.push(promise)}}
-  });
+  const res=await handleVideoMetadataRead(getReq(),env,{now:new Date('2026-10-20T03:00:00Z')});
   assert.equal(res.status,202);
  }
- await Promise.all(background);
- assert.equal(fetches,1);
  assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM public_video_metadata_recovery_demand').get().n,1);
+ const drained=await processVideoMetadataDemands(env,{now:new Date('2026-10-20T03:00:30Z'),limit:4,fetchImpl});
+ assert.equal(drained.resolved,1);
+ assert.equal(fetches,1);
  assert.equal(db.raw.prepare('SELECT calls FROM public_video_metadata_recovery_budget').get().calls,1);
  db.close();
 });
@@ -136,7 +128,7 @@ test('31 distinct public demands never exceed 30 provider calls and keep excess 
  const now=new Date('2026-10-20T03:00:00Z');
  for(let i=0;i<31;i++){
   const id=('0000000000'+i.toString(36)).slice(-11);
-  await handleVideoMetadataRead(getReq(id),env,{now,ctx:{waitUntil(){}}});
+  await handleVideoMetadataRead(getReq(id),env,{now});
  }
  const result=await processVideoMetadataDemands(env,{
   now,limit:31,fetchImpl:async()=>{fetches++;return fetchBody([])()}
@@ -153,7 +145,7 @@ test('pending demand resumes automatically after budget window renewal',async()=
  const first=new Date('2026-10-20T03:00:00Z');
  db.raw.prepare("INSERT INTO public_video_metadata_recovery_budget(window_start,calls,updated_at) VALUES(?,?,?)")
   .run('2026-10-20T03:00:00Z',30,'2026-10-20T03:00:00Z');
- await handleVideoMetadataRead(getReq(),env,{now:first,ctx:{waitUntil(){}}});
+ await handleVideoMetadataRead(getReq(),env,{now:first});
  const blocked=await processVideoMetadataDemands(env,{now:first,limit:1,fetchImpl:async()=>{fetches++;return fetchBody([youtubeItem({channelId:EXTERNAL})])()}});
  assert.equal(blocked.budget_exhausted,true);assert.equal(fetches,0);
  const later=new Date('2026-10-20T03:10:01Z');
