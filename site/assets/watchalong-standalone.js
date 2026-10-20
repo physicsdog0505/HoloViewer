@@ -31,6 +31,17 @@ const previousSegment=document.getElementById('previousSegment');
 const nextSegment=document.getElementById('nextSegment');
 const mobileSwapHost=document.getElementById('mobileSwapHost');
 const mobileSwapSource=document.getElementById('mobileSwapSource');
+const mobileControlsToggle=document.getElementById('mobileControlsToggle');
+const mobileControlsPanel=document.getElementById('mobileControlsPanel');
+const mobileControlsClose=document.getElementById('mobileControlsClose');
+const mobilePrimarySource=document.getElementById('mobilePrimarySource');
+const mobilePrimaryHost=document.getElementById('mobilePrimaryHost');
+const mobileLinkedPlayback=document.getElementById('mobileLinkedPlayback');
+const mobileStartSync=document.getElementById('mobileStartSync');
+const mobileAlignNow=document.getElementById('mobileAlignNow');
+const mobilePrevSegment=document.getElementById('mobilePrevSegment');
+const mobileNextSegment=document.getElementById('mobileNextSegment');
+const mobileFullscreen=document.getElementById('mobileFullscreen');
 const segmentStatus=document.getElementById('segmentStatus');
 const immersiveToolbarTrigger=document.getElementById('immersiveToolbarTrigger');
 const topbar=document.querySelector('.watchalong-topbar');
@@ -58,6 +69,7 @@ let activeSegmentIndex=-1;
 let activeSourceVideoId=SOURCE_ID||'';
 let sourceStandbyActive=false;
 let immersiveToolbarTimer=null;
+const mobileWatchMedia=window.matchMedia('(max-width:760px)');
 
 function validVideoId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{11}$/.test(id)?id:''}
 function validPlaylistId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{10,64}$/.test(id)?id:''}
@@ -91,6 +103,49 @@ function setOffset(value,{persist=true}={}){
 }
 refreshOffsetUi();
 
+function closeMobileControls(){
+ if(!mobileWatchMedia.matches)return;
+ mobileControlsPanel.hidden=true;
+ mobileControlsToggle.setAttribute('aria-expanded','false');
+}
+function refreshMobileControls(){
+ if(!mobileWatchMedia.matches)return;
+ mobileLinkedPlayback.textContent='連動播放：'+(linkedPlayback.checked?'開':'關');
+ mobilePrevSegment.disabled=previousSegment.disabled;
+ mobileNextSegment.disabled=nextSegment.disabled;
+}
+function openMobileControls(){
+ if(!mobileWatchMedia.matches)return;
+ refreshMobileControls();
+ mobileControlsPanel.hidden=false;
+ mobileControlsToggle.setAttribute('aria-expanded','true');
+}
+function mobileStartSynchronizedPlayback(){
+ if(!mobileWatchMedia.matches||!hostPlayer||!sourcePlayer)return;
+ let host=null,source=null;
+ try{
+  host=hostPlayer.getCurrentTime();
+  source=sourcePlayer.getCurrentTime();
+ }catch{return}
+ if(!Number.isFinite(host)||!Number.isFinite(source))return;
+ if(!timelineAligned)setOffset(source-host);
+ linkedPlayback.checked=true;
+ refreshMobileControls();
+ const expected=sourceExpectedTime(host);
+ if(Number.isFinite(expected)&&expected<0){
+  setSourceStandby(true);
+  try{hostPlayer.playVideo()}catch{}
+  closeMobileControls();
+  return;
+ }
+ setSourceStandby(false);
+ try{
+  if(Number.isFinite(expected)&&Math.abs(source-expected)>1)sourcePlayer.seekTo(Math.max(0,expected),true);
+  hostPlayer.playVideo();
+  sourcePlayer.playVideo();
+ }catch{}
+ closeMobileControls();
+}
 function setMobilePrimary(kind){
  const primary=kind==='host'?'host':'source';
  workspace.classList.toggle('mobile-primary-host',primary==='host');
@@ -108,7 +163,28 @@ document.querySelectorAll('[data-watch-layout]').forEach(button=>button.addEvent
 }));
 mobileSwapHost.onclick=()=>setMobilePrimary('host');
 mobileSwapSource.onclick=()=>setMobilePrimary('source');
+mobileControlsToggle.onclick=()=>{if(mobileControlsPanel.hidden)openMobileControls();else closeMobileControls()};
+mobileControlsClose.onclick=closeMobileControls;
+mobilePrimarySource.onclick=()=>{if(!mobileWatchMedia.matches)return;setMobilePrimary('source');closeMobileControls()};
+mobilePrimaryHost.onclick=()=>{if(!mobileWatchMedia.matches)return;setMobilePrimary('host');closeMobileControls()};
+mobileLinkedPlayback.onclick=()=>{
+ if(!mobileWatchMedia.matches)return;
+ linkedPlayback.checked=!linkedPlayback.checked;
+ refreshMobileControls();
+};
+mobileStartSync.onclick=mobileStartSynchronizedPlayback;
+mobileAlignNow.onclick=()=>{if(!mobileWatchMedia.matches)return;document.getElementById('captureOffset').click();refreshMobileControls()};
+mobilePrevSegment.onclick=()=>{if(!mobileWatchMedia.matches||previousSegment.disabled)return;previousSegment.click();refreshMobileControls()};
+mobileNextSegment.onclick=()=>{if(!mobileWatchMedia.matches||nextSegment.disabled)return;nextSegment.click();refreshMobileControls()};
+mobileFullscreen.onclick=()=>{if(!mobileWatchMedia.matches)return;fullscreenButton.click();closeMobileControls()};
+document.addEventListener('pointerdown',event=>{
+ if(!mobileWatchMedia.matches||mobileControlsPanel.hidden)return;
+ if(mobileControlsPanel.contains(event.target)||mobileControlsToggle.contains(event.target))return;
+ closeMobileControls();
+},{passive:true});
+mobileWatchMedia.addEventListener?.('change',event=>{if(!event.matches)mobileControlsPanel.hidden=true});
 setMobilePrimary('source');
+refreshMobileControls();
 offsetMinus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds-1)};
 offsetPlus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds+1)};
 document.getElementById('captureOffset').onclick=()=>{
@@ -303,12 +379,14 @@ function renderSegments(){
   segmentStatus.textContent='無段點';
   previousSegment.disabled=true;
   nextSegment.disabled=true;
+  refreshMobileControls();
   return;
  }
  if(activeSegmentIndex<0||activeSegmentIndex>=segments.length)activeSegmentIndex=0;
  segmentStatus.textContent=segments[activeSegmentIndex].label+' · '+(activeSegmentIndex+1)+'/'+segments.length;
  previousSegment.disabled=activeSegmentIndex<=0;
  nextSegment.disabled=activeSegmentIndex>=segments.length-1;
+ refreshMobileControls();
 }
 function jumpToSegmentIndex(index){
  if(index<0||index>=segments.length)return;
