@@ -6,7 +6,9 @@
       "kind": "sanitized-fixture",
       "evidence_id": "fixture-expected-aids-20261020",
       "observed_at": "2026-10-20T00:10:00Z",
-      "verified": true
+      "verified": true,
+      "version": "fixture-v1",
+      "issuer": "#48-sanitized-fixture"
     },
     "entries": [
       {
