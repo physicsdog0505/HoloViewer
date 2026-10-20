@@ -7,11 +7,12 @@ import {verifyPublisherTimeProof} from './time_authority.mjs';
 import {mountTodayPublisherOnCombinedApi} from './today/today-private-post.mjs';
 import {mountTodayCadence} from './today/cadence-refresh.mjs';
 import {mountTodayWebSubOnWorker} from './today/websub-runtime.mjs';
+import {mountVideoMetadataRecoveryOnWorker} from './today/video-metadata-recovery.mjs';
 
 const combined = composeFullPttOnExistingApi(createExistingApiRouter,{
   verifyAuthority: async (row,env) => verifyPublisherTimeProof(row,env)
 });
 
 export default mountTodayWebSubOnWorker(
-  mountTodayCadence(mountTodayPublisherOnCombinedApi(combined))
+  mountTodayCadence(mountVideoMetadataRecoveryOnWorker(mountTodayPublisherOnCombinedApi(combined)))
 );
