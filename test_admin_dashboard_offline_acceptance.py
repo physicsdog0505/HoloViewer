@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from admin_dashboard.coverage import project_coverage
+from admin_dashboard.finalization import build_daily_finalization
 from admin_dashboard.render import render_dashboard
 
 
@@ -147,6 +148,102 @@ class OfflineAdminAcceptance(unittest.TestCase):
         self.assertTrue(archive["job_verified"])
         self.assertEqual(archive["evidence_source_fields"]["coverage_summary"]["status"], "COMPLETE")
 
+
+    def test_daily_finalization_keeps_source_repair_archive_facts_separate(self):
+        coverage = {"days": [{
+            "date": "2026-10-20",
+            "local_status": "COMPLETE",
+            "expected_aids": ["day", "night"],
+            "actual_aids": ["day", "night"],
+            "missing_aids": [],
+            "source_line_gaps": {},
+            "last_updated_at": "2026-10-21T00:01:00Z",
+            "contract_gaps": [],
+        }]}
+        archive = {
+            "job_id": "archive-1",
+            "component": "Archive",
+            "source": "PTT Archive",
+            "target": "workers-static-assets",
+            "status": "completed",
+            "contract_gaps": [],
+            "evidence_source_fields": {
+                "coverage_summary": {"status": "PARTIAL"},
+                "job_verified": False,
+                "verification_mode": "bounded_sample",
+                "readback_observed_at": "2026-10-21T00:05:00Z",
+            },
+        }
+        result = build_daily_finalization({
+            "target_day": "2026-10-20",
+            "coverage": coverage,
+            "repair_job": None,
+            "archive_sync_job": archive,
+        })
+        run = result["runs"][0]
+        self.assertEqual(run["source_completeness"]["status"], "VERIFIED_COMPLETE")
+        self.assertEqual(run["repair_job"]["status"], "unknown")
+        self.assertEqual(run["archive"]["package_status"], "PARTIAL")
+        self.assertEqual(run["archive"]["delivery_job_status"], "completed")
+        self.assertEqual(run["archive"]["readback_verified_status"], "UNKNOWN")
+        self.assertIn("repair-job-evidence-unavailable", run["contract_gaps"])
+
+    def test_daily_finalization_repair_needed_counts_contiguous_ranges(self):
+        coverage = {"days": [{
+            "date": "2026-10-20",
+            "local_status": "REPAIR_NEEDED",
+            "expected_aids": ["day", "night"],
+            "actual_aids": ["day"],
+            "missing_aids": ["night"],
+            "source_line_gaps": {"day": [10, 11, 12, 20, 21]},
+            "contract_gaps": [],
+        }]}
+        run = build_daily_finalization({
+            "target_day": "2026-10-20",
+            "coverage": coverage,
+        })["runs"][0]
+        self.assertEqual(run["source_completeness"]["status"], "REPAIR_NEEDED")
+        self.assertEqual(run["source_completeness"]["missing_aid_count"], 1)
+        self.assertEqual(run["source_completeness"]["missing_range_count"], 2)
+        self.assertEqual(run["archive"]["delivery_job_status"], "unknown")
+
+    def test_daily_finalization_conflict_and_unknown_never_promote(self):
+        conflict = {"days": [{
+            "date": "2026-10-20", "local_status": "CONFLICT",
+            "expected_aids": ["day"], "actual_aids": ["day"],
+            "conflicts": ["authority-conflict"],
+        }]}
+        run = build_daily_finalization({
+            "target_day": "2026-10-20", "coverage": conflict,
+            "archive_sync_job": {"component": "Archive", "status": "completed",
+                                 "contract_gaps": [], "evidence_source_fields": {
+                                     "coverage_summary": {"status": "COMPLETE"},
+                                     "job_verified": True,
+                                 }},
+        })["runs"][0]
+        self.assertEqual(run["source_completeness"]["status"], "CONFLICT")
+        self.assertEqual(run["archive"]["readback_verified_status"], "VERIFIED")
+
+        unknown = build_daily_finalization({
+            "target_day": "2026-10-21", "coverage": {"days": []},
+        })["runs"][0]
+        self.assertEqual(unknown["source_completeness"]["status"], "UNKNOWN")
+        self.assertEqual(unknown["archive"]["package_status"], "UNKNOWN")
+        self.assertIn("source-completeness-evidence-unavailable", unknown["contract_gaps"])
+
+    def test_daily_finalization_explicit_target_day_beats_latest_coverage_day(self):
+        coverage = {"days": [
+            {"date": "2026-10-20", "local_status": "COMPLETE",
+             "expected_aids": ["day"], "actual_aids": ["day"]},
+            {"date": "2026-10-21", "local_status": "UNKNOWN",
+             "expected_aids": None, "actual_aids": []},
+        ]}
+        run = build_daily_finalization({
+            "target_day": "2026-10-20", "coverage": coverage,
+        })["runs"][0]
+        self.assertEqual(run["target_day"], "2026-10-20")
+        self.assertEqual(run["source_completeness"]["status"], "VERIFIED_COMPLETE")
+
     def test_duplicate_day_or_excess_range_rejected(self):
         with self.assertRaises(ValueError):
             project_coverage([{"date": "2026-10-01"}]*2, start_day="2026-10-01", end_day="2026-10-01")
@@ -157,7 +254,8 @@ class OfflineAdminAcceptance(unittest.TestCase):
         html = render_dashboard()
         for marker in ('id="coverage-rows"', 'id="sync-rows"', 'id="health-rows"',
                        'id="coverage-search"', 'id="from-day"', 'id="through-day"',
-                       'id="coverage-sort"', 'id="refresh-all"', 'data-refresh="sync_monitor"',
+                       'id="coverage-sort"', 'id="refresh-all"', 'data-refresh="daily_finalization"',
+                       'id="finalization-rows"', 'id="finalization-cards"', 'data-refresh="sync_monitor"',
                        'id="clear-filters"', 'id="coverage-cards"', 'id="sync-cards"',
                        'id="health-cards"', "contract_gaps", "UNKNOWN", "View raw evidence"):
             self.assertIn(marker, html)
@@ -167,7 +265,7 @@ class OfflineAdminAcceptance(unittest.TestCase):
         self.assertNotIn("innerHTML", html)
         self.assertIn("@media(max-width:760px)", html)
         self.assertIn("table-wrap", html)
-        for forbidden in ("重新同步", "重新執行", "Retry Publisher", "Replay", "Upload", "Deploy",
+        for forbidden in ("重新同步", "重新執行", "Retry Publisher", "Retry Repair", "Replay", "Upload", "Deploy",
                           "Restart Collector", "Restart Publisher", "R2 upload", "D1 write"):
             self.assertNotIn(forbidden, html)
 
