@@ -53,10 +53,12 @@ class DashboardController:
             else:
                 payload = build_system_health(raw, now=now, stale_after_seconds=self._stale_after)
             result = {"section": section, "availability": "available", "read_at": read_at,
+                      "last_successful_read_at": read_at,
                       "error": None, "payload": payload,
                       "refresh": {"status": "refreshed", "retry_after_seconds": self._cooldown}}
         except Exception as exc:  # retain last-good data while exposing the read failure
             result = {"section": section, "availability": "unavailable", "read_at": read_at,
+                      "last_successful_read_at": previous["public"].get("last_successful_read_at") if previous else None,
                       "error": {"code": type(exc).__name__,
                                 "message": "read-only monitor source failed"},
                       "payload": deepcopy(previous["public"].get("payload")) if previous else None,
