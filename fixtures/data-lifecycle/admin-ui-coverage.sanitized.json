@@ -235,7 +235,8 @@
             "1grg4Pag"
           ],
           "source_version": "fixture-r20",
-          "evidence_freshness": "fresh"
+          "evidence_freshness": "fresh",
+          "final_verification_at": "2026-10-21T00:18:00Z"
         }
       ]
     }
