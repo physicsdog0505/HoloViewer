@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 
 from .contracts import build_sync_monitor, build_system_health, coverage_sync_consistency
+from .privacy import sanitize_for_browser
 
 SECTIONS = ("data_coverage", "sync_monitor", "system_health")
 
@@ -52,6 +53,7 @@ class DashboardController:
                 payload = build_sync_monitor(raw, now=now, stale_after_seconds=self._stale_after)
             else:
                 payload = build_system_health(raw, now=now, stale_after_seconds=self._stale_after)
+            payload = sanitize_for_browser(payload)
             result = {"section": section, "availability": "available", "read_at": read_at,
                       "last_successful_read_at": read_at,
                       "error": None, "payload": payload,
