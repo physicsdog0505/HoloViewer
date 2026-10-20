@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from data_lifecycle.common import parse_time
 
-MONITOR_STATES = {"running", "waiting", "failed", "completed", "unknown"}
+MONITOR_STATES = {"running", "waiting", "failed", "completed", "succeeded", "unknown"}
 HEALTH_STATES = {"healthy", "degraded", "unhealthy", "unknown", "unavailable"}
 
 
