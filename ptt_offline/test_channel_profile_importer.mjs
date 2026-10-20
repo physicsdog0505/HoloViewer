@@ -109,7 +109,7 @@ test('duplicate ID and untrusted avatar fail validation',async()=>{
  body=JSON.parse(artifact());
  body.profiles[0].avatar_url='https://example.com/avatar';
  raw=JSON.stringify(body);
- await assert.rejects(()=>runImport({DB:db},raw,{apply:false,approvedSha:sha(raw)}),/invalid profile/);
+ await assert.rejects(()=>runImport({DB:db},raw,{apply:false,approvedSha:sha(raw)}),/artifact avatar invalid/);
  db.close();
 });
 
