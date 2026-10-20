@@ -245,6 +245,29 @@ class OfflineAdminAcceptance(unittest.TestCase):
         self.assertIsNone(run["source_completeness"]["final_verification_at"])
         self.assertIn("final-verification-timestamp-unavailable", run["contract_gaps"])
 
+    def test_daily_finalization_duplicate_aid_or_invalid_timestamp_never_verifies(self):
+        duplicate = {"days": [{
+            "date": "2026-10-20", "local_status": "COMPLETE",
+            "expected_aids": ["day"], "actual_aids": ["day", "day"],
+            "final_verification_at": "2026-10-21T00:01:00Z",
+        }]}
+        run = build_daily_finalization({
+            "target_day": "2026-10-20", "coverage": duplicate,
+        })["runs"][0]
+        self.assertEqual(run["source_completeness"]["status"], "UNKNOWN")
+
+        invalid_time = {"days": [{
+            "date": "2026-10-20", "local_status": "COMPLETE",
+            "expected_aids": ["day"], "actual_aids": ["day"],
+            "final_verification_at": "not-a-time",
+        }]}
+        run = build_daily_finalization({
+            "target_day": "2026-10-20", "coverage": invalid_time,
+        })["runs"][0]
+        self.assertEqual(run["source_completeness"]["status"], "UNKNOWN")
+        self.assertIsNone(run["source_completeness"]["final_verification_at"])
+        self.assertIn("final-verification-timestamp-unavailable", run["contract_gaps"])
+
     def test_daily_finalization_rejects_unbounded_error_code(self):
         run = build_daily_finalization({
             "target_day": "2026-10-20",
