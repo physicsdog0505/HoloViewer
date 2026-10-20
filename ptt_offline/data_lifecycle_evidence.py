@@ -16,7 +16,7 @@ SYNC_SCHEMA="holoviewer-sync-job-evidence-v1"
 AID_SCHEMA="holoviewer-ptt-expected-aids-v1"
 COVERAGE_SCHEMA="holoviewer-ptt-source-coverage-v1"
 COLLECTOR_SCHEMA="holoviewer-collector-semantic-evidence-v1"
-PERIODS=("day","night")
+PERIODS=("day","night","all_day")
 AID_RE=re.compile(r"^#?[A-Za-z0-9_-]{6,32}$")
 
 
@@ -79,9 +79,21 @@ def build_expected_aid_contract(*, day: str, entries: list[dict[str,Any]],
             "source_url":item.get("source_url"),
             "authority_record_id":item.get("authority_record_id"),
         })
-    for period in PERIODS:
+    all_day_count=seen_period["all_day"]
+    if all_day_count:
+        if seen_period["day"] or seen_period["night"]:
+            conflicts.append("all-day-cannot-mix-with-day-night")
+        if all_day_count>1:
+            conflicts.append("duplicate-all-day-aid")
+        periods_to_validate=("all_day",)
+    else:
+        periods_to_validate=("day","night")
+        for required in periods_to_validate:
+            if seen_period[required]==0:
+                gaps.append(f"expected-{required}-aid-missing")
+
+    for period in periods_to_validate:
         if seen_period[period]==0:
-            gaps.append(f"expected-{period}-aid-missing")
             continue
         parts=sorted(
             item["part"] for item in normalized
