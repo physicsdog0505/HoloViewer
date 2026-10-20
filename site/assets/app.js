@@ -1462,11 +1462,22 @@ watchForm.addEventListener('submit',event=>{
  const master=videoId(String(form.get('master')||''));
  const error=document.getElementById('watch-error');
  if(!master){error.textContent='Hololive 主影片無法辨識，請確認 YouTube URL 或 Video ID。';error.hidden=false;return}
- if(form.get('source_kind')==='youtube'&&form.get('youtube_mode')==='single'&&!videoId(String(form.get('source')||''))){error.textContent='請提供有效的 YouTube 片源網址或 Video ID。';error.hidden=false;return}
  if(form.get('source_kind')==='external'){
-  try{const u=new URL(String(form.get('external_source')||''));if(!['https:','http:'].includes(u.protocol))throw Error('invalid')}catch{error.textContent='外部片源網址無法辨識，請提供 http(s) 網址。';error.hidden=false;return}
+  error.textContent='第一版同時視聽先支援 YouTube 片源；外部平台仍保留在 4174 規格，但 Public 暫不啟動。';error.hidden=false;return;
  }
- error.textContent='4174 同時視聽播放器的同步與對齊引擎尚未移植完成，因此這個版本暫不啟動未驗證的同步播放。';error.hidden=false;
+ const q=new URLSearchParams();q.set('host',master);
+ if(form.get('youtube_mode')==='playlist'){
+  let playlist='';
+  try{const u=new URL(String(form.get('playlist')||''));playlist=u.searchParams.get('list')||''}catch{}
+  if(!/^[A-Za-z0-9_-]{10,64}$/.test(playlist)){error.textContent='請提供有效的 YouTube Playlist URL。';error.hidden=false;return}
+  q.set('playlist',playlist);
+  const start=Math.max(1,Number(form.get('playlist_start'))||1);q.set('playlist_start',String(start));
+ }else{
+  const source=videoId(String(form.get('source')||''));
+  if(!source){error.textContent='請提供有效的 YouTube 片源網址或 Video ID。';error.hidden=false;return}
+  q.set('source',source);
+ }
+ error.hidden=true;location.href='/watchalong-viewer/?'+q.toString();
 });
 })();
 
