@@ -344,6 +344,16 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .recent-watch-search-label{display:block;margin:10px 0 7px;font-size:12px;font-weight:700}.recent-watch-search{width:100%;max-width:420px;min-height:38px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:16px}.recent-watch-no-matches{color:var(--muted);font-size:13px}.recent-watch-card[hidden],.recent-watch-no-matches[hidden]{display:none!important}
 .recent-watch-note{margin:4px 0 14px;color:var(--muted);font-size:12px;line-height:1.55}
 .selection-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.selection-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;padding:8px 12px;background:#fff;color:var(--text);font-size:12px;font-weight:750;text-decoration:none}.selection-link:hover{background:var(--surface-2)}
+.watchalong-static-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:8px}
+.watchalong-static-card{
+ display:flex;flex-direction:column;gap:10px;min-height:148px;padding:16px;border:1px solid var(--line);border-radius:16px;
+ background:var(--surface);color:var(--text);text-decoration:none;transition:.15s ease
+}
+.watchalong-static-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.watchalong-static-card strong{font-size:15px;line-height:1.5}
+.watchalong-static-meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:11px;font-weight:750}
+.watchalong-static-action{margin-top:auto;color:#4f7f93;font-size:12px;font-weight:800}
+@media(max-width:900px){.watchalong-static-grid{grid-template-columns:1fr}}
 .manual-shell{padding:20px}.manual-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;align-items:start}
 .selected-master{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;margin-top:12px}.selected-master img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}.selected-master-copy{padding:12px}.selected-master-copy strong{display:block;margin-bottom:5px}.selected-master-copy span{color:var(--muted);font-size:12px}
 .manual-copy h2{margin:7px 0 8px;font-size:22px}.manual-copy p{margin:0;color:var(--muted);line-height:1.65}
