@@ -79,6 +79,7 @@ let pttFollowing=true;
 let pttLoaded=false;
 let pttLayoutRepinTimer=null;
 let pttResizeFrame=null;
+let pttLayoutTransitionDepth=0;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let pttVodRows=[];
@@ -158,15 +159,28 @@ function currentLayoutPreset(){
  return workspaceLayout==='focus'?'focus':'primary';
 }
 function setLayoutPreset(preset){
- if(preset==='equal'){layout='equal';workspaceLayout='sidebar'}
- else if(preset==='focus'){layout='primary';workspaceLayout='focus'}
- else{layout='primary';workspaceLayout='sidebar'}
- carousel.checked=preset!=='equal';
- lockedIndex=preset==='focus'?primaryIndex:null;
- secondaryOffset=0;
- renderControls();
- applyLayout();
- startCarousel();
+ // Snapshot follow before ANY lock/carousel geometry mutation. renderControls()
+ // changes focus classes before applyLayout(), which can fire a synthetic scroll
+ // and falsely mark a live PTT feed as "not following".
+ const wasFollowing=pttFollowing||pttAtBottom();
+ pttLayoutTransitionDepth+=1;
+ try{
+  if(preset==='equal'){layout='equal';workspaceLayout='sidebar'}
+  else if(preset==='focus'){layout='primary';workspaceLayout='focus'}
+  else{layout='primary';workspaceLayout='sidebar'}
+  carousel.checked=preset!=='equal';
+  lockedIndex=preset==='focus'?primaryIndex:null;
+  secondaryOffset=0;
+  renderControls();
+  applyLayout();
+  startCarousel();
+ }finally{
+  pttLayoutTransitionDepth=Math.max(0,pttLayoutTransitionDepth-1);
+ }
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
 }
 function hideSettings(){
  document.body.classList.remove('settings-open');
@@ -1604,6 +1618,7 @@ pttFontSize.addEventListener('input',()=>{
  try{localStorage.setItem('holoviewer-viewer-ptt-font',String(size))}catch{}
 });
 pttFeed.addEventListener('scroll',()=>{
+ if(pttLayoutTransitionDepth>0)return;
  pttFollowing=pttAtBottom();
  pttNewest.hidden=pttFollowing;
  if(!pttFollowing&&pttVodMode()){
