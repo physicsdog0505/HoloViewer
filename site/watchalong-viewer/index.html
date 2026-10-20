@@ -21,6 +21,25 @@
   </nav>
 </aside>
 
+<button id="mobileControlsToggle" class="mobile-controls-toggle" type="button" aria-expanded="false" aria-controls="mobileControlsPanel">⋯</button>
+<div id="mobileControlsPanel" class="mobile-controls-panel" hidden>
+  <div class="mobile-controls-head">
+    <strong>同時視聽控制</strong>
+    <button id="mobileControlsClose" type="button" aria-label="關閉控制">×</button>
+  </div>
+  <div class="mobile-controls-grid">
+    <button id="mobilePrimarySource" type="button">動畫主畫面</button>
+    <button id="mobilePrimaryHost" type="button">Hololive 主畫面</button>
+    <button id="mobileLinkedPlayback" type="button">連動播放：開</button>
+    <button id="mobileStartSync" type="button" class="mobile-sync-start">開始同步播放</button>
+    <button id="mobileAlignNow" type="button">對齊目前位置</button>
+    <button id="mobilePrevSegment" type="button">上一集</button>
+    <button id="mobileNextSegment" type="button">下一集</button>
+    <a href="/watchalong" class="mobile-control-link">返回選擇</a>
+    <button id="mobileFullscreen" type="button">沉浸模式</button>
+  </div>
+</div>
+
 <div class="watchalong-shell">
   <header class="watchalong-topbar">
     <div class="layout-segment" role="group" aria-label="同時視聽版型">
