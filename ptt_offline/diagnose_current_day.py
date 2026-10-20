@@ -38,13 +38,22 @@ def diagnose(*, source: str, state_dir: str, max_articles: int = 4) -> dict[str,
             checkpoint=_load_state(state_path)
             baseline=checkpoint.get("baseline_source_line")
             accepted=checkpoint.get("accepted")
-            accepted_count=len(accepted) if isinstance(accepted,dict) else 0
+            accepted=accepted if isinstance(accepted,dict) else {}
+            accepted_count=len(accepted)
 
             candidates=plan.get("candidate_rows",[])
             pending=set(plan.get("pending_source_lines",[]))
             candidate_after=[
                 row for row in candidates
                 if not isinstance(baseline,int) or row.get("source_line",0)>baseline
+            ]
+            accepted_after=[
+                row for row in candidate_after
+                if row.get("source_record_key") in accepted
+            ]
+            unaccepted_after=[
+                row for row in candidate_after
+                if row.get("source_record_key") not in accepted
             ]
             pending_after=sorted(
                 line for line in pending
@@ -54,6 +63,8 @@ def diagnose(*, source: str, state_dir: str, max_articles: int = 4) -> dict[str,
             after_days=Counter(row.get("day") for row in candidate_after if isinstance(row.get("day"),str))
             latest_candidate=max((row.get("source_line",0) for row in candidates),default=None)
             latest_after=max((row.get("source_line",0) for row in candidate_after),default=None)
+            accepted_after_lines=sorted(row.get("source_line") for row in accepted_after)
+            unaccepted_after_lines=sorted(row.get("source_line") for row in unaccepted_after)
 
             rows.append({
                 "article_id":article_id,
@@ -72,6 +83,10 @@ def diagnose(*, source: str, state_dir: str, max_articles: int = 4) -> dict[str,
                 "candidate_after_baseline_count":len(candidate_after),
                 "candidate_after_baseline_day_counts":dict(sorted(after_days.items())),
                 "latest_candidate_after_baseline":latest_after,
+                "accepted_after_baseline_count":len(accepted_after),
+                "accepted_after_baseline_first":accepted_after_lines[:20],
+                "unaccepted_after_baseline_count":len(unaccepted_after),
+                "unaccepted_after_baseline_first":unaccepted_after_lines[:20],
                 "pending_count":len(pending),
                 "pending_after_baseline_count":len(pending_after),
                 "pending_after_baseline_first":pending_after[:10],
