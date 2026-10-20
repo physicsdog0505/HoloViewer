@@ -9,11 +9,14 @@ button,input,select,output{font:inherit}
  background:rgba(247,245,242,.97);border-bottom:1px solid var(--line);color:var(--text)
 }
 .layout-segment{display:inline-flex;align-items:center;padding:2px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.62)}
-.layout-segment button,.sync-controls button,.segment-controls button,.watchalong-actions button,.watchalong-link{
+.layout-segment button,.sync-controls button,.segment-controls button,.subtitle-mode-controls button,.watchalong-actions button,.watchalong-link{
  min-height:32px;padding:0 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center
 }
 .layout-segment button{border:0;background:transparent}
 .layout-segment button.active{background:#242321;color:#fff}
+.subtitle-mode-controls{display:inline-flex;align-items:center;padding:2px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.62);gap:2px}
+.subtitle-mode-controls button{border:0;background:transparent;min-height:28px;padding:0 8px}
+.subtitle-mode-controls button.active{background:#242321;color:#fff}
 .control-toggle{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--muted)}
 .control-toggle input{accent-color:#242321}
 .sync-controls,.segment-controls{display:flex;align-items:center;gap:6px;font-size:12px}
@@ -57,6 +60,17 @@ button,input,select,output{font:inherit}
 }
 .subtitle-line.original{font-size:16px}
 .subtitle-line.translation{font-size:18px}
+.danmaku-layer{position:absolute;inset:0;z-index:6;overflow:hidden;pointer-events:none}
+.danmaku-item{
+ position:absolute;right:-10%;top:var(--danmaku-top,18%);max-width:86%;padding:4px 8px;border-radius:5px;
+ background:rgba(0,0,0,.48);color:#fff;font-size:18px;font-weight:850;line-height:1.35;white-space:nowrap;
+ text-shadow:0 1px 2px #000,0 0 4px #000;transform:translateX(110%);will-change:transform;
+ animation:watchalong-danmaku var(--danmaku-duration,8s) linear forwards
+}
+@keyframes watchalong-danmaku{
+ from{transform:translateX(110%)}
+ to{transform:translateX(calc(-100vw - 120%))}
+}
 
 .watchalong-ptt{position:relative;min-width:0;min-height:0;background:#11151b;border:1px solid #252a33;border-radius:10px;overflow:hidden;color:#e8eaed}
 .ptt-heading{height:38px;display:flex;align-items:center;gap:9px;padding:0 10px;border-bottom:1px solid #252a33;font-size:12px}
@@ -97,7 +111,7 @@ body.immersive .immersive-toolbar-trigger{
  .segment-controls{display:none}
 }
 @media(max-width:980px){
- .sync-controls{display:none}
+ .sync-controls,.subtitle-mode-controls{display:none}
  .watchalong-workspace.layout-source{grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr)}
 }
 @media(max-width:760px){
@@ -127,6 +141,7 @@ body.immersive .immersive-toolbar-trigger{
   text-decoration:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700
  }
  .mobile-controls-grid .mobile-sync-start{grid-column:1/-1;background:#242321;color:#fff;border-color:#242321}
+ .danmaku-item{font-size:15px;max-width:92%}
  .mobile-controls-grid button:disabled{opacity:.42}
  .watchalong-workspace.layout-equal,.watchalong-workspace.layout-source{grid-template-columns:1fr;height:auto}
  .host-stack,.source-stack,.watchalong-workspace.layout-source .host-stack{display:contents}
