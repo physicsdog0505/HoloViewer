@@ -28,6 +28,34 @@ EXPECTED |= {
     "admin_dashboard/render.py", "test_admin_dashboard.py",
     "docs/data-lifecycle/admin-dashboard.md",
 }
+EXPECTED |= {
+    "admin_dashboard/admission.py",
+    "admin_dashboard/auth.py",
+    "admin_dashboard/capabilities.py",
+    "admin_dashboard/coverage.py",
+    "admin_dashboard/fixture_readers.py",
+    "admin_dashboard/host_boundary.py",
+    "admin_dashboard/integration.py",
+    "admin_dashboard/isolated.py",
+    "admin_dashboard/privacy.py",
+    "admin_dashboard/production_shell.py",
+    "admin_dashboard/request_context.py",
+    "data_lifecycle/readback_contracts.py",
+    "docs/data-lifecycle/8501-admin-ui-ux.md",
+    "docs/data-lifecycle/8501-isolated-fixture-pilot.md",
+    "docs/data-lifecycle/8501-production-readonly-shell.md",
+    "docs/data-lifecycle/d1-readback-admin-contract.md",
+    "docs/data-lifecycle/offline-ui-acceptance.md",
+    "fixtures/data-lifecycle/admin-ui-coverage.sanitized.json",
+    "fixtures/data-lifecycle/api-semantic-health.sanitized.json",
+    "fixtures/data-lifecycle/archive-sync-jobs.sanitized.json",
+    "fixtures/data-lifecycle/d1-job-readback.sanitized.json",
+    "test_admin_dashboard_isolated.py",
+    "test_admin_dashboard_offline_acceptance.py",
+    "test_admin_dashboard_production_shell.py",
+    "test_readback_contracts.py",
+    "tools/admin_dashboard_fixture_server.py",
+}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
