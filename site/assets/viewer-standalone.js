@@ -80,6 +80,8 @@ let pttLoaded=false;
 let pttLayoutRepinTimer=null;
 let pttResizeFrame=null;
 let pttLayoutTransitionDepth=0;
+let pttUserScrollIntentUntil=0;
+let pttResizeObserver=null;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let pttVodRows=[];
@@ -1064,6 +1066,8 @@ pttShowFloor.addEventListener('change',()=>setPttFloorVisible(pttShowFloor.check
 setPttFloorVisible(false);
 
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
+function markPttUserScrollIntent(ms=1800){pttUserScrollIntentUntil=performance.now()+ms}
+function hasPttUserScrollIntent(){return performance.now()<=pttUserScrollIntentUntil}
 function repinPttAfterLayout({force=false}={}){
  const shouldFollow=force||pttFollowing;
  clearTimeout(pttLayoutRepinTimer);
@@ -1618,7 +1622,9 @@ pttFontSize.addEventListener('input',()=>{
  try{localStorage.setItem('holoviewer-viewer-ptt-font',String(size))}catch{}
 });
 pttFeed.addEventListener('scroll',()=>{
- if(pttLayoutTransitionDepth>0)return;
+ // Layout/fullscreen/ResizeObserver can change scrollTop without user intent.
+ // Only explicit user scroll gestures are allowed to change follow state.
+ if(pttLayoutTransitionDepth>0||!hasPttUserScrollIntent())return;
  pttFollowing=pttAtBottom();
  pttNewest.hidden=pttFollowing;
  if(!pttFollowing&&pttVodMode()){
@@ -1626,7 +1632,19 @@ pttFeed.addEventListener('scroll',()=>{
   pttNewest.textContent=clock?'最新 · '+clock:'最新';
  }
 },{passive:true});
-pttFeed.addEventListener('wheel',event=>{if(event.deltaY<0)pttFollowing=false},{passive:true});
+pttFeed.addEventListener('wheel',event=>{
+ markPttUserScrollIntent();
+ if(event.deltaY<0){pttFollowing=false;pttNewest.hidden=false}
+},{passive:true});
+pttFeed.addEventListener('touchstart',()=>markPttUserScrollIntent(2400),{passive:true});
+pttFeed.addEventListener('pointerdown',()=>markPttUserScrollIntent(2400),{passive:true});
+if('ResizeObserver' in window){
+ pttResizeObserver=new ResizeObserver(()=>{
+  if(pttFollowing)repinPttAfterLayout({force:true});
+ });
+ pttResizeObserver.observe(pttFeed);
+ pttResizeObserver.observe(pttPanel);
+}
 pttFeed.addEventListener('dblclick',event=>{
  event.preventDefault();
  window.open('/ptt-today','_blank','noopener,noreferrer');
@@ -1662,6 +1680,7 @@ window.addEventListener('blur',()=>{
 window.addEventListener('pagehide',()=>{
  clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);
  clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);
+ pttResizeObserver?.disconnect();
 });
 document.addEventListener('fullscreenchange',()=>{
  const wasFollowing=pttFollowing||pttAtBottom();
