@@ -68,6 +68,14 @@ class FixtureReaders:
         except (OSError, ValueError, KeyError, TypeError):
             return None
 
+    def daily_finalization(self):
+        return {
+            "coverage": self.coverage(),
+            "repair_job": None,
+            "archive_sync_job": self._read_archive_sync_job(),
+            "error_code": None,
+        }
+
     def sync_monitor(self):
         snapshot, cache_status = self._read_d1_with_cache()
         return {"d1_snapshot": snapshot, "d1_cache_status": cache_status,
@@ -130,5 +138,6 @@ class FixtureReaders:
 
     def injected(self):
         return {"data_coverage": self.coverage,
+                "daily_finalization": self.daily_finalization,
                 "sync_monitor": self.sync_monitor,
                 "system_health": self.system_health}
