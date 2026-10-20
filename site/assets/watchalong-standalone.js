@@ -7,10 +7,12 @@ const PTT_ARCHIVE_MANIFEST=String(config.pttArchiveManifest||'/ptt/v1/manifests/
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
 const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';
 const params=new URLSearchParams(location.search);
-const HOST_ID=validVideoId(params.get('host'));
-const SOURCE_ID=validVideoId(params.get('source'));
+let hostVideoId=validVideoId(params.get('host'));
+let sourceVideoId=validVideoId(params.get('source'));
 const PLAYLIST_ID=validPlaylistId(params.get('playlist'));
-const EVENT_ID=String(params.get('event')||'').trim();
+const EVENT_ID=String(params.get('watchalong_event')||params.get('event')||'').trim();
+const STATIC_EVENT_MODE=Boolean(EVENT_ID);
+const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';
 
 const workspace=document.getElementById('watchalongWorkspace');
 const linkedPlayback=document.getElementById('linkedPlayback');
@@ -66,8 +68,11 @@ let archiveManifestCache=null;
 let segments=[];
 let subtitles=[];
 let activeSegmentIndex=-1;
-let activeSourceVideoId=SOURCE_ID||'';
+let activeSourceVideoId=sourceVideoId||'';
 let sourceStandbyActive=false;
+let staticArtifactsReady=!STATIC_EVENT_MODE;
+let staticArtifactsFailed=false;
+let subtitleTimeline='source';
 let immersiveToolbarTimer=null;
 const mobileWatchMedia=window.matchMedia('(max-width:760px)');
 
@@ -288,15 +293,15 @@ function onHostStateChange(event){
 }
 function mountPlayers(){
  if(!window.YT?.Player)return;
- if(HOST_ID&&!hostPlayer){
+ if(hostVideoId&&!hostPlayer){
   hostPlayer=new YT.Player('hostPlayer',{
-   videoId:HOST_ID,playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
+   videoId:hostVideoId,playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
    events:{onStateChange:onHostStateChange,onReady:()=>{hostStatus.textContent='已就緒';startSyncLoop()}}
   });
- }else if(!HOST_ID){
+ }else if(!hostVideoId){
   hostStatus.textContent='缺少 Hololive 主影片';
  }
- if(!sourcePlayer&&(SOURCE_ID||PLAYLIST_ID)){
+ if(!sourcePlayer&&(sourceVideoId||PLAYLIST_ID)){
   const vars={playsinline:1,rel:0,enablejsapi:1,origin:location.origin};
   if(PLAYLIST_ID){
    vars.listType='playlist';vars.list=PLAYLIST_ID;
@@ -304,15 +309,19 @@ function mountPlayers(){
    vars.index=playlistStart-1;
   }
   sourcePlayer=new YT.Player('sourcePlayer',{
-   videoId:SOURCE_ID||undefined,playerVars:vars,
+   videoId:sourceVideoId||undefined,playerVars:vars,
    events:{onReady:()=>{sourceStatus.textContent=PLAYLIST_ID?'Playlist 已就緒':'片源已就緒';startSyncLoop();startSubtitleLoop()}}
   });
- }else if(!SOURCE_ID&&!PLAYLIST_ID){
+ }else if(!sourceVideoId&&!PLAYLIST_ID){
   sourceStatus.textContent='缺少 YouTube 片源';
  }
 }
-window.onYouTubeIframeAPIReady=mountPlayers;
-if(window.YT?.Player)mountPlayers();
+function maybeMountPlayers(){
+ if(staticArtifactsFailed||!staticArtifactsReady)return;
+ if(window.YT?.Player)mountPlayers();
+}
+window.onYouTubeIframeAPIReady=maybeMountPlayers;
+if(window.YT?.Player)maybeMountPlayers();
 
 function startSyncLoop(){
  if(syncTimer||!hostPlayer||!sourcePlayer)return;
@@ -321,6 +330,10 @@ function startSyncLoop(){
   try{host=hostPlayer.getCurrentTime()}catch{return}
   if(!Number.isFinite(host))return;
   syncPttToHost(host);
+  if(STATIC_EVENT_MODE&&segments.length){
+   const nextSegment=segmentIndexForHost(host);
+   if(nextSegment>=0&&nextSegment!==activeSegmentIndex)applyStaticSegment(nextSegment,{seek:true});
+  }
   if(!linkedPlayback.checked||!timelineAligned){setSourceStandby(false);return}
   const expected=sourceExpectedTime(host);
   if(!Number.isFinite(expected))return;
@@ -345,8 +358,9 @@ function startSyncLoop(){
 function startSubtitleLoop(){
  if(subtitleTimer)return;
  subtitleTimer=setInterval(()=>{
-  let current=null;try{current=sourcePlayer?.getCurrentTime?.()}catch{}
-  if(sourceStandbyActive||!Number.isFinite(current)||!subtitles.length){subtitleOverlay.hidden=true;return}
+  let current=null;
+  try{current=subtitleTimeline==='host'?hostPlayer?.getCurrentTime?.():sourcePlayer?.getCurrentTime?.()}catch{}
+  if(!Number.isFinite(current)||!subtitles.length){subtitleOverlay.hidden=true;return}
   const row=subtitles.find(item=>current>=item.start&&current<item.end);
   if(!row){subtitleOverlay.hidden=true;return}
   subtitleOriginal.textContent=row.original||'';
@@ -399,23 +413,105 @@ function jumpToSegmentIndex(index){
    sourcePlayer?.loadVideoById?.({videoId:segment.sourceVideoId,startSeconds:Math.max(0,segment.source)});
   }else sourcePlayer?.seekTo?.(Math.max(0,segment.source),true);
  }catch{}
- setOffset(segment.source-segment.host);
+ setOffset(segment.source-segment.host,{persist:!STATIC_EVENT_MODE});
  renderSegments();
  if(linkedPlayback.checked){try{hostPlayer?.playVideo?.();sourcePlayer?.playVideo?.()}catch{}}
 }
 previousSegment.onclick=()=>jumpToSegmentIndex(activeSegmentIndex-1);
 nextSegment.onclick=()=>jumpToSegmentIndex(activeSegmentIndex+1);
-async function loadReadOnlyArtifacts(){
- if(!EVENT_ID)return;
+async function sha256Hex(buffer){
+ const digest=await crypto.subtle.digest('SHA-256',buffer);
+ return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+async function fetchStaticJson(path){
+ const response=await fetch(path,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
+ if(!response.ok)throw new Error('HTTP '+response.status);
+ const buffer=await response.arrayBuffer();
+ let payload=null;
+ try{payload=JSON.parse(new TextDecoder().decode(buffer))}catch{throw new Error('JSON 無效')}
+ return {buffer,payload};
+}
+function failStaticEvent(error){
+ staticArtifactsFailed=true;
+ staticArtifactsReady=false;
+ segments=[];subtitles=[];activeSegmentIndex=-1;
+ segmentStatus.textContent='資料驗證失敗';
+ hostStatus.textContent='Watchalong 資料無法使用';
+ sourceStatus.textContent=String(error?.message||error||'驗證失敗');
+ linkedPlayback.checked=false;
+ renderSegments();
+}
+function normalizeStaticSegments(payload){
+ return payload.segments.map((item,index)=>({
+  id:String(item.segment_id||index+1),
+  label:String(item.label||('段點 '+(index+1))),
+  host:Number(item.host_start_ms)/1000,
+  source:Number(item.source_start_ms)/1000,
+  sourceVideoId:validVideoId(item.source_video_id)
+ }));
+}
+function normalizeStaticSubtitles(payload){
+ return payload.subtitles.map(item=>({
+  start:Number(item.start_ms)/1000,
+  end:Number(item.end_ms)/1000,
+  original:String(item.original||''),
+  translation:String(item.translation||'')
+ }));
+}
+function segmentIndexForHost(hostSeconds){
+ if(!STATIC_EVENT_MODE||!segments.length||!Number.isFinite(hostSeconds))return -1;
+ return HoloViewerWatchalongStatic.segmentIndexAt(
+  segments.map(item=>({host_start_ms:item.host*1000})),
+  hostSeconds
+ );
+}
+function applyStaticSegment(index,{seek=true}={}){
+ if(!STATIC_EVENT_MODE||index<0||index>=segments.length)return;
+ activeSegmentIndex=index;
+ const segment=segments[index];
+ const offset=segment.source-segment.host;
+ setOffset(offset,{persist:false});
+ renderSegments();
+ if(!sourcePlayer)return;
+ const hostNow=(()=>{try{return hostPlayer?.getCurrentTime?.()}catch{return null}})();
+ const target=Number.isFinite(hostNow)?hostNow+offset:segment.source;
  try{
-  const data=await api('/v1/watchalong/events/'+encodeURIComponent(EVENT_ID));
-  const payload=data?.event||data;
-  segments=normalizeSegments(payload);
-  subtitles=normalizeSubtitles(payload);
+  if(segment.sourceVideoId&&segment.sourceVideoId!==activeSourceVideoId){
+   activeSourceVideoId=segment.sourceVideoId;
+   sourceVideoId=segment.sourceVideoId;
+   const playing=hostPlayer?.getPlayerState?.()===YT.PlayerState.PLAYING;
+   const spec={videoId:segment.sourceVideoId,startSeconds:Math.max(0,target)};
+   if(playing)sourcePlayer.loadVideoById(spec);else sourcePlayer.cueVideoById(spec);
+  }else if(seek&&Number.isFinite(target)&&target>=0){
+   sourcePlayer.seekTo(Math.max(0,target),true);
+  }
+ }catch{}
+}
+async function loadReadOnlyArtifacts(){
+ if(!STATIC_EVENT_MODE){staticArtifactsReady=true;maybeMountPlayers();return}
+ try{
+  if(!window.HoloViewerWatchalongStatic)throw new Error('Static verifier missing');
+  const manifestResult=await fetchStaticJson(WATCHALONG_MANIFEST_PATH);
+  const entry=HoloViewerWatchalongStatic.manifestEntry(manifestResult.payload,EVENT_ID);
+  const eventResult=await fetchStaticJson(entry.path);
+  const digest=await sha256Hex(eventResult.buffer);
+  HoloViewerWatchalongStatic.verifyDigest(digest,entry.sha256);
+  const payload=HoloViewerWatchalongStatic.validateEvent(entry,eventResult.payload);
+
+  hostVideoId=validVideoId(payload.master_video_id);
+  sourceVideoId=validVideoId(payload.segments[0].source_video_id);
+  activeSourceVideoId=sourceVideoId;
+  segments=normalizeStaticSegments(payload);
+  subtitles=normalizeStaticSubtitles(payload);
+  subtitleTimeline='host';
+  activeSegmentIndex=0;
+  setOffset(segments[0].source-segments[0].host,{persist:false});
   renderSegments();
- }catch{
-  segments=[];subtitles=[];activeSegmentIndex=-1;renderSegments();
-  segmentStatus.textContent='段點資料不可用';
+
+  staticArtifactsReady=true;
+  maybeMountPlayers();
+ }catch(error){
+  failStaticEvent(error);
  }
 }
 renderSegments();
