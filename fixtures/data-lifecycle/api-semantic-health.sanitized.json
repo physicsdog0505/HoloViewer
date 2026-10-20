@@ -1,0 +1,62 @@
+{
+  "schema_version": "holoviewer-api-semantic-health-v1",
+  "sanitized": true,
+  "observed_at": "2026-10-20T11:30:00Z",
+  "target": {
+    "service": "holoviewer-public-api",
+    "base_url": "https://holoviewer-public-api.singlebagel.workers.dev"
+  },
+  "overall_status": "degraded",
+  "evidence_freshness": "fresh",
+  "probes": [
+    {
+      "name": "health",
+      "path": "/health",
+      "http_status": 200,
+      "reachable": true,
+      "semantic_status": "unknown",
+      "reason": "reachability-only",
+      "schema_version": "v1",
+      "observed_at": "2026-10-20T11:30:00Z"
+    },
+    {
+      "name": "today",
+      "path": "/v1/catalog/today?limit=10",
+      "http_status": 200,
+      "reachable": true,
+      "semantic_status": "healthy",
+      "reason": "schema-and-watermark-valid",
+      "schema_version": "public-consumer-v1",
+      "observed_at": "2026-10-20T11:30:00Z",
+      "content_health": {
+        "row_count_sampled": 10,
+        "semantic_watermark": "2026-10-20T11:29:30Z",
+        "source_freshness": "fresh",
+        "gap": false
+      }
+    },
+    {
+      "name": "ptt_today",
+      "path": "/v1/ptt/today?day=2026-10-20&limit=10",
+      "http_status": 200,
+      "reachable": true,
+      "semantic_status": "degraded",
+      "reason": "partial-coverage",
+      "schema_version": "ptt-public-v1",
+      "observed_at": "2026-10-20T11:30:00Z",
+      "content_health": {
+        "row_count_sampled": 10,
+        "semantic_watermark": "2026-10-20T11:28:00Z",
+        "source_freshness": "fresh",
+        "gap": true,
+        "coverage_status": "partial"
+      }
+    }
+  ],
+  "query_budget": {
+    "http_requests_used": 3,
+    "http_requests_max": 4,
+    "cache_ttl_seconds": 60
+  },
+  "contract_gaps": ["fixture-only-no-production-read"]
+}
