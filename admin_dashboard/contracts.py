@@ -39,8 +39,9 @@ def _job(**values) -> dict:
         "last_attempted_at": None, "last_successful_at": None, "status": "unknown",
         "attempt_count": None, "retry_after": None, "backoff_seconds": None,
         "input_count": None, "published_count": None, "verified_count": None,
-        "manifest_digest": None, "source_revision": None, "snapshot_id": None,
+        "manifest_digest": None, "source_revision": None, "source_hash": None, "snapshot_id": None,
         "scope": None, "readback_at": None, "verification_mode": None,
+        "target_kind": None, "archive_coverage_status": None, "expected_aid_status": None,
         "queries_used": None, "max_queries": None,
         "rows_returned": None, "max_rows_returned": None, "rows_read_reported": None,
         "page_count": None, "max_pages": None, "cache_status": None,
@@ -80,6 +81,7 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
     now = now or datetime.now(timezone.utc)
     checkpoint = evidence.get("publisher_checkpoint")
     manifest = evidence.get("r2_manifest")
+    archive_job = evidence.get("archive_job")
     target = evidence.get("d1_snapshot")
     jobs = []
 
@@ -102,6 +104,14 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
                          evidence_source="#48 publisher checkpoint",
                          contract_gaps=["publisher-checkpoint-unavailable"]))
 
+    # Archive is target-neutral. Production R2 is not assumed or implied.
+    # Until #48 hands off holoviewer-archive-job-evidence-v1, delivery status
+    # remains UNKNOWN even when a legacy manifest proves archive data coverage.
+    archive_values = {
+        "component": "Archive", "source": "PTT SQLite", "target": None,
+        "status": "unknown", "evidence_source": "archive evidence",
+        "contract_gaps": ["archive-delivery-job-evidence-unavailable"],
+    }
     if isinstance(manifest, dict) and manifest.get("schema_version") == "ptt-r2-archive-v1":
         observed = manifest.get("generated_at")
         days = manifest.get("days") if isinstance(manifest.get("days"), list) else []
@@ -109,25 +119,45 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
             isinstance(item, dict) and item.get("coverage_status") == "COMPLETE"
             and item.get("finalized") is True for item in days
         )
-        published = manifest.get("total_pushes", manifest.get("pushes"))
-        telemetry = _telemetry(evidence, "R2 Archive")
-        values = {
-            "job_id": manifest.get("manifest_key"), "component": "R2 Archive",
-            "source": "PTT SQLite", "target": "R2", "status": "unknown",
-            "input_count": published, "published_count": published,
-            "verified_count": published if complete and isinstance(published, int) else None,
-            "last_progress_at": observed, "evidence_source": "PR #135 ptt-r2-archive-v1 manifest",
+        archive_values.update({
+            "archive_coverage_status": "COMPLETE" if complete else "PARTIAL" if days else "UNKNOWN",
+            "published_count": manifest.get("total_pushes", manifest.get("pushes")),
+            "last_progress_at": observed,
             "evidence_observed_at": observed,
             "evidence_freshness": _freshness(observed, now=now, stale_after_seconds=stale_after_seconds),
-            "contract_gaps": ["manifest-is-data-evidence-not-job-success"] +
-                             ([] if telemetry else ["archive-attempt-retry-error-telemetry-unavailable"]),
-        }
-        values.update(telemetry)
-        jobs.append(_job(**values))
-    else:
-        jobs.append(_job(component="R2 Archive", source="PTT SQLite", target="R2",
-                         evidence_source="PR #135 ptt-r2-archive-v1 manifest",
-                         contract_gaps=["r2-manifest-unavailable"]))
+            "contract_gaps": ["manifest-is-coverage-evidence-not-delivery-job"] +
+                             ["archive-delivery-job-evidence-unavailable"],
+        })
+    if isinstance(archive_job, dict) and archive_job.get("schema_version") == "holoviewer-archive-job-evidence-v1":
+        target_info = archive_job.get("target") if isinstance(archive_job.get("target"), dict) else {}
+        verification = archive_job.get("verification") if isinstance(archive_job.get("verification"), dict) else {}
+        coverage = archive_job.get("coverage") if isinstance(archive_job.get("coverage"), dict) else {}
+        archive_values.update({
+            "job_id": archive_job.get("job_id"),
+            "target": target_info.get("kind"),
+            "target_kind": target_info.get("kind"),
+            "status": archive_job.get("status") if archive_job.get("status") in MONITOR_STATES else "unknown",
+            "last_attempted_at": archive_job.get("attempted_at"),
+            "last_successful_at": archive_job.get("succeeded_at"),
+            "attempt_count": archive_job.get("attempt_count"),
+            "published_count": archive_job.get("uploaded_count"),
+            "verified_count": archive_job.get("independently_verified_count"),
+            "manifest_digest": archive_job.get("manifest_digest"),
+            "source_revision": archive_job.get("source_revision"),
+            "source_hash": archive_job.get("source_hash"),
+            "snapshot_id": archive_job.get("snapshot_id"),
+            "verification_mode": verification.get("mode"),
+            "readback_at": archive_job.get("readback_at"),
+            "archive_coverage_status": coverage.get("status") or archive_values.get("archive_coverage_status"),
+            "expected_aid_status": archive_job.get("expected_aid_status"),
+            "evidence_source": "#48 holoviewer-archive-job-evidence-v1",
+            "evidence_observed_at": archive_job.get("observed_at") or archive_job.get("readback_at"),
+            "evidence_freshness": _freshness(
+                archive_job.get("observed_at") or archive_job.get("readback_at"),
+                now=now, stale_after_seconds=stale_after_seconds),
+            "contract_gaps": list(archive_job.get("contract_gaps", [])),
+        })
+    jobs.append(_job(**archive_values))
 
     if isinstance(target, dict) and target.get("sanitized") is True and isinstance(target.get("rows"), list):
         observed = target.get("observed_at")
@@ -172,7 +202,7 @@ def coverage_sync_consistency(inventory: object, monitor: object) -> list[dict]:
         return [{"code": "comparison-unavailable", "severity": "unknown"}]
     jobs = monitor.get("jobs") if isinstance(monitor.get("jobs"), list) else []
     statuses = {item.get("status") for item in jobs if isinstance(item, dict)
-                and item.get("component") in {"Publisher", "R2 Archive", "D1 Snapshot"}}
+                and item.get("component") in {"Publisher", "Archive", "D1 Snapshot"}}
     coverage_states = []
     if isinstance(inventory.get("days"), list):
         days = [item for item in inventory["days"] if isinstance(item, dict)]
