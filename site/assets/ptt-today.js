@@ -1,6 +1,7 @@
 'use strict';
 
 const config=window.HOLOVIEWER_CONFIG||{};
+const PTT_POLL_MS=60000;
 const $=id=>document.getElementById(id);
 let pttFollowing=true;
 let pttProgrammatic=false;
@@ -151,10 +152,10 @@ async function loadPtt(){
    else{list.scrollTop=previousScroll;latest.hidden=false}
   }
  }catch{
-  meta.textContent=today.replaceAll('-','/')+' · 後端暫未就緒 · 10 秒後重試 · 純 PTT 閱讀';
+  meta.textContent=today.replaceAll('-','/')+' · 後端暫未就緒 · 60 秒後重試 · 純 PTT 閱讀';
   if(!pttLastGoodCount){
    list.hidden=true;empty.hidden=false;latest.hidden=true;
-   empty.textContent='今日 PTT 後端資料暫未就緒；頁面會每 10 秒自動重試。';
+   empty.textContent='今日 PTT 後端資料暫未就緒；頁面會每 60 秒自動重試。';
   }
  }finally{pttLoadInFlight=false}
 }
@@ -187,6 +188,6 @@ function init(){
  loadPtt();
 }
 init();
-const pollTimer=setInterval(()=>{if(!document.hidden)loadPtt()},10000);
+const pollTimer=setInterval(()=>{if(!document.hidden)loadPtt()},PTT_POLL_MS);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadPtt()});
 window.addEventListener('pagehide',()=>clearInterval(pollTimer),{once:true});
