@@ -61,6 +61,29 @@ class IsolatedPilotTests(unittest.TestCase):
         self.assertNotIn("target?.verified===true", html)
         self.assertNotIn("innerHTML", html)
 
+    def test_fixture_daily_finalization_targets_previous_day_and_keeps_facts_separate(self):
+        fixture = json.loads((ROOT / "admin-ui-coverage.sanitized.json").read_text(encoding="utf-8"))
+        readers = FixtureReaders(
+            ROOT,
+            days=fixture["days"],
+            start_day=fixture["from_day"],
+            end_day=fixture["through_day"],
+        )
+        controller = DashboardController(readers.injected(), cooldown_seconds=0)
+        payload = controller.refresh(
+            "daily_finalization",
+            now=datetime(2026, 10, 21, 0, 30, 0, tzinfo=timezone.utc),
+        )["daily_finalization"]["payload"]
+        run = payload["runs"][0]
+        self.assertEqual(run["target_day"], "2026-10-20")
+        self.assertEqual(run["source_completeness"]["status"], "VERIFIED_COMPLETE")
+        self.assertEqual(run["source_completeness"]["expected_aid_count"], 1)
+        self.assertEqual(run["repair_job"]["status"], "unknown")
+        self.assertEqual(run["archive"]["package_status"], "COMPLETE")
+        self.assertEqual(run["archive"]["delivery_job_status"], "completed")
+        self.assertEqual(run["archive"]["readback_verified_status"], "VERIFIED")
+        self.assertIn("repair-job-evidence-unavailable", run["contract_gaps"])
+
     def test_fixture_readback_is_bounded_and_health_not_http(self):
         readers = FixtureReaders(ROOT)
         snapshot = readers._read_d1()
