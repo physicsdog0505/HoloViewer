@@ -44,16 +44,24 @@ export function evidenceChecksum(r) {
   for (let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
   return (h>>>0).toString(16).padStart(8,'0');
 }
-export async function writeEvidence(db, evidence, {projectHistory=true}={}) {
+export async function writeEvidence(db, evidence, options={}) {
+  const {projectHistory=true}=options;
   const r=validateEvidence(evidence), hash=evidenceChecksum(r);
-  const oldEvidence=await db.prepare('SELECT checksum FROM public_today_evidence WHERE video_id=? AND observed_at=? AND source_label=?')
-    .bind(r.video_id,r.observed_at,r.source_label).first();
+  const hasPreloadedEvidence=Object.prototype.hasOwnProperty.call(options,'preloadedEvidence');
+  const hasPreloadedCurrent=Object.prototype.hasOwnProperty.call(options,'preloadedCurrent');
+  const hasPreloadedCatalogAvatar=Object.prototype.hasOwnProperty.call(options,'preloadedCatalogAvatar');
+  const oldEvidence=hasPreloadedEvidence
+    ? options.preloadedEvidence
+    : await db.prepare('SELECT checksum FROM public_today_evidence WHERE video_id=? AND observed_at=? AND source_label=?')
+      .bind(r.video_id,r.observed_at,r.source_label).first();
   if (oldEvidence) {
     if (oldEvidence.checksum!==hash) throw Error('same-key contradictory evidence');
     return {changed:false,reason:'replay'};
   }
-  const current=await db.prepare('SELECT lifecycle_state,lifecycle_observed_at,publisher_channel_id,roster_version,source_checksum FROM public_today_canonical WHERE video_id=?')
-    .bind(r.video_id).first();
+  const current=hasPreloadedCurrent
+    ? options.preloadedCurrent
+    : await db.prepare('SELECT lifecycle_state,lifecycle_observed_at,publisher_channel_id,roster_version,source_checksum FROM public_today_canonical WHERE video_id=?')
+      .bind(r.video_id).first();
   if (current && (current.publisher_channel_id!==r.channel_id))
     throw Error('canonical publisher/roster mismatch');
   const newer=(!current || r.observed_at>current.lifecycle_observed_at);
@@ -80,9 +88,11 @@ export async function writeEvidence(db, evidence, {projectHistory=true}={}) {
     mutations.push(db.prepare(sql).bind(r.video_id,r.channel_id,r.roster_version,r.group,r.title,r.channel_name??'',
       r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.source_label,hash));
     if(projectHistory&&r.lifecycle_state==='ended'&&r.source_label===YOUTUBE_LIVE_SOURCE&&r.actual_start&&r.actual_end){
-      const catalogAvatar=await db.prepare(`SELECT avatar_url FROM public_catalog
-        WHERE channel_id=? AND avatar_url IS NOT NULL
-        ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1`).bind(r.channel_id).first();
+      const catalogAvatar=hasPreloadedCatalogAvatar
+        ? {avatar_url:options.preloadedCatalogAvatar}
+        : await db.prepare(`SELECT avatar_url FROM public_catalog
+          WHERE channel_id=? AND avatar_url IS NOT NULL
+          ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1`).bind(r.channel_id).first();
       const historyAvatar=verifiedChannelAvatar(catalogAvatar?.avatar_url)??'';
       const historySql=`INSERT INTO public_history
         (video_id,taipei_day,title,channel_id,channel_name,avatar_url,scheduled_start,actual_start,actual_end,source_revision,published_at)
