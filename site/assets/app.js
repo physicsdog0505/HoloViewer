@@ -105,6 +105,23 @@ function appendArchiveWindow(query,window){
  if(!window)return;
  query.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|'));
 }
+async function resolveVideoMetadata(id){
+ const videoId=String(id||'');
+ if(!/^[A-Za-z0-9_-]{11}$/.test(videoId))return null;
+ try{return await api('/v1/catalog/videos/'+encodeURIComponent(videoId))}
+ catch{
+  try{return await api('/v1/videos/'+encodeURIComponent(videoId)+'/metadata')}
+  catch{return null}
+ }
+}
+async function resolveVodWindow(id){
+ const row=await resolveVideoMetadata(id);
+ if(!row||String(row?.lifecycle_state||row?.state||'').toLowerCase()!=='ended')return null;
+ const window=trustedArchiveWindow({...row,video_id:String(row?.video_id||id)});
+ if(!window)return null;
+ window.scheduledStart=archiveScheduledStart(row,window);
+ return window;
+}
 function homeFilter(){try{const x=localStorage.getItem(HOME_FILTER_KEY);return HOME_FILTERS.has(x)?x:'hololive'}catch{return 'hololive'}}
 function setHomeFilter(value){if(!HOME_FILTERS.has(value))return;try{localStorage.setItem(HOME_FILTER_KEY,value)}catch{}applyHomeFilter(value)}
 function applyHomeFilter(value=homeFilter()){
@@ -1341,14 +1358,8 @@ document.getElementById('start').onclick=async()=>{
   const missing=items.filter(id=>!historyVodWindows.has(id));
   if(missing.length){
     await Promise.all(missing.map(async id=>{
-      try{
-        const row=await api('/v1/catalog/videos/'+encodeURIComponent(id));
-        if(String(row?.lifecycle_state||row?.state||'').toLowerCase()!=='ended')return;
-        const window=trustedArchiveWindow(row);
-        if(!window)return;
-        window.scheduledStart=archiveScheduledStart(row,window);
-        historyVodWindows.set(id,window);
-      }catch{}
+      const window=await resolveVodWindow(id);
+      if(window)historyVodWindows.set(id,window);
     }));
   }
   const q=new URLSearchParams();items.forEach(v=>q.append('stream',v));
