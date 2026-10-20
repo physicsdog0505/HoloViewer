@@ -14,6 +14,7 @@ from .data_lifecycle_evidence import (
     build_collector_semantic_evidence,
     build_expected_aid_contract,
     build_source_coverage,
+    expected_aids_for_pr147,
 )
 from .publisher_telemetry import build_publisher_telemetry
 
@@ -35,6 +36,7 @@ def build_bundle(raw: dict[str,Any]) -> dict[str,Any]:
         entries=expected_raw.get("entries",[]),
         authority=expected_raw.get("authority",{}),
     )
+    expected_projection=expected_aids_for_pr147(expected)
     coverage=build_source_coverage(
         day=coverage_raw.get("day"),
         aid=coverage_raw.get("aid"),
@@ -65,6 +67,7 @@ def build_bundle(raw: dict[str,Any]) -> dict[str,Any]:
         "schema_version":BUNDLE_SCHEMA,
         "sanitized":True,
         "expected_aids":expected,
+        "pr147_expected_set":expected_projection,
         "source_coverage":coverage,
         "job_telemetry":publisher,
         "system_health":{"components":{"Collector":collector}},
