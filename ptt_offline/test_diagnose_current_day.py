@@ -1,5 +1,6 @@
 import json
 from contextlib import nullcontext
+from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
 import unittest
@@ -15,8 +16,10 @@ class CurrentDayDiagnosisTests(unittest.TestCase):
             "status":"READY","aid":"1abc","source_identity":source_identity,
             "candidate_rows":[
                 {"source_line":100,"day":"2026-10-20","content":"secret-a"},
-                {"source_line":101,"day":"2026-10-20","content":"secret-b"},
-                {"source_line":102,"day":"2026-10-20","content":"secret-c"},
+                {"source_line":101,"day":"2026-10-20","content":"secret-b",
+                 "occurred_at":"2026-10-20T03:30:00Z"},
+                {"source_line":102,"day":"2026-10-20","content":"secret-c",
+                 "occurred_at":"2026-10-20T05:30:00Z"},
             ],
             "pending_source_lines":[103],
             "checked_source_rows":4,
@@ -35,7 +38,10 @@ class CurrentDayDiagnosisTests(unittest.TestCase):
                        return_value=[7]), \
                  patch("ptt_offline.diagnose_current_day.inspect_latest_article",
                        return_value=plan):
-                result=diagnose(source="/unused.sqlite3",state_dir=str(state))
+                result=diagnose(
+                    source="/unused.sqlite3",state_dir=str(state),
+                    now=datetime(2026,10,20,6,0,tzinfo=timezone.utc),
+                )
 
         row=result["articles"][0]
         self.assertEqual(row["candidate_after_baseline_count"],2)
@@ -44,6 +50,7 @@ class CurrentDayDiagnosisTests(unittest.TestCase):
         self.assertEqual(row["unaccepted_after_baseline_count"],2)
         self.assertEqual(row["unaccepted_after_baseline_first"],[101,102])
         self.assertEqual(row["pending_after_baseline_count"],1)
+        self.assertEqual(row["accepted_after_baseline_stale_now_count"],0)
         self.assertNotIn("content",json.dumps(result))
 
     def test_distinguishes_locally_accepted_rows_after_baseline(self):
@@ -52,8 +59,10 @@ class CurrentDayDiagnosisTests(unittest.TestCase):
             "status":"READY","aid":"1abc","source_identity":source_identity,
             "candidate_rows":[
                 {"source_line":100,"day":"2026-10-20","source_record_key":"1abc:100"},
-                {"source_line":101,"day":"2026-10-20","source_record_key":"1abc:101"},
-                {"source_line":102,"day":"2026-10-20","source_record_key":"1abc:102"},
+                {"source_line":101,"day":"2026-10-20","source_record_key":"1abc:101",
+                 "occurred_at":"2026-10-20T03:30:00Z"},
+                {"source_line":102,"day":"2026-10-20","source_record_key":"1abc:102",
+                 "occurred_at":"2026-10-20T05:30:00Z"},
             ],
             "pending_source_lines":[],
             "checked_source_rows":3,
@@ -73,11 +82,16 @@ class CurrentDayDiagnosisTests(unittest.TestCase):
                        return_value=[7]), \
                  patch("ptt_offline.diagnose_current_day.inspect_latest_article",
                        return_value=plan):
-                result=diagnose(source="/unused.sqlite3",state_dir=str(state))
+                result=diagnose(
+                    source="/unused.sqlite3",state_dir=str(state),
+                    now=datetime(2026,10,20,6,0,tzinfo=timezone.utc),
+                )
 
         row=result["articles"][0]
         self.assertEqual(row["accepted_after_baseline_count"],1)
         self.assertEqual(row["accepted_after_baseline_first"],[101])
+        self.assertEqual(row["accepted_after_baseline_stale_now_count"],1)
+        self.assertEqual(row["accepted_after_baseline_within_recovery_window_now_count"],0)
         self.assertEqual(row["unaccepted_after_baseline_count"],1)
         self.assertEqual(row["unaccepted_after_baseline_first"],[102])
 
