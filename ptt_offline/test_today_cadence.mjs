@@ -159,6 +159,8 @@ test('unchanged 50-video heartbeat rotates fairly without changing evidence prov
  assert.equal(d.metrics().readQueries,4);
  const checked=raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE checked_at='2026-10-18T09:05:00Z'").get().n;
  assert.equal(checked,25);
+ assert.equal(raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE checked_at='2026-10-18T09:00:00Z'").get().n,25);
+ assert.equal(raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE checked_at='2026-10-18T08:00:00Z'").get().n,0);
  const untouched=raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE lifecycle_observed_at!='2026-10-18T08:00:00Z' OR source_checksum!='steady'").get().n;
  assert.equal(untouched,0);
  assert.equal(raw.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,0);
