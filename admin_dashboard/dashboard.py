@@ -71,7 +71,7 @@ class DashboardController:
                           max(0.0, (now - last_success_dt).total_seconds())
                           if last_success_dt is not None else None
                       ),
-                      "error": {"code": type(exc).__name__,
+                      "error": {"code": "source_unavailable",
                                 "message": "read-only monitor source failed"},
                       "payload": deepcopy(previous["public"].get("payload")) if previous else None,
                       "refresh": {"status": "failed", "retry_after_seconds": self._cooldown}}
