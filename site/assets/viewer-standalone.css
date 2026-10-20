@@ -153,6 +153,19 @@ body.settings-open .viewer-main{height:calc(100vh - 58px)}
  background:rgba(0,0,0,.66);color:#fff;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none
 }
 .player-card.primary{outline:2px solid rgba(111,174,201,.85);outline-offset:-2px}
+.watchalong-subtitle-overlay{
+ position:absolute;left:5%;right:5%;bottom:5%;z-index:5;display:grid;gap:5px;justify-items:center;
+ pointer-events:none;text-align:center
+}
+.watchalong-subtitle-overlay[hidden]{display:none}
+.watchalong-subtitle-line{
+ max-width:96%;padding:5px 9px;border-radius:5px;background:rgba(0,0,0,.76);color:#fff;
+ font-weight:800;line-height:1.45;text-shadow:0 1px 2px #000
+}
+.watchalong-subtitle-line.original{font-size:16px}
+.watchalong-subtitle-line.translation{font-size:18px}
+.watchalong-failed{padding:24px;text-align:center}
+
 .player-host,.player-host iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 
 /* Call mode: hidden easter egg; overlay never reparents or replaces YouTube iframes. */
