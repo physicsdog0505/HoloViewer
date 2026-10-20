@@ -65,10 +65,10 @@ button,input,select,output{font:inherit}
 .subtitle-line.translation{font-size:clamp(20px,1.55vw,28px)}
 .danmaku-layer{position:absolute;left:0;right:0;top:0;height:48%;z-index:6;overflow:hidden;pointer-events:none}
 .danmaku-item{
- position:absolute;right:-10%;top:var(--danmaku-top,8%);max-width:88%;padding:3px 7px;border-radius:5px;
- background:rgba(0,0,0,.30);color:var(--danmaku-color,#6faec9);font-size:clamp(20px,1.55vw,28px);font-weight:900;line-height:1.3;white-space:nowrap;
+ position:absolute;right:-10%;top:var(--danmaku-top,8%);max-width:88%;padding:3px 7px;border-radius:0;
+ background:transparent;color:var(--danmaku-color,#6faec9);font-size:clamp(20px,1.55vw,28px);font-weight:900;line-height:1.3;white-space:nowrap;
  text-shadow:0 1px 2px #000,0 0 4px #000,1px 0 #000,-1px 0 #000;transform:translateX(110%);will-change:transform;
- animation:watchalong-danmaku var(--danmaku-duration,8s) linear forwards
+ animation:watchalong-danmaku var(--danmaku-duration,12s) linear forwards
 }
 @keyframes watchalong-danmaku{
  from{transform:translateX(110%)}
