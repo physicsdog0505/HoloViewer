@@ -177,11 +177,24 @@ class ArchiveJobEvidenceTests(unittest.TestCase):
             {"authorization":"Bearer x"},
             {"url":"https://example.invalid/file?X-Amz-Signature=abc"},
             {"source_path":"/Users/example/private/archive.json"},
+            {"password":"x"},
+            {"token":"x"},
+            {"refresh_token":"x"},
+            {"client_secret":"x"},
+            {"bearer_token":"x"},
         ]
         for value in bad_values:
             with self.subTest(value=value):
                 with self.assertRaises(ArchiveEvidenceError):
                     reject_sensitive(value)
+
+        # Legal evidence identity/hash fields must remain allowed.
+        reject_sensitive({
+            "content_hash":"a"*64,
+            "source_hash":"b"*64,
+            "snapshot_id":"c"*64,
+            "manifest_digest":"d"*64,
+        })
 
     def test_case11_contract_projection_modules_have_no_runtime_io_surface(self):
         for module in (archive_module,projection_module):
