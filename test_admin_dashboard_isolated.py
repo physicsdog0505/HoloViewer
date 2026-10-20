@@ -48,7 +48,9 @@ class IsolatedPilotTests(unittest.TestCase):
         self.assertEqual(status, "200 OK")
         payload = json.loads(body)
         self.assertEqual(payload["data_coverage"]["payload"]["days"][0]["status"], "UNKNOWN")
-        self.assertEqual(payload["sync_monitor"]["payload"]["jobs"][2]["status"], "unknown")
+        archive = next(x for x in payload["sync_monitor"]["payload"]["jobs"] if x["component"] == "Archive")
+        self.assertEqual(archive["status"], "completed")
+        self.assertEqual(archive["target"], "workers-static-assets")
         for method in ("POST", "PUT", "DELETE"):
             self.assertEqual(self.request(app, method)[0], "405 Method Not Allowed")
 
@@ -84,12 +86,74 @@ class IsolatedPilotTests(unittest.TestCase):
         self.assertEqual(len(results), 6)
 
 
+    def archive_case(self, name):
+        value = json.loads((ROOT / "archive-sync-jobs.sanitized.json").read_text(encoding="utf-8"))
+        return value["cases"][name]
+
     def test_archive_placeholder_is_target_neutral_and_unknown(self):
         monitor = build_sync_monitor({})
         archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
         self.assertEqual(archive["status"], "unknown")
         self.assertIsNone(archive["target"])
         self.assertIn("archive-delivery-job-evidence-unavailable", archive["contract_gaps"])
+
+
+    def test_archive_manifest_complete_without_job_stays_unknown(self):
+        monitor = build_sync_monitor({"archive_sync_job": self.archive_case("manifest_complete_job_not_run")})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertEqual(archive["archive_coverage_status"], "COMPLETE")
+        self.assertEqual(archive["status"], "unknown")
+        self.assertEqual(archive["expected_aid_status"], "UNKNOWN")
+
+    def test_archive_completed_job_does_not_promote_partial_coverage(self):
+        monitor = build_sync_monitor({"archive_sync_job": self.archive_case("job_success_manifest_partial")})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertEqual(archive["status"], "completed")
+        self.assertEqual(archive["archive_coverage_status"], "PARTIAL")
+        self.assertEqual(archive["expected_aid_status"], "UNKNOWN")
+
+    def test_archive_full_partition_verification_is_visible_only_as_job_verification(self):
+        monitor = build_sync_monitor({"archive_sync_job": self.archive_case("static_success_full")})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertTrue(archive["job_verified"])
+        self.assertEqual(archive["verification_mode"], "full_partition")
+        self.assertEqual(archive["archive_coverage_status"], "COMPLETE")
+        self.assertEqual(archive["expected_aid_status"], "UNKNOWN")
+
+    def test_archive_bounded_sample_never_verifies_whole_job(self):
+        monitor = build_sync_monitor({"archive_sync_job": self.archive_case("bounded_sample")})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertEqual(archive["verification_mode"], "bounded_sample")
+        self.assertFalse(archive["job_verified"])
+
+    def test_archive_expected_aid_missing_remains_unknown_when_delivery_verified(self):
+        monitor = build_sync_monitor({"archive_sync_job": self.archive_case("static_success_full")})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertTrue(archive["job_verified"])
+        self.assertEqual(archive["expected_aid_status"], "UNKNOWN")
+
+    def test_archive_static_assets_target_is_not_r2(self):
+        monitor = build_sync_monitor({"archive_sync_job": self.archive_case("static_success_full")})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertEqual(archive["target"], "workers-static-assets")
+        html = render_dashboard()
+        self.assertIn('"Static Assets"', html)
+
+    def test_archive_projection_sensitive_fields_are_scrubbed_from_browser(self):
+        row = self.archive_case("static_success_full")
+        row["evidence_source_fields"]["token"] = "must-not-leak"
+        row["evidence_source_fields"]["author"] = "must-not-leak"
+        controller = DashboardController({"sync_monitor": lambda: {"archive_sync_job": row}}, cooldown_seconds=0)
+        payload = controller.refresh("sync_monitor", now=datetime(2026, 10, 20, 11, 30, 30, tzinfo=timezone.utc))
+        archive = next(x for x in payload["sync_monitor"]["payload"]["jobs"] if x["component"] == "Archive")
+        self.assertNotIn("token", archive["evidence_source_fields"])
+        self.assertNotIn("author", archive["evidence_source_fields"])
+
+    def test_invalid_archive_projection_fails_closed(self):
+        monitor = build_sync_monitor({"archive_sync_job": {"component": "Archive", "status": "completed"}})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertEqual(archive["status"], "unknown")
+        self.assertIn("invalid-archive-sync-job-projection", archive["contract_gaps"])
 
     def test_d1_monitor_uses_job_binding_not_snapshot_id_and_exposes_cost(self):
         readers = FixtureReaders(ROOT)
