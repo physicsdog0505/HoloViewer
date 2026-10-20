@@ -17,6 +17,7 @@ from admin_dashboard.capabilities import (
 )
 from admin_dashboard.dashboard import DashboardController
 from admin_dashboard.http import DashboardApplication
+from admin_dashboard.host_boundary import InternalExposureConfig, evaluate_internal_exposure
 from admin_dashboard.isolated import AuthenticatedDashboard
 from admin_dashboard.production_shell import (
     EvidenceReaderSet, ProductionReadOnlyShell, select_reader_provider,
@@ -117,14 +118,33 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertNotIn(b"legacy-fixture", body)
 
     # Admission 5-10
-    def request(self, key="k", source="d1"):
-        return AdmissionRequest(source, {"day": "2026-10-20"}, "bounded_sample",
-                                "fixture-read", "bounded_read", key)
+    def request(self, key="k", source="d1", *, mode="bounded_sample", cost_class="bounded_read"):
+        request_class = {
+            "d1": "d1_snapshot", "archive": "archive_delivery",
+            "api_semantic": "api_semantic_health",
+            "publisher": "publisher_evidence", "collector": "collector_evidence",
+        }[source]
+        return AdmissionRequest(source, {"day": "2026-10-20"}, mode,
+                                request_class, cost_class, key)
 
     def test_admission_within_budget(self):
         receipt = self.admission({"d1": (2, 600)}).admit(self.request(), now=1000)
         self.assertTrue(receipt.admitted)
         self.assertEqual(receipt.requests_used, 1)
+
+
+    def test_automatic_full_partition_is_denied_by_admission_policy(self):
+        ctrl = self.admission({"d1": (6, 600)})
+        receipt = ctrl.admit(self.request("full", mode="full_partition"), now=1000)
+        self.assertFalse(receipt.admitted)
+        self.assertEqual(receipt.reason, "admission_denied")
+
+    def test_manual_full_partition_requires_explicit_manual_cost_class(self):
+        ctrl = self.admission({"d1": (6, 600)})
+        receipt = ctrl.admit(
+            self.request("full-manual", mode="full_partition", cost_class="manual_full_partition"),
+            now=1000)
+        self.assertTrue(receipt.admitted)
 
     def test_admission_exceeded_fails_closed(self):
         ctrl = self.admission({"d1": (1, 600)})
@@ -168,6 +188,25 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         receipt = ctrl.admit(self.request("bad"), now=1000)
         self.assertFalse(receipt.admitted)
         self.assertEqual(receipt.reason, "admission_state_error")
+
+
+    def test_wildcard_bind_is_not_isolation_proof(self):
+        decision = evaluate_internal_exposure(
+            InternalExposureConfig(bind_host="0.0.0.0", behind_authenticated_proxy=True,
+                                   internal_network_proven=True))
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.error_code, "wildcard_bind_unproven")
+
+    def test_loopback_internal_boundary_is_allowed(self):
+        decision = evaluate_internal_exposure(InternalExposureConfig(bind_host="127.0.0.1"))
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.mode, "loopback")
+
+    def test_public_route_is_always_denied(self):
+        decision = evaluate_internal_exposure(
+            InternalExposureConfig(bind_host="127.0.0.1", public_route_exposed=True))
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.error_code, "public_route_forbidden")
 
     # Capability 11-15
     def test_reader_interface_has_no_arbitrary_sql(self):
