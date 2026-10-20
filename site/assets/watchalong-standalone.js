@@ -417,7 +417,7 @@ function spawnDanmaku(row){
  item.className='danmaku-item';
  item.textContent=text;
  const lane=(Number(row.index)||0)%4;
- item.style.setProperty('--danmaku-top',(8+lane*10)+'%');
+ item.style.setProperty('--danmaku-top',(8+lane*18)+'%');
  const palette=['#6faec9','#A65788','#B8A6D8','#c85d67','#856C86','#4f7f93'];
  item.style.setProperty('--danmaku-color',palette[(Number(row.index)||0)%palette.length]);
  const duration=Math.max(6,Math.min(12,6+text.length*0.06));
@@ -436,9 +436,8 @@ function renderSubtitleCue(row){
  }
  if(subtitleMode==='standard'){
   clearDanmaku();
-  if(!row){subtitleOverlay.hidden=true;activeSubtitleCueId='';return}
-  subtitleTranslation.textContent=row.translation||'';
-  subtitleOverlay.hidden=!row.translation;
+  subtitleOverlay.hidden=false;
+  subtitleTranslation.textContent=row?.translation||'';
   activeSubtitleCueId=cueId;
   return;
  }
