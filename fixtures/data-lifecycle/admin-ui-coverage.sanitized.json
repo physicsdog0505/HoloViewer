@@ -1,0 +1,243 @@
+{
+  "schema_version": "holoviewer-admin-ui-fixture-v1",
+  "sanitized": true,
+  "from_day": "2026-10-14",
+  "through_day": "2026-10-21",
+  "days": [
+    {
+      "date": "2026-10-14",
+      "sources": [
+        {
+          "source": "ptt",
+          "completeness_status": "COMPLETE",
+          "expected_set": [
+            "day-a",
+            "night-a"
+          ],
+          "actual_set": [
+            "day-a",
+            "night-a"
+          ],
+          "source_version": "fixture-r14",
+          "evidence_freshness": "fresh",
+          "thread_evidence": [
+            {
+              "period": "day",
+              "aid": "day-a",
+              "part": 1
+            },
+            {
+              "period": "night",
+              "aid": "night-a",
+              "part": 1
+            }
+          ],
+          "source_line_ranges": {
+            "day-a": [
+              1,
+              420
+            ],
+            "night-a": [
+              1,
+              550
+            ]
+          },
+          "legal_empty_push_evidence": {
+            "night-a": [
+              311
+            ]
+          },
+          "expected_authority": {
+            "status": "VERIFIED",
+            "version": "fixture-aid-v1"
+          },
+          "target_evidence": {
+            "schema_version": "holoviewer-d1-sanitized-snapshot-v1",
+            "sanitized": true,
+            "job_binding": {
+              "job_id": "fixture-job-14",
+              "manifest_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "source_revision": "fixture-r14",
+              "scope": {
+                "day": "2026-10-14",
+                "aids": [
+                  "day-a",
+                  "night-a"
+                ]
+              }
+            },
+            "coverage": {
+              "complete_partition_proven": true,
+              "missing_identities": 0
+            },
+            "verification": {
+              "mode": "full_partition",
+              "job_verified": true,
+              "manifest_digest_match": true,
+              "identity_match": true,
+              "count_match": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "sources": [
+        {
+          "source": "ptt",
+          "completeness_status": "REPAIR_NEEDED",
+          "expected_set": [
+            "day-b",
+            "night-b"
+          ],
+          "actual_set": [
+            "day-b"
+          ],
+          "missing_ids": [
+            "night-b"
+          ],
+          "source_version": "fixture-r15",
+          "evidence_freshness": "fresh",
+          "expected_authority": {
+            "status": "VERIFIED"
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "sources": [
+        {
+          "source": "ptt",
+          "completeness_status": "REPAIR_NEEDED",
+          "expected_set": [
+            "all-c"
+          ],
+          "actual_set": [
+            "all-c"
+          ],
+          "source_line_gaps": {
+            "all-c": [
+              88,
+              89,
+              90
+            ]
+          },
+          "thread_evidence": [
+            {
+              "period": "all_day",
+              "aid": "all-c",
+              "part": 1
+            }
+          ],
+          "source_version": "fixture-r16",
+          "evidence_freshness": "fresh",
+          "expected_authority": {
+            "status": "VERIFIED"
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-10-17",
+      "sources": [
+        {
+          "source": "ptt",
+          "completeness_status": "CONFLICT",
+          "expected_set": [
+            "day-d"
+          ],
+          "actual_set": [
+            "day-d"
+          ],
+          "conflicts": [
+            "duplicate-authority"
+          ],
+          "source_version": "fixture-r17",
+          "evidence_freshness": "fresh",
+          "contract_gaps": [
+            "expected-aid-authority-conflict"
+          ]
+        }
+      ]
+    },
+    {
+      "date": "2026-10-18",
+      "sources": [
+        {
+          "source": "ptt",
+          "completeness_status": "COMPLETE",
+          "expected_set": [
+            "day-e"
+          ],
+          "actual_set": [
+            "day-e"
+          ],
+          "source_version": "fixture-r18",
+          "evidence_freshness": "stale",
+          "target_evidence": {
+            "schema_version": "holoviewer-d1-sanitized-snapshot-v1",
+            "sanitized": true,
+            "job_binding": {
+              "job_id": "fixture-job-18",
+              "manifest_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_revision": "fixture-r18",
+              "scope": {
+                "day": "2026-10-18",
+                "aids": [
+                  "day-e"
+                ]
+              }
+            },
+            "coverage": {
+              "complete_partition_proven": true,
+              "missing_identities": 1
+            },
+            "verification": {
+              "mode": "full_partition",
+              "job_verified": false,
+              "manifest_digest_match": true,
+              "identity_match": false,
+              "count_match": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-10-19",
+      "sources": [
+        {
+          "source": "ptt",
+          "completeness_status": "COMPLETE",
+          "expected_set": [
+            "day-f"
+          ],
+          "actual_set": [
+            "day-f"
+          ],
+          "source_version": "fixture-r19",
+          "evidence_freshness": "fresh"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-20",
+      "sources": [
+        {
+          "source": "ptt",
+          "completeness_status": "COMPLETE",
+          "expected_set": [
+            "1grg4Pag"
+          ],
+          "actual_set": [
+            "1grg4Pag"
+          ],
+          "source_version": "fixture-r20",
+          "evidence_freshness": "fresh"
+        }
+      ]
+    }
+  ]
+}
