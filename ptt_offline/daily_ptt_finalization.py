@@ -169,16 +169,29 @@ def finalize_day(
                     "mode":"bounded-missing-ranges-only",
                 }
                 repair_attempts+=1
-                refreshed=repair_executor(request)
-                after=_classify_coverage(day=day,aid=aid,coverage=refreshed)
-                result={
-                    **after,
-                    "repair_attempted":True,
-                    "repair_request":request,
-                    "repair_result":after["state"],
-                    "pre_repair_state":initial["state"],
-                    "pre_repair_coverage_digest":initial["coverage_digest"],
-                }
+                try:
+                    refreshed=repair_executor(request)
+                except Exception as exc:
+                    result={
+                        **initial,
+                        "repair_attempted":True,
+                        "repair_request":request,
+                        "repair_result":"FAILED",
+                        "repair_failure_code":"repair-executor-"+type(exc).__name__,
+                        "pre_repair_state":initial["state"],
+                        "pre_repair_coverage_digest":initial["coverage_digest"],
+                    }
+                else:
+                    after=_classify_coverage(day=day,aid=aid,coverage=refreshed)
+                    result={
+                        **after,
+                        "repair_attempted":True,
+                        "repair_request":request,
+                        "repair_result":after["state"],
+                        "repair_failure_code":None,
+                        "pre_repair_state":initial["state"],
+                        "pre_repair_coverage_digest":initial["coverage_digest"],
+                    }
             thread_results.append(result)
 
     states=[row["state"] for row in thread_results]
