@@ -88,19 +88,19 @@ class NoProductionCredentials:
 class ProductionEvidenceReader(Protocol):
     """Narrow read-only capability surface. No SQL/URL/path arguments exist."""
 
-    def read_d1_snapshot(self, scope: D1ReadScope) -> dict:
+    def read_d1_snapshot(self, scope: D1ReadScope, *, timeouts: ReaderTimeouts) -> dict:
         ...
 
-    def read_archive_delivery_evidence(self, scope: ArchiveReadScope) -> dict:
+    def read_archive_delivery_evidence(self, scope: ArchiveReadScope, *, timeouts: ReaderTimeouts) -> dict:
         ...
 
-    def read_api_semantic_health(self) -> dict:
+    def read_api_semantic_health(self, *, timeouts: ReaderTimeouts) -> dict:
         ...
 
-    def read_publisher_evidence(self) -> dict:
+    def read_publisher_evidence(self, *, timeouts: ReaderTimeouts) -> dict:
         ...
 
-    def read_collector_evidence(self) -> dict:
+    def read_collector_evidence(self, *, timeouts: ReaderTimeouts) -> dict:
         ...
 
 
@@ -110,19 +110,19 @@ class DeniedProductionEvidenceReader:
     def _deny(self):
         raise RuntimeError("source_disabled")
 
-    def read_d1_snapshot(self, scope: D1ReadScope) -> dict:
+    def read_d1_snapshot(self, scope: D1ReadScope, *, timeouts: ReaderTimeouts) -> dict:
         return self._deny()
 
-    def read_archive_delivery_evidence(self, scope: ArchiveReadScope) -> dict:
+    def read_archive_delivery_evidence(self, scope: ArchiveReadScope, *, timeouts: ReaderTimeouts) -> dict:
         return self._deny()
 
-    def read_api_semantic_health(self) -> dict:
+    def read_api_semantic_health(self, *, timeouts: ReaderTimeouts) -> dict:
         return self._deny()
 
-    def read_publisher_evidence(self) -> dict:
+    def read_publisher_evidence(self, *, timeouts: ReaderTimeouts) -> dict:
         return self._deny()
 
-    def read_collector_evidence(self) -> dict:
+    def read_collector_evidence(self, *, timeouts: ReaderTimeouts) -> dict:
         return self._deny()
 
 
@@ -144,17 +144,17 @@ class FakeProductionEvidenceReader:
             raise RuntimeError(self._failures[source])
         return self._values.get(source)
 
-    def read_d1_snapshot(self, scope: D1ReadScope) -> dict:
+    def read_d1_snapshot(self, scope: D1ReadScope, *, timeouts: ReaderTimeouts) -> dict:
         return self._read("d1")
 
-    def read_archive_delivery_evidence(self, scope: ArchiveReadScope) -> dict:
+    def read_archive_delivery_evidence(self, scope: ArchiveReadScope, *, timeouts: ReaderTimeouts) -> dict:
         return self._read("archive")
 
-    def read_api_semantic_health(self) -> dict:
+    def read_api_semantic_health(self, *, timeouts: ReaderTimeouts) -> dict:
         return self._read("api_semantic")
 
-    def read_publisher_evidence(self) -> dict:
+    def read_publisher_evidence(self, *, timeouts: ReaderTimeouts) -> dict:
         return self._read("publisher")
 
-    def read_collector_evidence(self) -> dict:
+    def read_collector_evidence(self, *, timeouts: ReaderTimeouts) -> dict:
         return self._read("collector")
