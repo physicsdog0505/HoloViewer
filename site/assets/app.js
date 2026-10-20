@@ -106,10 +106,12 @@ function appendArchiveWindow(query,window){
  query.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|'));
 }
 async function resolveVideoMetadata(id){
- const result=await window.HoloViewerVideoMetadata?.resolve(id,{
-  apiBase:config.apiBase,preferCatalog:true,waitForRecovery:false,maxAttempts:1
- });
- return result?.status==='ready'?result.row:null;
+ try{
+  const result=await window.HoloViewerVideoMetadata?.resolve(id,{
+   apiBase:config.apiBase,preferCatalog:true,waitForRecovery:false,maxAttempts:1
+  });
+  return result?.status==='ready'?result.row:null;
+ }catch{return null}
 }
 async function resolveVodWindow(id){
  const row=await resolveVideoMetadata(id);
