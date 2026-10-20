@@ -38,6 +38,12 @@ export function validateChannelProfileWrite(row){
  if(!normalized)throw Error('invalid profile');
  return normalized;
 }
+function profileContentKey(p){
+ return JSON.stringify([
+  p.channel_id,p.channel_name,p.display_name,p.avatar_url,p.group,p.member_accent,
+  p.member_accent_dual,p.support_mode,p.support_color_source,p.profile_revision,p.updated_at
+ ]);
+}
 export async function upsertChannelProfiles(db,rows){
  if(!db?.prepare||!Array.isArray(rows))throw Error('profile writer input required');
  const seen=new Set(),statements=[];
@@ -45,6 +51,15 @@ export async function upsertChannelProfiles(db,rows){
   const p=validateChannelProfileWrite(raw);
   if(seen.has(p.channel_id))throw Error('duplicate channel profile');
   seen.add(p.channel_id);
+  const existing=await db.prepare('SELECT channel_id,channel_name,display_name,avatar_url,channel_group AS "group",member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at FROM public_channel_profiles WHERE channel_id=? LIMIT 1').bind(p.channel_id).first();
+  if(existing){
+   const current=validateChannelProfileWrite({...existing,member_accent_dual:existing.member_accent_dual?JSON.parse(existing.member_accent_dual):null});
+   if(current.updated_at===p.updated_at){
+    if(profileContentKey(current)===profileContentKey(p))continue;
+    throw Error('same-timestamp profile conflict');
+   }
+   if(Date.parse(p.updated_at)<Date.parse(current.updated_at))continue;
+  }
   statements.push(db.prepare(`INSERT INTO public_channel_profiles
    (channel_id,channel_name,display_name,avatar_url,channel_group,member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at)
    VALUES(?,?,?,?,?,?,?,?,?,?,?)
@@ -53,7 +68,7 @@ export async function upsertChannelProfiles(db,rows){
     channel_group=excluded.channel_group,member_accent=excluded.member_accent,member_accent_dual=excluded.member_accent_dual,
     support_mode=excluded.support_mode,support_color_source=excluded.support_color_source,
     profile_revision=excluded.profile_revision,updated_at=excluded.updated_at
-   WHERE excluded.updated_at>=public_channel_profiles.updated_at`)
+   WHERE excluded.updated_at>public_channel_profiles.updated_at`)
    .bind(p.channel_id,p.channel_name,p.display_name,p.avatar_url,p.group,p.member_accent,encodeDual(p.member_accent_dual),
     p.support_mode,p.support_color_source,p.profile_revision,p.updated_at));
  }
