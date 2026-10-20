@@ -126,9 +126,10 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     count=batch.get("sent",0)
                     total_sent+=count
                     # Mirrors d1_owner_writer's conservative one-AID budget:
-                    # thread + state + push/evidence, plus pre/post readbacks.
+                    # thread + state + push/evidence writes, plus three bounded
+                    # verification SELECT families per HTTP batch.
                     modeled_writes+=2+2*count
-                    modeled_queries+=2+5*count
+                    modeled_queries+=5+2*count
                     if count<batch_cap:
                         break
                 backlog=backlog or (count==batch_cap)
@@ -157,7 +158,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                         burst_activated=True
                         total_sent+=burst_count
                         modeled_writes+=2+2*burst_count
-                        modeled_queries+=2+5*burst_count
+                        modeled_queries+=5+2*burst_count
                         backlog=backlog or (burst_count==batch_cap)
                         if burst_count<batch_cap:
                             break
