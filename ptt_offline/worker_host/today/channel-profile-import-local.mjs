@@ -5,6 +5,7 @@ const SCHEMA='holoviewer-channel-profile-import-v1';
 const ROSTER='today85-20261016-d0e326c0496b';
 const EXPECTED_COUNT=85;
 const BATCH_SIZE=25;
+const AVATAR_HOSTS=new Set(['yt3.ggpht.com','yt3.googleusercontent.com','yt3.google.com']);
 
 function json(body,status=200){
  return new Response(JSON.stringify(body),{
@@ -22,6 +23,14 @@ function sanitizedError(error){
  const message=String(error?.message??error??'error');
  if(/secret|token|authorization|cookie|credential/i.test(message))return 'validation_failed';
  return message.slice(0,160);
+}
+function strictAvatar(value){
+ if(value==null)return null;
+ if(typeof value!=='string'||!value)throw Error('artifact avatar invalid');
+ let url;try{url=new URL(value)}catch{throw Error('artifact avatar invalid')}
+ if(url.protocol!=='https:'||url.username||url.password||url.port||!AVATAR_HOSTS.has(url.hostname))
+  throw Error('artifact avatar invalid');
+ return value;
 }
 function canonicalKey(p){
  return JSON.stringify([
@@ -41,6 +50,7 @@ function parseArtifact(raw){
  for(const input of body.profiles){
   if(!CID.test(input?.channel_id??'')||seen.has(input.channel_id))throw Error('artifact channel identity invalid');
   seen.add(input.channel_id);
+  strictAvatar(input.avatar_url);
   rows.push(validateChannelProfileWrite(input));
  }
  return {body,rows};
