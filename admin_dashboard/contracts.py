@@ -40,7 +40,7 @@ def _job(**values) -> dict:
         "attempt_count": None, "retry_after": None, "backoff_seconds": None,
         "input_count": None, "published_count": None, "verified_count": None,
         "manifest_digest": None, "source_revision": None, "snapshot_id": None,
-        "readback_at": None, "verification_mode": None,
+        "scope": None, "readback_at": None, "verification_mode": None,
         "queries_used": None, "max_queries": None,
         "rows_returned": None, "max_rows_returned": None, "rows_read_reported": None,
         "page_count": None, "max_pages": None, "cache_status": None,
@@ -142,6 +142,7 @@ def build_sync_monitor(evidence: dict, *, now: datetime | None = None,
             "snapshot_id": target.get("snapshot_id"),
             "manifest_digest": binding.get("manifest_digest"),
             "source_revision": binding.get("source_revision"),
+            "scope": binding.get("scope"),
             "readback_at": observed, "verification_mode": verification.get("mode"),
             "queries_used": budget.get("queries_used"), "max_queries": budget.get("max_queries"),
             "rows_returned": budget.get("rows_returned"), "max_rows_returned": budget.get("max_rows_returned"),
@@ -174,12 +175,28 @@ def coverage_sync_consistency(inventory: object, monitor: object) -> list[dict]:
                 and item.get("component") in {"Publisher", "R2 Archive", "D1 Snapshot"}}
     coverage_states = []
     if isinstance(inventory.get("days"), list):
-        coverage_states = [item.get("status") for item in inventory["days"] if isinstance(item, dict)]
-    else:
-        sources = inventory.get("sources") if isinstance(inventory.get("sources"), list) else []
-        ptt = next((item for item in sources if isinstance(item, dict) and item.get("source") == "ptt"), None)
-        if ptt:
-            coverage_states = [ptt.get("completeness_status")]
+        days = [item for item in inventory["days"] if isinstance(item, dict)]
+        scoped_jobs = [item for item in jobs if isinstance(item.get("scope"), dict)
+                       and isinstance(item["scope"].get("day"), str)]
+        if not scoped_jobs:
+            return [{"code": "comparison-scope-unbound", "severity": "unknown"}]
+        findings = []
+        incomplete = {"UNKNOWN", "REPAIR_NEEDED", "LOCAL_MISSING", "PARTIAL", "CONFLICT", "PENDING_SYNC"}
+        for day in days:
+            day_status = day.get("status")
+            day_jobs = [job for job in scoped_jobs if job["scope"].get("day") == day.get("date")]
+            day_statuses = {job.get("status") for job in day_jobs}
+            if day_status == "COMPLETE" and "failed" in day_statuses:
+                findings.append({"code": "coverage-complete-sync-failed", "severity": "warning",
+                                 "day": day.get("date")})
+            if day_status in incomplete and "completed" in day_statuses:
+                findings.append({"code": "sync-completed-coverage-not-complete", "severity": "warning",
+                                 "day": day.get("date")})
+        return findings
+    sources = inventory.get("sources") if isinstance(inventory.get("sources"), list) else []
+    ptt = next((item for item in sources if isinstance(item, dict) and item.get("source") == "ptt"), None)
+    if ptt:
+        coverage_states = [ptt.get("completeness_status")]
     if not coverage_states:
         return [{"code": "ptt-coverage-unavailable", "severity": "unknown"}]
     findings = []
