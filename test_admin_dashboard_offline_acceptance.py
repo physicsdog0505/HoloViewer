@@ -103,6 +103,35 @@ class OfflineAdminAcceptance(unittest.TestCase):
         data = project_coverage(rows, start_day="2026-10-01", end_day="2026-10-01")
         self.assertEqual(data["days"][0]["status"], "UNKNOWN")
 
+
+    def test_archive_job_coverage_and_aid_authority_are_separate_fields(self):
+        from admin_dashboard.contracts import build_sync_monitor
+        monitor = build_sync_monitor({"archive_job": {
+            "schema_version": "holoviewer-archive-job-evidence-v1",
+            "job_id": "archive-job-1",
+            "target": {"kind": "workers-static-assets"},
+            "status": "completed",
+            "source_revision": "fixture-r1",
+            "source_hash": "sha256:" + "c" * 64,
+            "manifest_digest": "sha256:" + "d" * 64,
+            "attempted_at": "2026-10-20T10:00:00Z",
+            "succeeded_at": "2026-10-20T10:01:00Z",
+            "attempt_count": 1,
+            "uploaded_count": 10,
+            "independently_verified_count": 10,
+            "snapshot_id": "sha256:" + "e" * 64,
+            "verification": {"mode": "full_partition"},
+            "readback_at": "2026-10-20T10:02:00Z",
+            "coverage": {"status": "COMPLETE"},
+            "expected_aid_status": "VERIFIED",
+            "contract_gaps": [],
+        }})
+        archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
+        self.assertEqual(archive["target_kind"], "workers-static-assets")
+        self.assertEqual(archive["status"], "completed")
+        self.assertEqual(archive["archive_coverage_status"], "COMPLETE")
+        self.assertEqual(archive["expected_aid_status"], "VERIFIED")
+
     def test_duplicate_day_or_excess_range_rejected(self):
         with self.assertRaises(ValueError):
             project_coverage([{"date": "2026-10-01"}]*2, start_day="2026-10-01", end_day="2026-10-01")
@@ -114,12 +143,18 @@ class OfflineAdminAcceptance(unittest.TestCase):
         for marker in ('id="coverage-rows"', 'id="sync-rows"', 'id="health-rows"',
                        'id="coverage-search"', 'id="from-day"', 'id="through-day"',
                        'id="coverage-sort"', 'id="refresh-all"', 'data-refresh="sync_monitor"',
-                       'id="clear-filters"', "contract_gaps", "UNKNOWN"):
+                       'id="clear-filters"', 'id="coverage-cards"', 'id="sync-cards"',
+                       'id="health-cards"', "contract_gaps", "UNKNOWN", "View raw evidence"):
             self.assertIn(marker, html)
         self.assertIn("document.createElement", html)
         self.assertIn("textContent", html)
         self.assertNotIn("method:'POST'", html)
         self.assertNotIn("innerHTML", html)
+        self.assertIn("@media(max-width:760px)", html)
+        self.assertIn("table-wrap", html)
+        for forbidden in ("重新同步", "重新執行", "Retry Publisher", "Replay", "Upload", "Deploy",
+                          "Restart Collector", "Restart Publisher", "R2 upload", "D1 write"):
+            self.assertNotIn(forbidden, html)
 
 
 if __name__ == "__main__":
