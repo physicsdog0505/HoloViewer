@@ -8,6 +8,7 @@ Three facts are intentionally independent:
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import datetime
 import re
 
 SOURCE_STATES = {"VERIFIED_COMPLETE", "REPAIR_NEEDED", "UNKNOWN", "CONFLICT"}
@@ -19,6 +20,16 @@ _ERROR_CODE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
 
 def _bounded_error_code(value: object) -> str | None:
     return value if isinstance(value, str) and _ERROR_CODE.fullmatch(value) else None
+
+
+def _valid_iso(value: object) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return True
+    except ValueError:
+        return False
 
 
 def _count_gap_ranges(gaps: object) -> int:
@@ -48,8 +59,8 @@ def _source_state(day: dict) -> str:
     if local == "REPAIR_NEEDED" or missing or _count_gap_ranges(gaps):
         return "REPAIR_NEEDED"
     if (local == "COMPLETE" and isinstance(expected, list) and isinstance(actual, list)
-            and set(expected) == set(actual) and isinstance(day.get("final_verification_at"), str)
-            and day.get("final_verification_at")):
+            and len(expected) == len(actual) and set(expected) == set(actual)
+            and _valid_iso(day.get("final_verification_at"))):
         return "VERIFIED_COMPLETE"
     return "UNKNOWN"
 
@@ -142,14 +153,14 @@ def build_daily_finalization(evidence: dict) -> dict:
     contract_gaps.extend(archive["contract_gaps"])
     if not day:
         contract_gaps.append("source-completeness-evidence-unavailable")
-    if day and not day.get("final_verification_at"):
+    if day and not _valid_iso(day.get("final_verification_at")):
         contract_gaps.append("final-verification-timestamp-unavailable")
 
     top_error = _bounded_error_code(evidence.get("error_code"))
     if evidence.get("error_code") is not None and top_error is None:
         contract_gaps.append("invalid-error-code")
 
-    final_verification_at = day.get("final_verification_at")
+    final_verification_at = day.get("final_verification_at") if _valid_iso(day.get("final_verification_at")) else None
     return {
         "schema_version": "holoviewer-admin-daily-finalization-v1",
         "read_only": True,
