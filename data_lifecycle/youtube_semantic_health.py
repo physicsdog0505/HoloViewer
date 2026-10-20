@@ -6,13 +6,22 @@ route, scheduler or writer surface.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
+from urllib.parse import parse_qsl, urlsplit
 
 SCHEMA = "holoviewer-api-semantic-health-v1"
 ALLOWED = {"healthy", "degraded", "unhealthy", "unknown"}
-FORBIDDEN = {
-    "title", "body", "content", "author", "cookie", "authorization", "headers",
-    "request_headers", "response_headers", "secret", "password", "api_key", "token",
+
+CONTENT_KEYS = {"title", "body", "content", "author", "headers", "request_headers", "response_headers"}
+SENSITIVE_KEY_PARTS = {
+    "secret", "token", "password", "authorization", "auth", "cookie", "credential",
+    "api_key", "apikey", "private_key", "privatekey",
 }
+SENSITIVE_QUERY_KEYS = {
+    "token", "access_token", "refresh_token", "api_key", "apikey", "key",
+    "secret", "client_secret", "hmac_secret", "authorization", "auth", "credential",
+}
+SAFE_BASE_HOSTS = {"holoviewer-public-api.singlebagel.workers.dev"}
 
 
 def _parse(value: object) -> datetime | None:
@@ -25,14 +34,60 @@ def _parse(value: object) -> datetime | None:
         return None
 
 
+def _normalize_key(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value).lower()).strip("_")
+
+
+def _sensitive_key(value: object) -> bool:
+    key = _normalize_key(value)
+    if key in CONTENT_KEYS:
+        return True
+    parts = set(key.split("_"))
+    if key in SENSITIVE_KEY_PARTS or parts.intersection(SENSITIVE_KEY_PARTS):
+        return True
+    collapsed = key.replace("_", "")
+    return any(marker.replace("_", "") in collapsed for marker in {
+        "client_secret", "hmac_secret", "access_token", "refresh_token",
+        "wrangler_credential", "x_api_key", "api_token", "private_key",
+    })
+
+
 def _forbidden(value: object) -> bool:
     if isinstance(value, dict):
         for key, item in value.items():
-            if str(key).lower() in FORBIDDEN or _forbidden(item):
+            if _sensitive_key(key) or _forbidden(item):
                 return True
     elif isinstance(value, list):
         return any(_forbidden(item) for item in value)
     return False
+
+
+def _safe_base_url(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    parsed = urlsplit(value)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise ValueError("unsafe base_url")
+    if parsed.username or parsed.password or parsed.port not in {None, 443}:
+        raise ValueError("unsafe base_url")
+    if parsed.query or parsed.fragment or (parsed.path not in {"", "/"}):
+        raise ValueError("unsafe base_url")
+    if parsed.hostname.lower() not in SAFE_BASE_HOSTS:
+        raise ValueError("unapproved base_url host")
+    return f"https://{parsed.hostname.lower()}"
+
+
+def _safe_probe_path(value: object) -> str:
+    if not isinstance(value, str) or not value.startswith("/"):
+        raise ValueError("relative probe path required")
+    parsed = urlsplit(value)
+    if parsed.scheme or parsed.netloc or parsed.fragment:
+        raise ValueError("unsafe probe path")
+    for key, _ in parse_qsl(parsed.query, keep_blank_values=True):
+        norm = _normalize_key(key)
+        if norm in SENSITIVE_QUERY_KEYS or _sensitive_key(norm):
+            raise ValueError("sensitive probe query parameter")
+    return parsed.path + (("?" + parsed.query) if parsed.query else "")
 
 
 def _semantic_probe(name: str, raw: dict, *, observed_at: datetime,
@@ -69,7 +124,7 @@ def _semantic_probe(name: str, raw: dict, *, observed_at: datetime,
 
     probe = {
         "name": name,
-        "path": str(raw.get("path") or ""),
+        "path": _safe_probe_path(raw.get("path") or ""),
         "http_status": http_status if isinstance(http_status, int) else 0,
         "reachable": reachable,
         "semantic_status": status,
@@ -130,7 +185,7 @@ def build_semantic_health(observation: dict, *, stale_after_seconds: int = 120) 
         "observed_at": observation["observed_at"],
         "target": {
             "service": str(observation.get("service") or "holoviewer-public-api"),
-            "base_url": str(observation.get("base_url") or ""),
+            "base_url": _safe_base_url(observation.get("base_url") or ""),
         },
         "overall_status": overall,
         "evidence_freshness": "fresh",
