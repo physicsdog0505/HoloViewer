@@ -120,7 +120,7 @@ document.getElementById('fullscreen').onclick=async()=>{try{if(document.fullscre
 document.addEventListener('fullscreenchange',()=>document.body.classList.toggle('immersive',Boolean(document.fullscreenElement)));
 
 function onHostStateChange(event){
- if(!linkedPlayback.checked||!sourcePlayer||suppressLinkedCommand)return;
+ if(!linkedPlayback.checked||!timelineAligned||!sourcePlayer||suppressLinkedCommand)return;
  try{
   suppressLinkedCommand=true;
   if(event.data===YT.PlayerState.PLAYING)sourcePlayer.playVideo();
@@ -158,22 +158,23 @@ if(window.YT?.Player)mountPlayers();
 function startSyncLoop(){
  if(syncTimer||!hostPlayer||!sourcePlayer)return;
  syncTimer=setInterval(()=>{
-  if(!linkedPlayback.checked)return;
-  let host,source,state;
-  try{host=hostPlayer.getCurrentTime();source=sourcePlayer.getCurrentTime();state=hostPlayer.getPlayerState()}catch{return}
-  if(!Number.isFinite(host)||!Number.isFinite(source))return;
-  if(timelineAligned){
-   const expected=Math.max(0,host+sourceOffsetSeconds);
-   if(Math.abs(source-expected)>2.5){
-    try{sourcePlayer.seekTo(expected,true)}catch{}
-   }
+  let host=null;
+  try{host=hostPlayer.getCurrentTime()}catch{return}
+  if(!Number.isFinite(host))return;
+  syncPttToHost(host);
+  if(!linkedPlayback.checked||!timelineAligned)return;
+  let source,state;
+  try{source=sourcePlayer.getCurrentTime();state=hostPlayer.getPlayerState()}catch{return}
+  if(!Number.isFinite(source))return;
+  const expected=Math.max(0,host+sourceOffsetSeconds);
+  if(Math.abs(source-expected)>2.5){
+   try{sourcePlayer.seekTo(expected,true)}catch{}
   }
   if(state===YT.PlayerState.PLAYING){
    try{if(sourcePlayer.getPlayerState()!==YT.PlayerState.PLAYING)sourcePlayer.playVideo()}catch{}
   }else if(state===YT.PlayerState.PAUSED){
    try{if(sourcePlayer.getPlayerState()===YT.PlayerState.PLAYING)sourcePlayer.pauseVideo()}catch{}
   }
-  syncPttToHost(host);
  },500);
 }
 function startSubtitleLoop(){
