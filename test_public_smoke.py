@@ -216,7 +216,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("hostPlayer?.seekTo?.(Math.max(0,segment.host),true)", js)
         self.assertIn("sourcePlayer?.seekTo?.(Math.max(0,segment.source),true)", js)
         self.assertIn("let timelineAligned=params.has('offset')", js)
-        self.assertIn("if(!linkedPlayback.checked||!timelineAligned)return;", js)
+        self.assertIn("if(!linkedPlayback.checked||!timelineAligned){setSourceStandby(false);return}", js)
         self.assertIn("if(!linkedPlayback.checked||!timelineAligned||!sourcePlayer||suppressLinkedCommand)return;", js)
         self.assertIn("localStorage.setItem('holoviewer-viewer-ptt-font'", js)
         self.assertIn("content.className='ptt-content'", js)
