@@ -30,10 +30,15 @@ class FixtureReaders:
     def coverage(self):
         snapshot = self._read_d1()
         days = deepcopy(self._days)
+        snapshot_day = None
+        if isinstance(snapshot, dict):
+            binding = snapshot.get("job_binding") if isinstance(snapshot.get("job_binding"), dict) else {}
+            scope = binding.get("scope") if isinstance(binding.get("scope"), dict) else {}
+            snapshot_day = scope.get("day")
         for day in days:
             ptt = next((x for x in day.get("sources", []) if x.get("source") == "ptt"), None)
             if ptt is not None:
-                ptt["target_evidence"] = deepcopy(snapshot) if snapshot else None
+                ptt["target_evidence"] = deepcopy(snapshot) if snapshot and day.get("date") == snapshot_day else None
         return project_coverage(days, start_day=self._start, end_day=self._end)
 
     def _read_d1_with_cache(self):
