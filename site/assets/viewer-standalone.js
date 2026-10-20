@@ -77,6 +77,8 @@ let lockedIndex=null;
 let secondaryOffset=0;
 let pttFollowing=true;
 let pttLoaded=false;
+let pttLayoutRepinTimer=null;
+let pttResizeFrame=null;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let pttVodRows=[];
@@ -499,6 +501,7 @@ function refreshControlState(){
  }
 }
 function applyLayout(){
+ const wasFollowing=pttFollowing||pttAtBottom();
  const effective=watchMode==='multi'&&streams.length>1?layout:'equal';
  stage.className='viewer-stage layout-'+effective+' count-'+streams.length;
  workspace.className='viewer-workspace workspace-'+workspaceLayout+' layout-'+effective+' count-'+streams.length;
@@ -515,6 +518,10 @@ function applyLayout(){
  // YouTube iframe DOM nodes can interrupt active playback.
  refreshControlState();
  updateUrl();
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
 }
 function setAudioMaster(index){
  if(index<0||index>=streams.length)return;
@@ -527,6 +534,7 @@ function setAudioMaster(index){
 }
 function setPrimary(index){
  if(index<0||index>=streams.length)return;
+ const wasFollowing=pttFollowing||pttAtBottom();
  primaryIndex=index;
  secondaryOffset=0;
  if(currentLayoutPreset()==='focus')lockedIndex=index;
@@ -534,6 +542,10 @@ function setPrimary(index){
  applyLayout();
  mountCallOverlay();
  resolvePrimaryPtt();
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
 }
 function handleFocusAvatarClick(index){
  if(index<0||index>=streams.length)return;
@@ -1033,6 +1045,30 @@ pttShowFloor.addEventListener('change',()=>setPttFloorVisible(pttShowFloor.check
 setPttFloorVisible(false);
 
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
+function repinPttAfterLayout({force=false}={}){
+ const shouldFollow=force||pttFollowing;
+ clearTimeout(pttLayoutRepinTimer);
+ cancelAnimationFrame(pttResizeFrame);
+ if(!shouldFollow||pttPanel.hidden)return;
+ pttLayoutRepinTimer=setTimeout(()=>{
+  pttResizeFrame=requestAnimationFrame(()=>{
+   if(pttVodMode())syncVodPttTimeline({forceFollow:true});
+   else{
+    pttFeed.scrollTop=pttFeed.scrollHeight;
+    pttNewest.hidden=true;
+    pttFollowing=true;
+   }
+  });
+ },80);
+}
+function preservePttFollowDuringLayout(change){
+ const wasFollowing=pttFollowing||pttAtBottom();
+ change();
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
+}
 function pttVodMode(){return pttContext.mode==='archive'||pttContext.mode==='same-day'}
 function pttTimelineClock(ms){
  const date=new Date(ms);
@@ -1577,10 +1613,27 @@ pttFeed.addEventListener('dblclick',event=>{
 });
 pttNewest.addEventListener('click',pttToLatest);
 fullscreenButton.addEventListener('click',async()=>{
+ const wasFollowing=pttFollowing||pttAtBottom();
  try{
   if(document.fullscreenElement)await document.exitFullscreen();
   else await document.documentElement.requestFullscreen();
  }catch{}
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
+});
+window.addEventListener('resize',()=>{
+ const wasFollowing=pttFollowing||pttAtBottom();
+ if(!wasFollowing)return;
+ pttFollowing=true;
+ repinPttAfterLayout({force:true});
+},{passive:true});
+window.addEventListener('orientationchange',()=>{
+ const wasFollowing=pttFollowing||pttAtBottom();
+ if(!wasFollowing)return;
+ pttFollowing=true;
+ repinPttAfterLayout({force:true});
 });
 window.addEventListener('blur',()=>{
  if(!callEnabled)return;
@@ -1588,11 +1641,17 @@ window.addEventListener('blur',()=>{
 });
 window.addEventListener('pagehide',()=>{
  clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);
+ clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);
 });
 document.addEventListener('fullscreenchange',()=>{
+ const wasFollowing=pttFollowing||pttAtBottom();
  const on=Boolean(document.fullscreenElement);
  document.body.classList.toggle('immersive',on);
  fullscreenButton.textContent=on?'退出沉浸模式':'沉浸模式';
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
 });
 
 readSettings();
