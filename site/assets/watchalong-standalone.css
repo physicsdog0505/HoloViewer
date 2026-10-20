@@ -1,6 +1,7 @@
 html,body{height:100%;background:var(--bg)}
 body{margin:0;overflow:hidden}
 button,input,select,output{font:inherit}
+.mobile-controls-toggle,.mobile-controls-panel{display:none}
 
 .watchalong-shell{margin-left:var(--rail-collapsed);min-height:100vh;background:#080a0d}
 .watchalong-topbar{
@@ -103,9 +104,30 @@ body.immersive .immersive-toolbar-trigger{
  body{overflow:auto}
  .watchalong-shell{margin-left:0}
  .client-rail{display:none}
- .watchalong-topbar{position:sticky;top:0;z-index:20;flex-wrap:wrap;height:auto;min-height:58px}
- .watchalong-actions{margin-left:0}
- .watchalong-main{height:auto;min-height:calc(100vh - 58px)}
+ .watchalong-topbar{display:none!important}
+ .watchalong-main{height:auto;min-height:100vh;padding-top:6px}
+ .mobile-controls-toggle{
+  display:grid;place-items:center;position:fixed;right:12px;top:12px;z-index:95;
+  width:42px;height:42px;border:1px solid rgba(255,255,255,.32);border-radius:999px;
+  background:rgba(15,16,18,.78);color:#fff;font-size:24px;line-height:1;box-shadow:0 8px 24px rgba(0,0,0,.24)
+ }
+ .mobile-controls-panel{
+  position:fixed;left:12px;right:12px;top:12px;z-index:96;padding:12px;border-radius:14px;
+  background:rgba(247,245,242,.98);color:var(--text);border:1px solid var(--line);
+  box-shadow:0 16px 42px rgba(0,0,0,.28)
+ }
+ .mobile-controls-panel:not([hidden]){display:block}
+ .mobile-controls-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+ .mobile-controls-head button{
+  width:34px;height:34px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--text)
+ }
+ .mobile-controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+ .mobile-controls-grid button,.mobile-control-link{
+  min-height:42px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);
+  text-decoration:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700
+ }
+ .mobile-controls-grid .mobile-sync-start{grid-column:1/-1;background:#242321;color:#fff;border-color:#242321}
+ .mobile-controls-grid button:disabled{opacity:.42}
  .watchalong-workspace.layout-equal,.watchalong-workspace.layout-source{grid-template-columns:1fr;height:auto}
  .host-stack,.source-stack,.watchalong-workspace.layout-source .host-stack{display:contents}
  .video-card{aspect-ratio:16/9}
