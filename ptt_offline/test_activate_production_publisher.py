@@ -1,6 +1,11 @@
+import json
+import tempfile
 import unittest
-from unittest.mock import patch
-from ptt_offline.activate_production_publisher import parse_table_names_output, ensure_schema, REQUIRED_TABLES
+from pathlib import Path
+from unittest.mock import Mock, patch
+from ptt_offline.activate_production_publisher import (
+    parse_table_names_output, ensure_schema, REQUIRED_TABLES, start_publisher,
+)
 
 class ActivationPreflightTests(unittest.TestCase):
     def test_parses_wrapped_wrangler_table_rows(self):
@@ -53,6 +58,29 @@ class ActivationPreflightTests(unittest.TestCase):
                    return_value={"ptt_threads"}):
             with self.assertRaises(SystemExit):
                 ensure_schema("/tmp/wrangler.json", __import__("pathlib").Path("/tmp/repo"))
+
+    def test_production_start_uses_continuous_iterations(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            secrets_path=root/".publisher-secrets.json"
+            secrets_path.write_text(json.dumps({
+                "PTT_PUBLISH_HMAC_SECRET":"h"*64,
+                "PTT_TIME_AUTHORITY_SECRET":"t"*64,
+            }),encoding="utf-8")
+            process=Mock(pid=12345)
+            process.poll.return_value=None
+            with patch("ptt_offline.activate_production_publisher.run") as run, \
+                 patch("ptt_offline.activate_production_publisher.subprocess.Popen",
+                       return_value=process) as popen, \
+                 patch("ptt_offline.activate_production_publisher.time.sleep"):
+                result=start_publisher(Path("/tmp/repo"),"/tmp/source.sqlite3",root,secrets_path)
+
+        dry_run_cmd=run.call_args_list[0].args[0]
+        self.assertEqual(dry_run_cmd[dry_run_cmd.index("--iterations")+1],"1")
+        live_cmd=popen.call_args.args[0]
+        self.assertEqual(live_cmd[live_cmd.index("--iterations")+1],"0")
+        self.assertIn("--send",live_cmd)
+        self.assertEqual(result["pid"],12345)
 
 if __name__ == "__main__":
     unittest.main()
