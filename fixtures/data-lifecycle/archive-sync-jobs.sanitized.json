@@ -1,0 +1,228 @@
+{
+  "schema_version": "holoviewer-pr147-archive-monitor-fixture-set-v1",
+  "sanitized": true,
+  "source_contract": "holoviewer-pr147-archive-monitor-projection-v1",
+  "source_pr": 154,
+  "source_head": "d1651e96654c982959ede7678ac6b6582f1f50e7",
+  "default_case": "static_success_full",
+  "cases": {
+    "static_success_full": {
+      "job_id": "archive-job-static-20261020-001",
+      "component": "Archive",
+      "source": "PTT Archive",
+      "target": "workers-static-assets",
+      "last_attempted_at": "2026-10-20T10:00:00Z",
+      "last_successful_at": "2026-10-20T10:01:00Z",
+      "status": "completed",
+      "attempt_count": 1,
+      "retry_after": null,
+      "backoff_seconds": null,
+      "input_count": 2,
+      "published_count": 2,
+      "verified_count": 2,
+      "error_code": null,
+      "error_message": null,
+      "last_progress_at": "2026-10-20T10:02:00Z",
+      "evidence_source": "#48 archive delivery evidence",
+      "evidence_observed_at": "2026-10-20T10:02:00Z",
+      "contract_gaps": [],
+      "evidence_source_fields": {
+        "schema_version": "holoviewer-pr147-archive-monitor-projection-v1",
+        "sanitized": true,
+        "component": "Archive",
+        "job_id": "archive-job-static-20261020-001",
+        "target": {
+          "kind": "workers-static-assets",
+          "identity": "ptt-history-static-assets"
+        },
+        "source_revision": "archive-rev-2026-10-17-floor-repair",
+        "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "manifest_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "manifest_key": "ptt/v1/manifests/static-assets-full-2026-10.json",
+        "manifest_schema_version": "ptt-r2-archive-v1",
+        "attempted_at": "2026-10-20T10:00:00Z",
+        "succeeded_at": "2026-10-20T10:01:00Z",
+        "attempt_count": 1,
+        "retry_after": null,
+        "backoff_seconds": null,
+        "error_code": null,
+        "uploaded_count": 2,
+        "independently_verified_count": 2,
+        "snapshot_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "readback_observed_at": "2026-10-20T10:02:00Z",
+        "verification_mode": "full_partition",
+        "job_verified": true,
+        "coverage_summary": {
+          "status": "COMPLETE",
+          "object_count": 2
+        },
+        "job_status": "succeeded",
+        "expected_aid_completeness": {
+          "status": "UNKNOWN",
+          "authority": null,
+          "contract_gaps": [
+            "expected-aid-authority-unavailable"
+          ]
+        },
+        "contract_gaps": []
+      }
+    },
+    "manifest_complete_job_not_run": {
+      "job_id": null,
+      "component": "Archive",
+      "source": "PTT Archive",
+      "target": "workers-static-assets",
+      "last_attempted_at": null,
+      "last_successful_at": null,
+      "status": "unknown",
+      "attempt_count": null,
+      "retry_after": null,
+      "backoff_seconds": null,
+      "input_count": 1,
+      "published_count": null,
+      "verified_count": null,
+      "error_code": null,
+      "error_message": null,
+      "last_progress_at": null,
+      "evidence_source": "#48 archive delivery evidence",
+      "evidence_observed_at": null,
+      "contract_gaps": [
+        "archive-job-not-run"
+      ],
+      "evidence_source_fields": {
+        "schema_version": "holoviewer-pr147-archive-monitor-projection-v1",
+        "sanitized": true,
+        "component": "Archive",
+        "job_id": null,
+        "target": {
+          "kind": "workers-static-assets",
+          "identity": "ptt-history-static-assets"
+        },
+        "source_revision": "archive-rev-local-only",
+        "source_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "manifest_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "snapshot_id": null,
+        "readback_observed_at": null,
+        "verification_mode": null,
+        "job_verified": false,
+        "coverage_summary": {
+          "status": "COMPLETE",
+          "object_count": 1
+        },
+        "job_status": "unknown",
+        "expected_aid_completeness": {
+          "status": "UNKNOWN",
+          "authority": null,
+          "contract_gaps": [
+            "expected-aid-authority-unavailable"
+          ]
+        },
+        "contract_gaps": [
+          "archive-job-not-run"
+        ]
+      }
+    },
+    "job_success_manifest_partial": {
+      "job_id": "archive-job-static-partial-001",
+      "component": "Archive",
+      "source": "PTT Archive",
+      "target": "workers-static-assets",
+      "last_attempted_at": "2026-10-20T11:00:00Z",
+      "last_successful_at": "2026-10-20T11:01:00Z",
+      "status": "completed",
+      "attempt_count": 1,
+      "retry_after": null,
+      "backoff_seconds": null,
+      "input_count": 2,
+      "published_count": 2,
+      "verified_count": 2,
+      "error_code": null,
+      "error_message": null,
+      "last_progress_at": "2026-10-20T11:02:00Z",
+      "evidence_source": "#48 archive delivery evidence",
+      "evidence_observed_at": "2026-10-20T11:02:00Z",
+      "contract_gaps": [],
+      "evidence_source_fields": {
+        "schema_version": "holoviewer-pr147-archive-monitor-projection-v1",
+        "sanitized": true,
+        "component": "Archive",
+        "job_id": "archive-job-static-partial-001",
+        "target": {
+          "kind": "workers-static-assets",
+          "identity": "ptt-history-static-assets"
+        },
+        "source_revision": "archive-rev-partial",
+        "source_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "manifest_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "snapshot_id": "3333333333333333333333333333333333333333333333333333333333333333",
+        "readback_observed_at": "2026-10-20T11:02:00Z",
+        "verification_mode": "full_partition",
+        "job_verified": true,
+        "coverage_summary": {
+          "status": "PARTIAL",
+          "object_count": 2
+        },
+        "job_status": "succeeded",
+        "expected_aid_completeness": {
+          "status": "UNKNOWN",
+          "authority": null,
+          "contract_gaps": [
+            "expected-aid-authority-unavailable"
+          ]
+        },
+        "contract_gaps": []
+      }
+    },
+    "bounded_sample": {
+      "job_id": "archive-job-static-sample-001",
+      "component": "Archive",
+      "source": "PTT Archive",
+      "target": "workers-static-assets",
+      "last_attempted_at": "2026-10-20T12:00:00Z",
+      "last_successful_at": "2026-10-20T12:01:00Z",
+      "status": "completed",
+      "attempt_count": 1,
+      "retry_after": null,
+      "backoff_seconds": null,
+      "input_count": 100,
+      "published_count": 100,
+      "verified_count": 3,
+      "error_code": null,
+      "error_message": null,
+      "last_progress_at": "2026-10-20T12:02:00Z",
+      "evidence_source": "#48 archive delivery evidence",
+      "evidence_observed_at": "2026-10-20T12:02:00Z",
+      "contract_gaps": [],
+      "evidence_source_fields": {
+        "schema_version": "holoviewer-pr147-archive-monitor-projection-v1",
+        "sanitized": true,
+        "component": "Archive",
+        "job_id": "archive-job-static-sample-001",
+        "target": {
+          "kind": "workers-static-assets",
+          "identity": "ptt-history-static-assets"
+        },
+        "source_revision": "archive-rev-sample",
+        "source_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+        "manifest_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "snapshot_id": "6666666666666666666666666666666666666666666666666666666666666666",
+        "readback_observed_at": "2026-10-20T12:02:00Z",
+        "verification_mode": "bounded_sample",
+        "job_verified": false,
+        "coverage_summary": {
+          "status": "COMPLETE",
+          "object_count": 100
+        },
+        "job_status": "succeeded",
+        "expected_aid_completeness": {
+          "status": "UNKNOWN",
+          "authority": null,
+          "contract_gaps": [
+            "expected-aid-authority-unavailable"
+          ]
+        },
+        "contract_gaps": []
+      }
+    }
+  }
+}
