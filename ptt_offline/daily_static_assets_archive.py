@@ -122,6 +122,50 @@ def _validate_payload(*,raw: bytes,day: str,expected_aids: set[str]) -> tuple[in
     return len(payload["pushes"]),identities
 
 
+def compute_source_snapshot_hash(
+    *,
+    finalization_receipt: dict[str,Any],
+    source_revision: str,
+    source_objects: list[tuple[str,bytes]],
+) -> str:
+    """Hash the exact sanitized source snapshot bound to one finalization receipt."""
+    receipt=validate_finalization_receipt(finalization_receipt)
+    if not isinstance(source_revision,str) or not source_revision:
+        raise DailyArchiveError("source_revision required")
+    if not isinstance(source_objects,list) or not source_objects:
+        raise DailyArchiveError("at least one source object required")
+    expected_aids={aid.strip("#") for aid in receipt["expected_set"]["expected_aids"]}
+    rows=[]
+    seen_keys=set()
+    identities=[]
+    for logical_key,raw in source_objects:
+        logical_key=_safe_relative_key(logical_key)
+        if logical_key in seen_keys:
+            raise DailyArchiveError("duplicate logical object key")
+        seen_keys.add(logical_key)
+        if not isinstance(raw,(bytes,bytearray)):
+            raise DailyArchiveError("canonical object bytes required")
+        body=bytes(raw)
+        pushes,row_ids=_validate_payload(
+            raw=body,day=receipt["day"],expected_aids=expected_aids)
+        identities.extend(row_ids)
+        rows.append({
+            "logical_key":logical_key,
+            "sha256":_digest_bytes(body),
+            "bytes":len(body),
+            "pushes":pushes,
+        })
+    if len(identities)!=len(set(identities)):
+        raise DailyArchiveError("duplicate source_record_key across daily objects")
+    material={
+        "taipei_day":receipt["day"],
+        "source_revision":source_revision,
+        "finalization_evidence_digest":receipt["evidence_digest"],
+        "objects":rows,
+    }
+    return _digest_bytes(_canonical_bytes(material))
+
+
 def build_daily_static_package(
     *,
     finalization_receipt: dict[str,Any],
@@ -142,6 +186,13 @@ def build_daily_static_package(
     source_hash=_require_sha(source_hash,"source_hash")
     if not isinstance(source_objects,list) or not source_objects:
         raise DailyArchiveError("at least one source object required")
+    calculated_source_hash=compute_source_snapshot_hash(
+        finalization_receipt=receipt,
+        source_revision=source_revision,
+        source_objects=source_objects,
+    )
+    if source_hash!=calculated_source_hash:
+        raise DailyArchiveError("source_hash does not bind exact source snapshot")
 
     day=receipt["day"]
     expected_aids={aid.strip("#") for aid in receipt["expected_set"]["expected_aids"]}
@@ -268,7 +319,10 @@ def verify_http_readback(
     """
     manifest=package["manifest"]
     expected_objects=package["objects"]
-    manifest_raw=fetch_bytes(manifest["key"])
+    try:
+        manifest_raw=fetch_bytes(manifest["key"])
+    except Exception:
+        manifest_raw=None
     manifest_digest_match=(
         isinstance(manifest_raw,(bytes,bytearray))
         and _digest_bytes(bytes(manifest_raw))==manifest["digest"]
