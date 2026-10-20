@@ -37,6 +37,7 @@ button,input,select,output{font:inherit}
  padding:4px 7px;border-radius:6px;background:rgba(0,0,0,.68);color:#fff;font-size:11px
 }
 .video-label span{opacity:.72}
+.mobile-swap-button{display:none}
 .source-standby{
  position:absolute;inset:0;z-index:5;display:grid;place-content:center;gap:7px;padding:24px;
  background:#050608;color:#f2f2f2;text-align:center;pointer-events:none
@@ -106,8 +107,21 @@ body.immersive .immersive-toolbar-trigger{
  .watchalong-actions{margin-left:0}
  .watchalong-main{height:auto;min-height:calc(100vh - 58px)}
  .watchalong-workspace.layout-equal,.watchalong-workspace.layout-source{grid-template-columns:1fr;height:auto}
- .host-stack,.source-stack,.watchalong-workspace.layout-source .host-stack{grid-template-rows:auto}
+ .host-stack,.source-stack,.watchalong-workspace.layout-source .host-stack{display:contents}
  .video-card{aspect-ratio:16/9}
- .watchalong-ptt{min-height:340px}
- .watchalong-workspace.layout-equal .watchalong-ptt{display:block}
+ .watchalong-ptt{display:block!important;min-height:320px;order:2}
+ .host-card,.source-card{min-height:0}
+ .watchalong-workspace.mobile-primary-source .source-card,
+ .watchalong-workspace.mobile-primary-host .host-card{order:1;aspect-ratio:16/9;height:auto}
+ .watchalong-workspace.mobile-primary-source .host-card,
+ .watchalong-workspace.mobile-primary-host .source-card{order:3;aspect-ratio:auto;height:150px}
+ .mobile-swap-button{
+  position:absolute;right:8px;bottom:8px;z-index:7;min-height:32px;padding:0 10px;
+  border:1px solid rgba(255,255,255,.38);border-radius:999px;background:rgba(0,0,0,.72);
+  color:#fff;font-size:11px;font-weight:800;cursor:pointer
+ }
+ .watchalong-workspace.mobile-primary-source .host-card .mobile-swap-button,
+ .watchalong-workspace.mobile-primary-host .source-card .mobile-swap-button{display:inline-flex;align-items:center}
+ .watchalong-workspace.mobile-primary-source .source-card .mobile-swap-button,
+ .watchalong-workspace.mobile-primary-host .host-card .mobile-swap-button{display:none}
 }
