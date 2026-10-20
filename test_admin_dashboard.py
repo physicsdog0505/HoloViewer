@@ -52,6 +52,8 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(failed["payload"], good["payload"])
         self.assertEqual(failed["error"]["code"], "OSError")
         self.assertEqual(failed["error"]["message"], "read-only monitor source failed")
+        self.assertEqual(failed["last_successful_read_at"], good["last_successful_read_at"])
+        self.assertNotEqual(failed["read_at"], failed["last_successful_read_at"])
 
     def test_missing_monitor_sources_are_unknown_or_unavailable(self):
         jobs = build_sync_monitor({}, now=NOW)["jobs"]
