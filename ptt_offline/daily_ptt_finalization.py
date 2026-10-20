@@ -21,6 +21,11 @@ from .data_lifecycle_evidence import AID_SCHEMA, COVERAGE_SCHEMA
 SCHEMA_VERSION="holoviewer-ptt-daily-finalization-v1"
 TAIPEI=ZoneInfo("Asia/Taipei")
 STATES=("VERIFIED_COMPLETE","REPAIR_NEEDED","UNKNOWN","CONFLICT")
+REPAIRABLE_COVERAGE_GAPS={
+    "source-line-gap",
+    "collector-source-line-gap",
+    "collector-screen-coverage-behind-final-source-line",
+}
 
 
 def _digest(value: object) -> str:
@@ -111,8 +116,11 @@ def _classify_coverage(*,day: str,aid: str,coverage: dict[str,Any] | None) -> di
             and type(final_line) is int and final_line>=1 and not missing and not gaps):
         base["state"]="VERIFIED_COMPLETE"
         return base
+    repair_gaps=set(gaps)
+    repair_authority_complete=repair_gaps.issubset(REPAIRABLE_COVERAGE_GAPS)
     if (coverage.get("status")=="REPAIR_NEEDED" and start_line==1
             and type(final_line) is int and final_line>=1 and valid_missing and missing
+            and repair_authority_complete
             and all(1<=line<=final_line for line in missing)):
         base.update(
             state="REPAIR_NEEDED",
@@ -135,7 +143,7 @@ def finalize_day(
     observed_at: str | None=None,
 ) -> dict[str,Any]:
     expected_state,expected_gaps,expected_conflicts=_classify_expected(expected_contract)
-    if expected_contract.get("day")!=day:
+    if not isinstance(expected_contract,dict) or expected_contract.get("day")!=day:
         expected_state="CONFLICT"
         expected_conflicts=sorted(set(expected_conflicts+["expected-day-mismatch"]))
 
