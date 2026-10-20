@@ -120,7 +120,11 @@ function mountPlayers(){
  }
  if(!sourcePlayer&&(SOURCE_ID||PLAYLIST_ID)){
   const vars={playsinline:1,rel:0,enablejsapi:1,origin:location.origin};
-  if(PLAYLIST_ID){vars.listType='playlist';vars.list=PLAYLIST_ID}
+  if(PLAYLIST_ID){
+   vars.listType='playlist';vars.list=PLAYLIST_ID;
+   const playlistStart=Math.max(1,Number(params.get('playlist_start'))||1);
+   vars.index=playlistStart-1;
+  }
   sourcePlayer=new YT.Player('sourcePlayer',{
    videoId:SOURCE_ID||undefined,playerVars:vars,
    events:{onReady:()=>{sourceStatus.textContent=PLAYLIST_ID?'Playlist 已就緒':'片源已就緒';startSyncLoop();startSubtitleLoop()}}
