@@ -14,3 +14,18 @@ CREATE TABLE IF NOT EXISTS public_video_metadata_cache (
 );
 CREATE INDEX IF NOT EXISTS public_video_metadata_cache_observed
   ON public_video_metadata_cache(observed_at DESC);
+
+-- Durable recovery controls: replay suppression and provider-call budget.
+CREATE TABLE IF NOT EXISTS public_video_metadata_recovery_replay (
+  replay_key TEXT PRIMARY KEY NOT NULL,
+  accepted_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS public_video_metadata_recovery_replay_expiry
+  ON public_video_metadata_recovery_replay(expires_at);
+
+CREATE TABLE IF NOT EXISTS public_video_metadata_recovery_budget (
+  window_start TEXT PRIMARY KEY NOT NULL,
+  calls INTEGER NOT NULL CHECK(calls >= 0),
+  updated_at TEXT NOT NULL
+);
