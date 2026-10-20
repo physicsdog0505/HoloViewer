@@ -78,8 +78,7 @@ body.immersive .watchalong-topbar{
  transition:transform .18s ease,opacity .18s ease;
  box-shadow:0 8px 24px rgba(0,0,0,.18)
 }
-body.immersive.toolbar-visible .watchalong-topbar,
-body.immersive .watchalong-topbar:focus-within{transform:translateY(0);opacity:1}
+body.immersive.toolbar-visible .watchalong-topbar{transform:translateY(0);opacity:1}
 body.immersive .watchalong-main{height:100vh;padding-top:6px}
 body.immersive .immersive-toolbar-trigger{
  display:block;position:fixed;left:0;right:0;top:0;height:14px;z-index:79;background:transparent
