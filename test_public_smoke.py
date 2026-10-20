@@ -10,7 +10,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/watchalong-viewer/index.html", "site/assets/watchalong-standalone.css", "site/assets/watchalong-standalone.js", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
@@ -182,6 +182,36 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("entry.setAttribute('role','button')", app)
         self.assertIn("開啟多人連動", app)
         self.assertFalse((ROOT / "site/custom-view/index.html").exists())
+
+    def test_standalone_watchalong_contract(self):
+        html = (ROOT / "site/watchalong-viewer/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/watchalong-standalone.css").read_text(encoding="utf-8")
+        app = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        self.assertIn('href="/assets/shared-shell.css"', html)
+        self.assertIn('href="/assets/watchalong-standalone.css"', html)
+        self.assertIn('src="/assets/watchalong-standalone.js"', html)
+        self.assertIn('data-watch-layout="equal"', html)
+        self.assertIn('data-watch-layout="source"', html)
+        self.assertIn('id="hostPlayer"', html)
+        self.assertIn('id="sourcePlayer"', html)
+        self.assertIn('id="pttPanel"', html)
+        self.assertIn('id="subtitleOverlay"', html)
+        self.assertIn('id="segmentPanel"', html)
+        self.assertIn("const HOST_ID=validVideoId(params.get('host'));", js)
+        self.assertIn("const SOURCE_ID=validVideoId(params.get('source'));", js)
+        self.assertIn("const PLAYLIST_ID=validPlaylistId(params.get('playlist'));", js)
+        self.assertIn("api('/v1/watchalong/events/'+encodeURIComponent(EVENT_ID))", js)
+        self.assertIn("function jumpToSegment(segment,button)", js)
+        self.assertIn("hostPlayer?.seekTo?.(Math.max(0,segment.host),true)", js)
+        self.assertIn("sourcePlayer?.seekTo?.(Math.max(0,segment.source),true)", js)
+        self.assertIn("function normalizeSubtitles(payload)", js)
+        self.assertIn("function resolveHostPtt()", js)
+        self.assertIn("api('/v1/catalog/videos/'+encodeURIComponent(HOST_ID))", js)
+        self.assertIn("await loadArchivePtt(hostWindow)", js)
+        self.assertIn(".watchalong-workspace.layout-equal{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}", css)
+        self.assertIn(".watchalong-workspace.layout-source{grid-template-columns:minmax(280px,.72fr) minmax(0,1.55fr)}", css)
+        self.assertIn("location.href='/watchalong-viewer/?'+q.toString();", app)
 
     def test_standalone_ptt_today_contract(self):
         html = (ROOT / "site/ptt-today/index.html").read_text(encoding="utf-8")
