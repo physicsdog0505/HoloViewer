@@ -70,14 +70,9 @@ class WatchalongAssetTests(unittest.TestCase):
         self.assertEqual(event["artifacts"]["sync"]["status"], "REPAIRED")
         self.assertEqual(event["artifacts"]["translation"]["artifact_id"], "62b0a69f53a7e754b424b1ce298566d0f8e733414fe1dbea9bbda9e009f4e8ca")
 
-    def test_browser_loader_hashes_and_fails_closed(self):
-        source = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
-        self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", source)
-        self.assertIn("crypto.subtle.digest('SHA-256',buffer)", source)
-        self.assertIn("Watchalong artifact SHA-256 mismatch", source)
-        self.assertIn("Watchalong transcript fingerprint coverage mismatch", source)
-        self.assertIn("Watchalong translation is partial", source)
-        self.assertIn("subtitleTimeline==='host'?hostPlayer:sourcePlayer", source)
+    def test_data_only_pr_does_not_ship_a_second_watchalong_player(self):
+        self.assertFalse((ROOT / "site/assets/watchalong-standalone.js").exists())
+        self.assertFalse((ROOT / "site/watchalong-viewer").exists())
 
     def test_exporter_has_no_network_or_provider_write_path(self):
         source = (ROOT / "scripts/export_watchalong_assets.py").read_text(encoding="utf-8")
