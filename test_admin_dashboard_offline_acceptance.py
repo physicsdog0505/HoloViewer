@@ -104,33 +104,48 @@ class OfflineAdminAcceptance(unittest.TestCase):
         self.assertEqual(data["days"][0]["status"], "UNKNOWN")
 
 
-    def test_archive_job_coverage_and_aid_authority_are_separate_fields(self):
+    def test_archive_projection_keeps_job_coverage_and_aid_authority_separate(self):
         from admin_dashboard.contracts import build_sync_monitor
-        monitor = build_sync_monitor({"archive_job": {
-            "schema_version": "holoviewer-archive-job-evidence-v1",
+        projection = {
             "job_id": "archive-job-1",
-            "target": {"kind": "workers-static-assets"},
+            "component": "Archive",
+            "source": "PTT Archive",
+            "target": "workers-static-assets",
+            "last_attempted_at": "2026-10-20T10:00:00Z",
+            "last_successful_at": "2026-10-20T10:01:00Z",
             "status": "completed",
-            "source_revision": "fixture-r1",
-            "source_hash": "sha256:" + "c" * 64,
-            "manifest_digest": "sha256:" + "d" * 64,
-            "attempted_at": "2026-10-20T10:00:00Z",
-            "succeeded_at": "2026-10-20T10:01:00Z",
             "attempt_count": 1,
-            "uploaded_count": 10,
-            "independently_verified_count": 10,
-            "snapshot_id": "sha256:" + "e" * 64,
-            "verification": {"mode": "full_partition"},
-            "readback_at": "2026-10-20T10:02:00Z",
-            "coverage": {"status": "COMPLETE"},
-            "expected_aid_status": "VERIFIED",
+            "retry_after": None,
+            "backoff_seconds": None,
+            "input_count": 10,
+            "published_count": 10,
+            "verified_count": 10,
+            "error_code": None,
+            "error_message": None,
+            "last_progress_at": "2026-10-20T10:02:00Z",
+            "evidence_source": "#48 archive delivery evidence",
+            "evidence_observed_at": "2026-10-20T10:02:00Z",
             "contract_gaps": [],
-        }})
+            "evidence_source_fields": {
+                "source_revision": "fixture-r1",
+                "source_hash": "sha256:" + "c" * 64,
+                "manifest_digest": "sha256:" + "d" * 64,
+                "snapshot_id": "sha256:" + "e" * 64,
+                "readback_observed_at": "2026-10-20T10:02:00Z",
+                "verification_mode": "full_partition",
+                "job_verified": True,
+                "coverage_summary": {"status": "COMPLETE"},
+                "expected_aid_completeness": {"status": "VERIFIED"},
+            },
+        }
+        monitor = build_sync_monitor({"archive_sync_job": projection})
         archive = next(x for x in monitor["jobs"] if x["component"] == "Archive")
         self.assertEqual(archive["target_kind"], "workers-static-assets")
         self.assertEqual(archive["status"], "completed")
         self.assertEqual(archive["archive_coverage_status"], "COMPLETE")
         self.assertEqual(archive["expected_aid_status"], "VERIFIED")
+        self.assertTrue(archive["job_verified"])
+        self.assertEqual(archive["evidence_source_fields"]["coverage_summary"]["status"], "COMPLETE")
 
     def test_duplicate_day_or_excess_range_rejected(self):
         with self.assertRaises(ValueError):
