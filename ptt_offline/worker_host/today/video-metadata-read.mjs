@@ -2,6 +2,10 @@ import {YOUTUBE_LIVE_SOURCE} from './store.mjs';
 
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
 const TRUSTED_TODAY='YouTube liveStreamingDetails';
+const ADMISSION_WINDOW_MS=10*60_000;
+const ADMISSION_MAX_NEW=120;
+const ACTIVE_DEMAND_MAX=1000;
+const TERMINAL_RETENTION_MS=24*60*60_000;
 const TRUSTED_HISTORY=new Set([
   'stream-catalog-v1:youtube-liveStreamingDetails',
   'youtube-videos-list:liveStreamingDetails'
@@ -41,20 +45,56 @@ async function verifiedPttPriority(db,url){
   return {priority:2,ptt_day:null};
  }
 }
+function stamp(ms){return new Date(ms).toISOString().replace(/\.\d{3}Z$/,'Z');}
+function admissionWindowStart(ms){return Math.floor(ms/ADMISSION_WINDOW_MS)*ADMISSION_WINDOW_MS;}
+function admissionRetryAfterSeconds(nowMs){return Math.max(1,Math.ceil((admissionWindowStart(nowMs)+ADMISSION_WINDOW_MS-nowMs)/1000));}
+async function cleanupDemandState(db,now){
+ const nowMs=now.getTime(),nowIso=stamp(nowMs),terminalBefore=stamp(nowMs-TERMINAL_RETENTION_MS),ledgerBefore=stamp(nowMs-TERMINAL_RETENTION_MS);
+ await db.prepare("DELETE FROM public_video_metadata_recovery_demand WHERE status='resolved' AND updated_at<?").bind(terminalBefore).run();
+ await db.prepare("DELETE FROM public_video_metadata_recovery_demand WHERE status='not_found' AND next_attempt_at<=?").bind(nowIso).run();
+ await db.prepare("DELETE FROM public_video_metadata_recovery_admission_budget WHERE window_start<?").bind(ledgerBefore).run();
+}
+async function reserveAdmissionBudget(db,nowMs){
+ const bucket=stamp(admissionWindowStart(nowMs));
+ const result=await db.prepare(
+  'INSERT INTO public_video_metadata_recovery_admission_budget(window_start,admissions,updated_at) VALUES(?,1,?) '+
+  'ON CONFLICT(window_start) DO UPDATE SET admissions=public_video_metadata_recovery_admission_budget.admissions+1,updated_at=excluded.updated_at '+
+  'WHERE public_video_metadata_recovery_admission_budget.admissions<?'
+ ).bind(bucket,stamp(nowMs),ADMISSION_MAX_NEW).run();
+ return Number(result?.meta?.changes??result?.changes??0)!==0;
+}
 async function registerDemand(db,id,{priority,ptt_day,now}){
- const nowIso=now.toISOString().replace(/\.\d{3}Z$/,'Z');
+ const nowMs=now.getTime(),nowIso=stamp(nowMs);
+ await cleanupDemandState(db,now);
  const existing=await db.prepare('SELECT video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error FROM public_video_metadata_recovery_demand WHERE video_id=? LIMIT 1').bind(id).first();
- if(existing?.status==='not_found'&&Date.parse(existing.next_attempt_at)>now.getTime())return existing;
- await db.prepare(
-  "INSERT INTO public_video_metadata_recovery_demand(video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error) VALUES(?,?, 'pending', ?, ?, ?, ?, 0, NULL) "+
-  "ON CONFLICT(video_id) DO UPDATE SET "+
-  "priority=MIN(public_video_metadata_recovery_demand.priority,excluded.priority),"+
-  "ptt_day=COALESCE(public_video_metadata_recovery_demand.ptt_day,excluded.ptt_day),"+
-  "status=CASE WHEN public_video_metadata_recovery_demand.status='processing' THEN 'processing' ELSE 'pending' END,"+
-  "updated_at=excluded.updated_at,"+
-  "next_attempt_at=CASE WHEN public_video_metadata_recovery_demand.status='processing' THEN public_video_metadata_recovery_demand.next_attempt_at ELSE excluded.next_attempt_at END"
+ if(existing?.status==='not_found'&&Date.parse(existing.next_attempt_at)>nowMs)return {demand:existing,admitted:true,reused:true};
+ if(existing){
+  await db.prepare(
+   "UPDATE public_video_metadata_recovery_demand SET "+
+   "priority=MIN(priority,?),ptt_day=COALESCE(ptt_day,?),"+
+   "status=CASE WHEN status='processing' THEN 'processing' ELSE 'pending' END,"+
+   "updated_at=?,next_attempt_at=CASE WHEN status='processing' THEN next_attempt_at ELSE ? END "+
+   "WHERE video_id=?"
+  ).bind(priority,ptt_day,nowIso,nowIso,id).run();
+  const reused=await db.prepare('SELECT video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error FROM public_video_metadata_recovery_demand WHERE video_id=? LIMIT 1').bind(id).first();
+  return {demand:reused,admitted:true,reused:true};
+ }
+ const active=await db.prepare("SELECT COUNT(*) AS n FROM public_video_metadata_recovery_demand WHERE status IN ('pending','processing')").first();
+ if(Number(active?.n??0)>=ACTIVE_DEMAND_MAX){
+  return {demand:null,admitted:false,reused:false,reason:'active_queue_cap',retry_after_seconds:admissionRetryAfterSeconds(nowMs)};
+ }
+ if(!(await reserveAdmissionBudget(db,nowMs))){
+  return {demand:null,admitted:false,reused:false,reason:'admission_budget',retry_after_seconds:admissionRetryAfterSeconds(nowMs)};
+ }
+ const inserted=await db.prepare(
+  "INSERT OR IGNORE INTO public_video_metadata_recovery_demand(video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error) VALUES(?,?, 'pending', ?, ?, ?, ?, 0, NULL)"
  ).bind(id,priority,ptt_day,nowIso,nowIso,nowIso).run();
- return await db.prepare('SELECT video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error FROM public_video_metadata_recovery_demand WHERE video_id=? LIMIT 1').bind(id).first();
+ if(Number(inserted?.meta?.changes??inserted?.changes??0)===0){
+  const raced=await db.prepare('SELECT video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error FROM public_video_metadata_recovery_demand WHERE video_id=? LIMIT 1').bind(id).first();
+  return {demand:raced,admitted:true,reused:true};
+ }
+ const demand=await db.prepare('SELECT video_id,priority,status,ptt_day,requested_at,updated_at,next_attempt_at,attempts,last_error FROM public_video_metadata_recovery_demand WHERE video_id=? LIMIT 1').bind(id).first();
+ return {demand,admitted:true,reused:false};
 }
 
 async function readCatalog(db,id){
@@ -88,7 +128,14 @@ export async function handleVideoMetadataRead(request,env,{now=new Date()}={}){
  if(cached)return json({...cached,managed_channel:Boolean(cached.managed_channel),source:'youtube-fallback'},200,15);
 
  const ptt=await verifiedPttPriority(env.DB,url);
- const demand=await registerDemand(env.DB,id,{...ptt,now});
+ const registered=await registerDemand(env.DB,id,{...ptt,now});
+ if(!registered.admitted){
+  return json({error:'recovery_queue_busy',status:'queue_busy',video_id:id,lifecycle_state:'unknown',
+   retry_after_seconds:Number(registered.retry_after_seconds||60),
+   reason:String(registered.reason||'admission_limited'),
+   priority:ptt.priority,ptt_priority:false},429,0);
+ }
+ const demand=registered.demand;
  if(demand?.status==='not_found'&&Date.parse(demand.next_attempt_at)>now.getTime()){
   return json({error:'metadata_not_found_cached',status:'not_found',video_id:id,lifecycle_state:'unknown',
    retry_after_seconds:Math.max(1,Math.ceil((Date.parse(demand.next_attempt_at)-now.getTime())/1000)),
@@ -97,5 +144,6 @@ export async function handleVideoMetadataRead(request,env,{now=new Date()}={}){
  return json({status:'metadata_pending',video_id:id,lifecycle_state:'unknown',
   retry_after_seconds:60,priority:Number(demand?.priority??ptt.priority),
   ptt_priority:Boolean(Number(demand?.priority??ptt.priority)===1),
-  demand_state:String(demand?.status||'pending')},202,0);
+  demand_state:String(demand?.status||'pending'),
+  demand_reused:Boolean(registered.reused)},202,0);
 }
