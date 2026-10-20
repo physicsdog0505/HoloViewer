@@ -1662,14 +1662,6 @@ watchForm.addEventListener('submit',event=>{
  let saved=null;try{saved=JSON.parse(sessionStorage.getItem('hvCustomViewing')||'null')}catch{}
  const recovered=urls.length?ids:(Array.isArray(saved?.ids)?saved.ids.filter(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{11}$/.test(id)):[]);
  if(!recovered.length){route('single');return;}
- window.hvOpenCustomSession(recovered,{
-  layout:urls.length?params.get('layout'):saved.layout,
-  ptt:urls.length?params.get('ptt'):saved.ptt,
-  primary:urls.length?Number(params.get('primary')||0):saved.primary,
-  audio:urls.length?Number(params.get('audio')||0):saved.audio,
-  collabPollUrl:urls.length?'':saved?.collabPollUrl,
-  collabLabel:urls.length?'':saved?.collabLabel,
-  verifiedTimelineStarts:urls.length?{}:(saved?.verifiedTimelineStarts||{}),
-  streamMetadata:urls.length?[]:(Array.isArray(saved?.streamMetadata)?saved.streamMetadata:[])
- });
+ const legacyPtt=urls.length?params.get('ptt'):saved?.ptt;
+ openStandaloneViewer(recovered,{pttMode:legacyPtt==='live'?'live':'video'});
 })();
