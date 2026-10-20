@@ -97,7 +97,7 @@ async function batchRows(db,sql,ids){
 function firstPer(rows,key){
  const out=new Map();
  for(const row of rows){
-  const id=row?.[key];
+  const id=row?.[key]??(key==='channel_id'?row?.publisher_channel_id:null);
   if(CHANNEL.test(id??'')&&!out.has(id))out.set(id,row);
  }
  return out;
@@ -118,14 +118,22 @@ async function readLegacyCandidates(db,ids){
   p.avatar_url=safeAvatar(row.avatar_url);
  }
 
- const catalog=firstPer(await batchRows(db,
-  `SELECT channel_id,channel_name,avatar_url,actual_start,scheduled_start,video_id FROM public_catalog
+ const catalogAvatar=firstPer(await batchRows(db,
+  `SELECT channel_id,avatar_url,actual_start,scheduled_start,video_id FROM public_catalog
    WHERE channel_id IN (__IDS__) AND avatar_url IS NOT NULL
    ORDER BY channel_id,COALESCE(actual_start,scheduled_start) DESC,video_id DESC`,ids),'channel_id');
  for(const id of ids){
-  const row=catalog.get(id);if(!row)continue;
+  const row=catalogAvatar.get(id);if(!row)continue;
   const p=out.get(id);
   if(!p.avatar_url)p.avatar_url=safeAvatar(row.avatar_url);
+ }
+ const catalogName=firstPer(await batchRows(db,
+  `SELECT channel_id,channel_name,actual_start,scheduled_start,video_id FROM public_catalog
+   WHERE channel_id IN (__IDS__) AND channel_name IS NOT NULL
+   ORDER BY channel_id,COALESCE(actual_start,scheduled_start) DESC,video_id DESC`,ids),'channel_id');
+ for(const id of ids){
+  const row=catalogName.get(id);if(!row)continue;
+  const p=out.get(id);
   if(!p.channel_name&&typeof row.channel_name==='string'&&row.channel_name)p.channel_name=row.channel_name;
  }
 
