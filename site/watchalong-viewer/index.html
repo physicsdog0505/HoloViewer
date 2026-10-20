@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/assets/watchalong-standalone.css">
 </head>
 <body>
+<div id="immersiveToolbarTrigger" class="immersive-toolbar-trigger" aria-hidden="true"></div>
 <aside class="client-rail" aria-label="主要功能">
   <a class="rail-brand" href="/" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloViewer</span></a>
   <nav class="rail-nav">
@@ -35,7 +36,7 @@
       <button id="offsetMinus" type="button" title="片源提早 1 秒" disabled>−1s</button>
       <output id="offsetValue">尚未對齊</output>
       <button id="offsetPlus" type="button" title="片源延後 1 秒" disabled>+1s</button>
-      <button id="captureOffset" type="button">以目前位置校準</button>
+      <button id="captureOffset" type="button">對齊目前位置</button>
     </div>
     <div class="segment-controls" role="group" aria-label="段點切換">
       <button id="previousSegment" type="button" disabled>上一集</button>
