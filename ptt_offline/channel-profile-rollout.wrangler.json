@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "holoviewer-public-api",
+  "main": "ptt_offline/worker_host/index.mjs",
+  "compatibility_date": "2026-10-14",
+  "keep_vars": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "holoviewer-public-v1",
+      "database_id": "64e1a0ee-1455-4377-9640-3922e8f4d061"
+    }
+  ]
+}
