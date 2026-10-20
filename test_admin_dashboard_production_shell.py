@@ -253,6 +253,28 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertEqual(second["reader_calls"], [])
         self.assertTrue(second["cache_hit"])
 
+    def test_cache_hit_receipt_does_not_consume_new_quota(self):
+        ctrl = self.admission({"d1": (2, 600)})
+        req = self.request("cache-key")
+        first = ctrl.admit(req, now=1000)
+        self.assertTrue(first.admitted)
+        ctrl.release("cache-key")
+        receipt = ctrl.cache_hit_receipt(req, now=1001)
+        self.assertTrue(receipt.admitted)
+        self.assertEqual(receipt.reason, "cache_hit")
+        self.assertTrue(receipt.cache_hit)
+        self.assertEqual(receipt.requests_used, 1)
+
+    def test_result_cache_ttl_expires_at_sixty_seconds(self):
+        ctrl = self.admission({"d1": (6, 600)})
+        ctrl.cache_put("cache-key", "d1", {"sanitized": True}, ttl_seconds=60, now=1000)
+        value, hit = ctrl.cache_get("cache-key", now=1059)
+        self.assertTrue(hit)
+        self.assertEqual(value, {"sanitized": True})
+        value, hit = ctrl.cache_get("cache-key", now=1060)
+        self.assertFalse(hit)
+        self.assertIsNone(value)
+
     def test_corrupt_cached_d1_evidence_fails_closed_without_reader_fallback(self):
         fixture = json.loads(
             (Path(__file__).parent / "fixtures" / "data-lifecycle" /
@@ -365,6 +387,19 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertFalse(result["available"])
         self.assertEqual(result["error_code"], "source_disabled")
         self.assertEqual(fake.calls, [])
+
+    def test_disabled_and_credential_denials_are_audited_with_request_principal(self):
+        admission = self.admission()
+        fake = FakeProductionEvidenceReader(d1={"safe": True})
+        shell = ProductionReadOnlyShell(fake, admission, config=self.config(),
+                                        credentials=_Creds(), principal="admin-static")
+        shell.read_d1(D1ReadScope("2026-10-20", ()))
+        con = admission._connect()
+        row = con.execute(
+            "SELECT principal,admitted,error_code FROM admin_read_audit "
+            "WHERE source='d1' ORDER BY id DESC LIMIT 1").fetchone()
+        con.close()
+        self.assertEqual(row, ("admin-static", 0, "source_disabled"))
 
     def test_missing_credential_is_unavailable_without_reader_call(self):
         fake = FakeProductionEvidenceReader(d1={"safe": True})
