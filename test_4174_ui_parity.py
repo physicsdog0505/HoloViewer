@@ -787,6 +787,16 @@ class ParityContract(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
 
+    def test_viewer_ptt_follow_changes_only_on_user_scroll_intent(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let pttUserScrollIntentUntil=0;", js)
+        self.assertIn("function markPttUserScrollIntent(ms=1800)", js)
+        self.assertIn("if(pttLayoutTransitionDepth>0||!hasPttUserScrollIntent())return;", js)
+        self.assertIn("pttFeed.addEventListener('touchstart'", js)
+        self.assertIn("pttFeed.addEventListener('pointerdown'", js)
+        self.assertIn("new ResizeObserver(()=>", js)
+        self.assertIn("if(pttFollowing)repinPttAfterLayout({force:true});", js)
+
     def test_viewer_lock_transition_preserves_follow_before_geometry_mutation(self):
         js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
         self.assertIn("let pttLayoutTransitionDepth=0;", js)
