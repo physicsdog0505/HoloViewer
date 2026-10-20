@@ -23,16 +23,21 @@ const pttMeta=document.getElementById('pttMeta');
 const pttFeed=document.getElementById('pttFeed');
 const pttNewest=document.getElementById('pttNewest');
 const pttShowFloor=document.getElementById('pttShowFloor');
-const segmentPanel=document.getElementById('segmentPanel');
-const segmentList=document.getElementById('segmentList');
-const segmentMeta=document.getElementById('segmentMeta');
+const pttFontSize=document.getElementById('pttFontSize');
+const pttFontValue=document.getElementById('pttFontValue');
+const offsetMinus=document.getElementById('offsetMinus');
+const offsetPlus=document.getElementById('offsetPlus');
+const previousSegment=document.getElementById('previousSegment');
+const nextSegment=document.getElementById('nextSegment');
+const segmentStatus=document.getElementById('segmentStatus');
 const subtitleOverlay=document.getElementById('subtitleOverlay');
 const subtitleOriginal=document.getElementById('subtitleOriginal');
 const subtitleTranslation=document.getElementById('subtitleTranslation');
 
 let hostPlayer=null;
 let sourcePlayer=null;
-let sourceOffsetSeconds=Number(params.get('offset'))||0;
+let timelineAligned=params.has('offset')&&Number.isFinite(Number(params.get('offset')));
+let sourceOffsetSeconds=timelineAligned?Number(params.get('offset')):0;
 let suppressLinkedCommand=false;
 let syncTimer=null;
 let subtitleTimer=null;
@@ -44,6 +49,7 @@ let pttFollowing=true;
 let archiveManifestCache=null;
 let segments=[];
 let subtitles=[];
+let activeSegmentIndex=-1;
 let activeSourceVideoId=SOURCE_ID||'';
 
 function validVideoId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{11}$/.test(id)?id:''}
@@ -63,12 +69,20 @@ function clock(seconds){
  const s=Math.max(0,Math.floor(Number(seconds)||0)),m=Math.floor(s/60),r=s%60,h=Math.floor(m/60);
  return h?String(h).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+':'+String(r).padStart(2,'0'):String(m).padStart(2,'0')+':'+String(r).padStart(2,'0');
 }
-function setOffset(value){
- sourceOffsetSeconds=Math.round((Number(value)||0)*10)/10;
- offsetValue.textContent='Offset '+(sourceOffsetSeconds>=0?'+':'')+sourceOffsetSeconds.toFixed(1)+'s';
- const q=new URLSearchParams(location.search);q.set('offset',String(sourceOffsetSeconds));history.replaceState(null,'',location.pathname+'?'+q.toString());
+function refreshOffsetUi(){
+ offsetValue.textContent=timelineAligned?'Offset '+(sourceOffsetSeconds>=0?'+':'')+sourceOffsetSeconds.toFixed(1)+'s':'尚未對齊';
+ offsetMinus.disabled=!timelineAligned;
+ offsetPlus.disabled=!timelineAligned;
 }
-setOffset(sourceOffsetSeconds);
+function setOffset(value,{persist=true}={}){
+ sourceOffsetSeconds=Math.round((Number(value)||0)*10)/10;
+ timelineAligned=true;
+ refreshOffsetUi();
+ if(persist){
+  const q=new URLSearchParams(location.search);q.set('offset',String(sourceOffsetSeconds));history.replaceState(null,'',location.pathname+'?'+q.toString());
+ }
+}
+refreshOffsetUi();
 
 document.querySelectorAll('[data-watch-layout]').forEach(button=>button.addEventListener('click',()=>{
  const mode=button.dataset.watchLayout==='source'?'source':'equal';
@@ -77,21 +91,26 @@ document.querySelectorAll('[data-watch-layout]').forEach(button=>button.addEvent
   const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));
  });
 }));
-document.getElementById('offsetMinus').onclick=()=>setOffset(sourceOffsetSeconds-1);
-document.getElementById('offsetPlus').onclick=()=>setOffset(sourceOffsetSeconds+1);
+offsetMinus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds-1)};
+offsetPlus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds+1)};
 document.getElementById('captureOffset').onclick=()=>{
  try{
   const host=hostPlayer?.getCurrentTime?.(),source=sourcePlayer?.getCurrentTime?.();
   if(Number.isFinite(host)&&Number.isFinite(source))setOffset(source-host);
  }catch{}
 };
-document.getElementById('segmentToggle').onclick=()=>{
- segmentPanel.classList.toggle('collapsed');
- const expanded=!segmentPanel.classList.contains('collapsed');
- document.getElementById('segmentToggle').setAttribute('aria-expanded',String(expanded));
- document.getElementById('segmentToggle').textContent=expanded?'收合':'展開';
-};
 pttShowFloor.onchange=()=>pttPanel.classList.toggle('ptt-floor-hidden',!pttShowFloor.checked);
+pttFontSize.addEventListener('input',()=>{
+ const size=Math.max(12,Math.min(26,Number(pttFontSize.value)||14));
+ pttFontValue.textContent=size+'px';
+ document.documentElement.style.setProperty('--ptt-font-size',size+'px');
+ try{localStorage.setItem('holoviewer-viewer-ptt-font',String(size))}catch{}
+});
+try{
+ const font=Math.max(12,Math.min(26,Number(localStorage.getItem('holoviewer-viewer-ptt-font'))||14));
+ pttFontSize.value=String(font);pttFontValue.textContent=font+'px';
+ document.documentElement.style.setProperty('--ptt-font-size',font+'px');
+}catch{}
 pttNewest.onclick=()=>{pttFollowing=true;pttFeed.scrollTop=pttFeed.scrollHeight;pttNewest.hidden=true};
 pttFeed.addEventListener('scroll',()=>{
  pttFollowing=pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48;
@@ -143,9 +162,11 @@ function startSyncLoop(){
   let host,source,state;
   try{host=hostPlayer.getCurrentTime();source=sourcePlayer.getCurrentTime();state=hostPlayer.getPlayerState()}catch{return}
   if(!Number.isFinite(host)||!Number.isFinite(source))return;
-  const expected=Math.max(0,host+sourceOffsetSeconds);
-  if(Math.abs(source-expected)>2.5){
-   try{sourcePlayer.seekTo(expected,true)}catch{}
+  if(timelineAligned){
+   const expected=Math.max(0,host+sourceOffsetSeconds);
+   if(Math.abs(source-expected)>2.5){
+    try{sourcePlayer.seekTo(expected,true)}catch{}
+   }
   }
   if(state===YT.PlayerState.PLAYING){
    try{if(sourcePlayer.getPlayerState()!==YT.PlayerState.PLAYING)sourcePlayer.playVideo()}catch{}
@@ -187,19 +208,22 @@ function normalizeSubtitles(payload){
  })).filter(item=>Number.isFinite(item.start)&&Number.isFinite(item.end)&&item.end>item.start):[];
 }
 function renderSegments(){
- segmentList.replaceChildren();
- segmentMeta.textContent=segments.length?segments.length+' 個段點 · 唯讀':'唯讀資料';
- if(!segments.length){const e=document.createElement('div');e.className='segment-empty';e.textContent='目前沒有可用段點；影片仍可正常播放。';segmentList.append(e);return}
- segments.forEach(segment=>{
-  const button=document.createElement('button');button.type='button';button.className='segment-button';
-  const strong=document.createElement('strong');strong.textContent=segment.label;
-  const meta=document.createElement('span');meta.textContent='主持 '+clock(segment.host)+' · 片源 '+clock(segment.source);
-  button.append(strong,meta);
-  button.onclick=()=>jumpToSegment(segment,button);
-  segmentList.append(button);
- });
+ if(!segments.length){
+  activeSegmentIndex=-1;
+  segmentStatus.textContent='無段點';
+  previousSegment.disabled=true;
+  nextSegment.disabled=true;
+  return;
+ }
+ if(activeSegmentIndex<0||activeSegmentIndex>=segments.length)activeSegmentIndex=0;
+ segmentStatus.textContent=segments[activeSegmentIndex].label+' · '+(activeSegmentIndex+1)+'/'+segments.length;
+ previousSegment.disabled=activeSegmentIndex<=0;
+ nextSegment.disabled=activeSegmentIndex>=segments.length-1;
 }
-function jumpToSegment(segment,button){
+function jumpToSegmentIndex(index){
+ if(index<0||index>=segments.length)return;
+ activeSegmentIndex=index;
+ const segment=segments[index];
  try{hostPlayer?.seekTo?.(Math.max(0,segment.host),true)}catch{}
  try{
   if(segment.sourceVideoId&&segment.sourceVideoId!==activeSourceVideoId){
@@ -208,9 +232,11 @@ function jumpToSegment(segment,button){
   }else sourcePlayer?.seekTo?.(Math.max(0,segment.source),true);
  }catch{}
  setOffset(segment.source-segment.host);
- segmentList.querySelectorAll('.segment-button').forEach(item=>item.classList.toggle('active',item===button));
+ renderSegments();
  if(linkedPlayback.checked){try{hostPlayer?.playVideo?.();sourcePlayer?.playVideo?.()}catch{}}
 }
+previousSegment.onclick=()=>jumpToSegmentIndex(activeSegmentIndex-1);
+nextSegment.onclick=()=>jumpToSegmentIndex(activeSegmentIndex+1);
 async function loadReadOnlyArtifacts(){
  if(!EVENT_ID)return;
  try{
@@ -220,7 +246,8 @@ async function loadReadOnlyArtifacts(){
   subtitles=normalizeSubtitles(payload);
   renderSegments();
  }catch{
-  segmentMeta.textContent='資料暫時無法讀取';
+  segments=[];subtitles=[];activeSegmentIndex=-1;renderSegments();
+  segmentStatus.textContent='段點資料不可用';
  }
 }
 renderSegments();
@@ -235,7 +262,7 @@ function pttRow(row){
  const floor=document.createElement('span');floor.className='ptt-floor';floor.textContent=Number.isInteger(row?.floor)&&row.floor>0?row.floor+'樓':'';
  const body=document.createElement('span');body.className='ptt-body';
  const author=document.createElement('span');author.className='ptt-author';author.textContent=String(row?.author||'unknown')+':';
- const content=document.createElement('span');content.textContent=String(row?.content||'');
+ const content=document.createElement('span');content.className='ptt-content';content.textContent=String(row?.content||'');
  body.append(author,content);el.append(kindEl,time,floor,body);el.dataset.pushId=pttKey(row);return el;
 }
 function setPttRows(rows){
