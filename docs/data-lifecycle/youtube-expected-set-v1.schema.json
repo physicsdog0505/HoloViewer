@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "holoviewer-youtube-expected-set-v1",
+  "title": "HoloViewer YouTube daily expected-video set",
+  "type": "object",
+  "required": [
+    "schema_version", "day", "scope", "issuer", "issued_at", "source",
+    "late_metadata_watermark", "completeness_authority",
+    "expected_video_ids", "videos", "unknown_cases"
+  ],
+  "properties": {
+    "schema_version": {"const": "holoviewer-youtube-expected-set-v1"},
+    "day": {"type": "string", "format": "date"},
+    "scope": {
+      "type": "object",
+      "required": ["kind", "version", "channel_count", "hash"],
+      "properties": {
+        "kind": {"enum": ["history-review-66", "today-approved-85"]},
+        "version": {"type": "string", "minLength": 1},
+        "channel_count": {"enum": [66, 85]},
+        "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "issuer": {"type": "string", "minLength": 1},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "source": {
+      "type": "object",
+      "required": ["revision", "hash"],
+      "properties": {
+        "revision": {"type": "string", "minLength": 1},
+        "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "late_metadata_watermark": {
+      "type": "object",
+      "required": ["observed_through", "required_after", "status"],
+      "properties": {
+        "observed_through": {"type": "string", "format": "date-time"},
+        "required_after": {"type": "string", "format": "date-time"},
+        "status": {"enum": ["SATISFIED", "PENDING"]}
+      },
+      "additionalProperties": false
+    },
+    "completeness_authority": {"enum": ["VERIFIED", "UNKNOWN"]},
+    "expected_video_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$"}
+    },
+    "videos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "video_id", "channel_id", "actual_start", "actual_start_verified",
+          "actual_start_source", "revision", "content_hash"
+        ],
+        "properties": {
+          "video_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$"},
+          "channel_id": {"type": "string", "pattern": "^UC[A-Za-z0-9_-]{22}$"},
+          "actual_start": {"type": "string", "format": "date-time"},
+          "actual_start_verified": {"const": true},
+          "actual_start_source": {"const": "YouTube liveStreamingDetails.actualStartTime"},
+          "revision": {"type": "string", "minLength": 1},
+          "content_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "unknown_cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "video_id": {"type": ["string", "null"]},
+          "reason": {
+            "enum": [
+              "actual_start_missing", "actual_start_unverified", "source_gap",
+              "late_metadata_pending", "roster_membership_unknown",
+              "metadata_revision_conflict"
+            ]
+          },
+          "note": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
