@@ -1438,38 +1438,104 @@ document.querySelectorAll('[data-watch-group]').forEach(button=>button.addEventL
 }));
 const watchalongStaticGrid=document.getElementById('watchalongStaticGrid');
 const watchalongStaticEmpty=document.getElementById('watchalongStaticEmpty');
-async function loadCompletedWatchalongs(){
+const watchalongTodayGrid=document.getElementById('watchalongTodayGrid');
+const watchalongTodayEmpty=document.getElementById('watchalongTodayEmpty');
+const watchalongPastGrid=document.getElementById('watchalongPastGrid');
+const watchalongPastEmpty=document.getElementById('watchalongPastEmpty');
+function watchalongCandidateTitle(title){
+ return /(同時視聴|同時視聽|watch\s*along)/i.test(String(title||''));
+}
+function watchalongCardImage(videoId,title){
+ const thumb=document.createElement('div');thumb.className='watchalong-static-thumb';
+ const img=document.createElement('img');
+ img.src='https://i.ytimg.com/vi/'+encodeURIComponent(videoId)+'/hqdefault.jpg';
+ img.alt=String(title||'');
+ img.loading='lazy';thumb.append(img);return thumb;
+}
+function watchalongLandingCard({videoId,title,day='',detail='',action='開始同時視聽 →',href='',onpick=null,status=''}) {
+ if(!/^[A-Za-z0-9_-]{11}$/.test(String(videoId||'')))return null;
+ const card=document.createElement('a');card.className='watchalong-static-card';
+ card.href=href||'#manual';
+ if(typeof onpick==='function')card.onclick=event=>{event.preventDefault();onpick()};
+ card.append(watchalongCardImage(videoId,title));
+ const body=document.createElement('div');body.className='watchalong-static-body';
+ const meta=document.createElement('div');meta.className='watchalong-static-meta';
+ if(day){const dayEl=document.createElement('span');dayEl.textContent=String(day);meta.append(dayEl)}
+ if(detail){const detailEl=document.createElement('span');detailEl.textContent=String(detail);meta.append(detailEl)}
+ if(status){const statusEl=document.createElement('span');statusEl.textContent=String(status);meta.append(statusEl)}
+ const titleEl=document.createElement('strong');titleEl.textContent=String(title||videoId);
+ const actionEl=document.createElement('span');actionEl.className='watchalong-static-action';actionEl.textContent=action;
+ body.append(meta,titleEl,actionEl);card.append(body);return card;
+}
+function pickWatchalongHost(videoId){
+ const input=document.querySelector('#watchalongBuilder input[name="master"]');
+ if(!input)return;
+ input.value='https://www.youtube.com/watch?v='+videoId;
+ document.getElementById('manual')?.scrollIntoView({behavior:'smooth',block:'start'});
+ input.focus();
+}
+async function loadWatchalongLanding(){
  if(!watchalongStaticGrid||!watchalongStaticEmpty)return;
+ watchalongStaticGrid.replaceChildren();
+ watchalongTodayGrid?.replaceChildren();
+ watchalongPastGrid?.replaceChildren();
  try{
-  const response=await fetch('/data/watchalong/manifest.json',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
-  if(!response.ok)throw new Error('HTTP '+response.status);
-  const manifest=await response.json();
+  const [manifestResponse,todayResult]=await Promise.all([
+   fetch('/data/watchalong/manifest.json',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}}),
+   api('/v1/catalog/today').catch(()=>null)
+  ]);
+  if(!manifestResponse.ok)throw new Error('HTTP '+manifestResponse.status);
+  const manifest=await manifestResponse.json();
   if(manifest?.schema_version!=='holoviewer-watchalong-manifest-v1'||!Array.isArray(manifest.events))throw new Error('manifest');
-  watchalongStaticGrid.replaceChildren();
-  manifest.events.slice().sort((a,b)=>String(b.session_day||'').localeCompare(String(a.session_day||''))).forEach(entry=>{
+  const events=manifest.events.slice().sort((a,b)=>String(b.session_day||'').localeCompare(String(a.session_day||'')));
+  for(const entry of events){
    const eventId=String(entry?.event_id||'');
-   if(!/^[A-Za-z0-9_-]{11}$/.test(eventId))return;
-   const card=document.createElement('a');
-   card.className='watchalong-static-card';
-   card.href='/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId);
-   const meta=document.createElement('div');meta.className='watchalong-static-meta';
-   const day=document.createElement('span');day.textContent=String(entry.session_day||'');
-   const detail=document.createElement('span');detail.textContent=String(entry.source_count||0)+' 段 · '+String(entry.cue_count||0)+' 字幕';
-   meta.append(day,detail);
-   const title=document.createElement('strong');title.textContent=String(entry.title||eventId);
-   const action=document.createElement('span');action.className='watchalong-static-action';action.textContent='開始同時視聽 →';
-   card.append(meta,title,action);
-   watchalongStaticGrid.append(card);
-  });
+   const videoId=String(entry?.master_video_id||eventId);
+   if(!/^[A-Za-z0-9_-]{11}$/.test(eventId)||!/^[A-Za-z0-9_-]{11}$/.test(videoId))continue;
+   const card=watchalongLandingCard({
+    videoId,title:String(entry.title||eventId),day:String(entry.session_day||''),
+    detail:String(entry.source_count||0)+' 集',
+    href:'/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId)
+   });
+   if(card)watchalongStaticGrid.append(card);
+   const pastCard=watchalongLandingCard({
+    videoId,title:String(entry.title||eventId),day:String(entry.session_day||''),
+    status:'已結束',action:'開啟這場 →',
+    href:'/watchalong-viewer/?watchalong_event='+encodeURIComponent(eventId)
+   });
+   if(pastCard)watchalongPastGrid?.append(pastCard);
+  }
   watchalongStaticEmpty.hidden=watchalongStaticGrid.childElementCount>0;
   if(!watchalongStaticGrid.childElementCount)watchalongStaticEmpty.textContent='目前沒有已完成的同時視聽活動。';
+  if(watchalongPastEmpty){
+   watchalongPastEmpty.hidden=Boolean(watchalongPastGrid?.childElementCount);
+   if(!watchalongPastGrid?.childElementCount)watchalongPastEmpty.textContent='目前沒有過去同時視聽直播。';
+  }
+  const rows=Array.isArray(todayResult?.streams||todayResult?.items)?(todayResult.streams||todayResult.items):[];
+  const candidates=rows.filter(row=>watchalongCandidateTitle(row?.title));
+  for(const row of candidates){
+   const videoId=String(row?.video_id||'');
+   const state=String(row?.lifecycle_state||'');
+   const status=state==='live'?'直播中':(['upcoming','waiting'].includes(state)?'稍後':'今天');
+   const card=watchalongLandingCard({
+    videoId,title:String(row?.title||videoId),day:taipeiDay(),status,
+    action:'使用這場建立 →',onpick:()=>pickWatchalongHost(videoId)
+   });
+   if(card)watchalongTodayGrid?.append(card);
+  }
+  if(watchalongTodayEmpty){
+   watchalongTodayEmpty.hidden=Boolean(watchalongTodayGrid?.childElementCount);
+   if(!watchalongTodayGrid?.childElementCount)watchalongTodayEmpty.textContent='今天目前沒有符合同時視聽辨識規則的直播。';
+  }
  }catch{
   watchalongStaticGrid.replaceChildren();
   watchalongStaticEmpty.hidden=false;
   watchalongStaticEmpty.textContent='已完成活動暫時無法載入。';
+  if(watchalongPastEmpty){watchalongPastEmpty.hidden=false;watchalongPastEmpty.textContent='過去同時視聽直播暫時無法載入。'}
+  if(watchalongTodayEmpty){watchalongTodayEmpty.hidden=false;watchalongTodayEmpty.textContent='今日同時視聽暫時無法載入。'}
  }
 }
-loadCompletedWatchalongs();
+loadWatchalongLanding();
 
 const youtubePanel=document.getElementById('youtubePanel');
 const externalPanel=document.getElementById('externalPanel');
