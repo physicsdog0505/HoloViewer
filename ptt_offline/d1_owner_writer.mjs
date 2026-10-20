@@ -84,9 +84,9 @@ export async function applyAuthorizedPttBatch({DB,batch,verifyAuthority,limits={
     const existing=existingBySource.get(row.day+':'+row.aid+':'+row.source_record_key);
     requireTrue(!existing || existing.push_id===row.push_id,'existing source evidence conflict');
   }
-  // Idempotent re-observation must not create account-level D1 writes. The
-  // conflict preflight above still rejects source-identity disagreement before
-  // mutation; SQL conflict clauses below update only genuine enrichment.
+  // Idempotent re-observation must not rewrite push/source-evidence rows
+  // unless genuine enrichment changes. Provider-state observation updates remain
+  // unchanged here; their no-op suppression is a separate review scope.
     const aids=[...new Set(batch.rows.map(row=>row.aid))].sort();
   const statements=aids.map(aid=>DB.prepare(SQL_THREAD).bind(batch.day,aid,
     batch.rows.find(row=>row.aid===aid).source_url));
