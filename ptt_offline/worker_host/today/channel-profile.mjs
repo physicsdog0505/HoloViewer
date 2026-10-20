@@ -86,33 +86,55 @@ function applyRuntimeColor(profile,channelId,env){
  };
 }
 
+async function firstRow(db,sql,...params){
+ try{
+  const statement=db.prepare(sql).bind(...params);
+  if(typeof statement.first==='function'){
+   const row=await statement.first();
+   if(row)return row;
+  }
+  if(typeof statement.all==='function'){
+   const rows=await statement.all();
+   return rows?.results?.[0]??null;
+  }
+ }catch{}
+ return null;
+}
 async function legacyProfileCandidate(db,channelId){
  const candidate=neutralChannelProfile(channelId);
- try{
-  const catalog=await db.prepare(`SELECT avatar_url,channel_name FROM public_catalog
-    WHERE channel_id=? AND avatar_url IS NOT NULL
-    ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1`).bind(channelId).first();
+
+ // Old Today channel-profile proposal, if present, is a migration source only.
+ const oldProfile=await firstRow(db,
+  'SELECT channel_title,avatar_url,fetched_at FROM public_today_channel_profiles WHERE channel_id=? ORDER BY fetched_at DESC LIMIT 1',
+  channelId);
+ if(oldProfile){
+  candidate.channel_name=typeof oldProfile.channel_title==='string'&&oldProfile.channel_title?oldProfile.channel_title:null;
+  candidate.avatar_url=safeAvatar(oldProfile.avatar_url);
+ }
+
+ // Legacy catalog artwork is channel artwork, not video thumbnail; validation remains centralized.
+ if(!candidate.avatar_url){
+  const catalog=await firstRow(db,
+   'SELECT avatar_url FROM public_catalog WHERE channel_id=? AND avatar_url IS NOT NULL LIMIT 1',
+   channelId);
   candidate.avatar_url=safeAvatar(catalog?.avatar_url);
-  candidate.channel_name=typeof catalog?.channel_name==='string'&&catalog.channel_name?catalog.channel_name:null;
- }catch{}
- try{
-  const approved=await db.prepare('SELECT channel_group FROM public_today_approved_channels WHERE channel_id=? LIMIT 1').bind(channelId).first();
-  if(GROUPS.has(approved?.channel_group))candidate.group=approved.channel_group;
- }catch{}
- if(candidate.group==null){
-  try{
-   const today=await db.prepare('SELECT channel_group,channel_name FROM public_today_canonical WHERE publisher_channel_id=? ORDER BY lifecycle_observed_at DESC LIMIT 1').bind(channelId).first();
-   if(GROUPS.has(today?.channel_group))candidate.group=today.channel_group;
-   if(!candidate.channel_name&&typeof today?.channel_name==='string'&&today.channel_name)candidate.channel_name=today.channel_name;
-  }catch{}
  }
- if(!candidate.channel_name){
-  try{
-   const history=await db.prepare('SELECT channel_name,avatar_url FROM public_history WHERE channel_id=? ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1').bind(channelId).first();
-   candidate.channel_name=typeof history?.channel_name==='string'&&history.channel_name?history.channel_name:null;
-   if(!candidate.avatar_url)candidate.avatar_url=safeAvatar(history?.avatar_url);
-  }catch{}
- }
+ const approved=await firstRow(db,
+  'SELECT channel_group FROM public_today_approved_channels WHERE channel_id=? LIMIT 1',channelId);
+ if(GROUPS.has(approved?.channel_group))candidate.group=approved.channel_group;
+
+ const today=await firstRow(db,
+  'SELECT channel_group,channel_name FROM public_today_canonical WHERE publisher_channel_id=? ORDER BY lifecycle_observed_at DESC LIMIT 1',
+  channelId);
+ if(candidate.group==null&&GROUPS.has(today?.channel_group))candidate.group=today.channel_group;
+ if(!candidate.channel_name&&typeof today?.channel_name==='string'&&today.channel_name)candidate.channel_name=today.channel_name;
+
+ const history=await firstRow(db,
+  'SELECT channel_name,avatar_url FROM public_history WHERE channel_id=? ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1',
+  channelId);
+ if(!candidate.channel_name&&typeof history?.channel_name==='string'&&history.channel_name)candidate.channel_name=history.channel_name;
+ if(!candidate.avatar_url)candidate.avatar_url=safeAvatar(history?.avatar_url);
+
  candidate.support_color_source=candidate.avatar_url||candidate.group||candidate.channel_name?'legacy-migration-projection':null;
  return candidate;
 }
