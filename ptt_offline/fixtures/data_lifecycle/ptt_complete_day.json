@@ -1,0 +1,88 @@
+{
+  "expected_aids": {
+    "schema_version": "holoviewer-ptt-expected-aids-v1",
+    "day": "2026-10-20",
+    "authority": {
+      "kind": "sanitized-fixture",
+      "evidence_id": "fixture-expected-aids-20261020",
+      "observed_at": "2026-10-20T00:10:00Z",
+      "verified": true
+    },
+    "entries": [
+      {
+        "period": "day",
+        "aid": "1grg4Pag",
+        "source_url": "https://www.ptt.cc/bbs/C_Chat/M.fixture.day.html",
+        "authority_record_id": "fixture-day"
+      },
+      {
+        "period": "night",
+        "aid": "1grNight",
+        "source_url": "https://www.ptt.cc/bbs/C_Chat/M.fixture.night.html",
+        "authority_record_id": "fixture-night"
+      }
+    ]
+  },
+  "coverage": {
+    "day": "2026-10-20",
+    "aid": "1grg4Pag",
+    "article_start_line": 1,
+    "final_source_line": 6,
+    "lines": [
+      {
+        "source_line": 1,
+        "record_type": "non_push",
+        "content_empty": false
+      },
+      {
+        "source_line": 2,
+        "record_type": "non_push",
+        "content_empty": false
+      },
+      {
+        "source_line": 3,
+        "record_type": "push",
+        "content_empty": false
+      },
+      {
+        "source_line": 4,
+        "record_type": "push",
+        "content_empty": true,
+        "legal_empty_push": true
+      },
+      {
+        "source_line": 5,
+        "record_type": "non_push",
+        "content_empty": false
+      },
+      {
+        "source_line": 6,
+        "record_type": "push",
+        "content_empty": false
+      }
+    ]
+  },
+  "publisher": {
+    "status": "ACK",
+    "observed_at": "2026-10-20T05:23:01+00:00",
+    "source_identity": "fixture-source-identity",
+    "target_identity": "d1:holoviewer-public-v1",
+    "input_count": 1,
+    "sent": 1,
+    "http_posts": 1,
+    "readback": {
+      "receipt_digest": "sha256:fixture",
+      "verified_count": 1,
+      "observed_at": "2026-10-20T05:23:02+00:00"
+    }
+  },
+  "collector": {
+    "observed_at": "2026-10-20T05:23:00+00:00",
+    "active_aid": "1grg4Pag",
+    "watermark_source_line": 213,
+    "final_source_line": 213,
+    "source_line_gaps": [],
+    "scan_truncated": false,
+    "process_alive": true
+  }
+}
