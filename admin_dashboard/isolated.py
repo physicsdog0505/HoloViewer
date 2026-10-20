@@ -9,22 +9,32 @@ from copy import deepcopy
 from threading import Condition, Lock
 from time import monotonic
 
+from .auth import AuthResult
+
 
 class AuthenticatedDashboard:
     """Require an injected trusted server-side authentication decision first."""
 
-    def __init__(self, app, authenticate):
-        if not callable(authenticate):
+    def __init__(self, app, authenticator):
+        authenticate = getattr(authenticator, "authenticate", None)
+        if not callable(authenticate) and not callable(authenticator):
             raise ValueError("server-side authenticator required")
         self._app = app
-        self._authenticate = authenticate
+        self._authenticator = authenticator
 
     def __call__(self, environ, start_response):
         try:
-            allowed = self._authenticate(environ) is True
+            authenticate = getattr(self._authenticator, "authenticate", None)
+            raw = authenticate(environ) if callable(authenticate) else self._authenticator(environ)
+            if isinstance(raw, AuthResult):
+                result = raw
+            elif raw is True:  # backwards-compatible fixture seam only
+                result = AuthResult.allow("fixture-admin", "legacy-fixture")
+            else:
+                result = AuthResult.deny("auth_required")
         except Exception:
-            allowed = False
-        if not allowed:
+            result = AuthResult.deny("auth_exception")
+        if not result.authenticated:
             body = b'{"error":"unauthorized"}'
             start_response("401 Unauthorized", [
                 ("Content-Type", "application/json"),
@@ -32,7 +42,10 @@ class AuthenticatedDashboard:
                 ("Content-Length", str(len(body))),
             ])
             return [body]
-        return self._app(environ, start_response)
+        child = dict(environ)
+        child["holoviewer.admin.principal"] = result.principal
+        child["holoviewer.admin.auth_method"] = result.auth_method
+        return self._app(child, start_response)
 
 
 class SharedFixtureCache:
