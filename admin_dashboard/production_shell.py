@@ -224,6 +224,7 @@ class EvidenceReaderSet:
         archive = self._shell.read_archive(
             ArchiveReadScope(self._archive_from, self._archive_through))
         return {
+            "target_day": self._day,
             "coverage": self.coverage(),
             "repair_job": None,
             "archive_sync_job": archive["value"] if archive["available"] else None,
