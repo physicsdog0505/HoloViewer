@@ -118,7 +118,7 @@ class RecurringPublisherTests(unittest.TestCase):
             self.assertTrue(result["backlog_may_remain"])
 
     def test_query_model_matches_three_bounded_reads_per_batch(self):
-        source="q"*64
+        source="a"*64
         for sent,expected in [(1,7),(10,25),(25,55)]:
             with self.subTest(sent=sent), \
                  patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
