@@ -65,7 +65,6 @@ let suppressLinkedCommand=false;
 let syncTimer=null;
 let subtitleTimer=null;
 let pttTimer=null;
-let metadataRetryTimer=null;
 let pttPrimeTimers=[];
 let hostWindow=null;
 let pttRows=[];
@@ -99,21 +98,13 @@ function api(path){
  return fetch(API_BASE+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}}).then(r=>{if(!r.ok)throw new Error('API HTTP '+r.status);return r.json()});
 }
 async function metadataRead(videoId){
- if(!API_BASE||!/^https:\/\//.test(API_BASE))throw new Error('正式 API 未設定');
- const q=new URLSearchParams();
- if(/^\d{4}-\d{2}-\d{2}$/.test(watchalongSessionDay))q.set('ptt_day',watchalongSessionDay);
- const suffix=q.toString()?'?'+q.toString():'';
- const response=await fetch(API_BASE+'/v1/videos/'+encodeURIComponent(videoId)+'/metadata'+suffix,{
-  mode:'cors',credentials:'omit',headers:{Accept:'application/json'}
+ const result=await window.HoloViewerVideoMetadata?.resolve(videoId,{
+  apiBase:API_BASE,preferCatalog:true,waitForRecovery:true,maxAttempts:6
  });
- let payload={};
- try{payload=await response.json()}catch{}
- return {status:response.status,payload};
-}
-function scheduleMetadataRetry(seconds){
- clearTimeout(metadataRetryTimer);
- const delay=Math.max(2,Math.min(60,Number(seconds)||5))*1000;
- metadataRetryTimer=setTimeout(()=>{metadataRetryTimer=null;resolveHostPtt()},delay);
+ if(result?.status==='ready')return {status:200,payload:result.row};
+ if(result?.status==='pending')return {status:202,payload:result.row||{status:'metadata_pending'}};
+ if(result?.status==='not-found')return {status:404,payload:result.row||{error:'metadata_not_found_cached'}};
+ return {status:result?.httpStatus||500,payload:result?.row||{error:result?.status||'metadata_error'}};
 }
 const WATCHALONG_MEMBER_ACCENTS=[
  [['ロボ子','ROBOCO'],'#d85a8a'],
@@ -893,20 +884,12 @@ async function loadArchivePtt(windowInfo){
 }
 async function resolveHostPtt(){
  if(!hostVideoId){pttMeta.textContent='缺少 Hololive 主影片';return}
- clearTimeout(metadataRetryTimer);metadataRetryTimer=null;
  try{
   const result=await metadataRead(hostVideoId);
   const row=result.payload||{};
   if(result.status===202&&row.status==='metadata_pending'){
    hostStatus.textContent='metadata_pending';
-   pttMeta.textContent='影片時間資料補查中';
-   scheduleMetadataRetry(row.retry_after_seconds);
-   return;
-  }
-  if(result.status===429&&row.error==='recovery_queue_busy'){
-   hostStatus.textContent='metadata_pending';
-   pttMeta.textContent='影片時間補查佇列忙碌，稍後重試';
-   scheduleMetadataRetry(row.retry_after_seconds);
+   pttMeta.textContent='影片時間資料補查中，稍後可重新進入或重新整理';
    return;
   }
   if(result.status===404&&row.error==='metadata_not_found_cached'){
@@ -948,6 +931,6 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('pagehide',()=>{
  saveCheckpoint();
- clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);clearInterval(checkpointTimer);clearTimeout(metadataRetryTimer);
+ clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);clearInterval(checkpointTimer);
  pttPrimeTimers.forEach(clearTimeout);pttPrimeTimers=[];
 });
