@@ -22,6 +22,9 @@ const collabKind=['live','vod'].includes(params.get('collab_kind'))?params.get('
 const collabDay=/^\d{4}-\d{2}-\d{2}$/.test(String(params.get('collab_day')||''))?String(params.get('collab_day')):'';
 const collabSyncVerified=collabKind==='vod'&&params.get('collab_sync')==='verified';
 const collabManaged=Boolean(collabEventId&&collabKind);
+const watchalongEventId=String(params.get('watchalong_event')||'').trim();
+const watchalongManaged=/^[A-Za-z0-9_-]{11}$/.test(watchalongEventId);
+const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';
 function parseArchiveWindows(){
  const map=new Map();
  for(const raw of params.getAll('ptt_window')){
@@ -92,6 +95,17 @@ let collabPollTimer=null;
 let collabVodTimer=null;
 let collabAbsoluteMs=null;
 let collabReconciling=false;
+let watchalongEvent=null;
+let watchalongManifestEntry=null;
+let watchalongSegments=[];
+let watchalongSubtitles=[];
+let watchalongActiveSegmentIndex=-1;
+let watchalongOffsetSeconds=0;
+let watchalongTimer=null;
+let watchalongFailed=false;
+let watchalongSubtitleOverlay=null;
+let watchalongSubtitleOriginal=null;
+let watchalongSubtitleTranslation=null;
 
 const CALL_DEFAULT_BEAT_MS=500;
 let callEnabled=false;
@@ -195,6 +209,7 @@ function updateUrl(){
   if(collabDay)q.set('collab_day',collabDay);
   if(collabSyncVerified)q.set('collab_sync','verified');
  }
+ if(watchalongManaged)q.set('watchalong_event',watchalongEventId);
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
 
@@ -453,7 +468,7 @@ function renderControls(){
  });
  const multi=watchMode==='multi'&&streams.length>1;
  const focusMode=multi&&currentLayoutPreset()!=='equal';
- playerCards.forEach(card=>{const remove=card?.querySelector('.player-remove');if(remove)remove.hidden=!multi});
+ playerCards.forEach(card=>{const remove=card?.querySelector('.player-remove');if(remove)remove.hidden=!multi||watchalongManaged});
  document.getElementById('layoutGroup').hidden=!multi;
  document.getElementById('focusGroup').hidden=!focusMode;
  persistentPlaybackControls.hidden=!multi;
@@ -594,7 +609,10 @@ function mountPlayerAt(index,autoplay=false,seekSeconds=null){
   }
  });
 }
-function mountPlayers(){streams.forEach((stream,index)=>mountPlayerAt(index,confirmedLiveIds.has(stream.videoId)))}
+function mountPlayers(){
+ streams.forEach((stream,index)=>mountPlayerAt(index,confirmedLiveIds.has(stream.videoId)));
+ if(watchalongManaged)setTimeout(()=>watchalongTick({force:true}),0);
+}
 function destroyPlayers(){
  players.forEach(player=>{try{player?.destroy()}catch{}});
  players.splice(0,players.length);
@@ -909,6 +927,164 @@ async function initCollabManager(){
    reconcileCollabRows(desiredVodRowsAt(collabAbsoluteMs),{absoluteMs:collabAbsoluteMs});
   }
   collabVodTimer=setInterval(()=>{if(!document.hidden)reconcileVodCollab()},500);
+ }
+}
+
+
+async function watchalongSha256Hex(buffer){
+ const hash=await crypto.subtle.digest('SHA-256',buffer);
+ return [...new Uint8Array(hash)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+async function watchalongFetchJson(path){
+ const response=await fetch(path,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
+ if(!response.ok)throw new Error('Watchalong HTTP '+response.status);
+ const buffer=await response.arrayBuffer();
+ let payload=null;
+ try{payload=JSON.parse(new TextDecoder().decode(buffer))}catch{throw new Error('Watchalong JSON invalid')}
+ return {payload,buffer};
+}
+function watchalongFailClosed(error){
+ watchalongFailed=true;
+ clearInterval(watchalongTimer);watchalongTimer=null;
+ const message='同時視聽資料驗證失敗：'+String(error?.message||error||'unknown');
+ stage.replaceChildren(node('div',message,'ptt-empty watchalong-failed'));
+ playerCards.splice(0,playerCards.length);
+ controls.hidden=true;
+ persistentPlaybackControls.hidden=true;
+ liveRail.hidden=true;
+ pttPanel.hidden=true;
+ if(watchalongSubtitleOverlay)watchalongSubtitleOverlay.hidden=true;
+}
+function watchalongEnsureSubtitleOverlay(){
+ if(!watchalongManaged||watchalongFailed)return;
+ const hostCard=playerCards[0];
+ if(!hostCard)return;
+ if(!watchalongSubtitleOverlay){
+  watchalongSubtitleOverlay=node('div',undefined,'watchalong-subtitle-overlay');
+  watchalongSubtitleOverlay.id='watchalongSubtitleOverlay';
+  watchalongSubtitleOriginal=node('div','', 'watchalong-subtitle-line original');
+  watchalongSubtitleTranslation=node('div','', 'watchalong-subtitle-line translation');
+  watchalongSubtitleOverlay.append(watchalongSubtitleOriginal,watchalongSubtitleTranslation);
+ }
+ if(watchalongSubtitleOverlay.parentElement!==hostCard)hostCard.append(watchalongSubtitleOverlay);
+}
+function watchalongRenderSubtitle(hostSeconds){
+ if(!watchalongSubtitleOverlay)return;
+ const cue=HoloViewerWatchalongCore.subtitleAt(watchalongSubtitles,hostSeconds);
+ if(!cue){
+  watchalongSubtitleOverlay.hidden=true;
+  watchalongSubtitleOriginal.textContent='';
+  watchalongSubtitleTranslation.textContent='';
+  return;
+ }
+ watchalongSubtitleOriginal.textContent=String(cue.original||'');
+ watchalongSubtitleTranslation.textContent=String(cue.translation||'');
+ watchalongSubtitleOverlay.hidden=false;
+}
+function watchalongHostSeconds(){
+ let value=null;
+ try{value=players[0]?.getCurrentTime?.()}catch{}
+ return Number.isFinite(value)?value:null;
+}
+function watchalongSourceTarget(hostSeconds,segment=watchalongSegments[watchalongActiveSegmentIndex]){
+ if(!segment||!Number.isFinite(hostSeconds))return null;
+ return HoloViewerWatchalongCore.sourceTargetSeconds(segment,hostSeconds);
+}
+function watchalongSetSegment(index,{forceSeek=false}={}){
+ if(!watchalongManaged||watchalongFailed||index<0||index>=watchalongSegments.length)return;
+ const segment=watchalongSegments[index];
+ watchalongActiveSegmentIndex=index;
+ watchalongOffsetSeconds=HoloViewerWatchalongCore.segmentOffsetSeconds(segment);
+ const sourceId=String(segment.source_video_id);
+ if(streams[1]){
+  streams[1].label=String(segment.label||'同步片源');
+  const label=playerCards[1]?.querySelector('.player-label');
+  if(label)label.textContent=streams[1].label;
+ }
+ const hostSeconds=watchalongHostSeconds();
+ const target=watchalongSourceTarget(Number.isFinite(hostSeconds)?hostSeconds:Number(segment.host_start_ms)/1000,segment);
+ const sourcePlayer=players[1];
+ if(streams[1]&&streams[1].videoId!==sourceId){
+  streams[1].videoId=sourceId;
+  if(sourcePlayer){
+   let shouldPlay=false;
+   try{
+    shouldPlay=sourcePlayer.getPlayerState?.()===YT.PlayerState.PLAYING||
+     (syncPlayback.checked&&players[0]?.getPlayerState?.()===YT.PlayerState.PLAYING);
+   }catch{}
+   try{
+    const spec={videoId:sourceId,startSeconds:Math.max(0,Number(target)||0)};
+    if(shouldPlay)sourcePlayer.loadVideoById(spec);
+    else sourcePlayer.cueVideoById(spec);
+   }catch{}
+  }
+  updateUrl();
+  return;
+ }
+ if(sourcePlayer&&Number.isFinite(target)&&target>=0){
+  let current=null;try{current=sourcePlayer.getCurrentTime?.()}catch{}
+  if(forceSeek||!Number.isFinite(current)||Math.abs(current-target)>1.2){
+   try{sourcePlayer.seekTo(Math.max(0,target),true)}catch{}
+  }
+ }
+}
+function watchalongTick({force=false}={}){
+ if(!watchalongManaged||watchalongFailed||!watchalongEvent)return;
+ const hostSeconds=watchalongHostSeconds();
+ if(!Number.isFinite(hostSeconds))return;
+ const nextIndex=HoloViewerWatchalongCore.segmentIndexAt(watchalongSegments,hostSeconds);
+ if(nextIndex>=0&&(nextIndex!==watchalongActiveSegmentIndex||force)){
+  watchalongSetSegment(nextIndex,{forceSeek:true});
+ }
+ watchalongEnsureSubtitleOverlay();
+ watchalongRenderSubtitle(hostSeconds);
+ if(!syncPlayback.checked)return;
+ const segment=watchalongSegments[watchalongActiveSegmentIndex];
+ const target=watchalongSourceTarget(hostSeconds,segment);
+ const sourcePlayer=players[1];
+ if(!sourcePlayer||!Number.isFinite(target))return;
+ if(target<0){
+  try{
+   const current=sourcePlayer.getCurrentTime?.();
+   if(Number.isFinite(current)&&current>0.75)sourcePlayer.seekTo(0,true);
+   if(sourcePlayer.getPlayerState?.()===YT.PlayerState.PLAYING)sourcePlayer.pauseVideo();
+  }catch{}
+  return;
+ }
+ let current=null;try{current=sourcePlayer.getCurrentTime?.()}catch{}
+ if(!Number.isFinite(current)||Math.abs(current-target)>1.2){
+  try{sourcePlayer.seekTo(Math.max(0,target),true)}catch{}
+ }
+}
+async function initWatchalongAdapter(){
+ if(!watchalongManaged)return true;
+ try{
+  if(!window.HoloViewerWatchalongCore)throw new Error('watchalong adapter core missing');
+  const manifestResult=await watchalongFetchJson(WATCHALONG_MANIFEST_PATH);
+  const entry=HoloViewerWatchalongCore.manifestEntry(manifestResult.payload,watchalongEventId);
+  const eventResult=await watchalongFetchJson(entry.path);
+  const digest=await watchalongSha256Hex(eventResult.buffer);
+  HoloViewerWatchalongCore.verifyDigest(digest,entry.sha256);
+  const validated=HoloViewerWatchalongCore.validateEvent(entry,eventResult.payload);
+  watchalongManifestEntry=entry;
+  watchalongEvent=validated.event;
+  watchalongSegments=validated.segments;
+  watchalongSubtitles=validated.subtitles;
+  watchalongActiveSegmentIndex=0;
+  watchalongOffsetSeconds=validated.initial_offset_seconds;
+  streams.splice(0,streams.length,
+   {videoId:String(watchalongEvent.master_video_id),label:'Hololive',channelId:''},
+   {videoId:String(watchalongSegments[0].source_video_id),label:String(watchalongSegments[0].label||'同步片源'),channelId:''}
+  );
+  primaryIndex=0;
+  audioMaster=0;
+  watchMode='multi';
+  multiModeSwitch.disabled=true;
+  liveRail.hidden=true;
+  return true;
+ }catch(error){
+  watchalongFailClosed(error);
+  return false;
  }
 }
 
@@ -1564,7 +1740,7 @@ window.addEventListener('blur',()=>{
  clearTimeout(callWaveTimer);callWaveTimer=null;callHeldDirection='';callSpaceHeld=false;callClearMotion();callUpdateHud('待機');
 });
 window.addEventListener('pagehide',()=>{
- clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);
+ clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);clearInterval(watchalongTimer);
 });
 document.addEventListener('fullscreenchange',()=>{
  const on=Boolean(document.fullscreenElement);
@@ -1575,9 +1751,6 @@ document.addEventListener('fullscreenchange',()=>{
 readSettings();
 carousel.checked=currentLayoutPreset()!=='equal';
 if(currentLayoutPreset()==='focus')lockedIndex=primaryIndex;
-renderShell();
-applyModeClass();
-startCarousel();
 
 let viewerReadyForPlayers=false;
 function tryMountPlayers(){
@@ -1585,12 +1758,25 @@ function tryMountPlayers(){
  mountPlayers();
 }
 (async()=>{
- if(!archiveVodEntry)await loadCatalog();
+ if(watchalongManaged){
+  const ready=await initWatchalongAdapter();
+  if(!ready)return;
+ }
+ renderShell();
+ applyModeClass();
+ startCarousel();
+ if(!archiveVodEntry&&!watchalongManaged)await loadCatalog();
  else{liveRail.hidden=true}
  if(collabManaged)await initCollabManager();
  viewerReadyForPlayers=true;
  tryMountPlayers();
  resolvePrimaryPtt();
+ if(watchalongManaged){
+  watchalongEnsureSubtitleOverlay();
+  watchalongSetSegment(0,{forceSeek:true});
+  clearInterval(watchalongTimer);
+  watchalongTimer=setInterval(()=>{if(!document.hidden)watchalongTick()},250);
+ }
 })();
 setInterval(loadPtt,10000);
 
