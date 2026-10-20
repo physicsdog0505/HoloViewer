@@ -1,4 +1,5 @@
 import {YOUTUBE_LIVE_SOURCE} from './store.mjs';
+import {readChannelProfile,applyChannelProfile} from './channel-profile.mjs';
 
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
 const TRUSTED_TODAY='YouTube liveStreamingDetails';
@@ -123,9 +124,16 @@ export async function handleVideoMetadataRead(request,env,{now=new Date()}={}){
  if(!VIDEO.test(id))return json({error:'invalid_video_id'},400,0);
  if(!env?.DB?.prepare)return json({error:'database_not_bound'},503,0);
  const catalog=await readCatalog(env.DB,id);
- if(catalog){const membership=await managedMembership(env.DB,catalog.channel_id);return json({...catalog,managed_channel:Boolean(membership),source:'catalog'},200,15);}
+ if(catalog){
+  const membership=await managedMembership(env.DB,catalog.channel_id);
+  const profile=await readChannelProfile(env.DB,catalog.channel_id,{env});
+  return json(applyChannelProfile({...catalog,managed_channel:Boolean(membership),source:'catalog'},profile),200,15);
+ }
  const cached=await env.DB.prepare('SELECT video_id,channel_id,title,channel_name,lifecycle_state,scheduled_start,actual_start,actual_end,managed_channel,source,observed_at FROM public_video_metadata_cache WHERE video_id=? LIMIT 1').bind(id).first();
- if(cached)return json({...cached,managed_channel:Boolean(cached.managed_channel),source:'youtube-fallback'},200,15);
+ if(cached){
+  const profile=await readChannelProfile(env.DB,cached.channel_id,{env});
+  return json(applyChannelProfile({...cached,managed_channel:Boolean(cached.managed_channel),source:'youtube-fallback'},profile),200,15);
+ }
 
  const ptt=await verifiedPttPriority(env.DB,url);
  const registered=await registerDemand(env.DB,id,{...ptt,now});
