@@ -96,6 +96,10 @@ def validate_finalization_receipt(receipt: object) -> dict[str,Any]:
         raise DailyArchiveError("expected-AID authority day mismatch")
     evidence_digest=receipt.get("evidence_digest")
     _require_sha(evidence_digest,"finalization evidence_digest")
+    material=dict(receipt)
+    material.pop("evidence_digest",None)
+    if _digest_bytes(_canonical_bytes(material))!=evidence_digest:
+        raise DailyArchiveError("finalization evidence_digest mismatch")
     return receipt
 
 
