@@ -24,6 +24,8 @@ button,input,select,output{font:inherit}
 #offsetValue{min-width:78px;text-align:center;color:var(--muted);font-weight:700}
 #segmentStatus{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-weight:700}
 .watchalong-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.resume-status{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px;font-weight:700}
+#copyCheckpoint{white-space:nowrap}
 
 .watchalong-main{height:calc(100vh - 58px);padding:6px;background:#080a0d}
 .watchalong-workspace{display:grid;gap:6px;width:100%;height:100%;min-width:0;min-height:0}
