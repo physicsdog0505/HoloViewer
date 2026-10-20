@@ -220,6 +220,16 @@ class EvidenceReaderSet:
             "read_only": True,
         }
 
+    def daily_finalization(self):
+        archive = self._shell.read_archive(
+            ArchiveReadScope(self._archive_from, self._archive_through))
+        return {
+            "coverage": self.coverage(),
+            "repair_job": None,
+            "archive_sync_job": archive["value"] if archive["available"] else None,
+            "error_code": archive["error_code"],
+        }
+
     def sync_monitor(self):
         d1 = self._shell.read_d1(D1ReadScope(self._day, self._aids))
         archive = self._shell.read_archive(
@@ -267,6 +277,7 @@ class EvidenceReaderSet:
     def injected(self):
         return {
             "data_coverage": self.coverage,
+            "daily_finalization": self.daily_finalization,
             "sync_monitor": self.sync_monitor,
             "system_health": self.system_health,
         }
