@@ -192,7 +192,8 @@ def main(argv=None):
     p.add_argument("--metrics",required=True)
     p.add_argument("--interval-seconds",type=int,choices=(60,120),default=None,
                    help="optional fixed interval override; default 1min daytime / 10min 02-07 Asia/Taipei")
-    p.add_argument("--iterations",type=int,default=1)
+    p.add_argument("--iterations",type=int,default=1,
+                   help="number of snapshots; 0 means run until externally stopped")
     p.add_argument("--send",action="store_true")
     p.add_argument("--batch-cap",type=int,default=5)
     p.add_argument("--max-batches",type=int,default=1)
@@ -201,8 +202,8 @@ def main(argv=None):
     p.add_argument("--approve-live-capture-policy",action="store_true")
     p.add_argument("--endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish")
     args=p.parse_args(argv)
-    if not 1<=args.iterations<=1440:
-        p.error("maximum 1440 bounded iterations allowed")
+    if not 0<=args.iterations<=1440:
+        p.error("iterations must be 0 (continuous) or 1-1440")
     if not 1<=args.batch_cap<=25:
         p.error('batch cap must be 1-25 and match approved Worker configuration')
     if not 1<=args.max_articles<=8:
@@ -223,7 +224,8 @@ def main(argv=None):
     metric=Path(args.metrics)
     metric.parent.mkdir(parents=True,exist_ok=True)
     with exclusive_lock(Path(args.state_dir)/".single-publisher.lock"):
-        for iteration in range(args.iterations):
+        iteration=0
+        while args.iterations==0 or iteration<args.iterations:
             started=time.monotonic()
             try:
                 result=run_snapshot(source=args.source,state_dir=args.state_dir,send=args.send,
@@ -243,7 +245,9 @@ def main(argv=None):
                 handle.flush()
                 os.fsync(handle.fileno())
             print(json.dumps(result,ensure_ascii=False,sort_keys=True),flush=True)
-            if iteration+1<args.iterations:
-                time.sleep(max(0,args.interval_seconds-(time.monotonic()-started))
-                           if args.interval_seconds else seconds_until_next_snapshot())
+            iteration+=1
+            if args.iterations!=0 and iteration>=args.iterations:
+                break
+            time.sleep(max(0,args.interval_seconds-(time.monotonic()-started))
+                       if args.interval_seconds else seconds_until_next_snapshot())
 if __name__=="__main__":main()
