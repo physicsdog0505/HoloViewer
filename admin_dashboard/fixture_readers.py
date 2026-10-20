@@ -5,6 +5,7 @@ Fixture root is set by trusted host code, never a browser argument.
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import date, timedelta
 import json
 from pathlib import Path
 
@@ -69,7 +70,9 @@ class FixtureReaders:
             return None
 
     def daily_finalization(self):
+        target_day = (date.fromisoformat(self._end) - timedelta(days=1)).isoformat()
         return {
+            "target_day": target_day,
             "coverage": self.coverage(),
             "repair_job": None,
             "archive_sync_job": self._read_archive_sync_job(),
