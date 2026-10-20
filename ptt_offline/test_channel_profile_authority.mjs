@@ -71,6 +71,27 @@ test('canonical profile round-trips through one shared projection',async()=>{
  db.close();
 });
 
+test('legacy catalog avatar survives when optional channel_name column is absent',async()=>{
+ const db=sqliteD1();
+ db.raw.exec('DROP TABLE public_catalog');
+ db.raw.exec('CREATE TABLE public_catalog(video_id TEXT PRIMARY KEY,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)');
+ db.raw.prepare('INSERT INTO public_catalog(video_id,channel_id,avatar_url,actual_start,scheduled_start) VALUES(?,?,?,?,?)')
+  .run(VIDEO,CHANNEL,'https://yt3.ggpht.com/legacy-avatar','2026-10-20T10:00:00Z','2026-10-20T10:00:00Z');
+ const out=await readChannelProfile(db,CHANNEL);
+ assert.equal(out.avatar_url,'https://yt3.ggpht.com/legacy-avatar');
+ db.close();
+});
+
+test('missing legacy source remains neutral and fail-closed',async()=>{
+ const db=sqliteD1();
+ db.raw.exec('DROP TABLE public_catalog');
+ db.raw.exec('DROP TABLE public_history');
+ const unknown='UC'+'M'.repeat(22);
+ const out=await readChannelProfile(db,unknown);
+ assert.deepEqual(out,neutralChannelProfile(unknown));
+ db.close();
+});
+
 test('batch resolver query count is bounded by source classes, not channel count',async()=>{
  const base=sqliteD1();
  let queries=0;
