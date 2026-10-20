@@ -124,6 +124,39 @@ class IsolatedPilotTests(unittest.TestCase):
         for marker in ("hmac secret", "wrangler credential", "filesystem secret path", "api key"):
             self.assertNotIn(marker, html)
 
+
+    def test_semantic_health_aggregate_excludes_reachability_probe(self):
+        readers = FixtureReaders(ROOT)
+        health = readers.system_health()["components"]["Production API"]
+        semantic = health["semantic_check"]
+        self.assertEqual(semantic["status"], "degraded")
+        self.assertTrue(semantic["reachability_probes"])
+        self.assertNotIn("unknown", semantic["semantic_probe_statuses"])
+
+    def test_health_only_fixture_cannot_certify_healthy(self):
+        readers = FixtureReaders(ROOT)
+        original = readers._fixture
+        def fixture(name):
+            if name == "api-semantic-health.sanitized.json":
+                return {
+                    "schema_version": "holoviewer-api-semantic-health-v1",
+                    "sanitized": True,
+                    "observed_at": "2026-10-20T11:30:00Z",
+                    "overall_status": "unknown",
+                    "probes": [{
+                        "name": "health", "http_status": 200, "reachable": True,
+                        "semantic_status": "unknown", "schema_version": "v1",
+                        "observed_at": "2026-10-20T11:30:00Z"
+                    }],
+                    "query_budget": {"http_requests_used": 1, "http_requests_max": 4,
+                                     "cache_ttl_seconds": 60},
+                    "contract_gaps": ["fixture-only"]
+                }
+            return original(name)
+        readers._fixture = fixture
+        health = readers.system_health()["components"]["Production API"]
+        self.assertEqual(health["semantic_check"]["status"], "unknown")
+
     def test_missing_fixture_fails_closed(self):
         readers = FixtureReaders(ROOT / "nonexistent")
         self.assertEqual(readers.coverage()["days"][0]["status"], "UNKNOWN")
