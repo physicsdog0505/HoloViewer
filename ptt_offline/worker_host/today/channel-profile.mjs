@@ -1,3 +1,4 @@
+import {validateSupportColorExport,supportColorFor} from './support-colors.mjs';
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
 const HEX=/^#[0-9A-Fa-f]{6}$/;
 const GROUPS=new Set(['hololive','holostars','mekpark','other']);
@@ -58,23 +59,51 @@ export function normalizeChannelProfile(row,channelId=''){
   updated_at:safeTime(row?.updated_at)
  };
 }
-export async function readChannelProfile(db,channelId){
+function supportColorJson(env){
+ if(env?.TODAY_SUPPORT_COLORS_JSON)return String(env.TODAY_SUPPORT_COLORS_JSON);
+ const parts=[];
+ for(let i=0;i<16;i++){
+  const value=env?.['TODAY_SUPPORT_COLORS_JSON_'+i];
+  if(value==null){if(i===0)return null;break}
+  parts.push(String(value));
+ }
+ return parts.length?parts.join(''):null;
+}
+function runtimeColorMap(env){
+ try{
+  const raw=supportColorJson(env);
+  return raw?validateSupportColorExport(JSON.parse(raw)):null;
+ }catch{return null}
+}
+function applyRuntimeColor(profile,channelId,env){
+ const runtime=supportColorFor(channelId,runtimeColorMap(env));
+ if(profile.support_mode!=='neutral')return profile;
+ return {...profile,
+  member_accent:runtime.member_accent,
+  member_accent_dual:runtime.member_accent_dual,
+  support_mode:runtime.support_mode,
+  support_color_source:runtime.support_color_source
+ };
+}
+
+export async function readChannelProfile(db,channelId,{env=null}={}){
  if(!CHANNEL.test(channelId??''))return neutralChannelProfile(null);
  try{
   const row=await db.prepare('SELECT channel_id,channel_name,display_name,avatar_url,channel_group,member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at FROM public_channel_profiles WHERE channel_id=? LIMIT 1').bind(channelId).first();
-  return row?normalizeChannelProfile(row,channelId):neutralChannelProfile(channelId);
+  const profile=row?normalizeChannelProfile(row,channelId):neutralChannelProfile(channelId);
+  return applyRuntimeColor(profile,channelId,env);
  }catch{
-  return neutralChannelProfile(channelId);
+  return applyRuntimeColor(neutralChannelProfile(channelId),channelId,env);
  }
 }
-export async function readChannelProfiles(db,channelIds){
+export async function readChannelProfiles(db,channelIds,{env=null}={}){
  const ids=[...new Set((Array.isArray(channelIds)?channelIds:[]).filter(x=>CHANNEL.test(x)))];
  const out=new Map(ids.map(id=>[id,neutralChannelProfile(id)]));
  if(!ids.length)return out;
  try{
   const placeholders=ids.map(()=>'?').join(',');
   const rows=await db.prepare(`SELECT channel_id,channel_name,display_name,avatar_url,channel_group,member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at FROM public_channel_profiles WHERE channel_id IN (${placeholders})`).bind(...ids).all();
-  for(const row of rows.results??[])out.set(row.channel_id,normalizeChannelProfile(row,row.channel_id));
+  for(const row of rows.results??[])out.set(row.channel_id,applyRuntimeColor(normalizeChannelProfile(row,row.channel_id),row.channel_id,env));
  }catch{}
  return out;
 }
