@@ -107,21 +107,30 @@ export async function readChannelProfiles(db,channelIds,{env=null}={}){
  }catch{}
  return out;
 }
-export function applyChannelProfile(row,profile){
- const p=profile??neutralChannelProfile(row?.channel_id??'');
+export function applyChannelProfile(row,profile,{includeNested=true}={}){
+ const base=profile??neutralChannelProfile(row?.channel_id??'');
+ const rowHasGroup=Object.prototype.hasOwnProperty.call(row??{},'channel_group')||Object.prototype.hasOwnProperty.call(row??{},'group');
+ const fallbackGroup=GROUPS.has(row?.channel_group??row?.group)?(row.channel_group??row.group):(rowHasGroup?'other':null);
+ const merged={
+  ...base,
+  channel_id:base.channel_id??(CHANNEL.test(row?.channel_id??'')?row.channel_id:null),
+  channel_name:base.channel_name??(typeof row?.channel_name==='string'&&row.channel_name?row.channel_name:null),
+  avatar_url:base.avatar_url??safeAvatar(row?.trusted_channel_avatar)??safeAvatar(row?.avatar_url),
+  group:base.group??fallbackGroup
+ };
  return {
   ...row,
-  channel_id:p.channel_id??row?.channel_id??null,
-  channel_name:p.channel_name??row?.channel_name??null,
-  display_name:p.display_name,
-  avatar_url:p.avatar_url,
-  group:p.group,
-  member_accent:p.member_accent,
-  member_accent_dual:p.member_accent_dual,
-  support_mode:p.support_mode,
-  support_color_source:p.support_color_source,
-  profile_revision:p.profile_revision,
-  profile_updated_at:p.updated_at,
-  channel:p
+  channel_id:merged.channel_id,
+  channel_name:merged.channel_name??row?.channel_name??null,
+  display_name:merged.display_name,
+  avatar_url:merged.avatar_url,
+  group:merged.group,
+  member_accent:merged.member_accent,
+  member_accent_dual:merged.member_accent_dual,
+  support_mode:merged.support_mode,
+  support_color_source:merged.support_color_source,
+  profile_revision:merged.profile_revision,
+  profile_updated_at:merged.updated_at,
+  ...(includeNested?{channel:merged}:{})
  };
 }
