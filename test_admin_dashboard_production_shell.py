@@ -144,6 +144,38 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertNotIn(b"fixture-principal", body)
         self.assertNotIn(b"legacy-fixture", body)
 
+    def test_authenticated_principals_are_distinct_in_audit_but_not_browser(self):
+        fixture = json.loads(
+            (Path(__file__).parent / "fixtures" / "data-lifecycle" /
+             "d1-job-readback.sanitized.json").read_text(encoding="utf-8"))
+        admission = self.admission()
+        fake = FakeProductionEvidenceReader(d1=fixture)
+        shell = ProductionReadOnlyShell(
+            fake, admission, config=self.config(d1=True), credentials=_Creds({"d1"}))
+        controller = DashboardController(EvidenceReaderSet(shell).injected(), cooldown_seconds=0)
+
+        bodies = []
+        for principal, section in (("admin-a", "data_coverage"), ("admin-b", "sync_monitor")):
+            app = AuthenticatedDashboard(
+                DashboardApplication(controller),
+                FixtureAdminAuthenticator(principal=principal))
+            captured = {}
+            body = b"".join(app(
+                {"REQUEST_METHOD": "GET", "PATH_INFO": "/admin/status",
+                 "QUERY_STRING": "section=" + section, "wsgi.input": io.BytesIO()},
+                lambda status, headers: captured.update(status=status)))
+            self.assertEqual(captured["status"], "200 OK")
+            bodies.append(body)
+
+        con = admission._connect()
+        principals = [row[0] for row in con.execute(
+            "SELECT DISTINCT principal FROM admin_read_audit WHERE source='d1' ORDER BY principal")]
+        con.close()
+        self.assertEqual(principals, ["admin-a", "admin-b"])
+        combined = b"".join(bodies)
+        self.assertNotIn(b"admin-a", combined)
+        self.assertNotIn(b"admin-b", combined)
+
     # Admission 5-10
     def request(self, key="k", source="d1", *, mode="bounded_sample", cost_class="bounded_read"):
         request_class = {
@@ -410,10 +442,11 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertEqual(result["error_code"], "source_unavailable")
         self.assertNotIn("secret", json.dumps(result))
 
-    def test_browser_shell_payload_scrubs_secret_token_account_and_path(self):
+    def test_unsanitized_d1_evidence_is_rejected_before_browser_and_cache(self):
         fake = FakeProductionEvidenceReader(d1={
+            "schema_version": "holoviewer-d1-sanitized-snapshot-v1",
+            "sanitized": True,
             "token": "secret", "account_id": "123", "path": "/Users/name/secret.json",
-            "content_hash": "sha256:ok",
         })
         shell = ProductionReadOnlyShell(
             fake, self.admission(), config=self.config(d1=True), credentials=_Creds({"d1"}))
@@ -423,7 +456,7 @@ class ProductionShellPhase1Tests(unittest.TestCase):
         self.assertNotIn('"token"', encoded)
         self.assertNotIn('"account_id"', encoded)
         self.assertNotIn("/users/name", encoded)
-        self.assertIn("content_hash", encoded)
+        self.assertIn("cache_state_error", encoded)
 
 
     def test_audit_failure_turns_read_unavailable(self):
