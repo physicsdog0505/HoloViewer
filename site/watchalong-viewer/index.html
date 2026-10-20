@@ -81,6 +81,10 @@
           <div class="video-label"><strong>Hololive</strong><span id="hostStatus">判定中</span></div>
           <button id="mobileSwapHost" class="mobile-swap-button" type="button" aria-label="將 Hololive 切到主畫面">切到主畫面</button>
           <div id="hostPlayer" class="player-host"></div>
+          <div id="subtitleOverlay" class="subtitle-overlay" hidden>
+            <div id="subtitleOriginal" class="subtitle-line original"></div>
+            <div id="subtitleTranslation" class="subtitle-line translation"></div>
+          </div>
         </article>
         <aside id="pttPanel" class="watchalong-ptt ptt-floor-hidden">
           <div class="ptt-heading">
@@ -105,10 +109,6 @@
           <div id="sourceStandby" class="source-standby" hidden>
             <strong>等待同步片源</strong>
             <span>主影片尚未進入這段片源的對齊時間</span>
-          </div>
-          <div id="subtitleOverlay" class="subtitle-overlay" hidden>
-            <div id="subtitleOriginal" class="subtitle-line original"></div>
-            <div id="subtitleTranslation" class="subtitle-line translation"></div>
           </div>
           <div id="danmakuLayer" class="danmaku-layer" aria-live="off"></div>
         </article>
