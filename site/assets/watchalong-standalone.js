@@ -61,6 +61,7 @@ let suppressLinkedCommand=false;
 let syncTimer=null;
 let subtitleTimer=null;
 let pttTimer=null;
+let metadataRetryTimer=null;
 let pttPrimeTimers=[];
 let hostWindow=null;
 let pttRows=[];
@@ -74,6 +75,7 @@ let activeSourceVideoId=sourceVideoId||'';
 let sourceStandbyActive=false;
 let staticArtifactsReady=!STATIC_EVENT_MODE;
 let staticArtifactsFailed=false;
+let watchalongSessionDay='';
 let subtitleTimeline='source';
 let subtitleEnabled=true;
 let danmakuEnabled=false;
@@ -87,6 +89,23 @@ function validPlaylistId(value){const id=String(value||'');return /^[A-Za-z0-9_-
 function api(path){
  if(!API_BASE||!/^https:\/\//.test(API_BASE))return Promise.reject(new Error('正式 API 未設定'));
  return fetch(API_BASE+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}}).then(r=>{if(!r.ok)throw new Error('API HTTP '+r.status);return r.json()});
+}
+async function metadataRead(videoId){
+ if(!API_BASE||!/^https:\/\//.test(API_BASE))throw new Error('正式 API 未設定');
+ const q=new URLSearchParams();
+ if(/^\d{4}-\d{2}-\d{2}$/.test(watchalongSessionDay))q.set('ptt_day',watchalongSessionDay);
+ const suffix=q.toString()?'?'+q.toString():'';
+ const response=await fetch(API_BASE+'/v1/videos/'+encodeURIComponent(videoId)+'/metadata'+suffix,{
+  mode:'cors',credentials:'omit',headers:{Accept:'application/json'}
+ });
+ let payload={};
+ try{payload=await response.json()}catch{}
+ return {status:response.status,payload};
+}
+function scheduleMetadataRetry(seconds){
+ clearTimeout(metadataRetryTimer);
+ const delay=Math.max(2,Math.min(60,Number(seconds)||5))*1000;
+ metadataRetryTimer=setTimeout(()=>{metadataRetryTimer=null;resolveHostPtt()},delay);
 }
 const WATCHALONG_MEMBER_ACCENTS=[
  [['ロボ子','ROBOCO'],'#d85a8a'],
@@ -671,6 +690,7 @@ async function loadReadOnlyArtifacts(){
   activeSourceVideoId=sourceVideoId;
   segments=normalizeStaticSegments(payload);
   subtitles=normalizeStaticSubtitles(payload);
+  watchalongSessionDay=String(payload.session_day||'');
   subtitleTimeline='host';
   activeSegmentIndex=0;
   setOffset(segments[0].source-segments[0].host,{persist:false});
@@ -751,12 +771,39 @@ async function loadArchivePtt(windowInfo){
 }
 async function resolveHostPtt(){
  if(!hostVideoId){pttMeta.textContent='缺少 Hololive 主影片';return}
+ clearTimeout(metadataRetryTimer);metadataRetryTimer=null;
  try{
-  const row=await api('/v1/catalog/videos/'+encodeURIComponent(hostVideoId));
+  const result=await metadataRead(hostVideoId);
+  const row=result.payload||{};
+  if(result.status===202&&row.status==='metadata_pending'){
+   hostStatus.textContent='metadata_pending';
+   pttMeta.textContent='影片時間資料補查中';
+   scheduleMetadataRetry(row.retry_after_seconds);
+   return;
+  }
+  if(result.status===429&&row.error==='recovery_queue_busy'){
+   hostStatus.textContent='metadata_pending';
+   pttMeta.textContent='影片時間補查佇列忙碌，稍後重試';
+   scheduleMetadataRetry(row.retry_after_seconds);
+   return;
+  }
+  if(result.status===404&&row.error==='metadata_not_found_cached'){
+   hostStatus.textContent='unknown';
+   pttMeta.textContent='找不到可信的 YouTube 直播時間資料';
+   return;
+  }
+  if(result.status!==200)throw new Error(row.error||('metadata HTTP '+result.status));
+
   const state=String(row?.lifecycle_state||row?.state||'').toLowerCase();
   applyWatchalongHostAccent(row);
   hostStatus.textContent=state||'unknown';
-  if(state==='live'){hostWindow=null;await loadTodayPtt(taipeiDay());pttTimer=setInterval(()=>{if(!document.hidden)loadTodayPtt(taipeiDay())},10000);return}
+  if(state==='live'){
+   hostWindow=null;
+   await loadTodayPtt(taipeiDay());
+   clearInterval(pttTimer);
+   pttTimer=setInterval(()=>{if(!document.hidden)loadTodayPtt(taipeiDay())},10000);
+   return;
+  }
   const start=String(row?.actual_start||''),end=String(row?.actual_end||'');
   const startMs=Date.parse(start),endMs=Date.parse(end);
   if(state==='ended'&&Number.isFinite(startMs)&&Number.isFinite(endMs)&&endMs>startMs){
@@ -775,6 +822,6 @@ staticArtifactsPromise.then(()=>{
 });
 
 window.addEventListener('pagehide',()=>{
- clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);
+ clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);clearTimeout(metadataRetryTimer);
  pttPrimeTimers.forEach(clearTimeout);pttPrimeTimers=[];
 });
