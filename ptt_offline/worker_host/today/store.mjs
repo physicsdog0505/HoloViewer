@@ -163,7 +163,8 @@ function consumerRow(row,nowStamp,supportColors){
  if(!video_id||!channel_id)return null;
  const color=supportColorFor(channel_id,supportColors);
  const observed=consumerTime(row.lifecycle_observed_at);
- const age=observed?Date.parse(nowStamp)-Date.parse(observed):NaN;
+ const checked=consumerTime(row.checked_at);
+ const age=checked?Date.parse(nowStamp)-Date.parse(checked):NaN;
  const fresh=Number.isFinite(age)&&age>=0&&age<=1200000;
  const state=consumerLifecycle(row.lifecycle_state);
  const source_label=consumerText(row.source_label);
