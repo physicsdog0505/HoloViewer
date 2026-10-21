@@ -16,6 +16,7 @@ from ptt_offline.data_lifecycle_evidence import (
 from ptt_offline.daily_history_runtime import (
     CONFIG_SCHEMA,
     DailyHistoryRuntimeError,
+    _build_taipei_day_source_object,
     load_config,
     make_repair_executor,
     run_closeout,
@@ -79,6 +80,59 @@ def source_object():
 
 
 class DailyHistoryRuntimeTests(unittest.TestCase):
+    def test_hourly_export_payloads_collapse_to_one_taipei_day_object(self):
+        first={
+            "pushes":[{
+                "aid":AID,
+                "source_line":2,
+                "source_record_key":f"{DAY}:{AID}:2",
+                "floor":1,
+                "floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-19T16:01:00Z",
+                "content":"a",
+            }],
+        }
+        second={
+            "pushes":[{
+                "aid":AID,
+                "source_line":3,
+                "source_record_key":f"{DAY}:{AID}:3",
+                "floor":2,
+                "floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T15:59:00Z",
+                "content":"b",
+            }],
+        }
+        logical,raw=_build_taipei_day_source_object(
+            day=DAY,payloads=[second,first],expected_aids={AID})
+        self.assertEqual(logical,"day.json")
+        payload=json.loads(raw)
+        self.assertEqual(payload["schema_version"],"holoviewer-ptt-history-day-v1")
+        self.assertEqual(payload["partition_kind"],"taipei-day")
+        self.assertEqual(payload["partition_start"],"2026-10-19T16:00:00Z")
+        self.assertEqual(payload["partition_end"],"2026-10-20T16:00:00Z")
+        self.assertEqual(len(payload["pushes"]),2)
+        self.assertEqual(
+            [row["source_record_key"] for row in payload["pushes"]],
+            [f"{DAY}:{AID}:2",f"{DAY}:{AID}:3"])
+        self.assertTrue(all(row["coverage_status"]=="COMPLETE" for row in payload["pushes"]))
+
+    def test_daily_object_rejects_duplicate_source_identity(self):
+        payload={
+            "pushes":[{
+                "aid":AID,
+                "source_line":2,
+                "source_record_key":f"{DAY}:{AID}:2",
+                "floor":1,
+                "floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T01:01:00Z",
+                "content":"",
+            }],
+        }
+        with self.assertRaisesRegex(DailyHistoryRuntimeError,"duplicate source_record_key"):
+            _build_taipei_day_source_object(
+                day=DAY,payloads=[payload,payload],expected_aids={AID})
+
     def _config(self,root: Path, *, deploy=False):
         collector=root/"collector.sqlite3"
         collector.write_bytes(b"fixture")
