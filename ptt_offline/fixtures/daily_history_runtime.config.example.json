@@ -1,0 +1,21 @@
+{
+  "schema_version": "holoviewer-ptt-daily-history-runtime-config-v1",
+  "collector_source": "/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer/hololive_ptt.sqlite3",
+  "state_root": "/Users/hsuhsunshun/Documents/HoloViewer-Historical/daily-ptt-history",
+  "expected_contract_command": [
+    "/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer/.venv-frontend/bin/python",
+    "/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer/daily_expected_aid_export.py",
+    "--day",
+    "{day}"
+  ],
+  "repair_command": null,
+  "static_target": "holoviewer-ptt-static-assets-pilot",
+  "base_url": "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev",
+  "deploy": false,
+  "wrangler_command": [
+    "npx",
+    "wrangler"
+  ],
+  "expected_timeout_seconds": 60,
+  "readback_timeout_seconds": 20
+}
