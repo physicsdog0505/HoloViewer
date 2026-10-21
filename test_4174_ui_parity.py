@@ -446,7 +446,7 @@ process.stdout.write(JSON.stringify({
         self.assertIn('"2026-09": Object.freeze({',config)
 
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
-        self.assertIn("archiveObjectPlan(archives,fetchStartMs,endMs)",viewer)
+        self.assertIn("archiveObjectPlan([{source,manifest}],rangeStart,rangeEnd)",viewer)
         self.assertIn("occurred>=rangeStart&&occurred<rangeEnd",viewer)
         self.assertIn("const coverageStatus=archiveDayCoverageStatus(manifest,day)",viewer)
         self.assertNotIn("archiveHourKey(",viewer)
