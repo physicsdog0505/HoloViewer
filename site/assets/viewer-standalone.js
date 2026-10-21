@@ -1777,28 +1777,25 @@ function combineArchiveCoverage(parts){
 function recentUnsealedArchiveDay(day){
  return /^\d{4}-\d{2}-\d{2}$/.test(String(day||''))&&nextIsoDay(day)===taipeiDay();
 }
-function taipeiDayStartMs(day){
- const ms=Date.parse(String(day||'')+'T00:00:00+08:00');
- return Number.isFinite(ms)?ms:null;
+function recentSingleDayVodDay(context){
+ const startMs=Date.parse(String(context?.start||'')),endMs=Date.parse(String(context?.end||''));
+ if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return '';
+ const startDay=taipeiDayForDate(new Date(startMs));
+ const endDay=taipeiDayForDate(new Date(endMs-1));
+ return startDay===endDay&&recentUnsealedArchiveDay(startDay)?startDay:'';
 }
-async function supplementRecentArchiveWithD1(context,result){
- if(!result||result.coverageStatus==='COMPLETE')return {...result,d1FallbackDays:[]};
+async function loadRecentVodD1First(context){
+ const day=recentSingleDayVodDay(context);
+ if(!day)return null;
  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
  const fetchStartMs=vodPttFetchStartMs(context)??startMs;
- if(!Number.isFinite(fetchStartMs)||!Number.isFinite(endMs)||endMs<=fetchStartMs)return {...result,d1FallbackDays:[]};
- const fallbackDays=(result.coverageDays||[]).filter(recentUnsealedArchiveDay);
- if(!fallbackDays.length)return {...result,d1FallbackDays:[]};
- const extra=[];
- for(const day of fallbackDays){
-  const dayStart=taipeiDayStartMs(day),nextStart=taipeiDayStartMs(nextIsoDay(day));
-  if(!Number.isFinite(dayStart)||!Number.isFinite(nextStart))continue;
-  const rangeStart=Math.max(fetchStartMs,dayStart);
-  const rangeEnd=Math.min(endMs,nextStart);
-  if(rangeEnd<=rangeStart)continue;
-  const d1=await loadPttDayWindowRows(day,rangeStart,rangeEnd);
-  extra.push(...d1.rows);
+ if(!Number.isFinite(fetchStartMs)||!Number.isFinite(endMs)||endMs<=fetchStartMs)return null;
+ try{
+  const result=await loadPttDayWindowRows(day,fetchStartMs,endMs);
+  return {...result,day};
+ }catch(error){
+  return {rows:[],pages:0,incomplete:true,envelope:null,source:'history-error',day,error};
  }
- return {...result,rows:dedupeArchiveRows([...(result.rows||[]),...extra]),d1FallbackDays:fallbackDays};
 }
 function archiveRowIdentity(row){
  const stable=String(row?.source_record_key||row?.push_id||'');
@@ -1880,29 +1877,49 @@ async function resolveArchivePttResult(context){
 async function loadArchivePtt(context,token){
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 歷史專串';
+ const recentDay=recentSingleDayVodDay(context);
+ if(recentDay){
+  pttMeta.textContent=recentDay.replaceAll('-','/')+' · 昨日 D1 · 讀取中';
+  const d1=await loadRecentVodD1First(context);
+  if(token!==pttResolveToken)return;
+  if(d1&&d1.rows.length&&!d1.incomplete){
+   setVodPttRows(d1.rows);
+   pttLoaded=true;pttFollowing=true;pttNewest.hidden=true;
+   pttMeta.textContent=recentDay.replaceAll('-','/')+' · '+d1.rows.length+
+    ' 則 · VOD · 昨日 D1 history · 對齊播放時間 · 未封存';
+   startVodPttTimeline();
+   return;
+  }
+ }
  pttMeta.textContent='歷史 Static Assets · 讀取中';
  try{
   const archiveResult=await resolveArchivePttResult(context);
   if(token!==pttResolveToken||!archiveResult)return;
-  const result=await supplementRecentArchiveWithD1(context,archiveResult);
-  if(token!==pttResolveToken)return;
-  setVodPttRows(result.rows);
+  let rows=archiveResult.rows;
+  let usedD1=false;
+  if(recentDay){
+   const d1=await loadRecentVodD1First(context);
+   if(token!==pttResolveToken)return;
+   if(d1){
+    rows=dedupeArchiveRows([...(d1.rows||[]),...archiveResult.rows]);
+    usedD1=Boolean(d1.rows?.length);
+   }
+  }
+  setVodPttRows(rows);
   pttLoaded=true;
   pttFollowing=true;
   pttNewest.hidden=true;
-  const dayLabel=result.coverageDays.length?result.coverageDays.join('～'):(context.day||'').replaceAll('-','/');
-  const usedD1=Array.isArray(result.d1FallbackDays)&&result.d1FallbackDays.length>0;
-  const warning=result.coverageStatus==='COMPLETE'
+  const dayLabel=archiveResult.coverageDays.length?archiveResult.coverageDays.join('～'):(context.day||'').replaceAll('-','/');
+  const warning=archiveResult.coverageStatus==='COMPLETE'
    ?'完整涵蓋'
    :usedD1
-    ?'⚠ '+result.coverageStatus+' + 昨日 D1 補讀（未封存）'
-    :'⚠ '+result.coverageStatus+' · 資料可能不完整';
-  const sourceLabel=result.archiveMonths.length?' · '+result.archiveMonths.join(' + '):'';
-  pttMeta.textContent=dayLabel+' · '+result.rows.length+' 則 · VOD · 對齊播放時間 · '+warning+sourceLabel;
-  if(!result.rows.length)pttFeed.replaceChildren(node('div',
-   result.coverageStatus==='COMPLETE'?'這段 VOD 時間範圍內沒有 PTT 推文。':
-   usedD1?'這段昨日 VOD 在 Archive 與 D1 history 都沒有可顯示的 PTT 推文。':
-   '這段 VOD 沒有可顯示推文；歷史涵蓋狀態為 '+result.coverageStatus+'。','ptt-empty'));
+    ?'⚠ '+archiveResult.coverageStatus+' + 昨日 D1 補讀（未封存）'
+    :'⚠ '+archiveResult.coverageStatus+' · 資料可能不完整';
+  const sourceLabel=archiveResult.archiveMonths.length?' · '+archiveResult.archiveMonths.join(' + '):'';
+  pttMeta.textContent=dayLabel+' · '+rows.length+' 則 · VOD · 對齊播放時間 · '+warning+sourceLabel;
+  if(!rows.length)pttFeed.replaceChildren(node('div',
+   archiveResult.coverageStatus==='COMPLETE'?'這段 VOD 時間範圍內沒有 PTT 推文。':
+   '這段 VOD 沒有可顯示推文；歷史涵蓋狀態為 '+archiveResult.coverageStatus+'。','ptt-empty'));
   startVodPttTimeline();
  }catch(error){
   if(token!==pttResolveToken)return;
