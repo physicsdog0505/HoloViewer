@@ -89,7 +89,8 @@ assert.equal(adapter.masterFromSource('A','AAAAAAAAAAA',45000),40000);
         self.assertIn("function replaceTimelinePovSource(index,resolved)", VIEWER)
         self.assertIn("if(String(stream.videoId)===String(resolved.video_id))return false;", VIEWER)
         self.assertIn("if(resolved.replace){\n    replaceTimelinePovSource(index,resolved);", VIEWER)
-        self.assertIn("if(player&&(!Number.isFinite(currentSeconds)||Math.abs(currentSeconds-target)>1.2))", VIEWER)
+        self.assertNotIn("if(player&&(!Number.isFinite(currentSeconds)||Math.abs(currentSeconds-target)>1.2))", VIEWER)
+        self.assertIn("if(player&&resyncOthers&&povId!==viewingClockPovId)", VIEWER)
         self.assertNotIn("destroyPlayers();\n  const plan=viewingAdapter.plan", VIEWER)
 
     def test_share_state_runtime_reconstruction_is_real(self):
@@ -185,19 +186,34 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
         reconcile_end = VIEWER.index("function initViewingTimeline", reconcile_start)
         body = VIEWER[reconcile_start:reconcile_end]
         self.assertIn("if(resolved.status!=='READY')", body)
+        self.assertIn("timelineGapPovs.add(povId);", body)
         self.assertIn("player.getPlayerState?.()===YT.PlayerState.PLAYING", body)
         self.assertIn(
             "syncExpected.set(player,{state:YT.PlayerState.PAUSED,until:Date.now()+900});",
             body,
         )
-        self.assertIn("timelineGapPaused.add(player);", body)
         self.assertIn("player.pauseVideo?.();", body)
-        self.assertIn("if(player&&timelineGapPaused.has(player))", body)
+        self.assertIn("const resumedFromGap=timelineGapPovs.delete(povId);", body)
+        self.assertIn("if(player&&resumedFromGap)", body)
+        self.assertIn("player.seekTo(target,true)", body)
         self.assertIn(
             "syncExpected.set(player,{state:YT.PlayerState.PLAYING,until:Date.now()+900});",
             body,
         )
         self.assertIn("player.playVideo?.();", body)
+
+    def test_runtime_has_no_periodic_seek_loop(self):
+        reconcile_start = VIEWER.index("function reconcileViewingTimeline")
+        reconcile_end = VIEWER.index("function initViewingTimeline", reconcile_start)
+        body = VIEWER[reconcile_start:reconcile_end]
+        self.assertIn("const resyncOthers=viewingResyncPending;", body)
+        self.assertIn("if(player&&resyncOthers&&povId!==viewingClockPovId)", body)
+        self.assertNotIn(
+            "if(player&&(!Number.isFinite(currentSeconds)||Math.abs(currentSeconds-target)>1.2))",
+            body,
+        )
+        self.assertIn("const resumedFromGap=timelineGapPovs.delete(povId);", body)
+        self.assertIn("Math.abs(candidate-expected)>2500", VIEWER)
 
     def test_cross_day_vod_ptt_uses_archive_plus_today_hybrid(self):
         self.assertIn("function vodPttWindowMode(start,end)", VIEWER)
