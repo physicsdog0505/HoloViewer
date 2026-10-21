@@ -281,7 +281,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("async function fetchArchiveObject(source,item)",viewer)
         self.assertNotIn("fetchArchiveChunk",viewer)
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
-        self.assertIn("archiveSourcesForWindow(fetchStartMs,endMs)",viewer)
+        self.assertIn("const days=archiveCoverageDays(fetchStartMs,endMs)",viewer)
+        self.assertIn("const source=archiveSourceForMonth(month)",viewer)
         self.assertIn("occurred>=rangeStart&&occurred<rangeEnd",viewer)
         self.assertIn("row?.source_record_key||row?.push_id",viewer)
         self.assertIn("Number.isInteger(row?.floor)&&row.floor>0",viewer)
@@ -332,6 +333,9 @@ class ParityContract(unittest.TestCase):
         row_start=viewer.index("function archiveRowIdentity(row){")
         row_end=viewer.index("function archiveObjectPlan(archives,startMs,endMs){",row_start)
         row_helpers=viewer[row_start:row_end]
+        plan_start=viewer.index("function archiveObjectPlan(archives,startMs,endMs){")
+        plan_end=viewer.index("async function loadCoverageDrivenVodPtt(context,token){",plan_start)
+        plan_helper=viewer[plan_start:plan_end]
         visible_start=viewer.index("function vodPttVisibleCountAt(rows,absoluteMs){")
         visible_end=viewer.index("function setVodPttRows(rows){",visible_start)
         visible_helper=viewer[visible_start:visible_end]
@@ -351,6 +355,7 @@ function taipeiDayForDate(value){
 function archiveUnavailableError(message){const error=new Error(message);error.archiveUnavailable=true;return error;}
 HELPERS
 ROW_HELPERS
+PLAN_HELPER
 VISIBLE_HELPER
 const sep=archiveSourcesForWindow(Date.parse('2026-09-18T11:00:25Z'),Date.parse('2026-09-18T16:13:34Z'));
 const crossSources=archiveSourcesForWindow(Date.parse('2026-09-30T15:59:00Z'),Date.parse('2026-09-30T16:01:00Z'));
@@ -423,7 +428,7 @@ process.stdout.write(JSON.stringify({
  dailyCount:archiveObjectPushCount(dailyObject),
  deduped:deduped.length,visible
 }));
-""".replace("REGISTRY",registry).replace("ROW_HELPERS",row_helpers).replace("VISIBLE_HELPER",visible_helper).replace("HELPERS",helpers)
+""".replace("REGISTRY",registry).replace("ROW_HELPERS",row_helpers).replace("PLAN_HELPER",plan_helper).replace("VISIBLE_HELPER",visible_helper).replace("HELPERS",helpers)
         result=subprocess.run(["node","-e",script],check=True,capture_output=True,text=True)
         payload=json.loads(result.stdout)
         self.assertEqual([x["month"] for x in payload["crossSources"]],["2026-09","2026-10"])
@@ -904,7 +909,7 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000)return scheduledMs",viewer)
         self.assertIn("return anchorMs-3600000",viewer)
         self.assertIn("if(state===YT.PlayerState.PLAYING)pttVodHasPlayed=true",viewer)
-        self.assertIn("scheduledStart:archiveWindow.scheduledStart||''",viewer)
+        self.assertIn("scheduledStart:vodWindow.scheduledStart||''",viewer)
         helper_start=viewer.index("function vodPttCutoffMs(context,seconds,hasPlayed){")
         helper_end=viewer.index("function vodPttFetchStartMs(context){",helper_start)
         helper=viewer[helper_start:helper_end]
