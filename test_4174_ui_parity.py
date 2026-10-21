@@ -310,6 +310,93 @@ class ParityContract(unittest.TestCase):
         self.assertIn("今日暫存 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整",viewer)
         self.assertIn("mode:'same-day'",viewer)
 
+
+    def test_historical_ptt_month_registry_and_cross_month_plan(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        config=(ROOT/'site/assets/config.js').read_text(encoding='utf-8')
+        start=viewer.index("function nextIsoDay(day){")
+        end=viewer.index("async function archiveSha256Hex(buffer){",start)
+        helpers=viewer[start:end]
+        row_start=viewer.index("function archiveRowIdentity(row){")
+        row_end=viewer.index("async function resolveArchiveRows(context,archives){",row_start)
+        row_helpers=viewer[row_start:row_end]
+        visible_start=viewer.index("function vodPttVisibleCountAt(rows,absoluteMs){")
+        visible_end=viewer.index("function setVodPttRows(rows){",visible_start)
+        visible_helper=viewer[visible_start:visible_end]
+        registry="""{
+          "2026-08": {"base":"https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev","manifest":"/ptt/v1/manifests/static-assets-full-2026-08.json"},
+          "2026-09": {"base":"https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev","manifest":"/ptt/v1/manifests/static-assets-full-2026-09.json"},
+          "2026-10": {"base":"https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev","manifest":"/ptt/v1/manifests/static-assets-full-2026-10.json"}
+        }"""
+        script="""
+const PTT_ARCHIVE_MONTHS=REGISTRY;
+function taipeiDayForDate(value){
+ const d=value instanceof Date?value:new Date(value);
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+ const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return out.year+'-'+out.month+'-'+out.day;
+}
+function archiveUnavailableError(message){const error=new Error(message);error.archiveUnavailable=true;return error;}
+HELPERS
+ROW_HELPERS
+VISIBLE_HELPER
+const aug=archiveSourcesForWindow(Date.parse('2026-08-15T00:00:00Z'),Date.parse('2026-08-15T01:00:00Z'));
+const sep=archiveSourcesForWindow(Date.parse('2026-09-18T11:00:25Z'),Date.parse('2026-09-18T16:13:34Z'));
+const oct=archiveSourcesForWindow(Date.parse('2026-10-18T00:00:00Z'),Date.parse('2026-10-18T01:00:00Z'));
+const cross=archiveSourcesForWindow(Date.parse('2026-09-30T15:59:00Z'),Date.parse('2026-09-30T16:01:00Z'));
+const keys=archiveHourKeys(Date.parse('2026-09-18T11:00:25Z'),Date.parse('2026-09-18T16:13:34Z'));
+const manifest={objects:keys.map(key=>({key}))};
+const plan=archiveChunkPlan([{source:sep[0],manifest}],Date.parse('2026-09-18T11:00:25Z'),Date.parse('2026-09-18T16:13:34Z'));
+const rows=Array.from({length:2019},(_,i)=>({
+ source_record_key:'J33JnrVJiIQ:'+i,
+ occurred_at:new Date(Date.parse('2026-09-18T11:00:25Z')+i*9000).toISOString(),
+ aid:'J33JnrVJiIQ',source_line:247+i,floor:i+1
+}));
+rows.push({...rows[1000]});
+const deduped=dedupeArchiveRows(rows);
+const visible=vodPttVisibleCountAt(deduped,Date.parse('2026-09-18T16:13:34Z'));
+process.stdout.write(JSON.stringify({aug,sep,oct,cross,keys,plan:plan.map(x=>x.source.base+'/'+x.item.key),deduped:deduped.length,visible}));
+""".replace("REGISTRY",registry).replace("HELPERS",helpers).replace("ROW_HELPERS",row_helpers).replace("VISIBLE_HELPER",visible_helper)
+        result=subprocess.run(["node","-e",script],check=True,capture_output=True,text=True)
+        payload=json.loads(result.stdout)
+        self.assertEqual(payload["aug"][0]["month"],"2026-08")
+        self.assertIn("full-offline",payload["aug"][0]["base"])
+        self.assertEqual(payload["sep"][0]["month"],"2026-09")
+        self.assertIn("static-assets-pilot",payload["sep"][0]["base"])
+        self.assertEqual(payload["oct"][0]["month"],"2026-10")
+        self.assertIn("full-offline",payload["oct"][0]["base"])
+        self.assertEqual([x["month"] for x in payload["cross"]],["2026-09","2026-10"])
+        self.assertEqual(payload["keys"],[
+            "ptt/v1/chunks/2026/09/18/1100.json",
+            "ptt/v1/chunks/2026/09/18/1200.json",
+            "ptt/v1/chunks/2026/09/18/1300.json",
+            "ptt/v1/chunks/2026/09/18/1400.json",
+            "ptt/v1/chunks/2026/09/18/1500.json",
+            "ptt/v1/chunks/2026/09/18/1600.json",
+        ])
+        self.assertEqual(len(payload["plan"]),6)
+        self.assertTrue(all("static-assets-pilot.singlebagel.workers.dev" in url for url in payload["plan"]))
+        self.assertEqual(payload["deduped"],2019)
+        self.assertEqual(payload["visible"],2019)
+        self.assertIn('"2026-09": Object.freeze({',config)
+
+    def test_historical_ptt_manifest_failure_is_unavailable_not_empty(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("throw archiveUnavailableError('歷史 PTT '+source.month+' manifest HTTP '+response.status+'：'+url);",viewer)
+        self.assertIn("pttMeta.textContent='歷史 Static Assets · UNKNOWN / UNAVAILABLE';",viewer)
+        self.assertIn("'歷史 PTT UNKNOWN / UNAVAILABLE：'+detail",viewer)
+        load=viewer.split("async function loadArchivePtt(context,token){",1)[1].split("async function resolvePrimaryPtt()",1)[0]
+        self.assertIn("result.coverageStatus==='COMPLETE'?'這段 VOD 時間範圍內沒有 PTT 推文。'",load)
+        self.assertNotIn("UNKNOWN / UNAVAILABLE：'+detail,'ptt-empty'));\n  startVodPttTimeline()",load)
+
+    def test_historical_ptt_archive_path_is_read_only(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        archive=viewer.split("const archiveManifestCache=new Map();",1)[1].split("async function resolvePrimaryPtt()",1)[0]
+        for verb in ("method:'POST'","method:'PUT'","method:'PATCH'","method:'DELETE'","INSERT ","UPDATE ","DELETE FROM","wrangler","D1","R2"):
+            self.assertNotIn(verb,archive)
+        self.assertIn("credentials:'omit'",archive)
+        self.assertIn("cache:'no-cache'",archive)
+
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
