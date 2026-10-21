@@ -5,6 +5,7 @@ const PTT_ARCHIVE_MONTHS=window.HOLOVIEWER_CONFIG?.pttArchiveMonths||{};
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
 const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';
 const PTT_POLL_MS=60000;
+const VOD_PTT_HISTORY_PAGE_CAP=20;
 const params=new URLSearchParams(location.search);
 const MAX_STREAMS=16;
 const FOCUS_VISIBLE_SLOTS=4;
@@ -1442,6 +1443,31 @@ async function loadTodayPttPayload(day){
  try{return await api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=1000')}
  catch{return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300')}
 }
+async function loadPttDayWindowRows(day,startMs,endMs){
+ const rows=[],seenCheckpoints=new Set();
+ let after='',pages=0,lastEnvelope=null,reachedEnd=false;
+ while(pages<VOD_PTT_HISTORY_PAGE_CAP){
+  const path='/v1/ptt/history?day='+encodeURIComponent(day)+'&limit=200'+
+   (after?'&after='+encodeURIComponent(after):'');
+  const data=await api(path);
+  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes)||
+     !data.page||typeof data.page.has_more!=='boolean')throw new Error('PTT history 資料格式錯誤');
+  lastEnvelope=data;pages+=1;
+  for(const row of data.pushes){
+   if(!row||typeof row.content!=='string')continue;
+   const occurred=Date.parse(String(row.occurred_at||''));
+   if(!Number.isFinite(occurred))continue;
+   if(occurred>=endMs){reachedEnd=true;break}
+   if(occurred>=startMs)rows.push(row);
+  }
+  if(reachedEnd||!data.page.has_more)break;
+  const next=String(data.page.next_checkpoint||'');
+  if(!next||seenCheckpoints.has(next))throw new Error('PTT history continuation 無法前進');
+  seenCheckpoints.add(next);after=next;
+ }
+ const incomplete=!reachedEnd&&Boolean(lastEnvelope?.page?.has_more);
+ return {rows:dedupeArchiveRows(rows),pages,incomplete,envelope:lastEnvelope};
+}
 function vodPttVisibleCountAt(rows,absoluteMs){
  let low=0,high=rows.length;
  while(low<high){
@@ -1530,26 +1556,18 @@ async function loadSameDayVodPtt(context,token){
  pttTitle.textContent='PTT 今日專串';
  pttMeta.textContent=context.day.replaceAll('-','/')+' · 今日暫存 · 讀取中';
  try{
-  const data=await loadTodayPttPayload(context.day);
-  if(token!==pttResolveToken)return;
-  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw new Error('資料格式錯誤');
   const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
   const fetchStartMs=vodPttFetchStartMs(context)??startMs;
-  const rows=data.pushes.filter(row=>{
-   if(!row||typeof row.content!=='string')return false;
-   const occurred=Date.parse(String(row.occurred_at||''));
-   return Number.isFinite(occurred)&&occurred>=fetchStartMs&&occurred<endMs;
-  });
-  const seen=new Set(),deduped=[];
-  for(const row of rows){
-   const key=pttKey(row);
-   if(!key||seen.has(key))continue;
-   seen.add(key);deduped.push(row);
-  }
-  setVodPttRows(deduped);
+  const result=await loadPttDayWindowRows(context.day,fetchStartMs,endMs);
+  if(token!==pttResolveToken)return;
+  setVodPttRows(result.rows);
   pttLoaded=true;pttFollowing=true;pttNewest.hidden=true;
-  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+deduped.length+' 則 · 今日暫存 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整';
-  if(!deduped.length)pttFeed.replaceChildren(node('div','這段今日 VOD 時間範圍內目前沒有可顯示的 PTT 推文；資料尚未封存。','ptt-empty'));
+  const paging=result.incomplete?' · ⚠ 分頁上限，資料可能不完整':'';
+  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+result.rows.length+
+   ' 則 · 今日 D1 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整'+paging;
+  if(!result.rows.length)pttFeed.replaceChildren(node('div',
+   result.incomplete?'今日 VOD PTT 分頁達安全上限，尚未取得播放時間窗內的資料。':'這段今日 VOD 時間範圍內目前沒有可顯示的 PTT 推文；資料尚未封存。',
+   'ptt-empty'));
   startVodPttTimeline();
  }catch(error){
   if(token!==pttResolveToken)return;
@@ -1815,26 +1833,21 @@ async function loadHybridVodPtt(context,token){
   if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||!Number.isFinite(boundaryMs)||
      !(startMs<boundaryMs&&boundaryMs<endMs))throw new Error('跨日 VOD 時間窗無效');
   const archiveContext={...context,end:new Date(boundaryMs).toISOString()};
-  const [archiveResult,todayData]=await Promise.all([
+  const [archiveResult,todayResult]=await Promise.all([
    resolveArchivePttResult(archiveContext),
-   loadTodayPttPayload(today)
+   loadPttDayWindowRows(today,boundaryMs,endMs)
   ]);
   if(token!==pttResolveToken)return;
-  if(!archiveResult||todayData?.schema_version!=='public-consumer-v1'||!Array.isArray(todayData.pushes))
-   throw new Error('跨日 PTT 資料格式錯誤');
-  const todayRows=todayData.pushes.filter(row=>{
-   if(!row||typeof row.content!=='string')return false;
-   const occurred=Date.parse(String(row.occurred_at||''));
-   return Number.isFinite(occurred)&&occurred>=boundaryMs&&occurred<endMs;
-  });
-  const rows=dedupeArchiveRows([...archiveResult.rows,...todayRows]);
+  if(!archiveResult)throw new Error('跨日 PTT 歷史資料無法讀取');
+  const rows=dedupeArchiveRows([...archiveResult.rows,...todayResult.rows]);
   setVodPttRows(rows);
   pttLoaded=true;pttFollowing=true;pttNewest.hidden=true;
   const archiveWarning=archiveResult.coverageStatus==='COMPLETE'
    ?'昨日封存完整'
    :'⚠ 昨日 '+archiveResult.coverageStatus;
+  const paging=todayResult.incomplete?' · ⚠ 今日分頁上限':'';
   pttMeta.textContent=taipeiDayForDate(new Date(startMs))+'～'+today+
-   ' · '+rows.length+' 則 · VOD · '+archiveWarning+' + 今日暫存（未封存）';
+   ' · '+rows.length+' 則 · VOD · '+archiveWarning+' + 今日 D1（未封存）'+paging;
   if(!rows.length)pttFeed.replaceChildren(node('div','這段跨日 VOD 目前沒有可顯示的 PTT 推文。','ptt-empty'));
   startVodPttTimeline();
  }catch(error){
