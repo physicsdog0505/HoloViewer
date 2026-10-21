@@ -165,7 +165,7 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
     def test_runtime_gap_fallback_uses_session_clock_policy(self):
         self.assertIn("let viewingClockPolicy=null;", VIEWER)
         self.assertIn("function viewingSessionPlaying()", VIEWER)
-        self.assertIn("resolved?.status==='READY'&&ownerPlaying", VIEWER)
+        self.assertIn("[YT.PlayerState.PLAYING,YT.PlayerState.PAUSED,YT.PlayerState.BUFFERING].includes(ownerState)", VIEWER)
         self.assertIn(
             "viewingClockPolicy.step({nowMs:now,running:viewingSessionPlaying(),mappedMasterMs:mapped})",
             VIEWER,
