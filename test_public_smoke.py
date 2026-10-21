@@ -41,6 +41,8 @@ EXPECTED |= {
     "admin_dashboard/privacy.py",
     "admin_dashboard/production_shell.py",
     "admin_dashboard/request_context.py",
+    "admin_dashboard/recovery_contracts.py",
+    "admin_dashboard/recovery_readers.py",
     "data_lifecycle/readback_contracts.py",
     "docs/data-lifecycle/8501-admin-ui-ux.md",
     "docs/data-lifecycle/8501-isolated-fixture-pilot.md",
@@ -51,10 +53,13 @@ EXPECTED |= {
     "fixtures/data-lifecycle/api-semantic-health.sanitized.json",
     "fixtures/data-lifecycle/archive-sync-jobs.sanitized.json",
     "fixtures/data-lifecycle/d1-job-readback.sanitized.json",
+    "fixtures/data-lifecycle/daily-recovery.sanitized.json",
+    "fixtures/data-lifecycle/data-library.sanitized.json",
     "test_admin_dashboard_isolated.py",
     "test_admin_dashboard_offline_acceptance.py",
     "test_admin_dashboard_production_shell.py",
     "test_readback_contracts.py",
+    "test_admin_dashboard_recovery.py",
     "tools/admin_dashboard_fixture_server.py",
 }
 
