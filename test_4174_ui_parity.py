@@ -846,6 +846,9 @@ class ParityContract(unittest.TestCase):
     def test_metadata_transport_fallback_is_bounded(self):
         resolver=(ROOT / "site/assets/video-metadata-resolver.js").read_text(encoding="utf-8")
         app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        start=app.index("async function resolveVideoMetadata(id){")
+        end=app.index("async function resolveVodWindow(id){",start)
+        wrapper=app[start:end]
         script = """
 global.window={HOLOVIEWER_CONFIG:{apiBase:'https://api.example'}};
 let calls=[];
@@ -864,8 +867,16 @@ global.fetch=async(url,options)=>{
 const second=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',maxAttempts:1});
 const controller=new AbortController();controller.abort();
 const third=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',signal:controller.signal,maxAttempts:1});
-process.stdout.write(JSON.stringify({first,second,third,calls}));
-""".replace("RESOLVER_SOURCE", json.dumps(resolver))
+
+const config={apiBase:'https://api.example'};
+eval(APP_WRAPPER);
+window.HoloViewerVideoMetadata={resolve:async()=>{throw new TypeError('resolver transport')}};
+const customRejected=await resolveVideoMetadata('abcdefghijk');
+window.HoloViewerVideoMetadata={resolve:async()=>({status:'error',row:{error:'transport_error'},httpStatus:0})};
+const customBounded=await resolveVideoMetadata('abcdefghijk');
+
+process.stdout.write(JSON.stringify({first,second,third,customRejected,customBounded,calls}));
+""".replace("RESOLVER_SOURCE", json.dumps(resolver)).replace("APP_WRAPPER", json.dumps(wrapper))
         result=subprocess.run(
             ["node","--input-type=module","-e",script],
             check=True,capture_output=True,text=True
@@ -878,11 +889,8 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertEqual(payload["second"]["httpStatus"],0)
         self.assertEqual(payload["second"]["row"]["error"],"transport_error")
         self.assertEqual(payload["third"]["status"],"aborted")
-        start=app.index("async function resolveVideoMetadata(id){")
-        end=app.index("async function resolveVodWindow(id){",start)
-        wrapper=app[start:end]
-        self.assertIn("try{",wrapper)
-        self.assertIn("catch{return null}",wrapper)
+        self.assertIsNone(payload["customRejected"])
+        self.assertIsNone(payload["customBounded"])
 
     def test_public_viewing_entries_use_standalone_surfaces_not_spa(self):
         app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
