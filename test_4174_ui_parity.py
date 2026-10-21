@@ -176,7 +176,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("pttLoadInFlight", js)
         self.assertIn("homeLoadInFlight", js)
         self.assertIn("pttLastGoodDay&&pttLastGoodDay!==today", js)
-        self.assertIn("10 秒後重試", js)
+        self.assertIn("60 秒後重試", js)
         self.assertIn('id="ptt-newest"', html)
         self.assertIn('id="ptt-show-floor"', html)
         self.assertIn("function pttAtBottom()", js)
@@ -203,7 +203,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.source-choice{display:grid', css)
         self.assertIn('.manual-shell{padding:20px}', css)
         self.assertIn("const youtubePanel=document.getElementById('youtubePanel')", js)
-        self.assertIn("4174 同時視聽播放器的同步與對齊引擎尚未移植完成", js)
+        self.assertIn("location.href='/watchalong-viewer/?'+q.toString();", js)
+        self.assertIn("第一版同時視聽先支援 YouTube 片源", js)
         self.assertNotIn("watch-add').onclick", js)
 
     def test_original_4174_collab_hub_structure(self):
@@ -224,6 +225,27 @@ class ParityContract(unittest.TestCase):
         self.assertIn("q.set('collab_kind',isLive?'live':'vod');", js)
         self.assertIn("location.href='/viewer/?'+q.toString();", js)
         self.assertIn("if(event.target.closest('.stream-collab-entry'))return", js)
+
+    def test_viewer_resolves_ptt_source_from_lifecycle_not_entry_mode(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("function verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("pttMeta.textContent='判定影片狀態中'",viewer)
+        self.assertIn("async function videoMetadata(id)",viewer)
+        self.assertIn("window.HoloViewerVideoMetadata?.resolve(id",viewer)
+        self.assertIn("waitForRecovery:true,maxAttempts:6",viewer)
+        self.assertIn("const row=await videoMetadata(id)",viewer)
+        self.assertIn("if(lifecycle==='live')",viewer)
+        self.assertIn("if(lifecycle==='ended')",viewer)
+        self.assertIn("const sameDayWindow=verifiedSameDayVodWindow(row)",viewer)
+        self.assertIn("const archiveWindow=verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("archiveWindows.set(id,cached)",viewer)
+        self.assertIn("await loadSameDayVodPtt(pttContext,token)",viewer)
+        self.assertIn("await loadArchivePtt(pttContext,token)",viewer)
+        self.assertIn("const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode)",viewer)
+        resolver=viewer.split("async function resolvePrimaryPtt(){",1)[1].split("async function loadPtt(){",1)[0]
+        self.assertNotIn("if(archiveVodEntry)",resolver)
+        self.assertNotIn("requestedPttMode==='live'&&todayState==='live'",resolver)
+        self.assertNotIn("歷史 VOD 請由 History 提供 verified window",resolver)
 
     def test_vod_history_ptt_uses_static_assets_and_verified_windows(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
@@ -274,10 +296,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn("el.append(kindEl,time,floorEl,body);",viewer)
         self.assertIn("if(floor!==null)el.classList.add('has-floor');",viewer)
         self.assertIn("const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);",viewer)
-        self.assertIn("if(requestedPttMode==='live'&&todayState==='live')",viewer)
         self.assertIn("function verifiedSameDayVodWindow(row)",viewer)
         self.assertIn("lifecycle!=='ended'",viewer)
-        self.assertIn("taipeiDayForDate(start)!==today",viewer)
+        self.assertIn("function verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("if(taipeiDayForDate(window.start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null",viewer)
         self.assertIn("taipeiDayForDate(new Date(endMs-1))!==today",viewer)
         self.assertIn("async function loadTodayPttPayload(day)",viewer)
         self.assertIn("&limit=1000",viewer)
@@ -287,7 +309,6 @@ class ParityContract(unittest.TestCase):
         self.assertIn("[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||'']",viewer)
         self.assertIn("今日暫存 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整",viewer)
         self.assertIn("mode:'same-day'",viewer)
-        self.assertIn("這支影片沒有被今日 catalog 驗證為 LIVE",viewer)
 
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
@@ -580,14 +601,49 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.custom-content-grid:has(#stage > .player-card:only-child)',fix)
         self.assertNotIn('viewerPttPanel.remove()',fix)
 
+    def test_custom_history_start_preserves_verified_ptt_windows(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("const historyVodWindows=new Map()",js)
+        self.assertIn("const window=trustedArchiveWindow(row)",js)
+        self.assertIn("window.scheduledStart=archiveScheduledStart(row,window)",js)
+        self.assertIn("historyVodWindows.set(window.videoId,window)",js)
+        self.assertIn("document.getElementById('start').onclick=async()=>",js)
+        self.assertIn("const missing=items.filter(id=>!historyVodWindows.has(id))",js)
+        self.assertIn("async function resolveVideoMetadata(id)",js)
+        self.assertIn("window.HoloViewerVideoMetadata?.resolve(id",js)
+        self.assertIn("waitForRecovery:false,maxAttempts:1",js)
+        self.assertIn("async function resolveVodWindow(id)",js)
+        self.assertIn("if(!row||String(row?.lifecycle_state||row?.state||'').toLowerCase()!=='ended')return null",js)
+        self.assertIn("const window=trustedArchiveWindow({...row,video_id:String(row?.video_id||id)})",js)
+        self.assertIn("const window=await resolveVodWindow(id)",js)
+        self.assertIn("if(window)historyVodWindows.set(id,window)",js)
+        self.assertIn("const selectedHistory=items.length>0&&items.every(id=>historyVodWindows.has(id))",js)
+        self.assertIn("const pttMode=selectedHistory?'video':document.getElementById('pttMode').value",js)
+        self.assertIn("if(selectedHistory)items.forEach(id=>appendArchiveWindow(q,historyVodWindows.get(id)))",js)
+
+    def test_vod_ptt_preloads_before_actual_start_when_scheduled_hint_is_missing(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("const anchorMs=hasScheduled?Math.min(startMs,scheduledMs):startMs",viewer)
+        self.assertIn("return anchorMs-3600000",viewer)
+        self.assertIn("Math.abs(scheduledMs-startMs)<=43200000",viewer)
+        helper_start=viewer.index("function vodPttFetchStartMs(context){")
+        helper_end=viewer.index("function pttVodPlaybackMs(){",helper_start)
+        helper=viewer[helper_start:helper_end]
+        script=helper+"\nprocess.stdout.write(JSON.stringify([vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:''}),vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:'2026-10-17T06:00:00Z'}),vodPttFetchStartMs({start:'2026-10-17T06:00:12Z',scheduledStart:'2026-10-17T06:01:00Z'})]));"
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        values=json.loads(result.stdout)
+        self.assertEqual(values[0],1792213212000)
+        self.assertEqual(values[1],1792213200000)
+        self.assertEqual(values[2],1792213212000)
+
     def test_vod_ptt_preloads_scheduled_start_before_first_play(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("parts.length!==4&&parts.length!==5",viewer)
-        self.assertIn("scheduledStart:Number.isFinite(scheduledMs)&&scheduledMs<=startMs?scheduledStart:''",viewer)
+        self.assertIn("scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''",viewer)
         self.assertIn("function vodPttCutoffMs(context,seconds,hasPlayed)",viewer)
-        self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&scheduledMs<=startMs)return scheduledMs",viewer)
-        self.assertIn("scheduledMs-3600000",viewer)
+        self.assertIn("if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000)return scheduledMs",viewer)
+        self.assertIn("return anchorMs-3600000",viewer)
         self.assertIn("if(state===YT.PlayerState.PLAYING)pttVodHasPlayed=true",viewer)
         self.assertIn("scheduledStart:archiveWindow.scheduledStart||''",viewer)
         helper_start=viewer.index("function vodPttCutoffMs(context,seconds,hasPlayed){")
@@ -637,7 +693,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("sessionStorage.setItem('hvCustomViewing'",js)
         self.assertIn('function restoreCustomSession()',js)
         self.assertIn("if(!recovered.length){route('single');return;}",js)
-        self.assertIn('window.hvOpenCustomSession(recovered,',js)
+        self.assertIn("openStandaloneViewer(recovered,{pttMode:legacyPtt==='live'?'live':'video'})",js)
+        self.assertNotIn('window.hvOpenCustomSession(recovered,',js)
 
     def test_immersive_overrides_watch_shell_and_has_exit(self):
         css=(ROOT/'site/assets/4174-shared-viewing-a144bb3.css').read_text(encoding='utf-8')
@@ -737,6 +794,162 @@ class ParityContract(unittest.TestCase):
     def test_history_label_agrees_with_navigation_js(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("history:'歷史直播'", js)
+
+    def test_public_ptt_polling_matches_60s_publisher_cadence(self):
+        app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        ptt_today=(ROOT / "site/assets/ptt-today.js").read_text(encoding="utf-8")
+        viewer=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        watch=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        for js in (app,ptt_today,viewer,watch):
+            self.assertIn("const PTT_POLL_MS=60000;",js)
+        self.assertIn("},PTT_POLL_MS);",app)
+        self.assertIn("const pollTimer=setInterval(()=>{if(!document.hidden)loadPtt()},PTT_POLL_MS);",ptt_today)
+        self.assertIn("const pttPollTimer=setInterval(()=>{if(!document.hidden)loadPtt()},PTT_POLL_MS);",viewer)
+        self.assertIn("pttTimer=setInterval(()=>{if(!document.hidden)loadTodayPtt(taipeiDay())},PTT_POLL_MS);",watch)
+        self.assertIn("if($('ptt').classList.contains('active'))loadPtt();",app)
+        self.assertIn("if(!document.hidden&&pttContext.mode==='live')loadPtt();",viewer)
+        self.assertIn("if(!document.hidden&&hostStatus.textContent==='live')loadTodayPtt(taipeiDay());",watch)
+        self.assertNotIn("setInterval(loadPtt,10000)",viewer)
+        self.assertNotIn("loadTodayPtt(taipeiDay())},10000",watch)
+        self.assertNotIn("if(!document.hidden&&$('ptt').classList.contains('active'))loadPtt();\n},10000)",app)
+        self.assertNotIn("10 秒後重試",app)
+        self.assertNotIn("每 10 秒自動重試",app)
+        self.assertNotIn("10 秒後重試",ptt_today)
+        self.assertNotIn("loadPtt()},10000",ptt_today)
+        # Non-PTT timers (collab lifecycle, local VOD timeline rendering, etc.)
+        # are intentionally outside this emergency mitigation.
+        self.assertIn("reconcileLiveCollab()},10000)",viewer)
+        self.assertIn("syncVodPttTimeline(),500)",viewer)
+
+    def test_all_vod_entries_use_metadata_fallback_for_timing(self):
+        app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        viewer=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        watch=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        resolver=(ROOT / "site/assets/video-metadata-resolver.js").read_text(encoding="utf-8")
+        for html_path in ("site/index.html","site/viewer/index.html","site/watchalong-viewer/index.html"):
+            html=(ROOT / html_path).read_text(encoding="utf-8")
+            self.assertIn("video-metadata-resolver.js",html)
+        self.assertIn("payload.status==='metadata_pending'",resolver)
+        self.assertIn("payload.error==='recovery_queue_busy'",resolver)
+        self.assertIn("payload.error==='metadata_not_found_cached'",resolver)
+        self.assertIn("async function resolveVideoMetadata(id)",app)
+        self.assertIn("window.HoloViewerVideoMetadata?.resolve(id",app)
+        self.assertIn("async function resolveVodWindow(id)",app)
+        self.assertIn("const window=await resolveVodWindow(id);",app)
+        self.assertIn("async function videoMetadata(id)",viewer)
+        self.assertIn("window.HoloViewerVideoMetadata?.resolve(id",viewer)
+        self.assertIn("waitForRecovery:true,maxAttempts:6",viewer)
+        self.assertIn("const row=await videoMetadata(id);",viewer)
+        self.assertIn("window.HoloViewerVideoMetadata?.resolve(videoId",watch)
+        self.assertIn("pttDay:/^\\d{4}-\\d{2}-\\d{2}$/.test(watchalongSessionDay)",watch)
+
+    def test_metadata_transport_fallback_is_bounded(self):
+        resolver=(ROOT / "site/assets/video-metadata-resolver.js").read_text(encoding="utf-8")
+        app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        start=app.index("async function resolveVideoMetadata(id){")
+        end=app.index("async function resolveVodWindow(id){",start)
+        wrapper=app[start:end]
+        script = """
+global.window={HOLOVIEWER_CONFIG:{apiBase:'https://api.example'}};
+let calls=[];
+global.fetch=async(url,options)=>{
+  calls.push(url);
+  if(url.includes('/v1/catalog/videos/'))throw new TypeError('catalog transport');
+  return {status:200,json:async()=>({video_id:'abcdefghijk',lifecycle_state:'ended',actual_start:'2026-10-18T15:00:06Z',actual_end:'2026-10-18T16:04:31Z'})};
+};
+eval(RESOLVER_SOURCE);
+const first=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',maxAttempts:1});
+global.fetch=async(url,options)=>{
+  calls.push(url);
+  if(url.includes('/v1/catalog/videos/'))return {status:404,json:async()=>({error:'not_found'})};
+  throw new TypeError('metadata transport');
+};
+const second=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',maxAttempts:1});
+const controller=new AbortController();controller.abort();
+const third=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',signal:controller.signal,maxAttempts:1});
+
+const config={apiBase:'https://api.example'};
+eval(APP_WRAPPER);
+window.HoloViewerVideoMetadata={resolve:async()=>{throw new TypeError('resolver transport')}};
+const customRejected=await resolveVideoMetadata('abcdefghijk');
+window.HoloViewerVideoMetadata={resolve:async()=>({status:'error',row:{error:'transport_error'},httpStatus:0})};
+const customBounded=await resolveVideoMetadata('abcdefghijk');
+
+process.stdout.write(JSON.stringify({first,second,third,customRejected,customBounded,calls}));
+""".replace("RESOLVER_SOURCE", json.dumps(resolver)).replace("APP_WRAPPER", json.dumps(wrapper))
+        result=subprocess.run(
+            ["node","--input-type=module","-e",script],
+            check=True,capture_output=True,text=True
+        )
+        payload=json.loads(result.stdout)
+        self.assertEqual(payload["first"]["status"],"ready")
+        self.assertEqual(payload["first"]["source"],"metadata")
+        self.assertTrue(any("/v1/videos/abcdefghijk/metadata" in url for url in payload["calls"]))
+        self.assertEqual(payload["second"]["status"],"error")
+        self.assertEqual(payload["second"]["httpStatus"],0)
+        self.assertEqual(payload["second"]["row"]["error"],"transport_error")
+        self.assertEqual(payload["third"]["status"],"aborted")
+        self.assertIsNone(payload["customRejected"])
+        self.assertIsNone(payload["customBounded"])
+
+    def test_public_viewing_entries_use_standalone_surfaces_not_spa(self):
+        app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        self.assertIn("function standaloneViewerUrl(ids,{vodWindows=null,pttMode=''}={})",app)
+        self.assertIn("return '/viewer/?'+q.toString();",app)
+        self.assertIn("location.href='/viewer/?'+q.toString();",app)
+        self.assertIn("location.href='/watchalong-viewer/?'+q.toString();",app)
+        # Keep the old SPA mount only as dormant compatibility code; normal entry
+        # points and old-session recovery must not call it.
+        self.assertEqual(app.count("window.hvOpenCustomSession?.("),0)
+        self.assertNotIn("window.hvOpenCustomSession(recovered,",app)
+        self.assertIn("openStandaloneViewer(recovered,{pttMode:legacyPtt==='live'?'live':'video'})",app)
+
+    def test_viewer_lock_is_behavior_not_ptt_workspace_geometry(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;", js)
+        self.assertIn("workspaceLayout='sidebar';", js)
+        self.assertIn("return lockedIndex!==null?'focus':'primary';", js)
+        self.assertIn("else if(preset==='focus'){layout='primary';lockedIndex=primaryIndex}", js)
+        self.assertIn("workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+streams.length;", js)
+        self.assertIn("q.set('workspace',currentLayoutPreset()==='focus'?'focus':'sidebar');", js)
+
+    def test_viewer_ptt_follow_changes_only_on_user_scroll_intent(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let pttUserScrollIntentUntil=0;", js)
+        self.assertIn("function markPttUserScrollIntent(ms=1800)", js)
+        self.assertIn("if(pttLayoutTransitionDepth>0||!hasPttUserScrollIntent())return;", js)
+        self.assertIn("pttFeed.addEventListener('touchstart'", js)
+        self.assertIn("pttFeed.addEventListener('pointerdown'", js)
+        self.assertIn("new ResizeObserver(()=>", js)
+        self.assertIn("if(pttFollowing)repinPttAfterLayout({force:true});", js)
+
+    def test_viewer_lock_transition_preserves_follow_before_geometry_mutation(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let pttLayoutTransitionDepth=0;", js)
+        self.assertIn("const wasFollowing=pttFollowing||pttAtBottom();\n pttLayoutTransitionDepth+=1;", js)
+        self.assertIn("pttLayoutTransitionDepth=Math.max(0,pttLayoutTransitionDepth-1);", js)
+        self.assertIn("if(pttLayoutTransitionDepth>0||!hasPttUserScrollIntent())return;", js)
+        self.assertIn("if(wasFollowing){\n  pttFollowing=true;\n  repinPttAfterLayout({force:true});\n }", js)
+
+    def test_viewer_locking_current_primary_does_not_reload_ptt(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("const previousIndex=primaryIndex;", js)
+        self.assertIn("const primaryChanged=index!==previousIndex;", js)
+        self.assertIn("if(primaryChanged)resolvePrimaryPtt();", js)
+        self.assertIn("if(index!==primaryIndex)setPrimary(index);", js)
+        self.assertIn("setLayoutPreset('focus');", js)
+
+    def test_viewer_ptt_follow_survives_immersive_layout_and_resize(self):
+        js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("function repinPttAfterLayout({force=false}={})", js)
+        self.assertIn("if(pttVodMode())syncVodPttTimeline({forceFollow:true});", js)
+        self.assertIn("const wasFollowing=pttFollowing||pttAtBottom();", js)
+        self.assertIn("document.addEventListener('fullscreenchange'", js)
+        self.assertIn("window.addEventListener('resize'", js)
+        self.assertIn("window.addEventListener('orientationchange'", js)
+        self.assertIn("if(wasFollowing){\n  pttFollowing=true;\n  repinPttAfterLayout({force:true});\n }", js)
+        self.assertIn("clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);", js)
+
 
 if __name__ == "__main__":
     unittest.main()

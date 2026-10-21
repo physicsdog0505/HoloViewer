@@ -5,6 +5,7 @@ const PTT_ARCHIVE_BASE=String(window.HOLOVIEWER_CONFIG?.pttArchiveBase||'').repl
 const PTT_ARCHIVE_MANIFEST=String(window.HOLOVIEWER_CONFIG?.pttArchiveManifest||'/ptt/v1/manifests/static-assets-full-2026-10.json');
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
 const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';
+const PTT_POLL_MS=60000;
 const params=new URLSearchParams(location.search);
 const MAX_STREAMS=16;
 const FOCUS_VISIBLE_SLOTS=4;
@@ -32,7 +33,7 @@ function parseArchiveWindows(){
   if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)||anchorSource!==PTT_ARCHIVE_ANCHOR||
      !Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)continue;
   map.set(videoId,{videoId,start,end,anchorSource,
-   scheduledStart:Number.isFinite(scheduledMs)&&scheduledMs<=startMs?scheduledStart:''});
+   scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''});
  }
  return map;
 }
@@ -73,10 +74,18 @@ const playerCards=[];
 let catalogRows=[];
 const syncExpected=new WeakMap();
 let carouselTimer=null;
-let lockedIndex=null;
+let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;
+// "focus" is accepted only as a legacy URL marker for Lock. Runtime geometry
+// stays sidebar for both Carousel and Lock so PTT never changes containers/rows.
+workspaceLayout='sidebar';
 let secondaryOffset=0;
 let pttFollowing=true;
 let pttLoaded=false;
+let pttLayoutRepinTimer=null;
+let pttResizeFrame=null;
+let pttLayoutTransitionDepth=0;
+let pttUserScrollIntentUntil=0;
+let pttResizeObserver=null;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let pttVodRows=[];
@@ -116,6 +125,15 @@ function api(path){
   return response.json();
  });
 }
+async function videoMetadata(id){
+ const result=await window.HoloViewerVideoMetadata?.resolve(id,{
+  apiBase:API_BASE,preferCatalog:true,waitForRecovery:true,maxAttempts:6
+ });
+ if(result?.status==='ready')return result.row;
+ const error=new Error(result?.status||'metadata unavailable');
+ error.metadataResult=result||null;
+ throw error;
+}
 function node(tag,text,className){
  const el=document.createElement(tag);
  if(text!==undefined&&text!==null)el.textContent=String(text);
@@ -153,18 +171,31 @@ function applyFocusAccent(button,stream){
 }
 function currentLayoutPreset(){
  if(layout==='equal')return 'equal';
- return workspaceLayout==='focus'?'focus':'primary';
+ return lockedIndex!==null?'focus':'primary';
 }
 function setLayoutPreset(preset){
- if(preset==='equal'){layout='equal';workspaceLayout='sidebar'}
- else if(preset==='focus'){layout='primary';workspaceLayout='focus'}
- else{layout='primary';workspaceLayout='sidebar'}
- carousel.checked=preset!=='equal';
- lockedIndex=preset==='focus'?primaryIndex:null;
- secondaryOffset=0;
- renderControls();
- applyLayout();
- startCarousel();
+ // Snapshot follow before ANY lock/carousel geometry mutation. renderControls()
+ // changes focus classes before applyLayout(), which can fire a synthetic scroll
+ // and falsely mark a live PTT feed as "not following".
+ const wasFollowing=pttFollowing||pttAtBottom();
+ pttLayoutTransitionDepth+=1;
+ try{
+  if(preset==='equal'){layout='equal';lockedIndex=null}
+  else if(preset==='focus'){layout='primary';lockedIndex=primaryIndex}
+  else{layout='primary';lockedIndex=null}
+  workspaceLayout='sidebar';
+  carousel.checked=preset!=='equal';
+  secondaryOffset=0;
+  renderControls();
+  applyLayout();
+  startCarousel();
+ }finally{
+  pttLayoutTransitionDepth=Math.max(0,pttLayoutTransitionDepth-1);
+ }
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
 }
 function hideSettings(){
  document.body.classList.remove('settings-open');
@@ -183,8 +214,9 @@ function updateUrl(){
  const q=new URLSearchParams();
  streams.forEach(stream=>q.append('stream',stream.videoId));
  q.set('layout',layout);
- q.set('workspace',workspaceLayout);
- q.set('ptt',pttContext.mode==='live'?'live':requestedPttMode);
+ q.set('workspace',currentLayoutPreset()==='focus'?'focus':'sidebar');
+ const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode);
+ q.set('ptt',resolvedPttMode);
  archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|')));
  q.set('primary',String(primaryIndex));
  q.set('audio',String(primaryIndex));
@@ -498,9 +530,10 @@ function refreshControlState(){
  }
 }
 function applyLayout(){
+ const wasFollowing=pttFollowing||pttAtBottom();
  const effective=watchMode==='multi'&&streams.length>1?layout:'equal';
  stage.className='viewer-stage layout-'+effective+' count-'+streams.length;
- workspace.className='viewer-workspace workspace-'+workspaceLayout+' layout-'+effective+' count-'+streams.length;
+ workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+streams.length;
  const count=streams.length;
  const cols=count<=1?1:count<=4?2:count<=9?3:4;
  const rows=Math.max(1,Math.ceil(count/cols));
@@ -514,6 +547,10 @@ function applyLayout(){
  // YouTube iframe DOM nodes can interrupt active playback.
  refreshControlState();
  updateUrl();
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
 }
 function setAudioMaster(index){
  if(index<0||index>=streams.length)return;
@@ -526,13 +563,22 @@ function setAudioMaster(index){
 }
 function setPrimary(index){
  if(index<0||index>=streams.length)return;
+ const previousIndex=primaryIndex;
+ const primaryChanged=index!==previousIndex;
+ const wasFollowing=pttFollowing||pttAtBottom();
  primaryIndex=index;
  secondaryOffset=0;
  if(currentLayoutPreset()==='focus')lockedIndex=index;
  setAudioMaster(index);
  applyLayout();
  mountCallOverlay();
- resolvePrimaryPtt();
+ // Locking the already-primary stream is a layout-only transition. Re-resolving
+ // PTT here resets the live/VOD feed even though the timeline source did not change.
+ if(primaryChanged)resolvePrimaryPtt();
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
 }
 function handleFocusAvatarClick(index){
  if(index<0||index>=streams.length)return;
@@ -541,7 +587,8 @@ function handleFocusAvatarClick(index){
   return;
  }
  if(currentLayoutPreset()!=='focus'){
-  setPrimary(index);
+  // Entering Lock on the current carousel primary must not reload or re-resolve PTT.
+  if(index!==primaryIndex)setPrimary(index);
   setLayoutPreset('focus');
   return;
  }
@@ -1032,6 +1079,32 @@ pttShowFloor.addEventListener('change',()=>setPttFloorVisible(pttShowFloor.check
 setPttFloorVisible(false);
 
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
+function markPttUserScrollIntent(ms=1800){pttUserScrollIntentUntil=performance.now()+ms}
+function hasPttUserScrollIntent(){return performance.now()<=pttUserScrollIntentUntil}
+function repinPttAfterLayout({force=false}={}){
+ const shouldFollow=force||pttFollowing;
+ clearTimeout(pttLayoutRepinTimer);
+ cancelAnimationFrame(pttResizeFrame);
+ if(!shouldFollow||pttPanel.hidden)return;
+ pttLayoutRepinTimer=setTimeout(()=>{
+  pttResizeFrame=requestAnimationFrame(()=>{
+   if(pttVodMode())syncVodPttTimeline({forceFollow:true});
+   else{
+    pttFeed.scrollTop=pttFeed.scrollHeight;
+    pttNewest.hidden=true;
+    pttFollowing=true;
+   }
+  });
+ },80);
+}
+function preservePttFollowDuringLayout(change){
+ const wasFollowing=pttFollowing||pttAtBottom();
+ change();
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
+}
 function pttVodMode(){return pttContext.mode==='archive'||pttContext.mode==='same-day'}
 function pttTimelineClock(ms){
  const date=new Date(ms);
@@ -1042,7 +1115,7 @@ function vodPttCutoffMs(context,seconds,hasPlayed){
  const startMs=Date.parse(String(context?.start||''));
  if(!Number.isFinite(startMs)||!Number.isFinite(seconds))return null;
  const scheduledMs=Date.parse(String(context?.scheduledStart||''));
- if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&scheduledMs<=startMs)return scheduledMs;
+ if(!hasPlayed&&seconds<=3&&Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000)return scheduledMs;
  const endMs=Date.parse(String(context?.end||''));
  const raw=startMs+Math.max(0,seconds)*1000;
  return Number.isFinite(endMs)?Math.min(raw,endMs):raw;
@@ -1051,7 +1124,9 @@ function vodPttFetchStartMs(context){
  const startMs=Date.parse(String(context?.start||''));
  const scheduledMs=Date.parse(String(context?.scheduledStart||''));
  if(!Number.isFinite(startMs))return null;
- return Number.isFinite(scheduledMs)&&scheduledMs<=startMs?Math.min(startMs,scheduledMs-3600000):startMs;
+ const hasScheduled=Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000;
+ const anchorMs=hasScheduled?Math.min(startMs,scheduledMs):startMs;
+ return anchorMs-3600000;
 }
 function pttVodPlaybackMs(){
  if(!pttVodMode())return null;
@@ -1111,14 +1186,22 @@ async function loadLivePtt(){
   if(!pttLoaded)pttFeed.replaceChildren(node('div','PTT 暫時無法讀取，稍後會自動重試。','ptt-empty'));
  }
 }
-function verifiedSameDayVodWindow(row){
+function verifiedEndedVodWindow(row){
  const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
  const start=String(row?.actual_start||''),end=String(row?.actual_end||'');
  const startMs=Date.parse(start),endMs=Date.parse(end);
  if(lifecycle!=='ended'||!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return null;
- const today=taipeiDay();
- if(taipeiDayForDate(start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null;
- return {start,end,day:today,anchorSource:PTT_ARCHIVE_ANCHOR};
+ const scheduledStart=String(row?.scheduled_start||'');
+ const scheduledMs=Date.parse(scheduledStart);
+ return {start,end,day:taipeiDayForDate(start),anchorSource:PTT_ARCHIVE_ANCHOR,
+  scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''};
+}
+function verifiedSameDayVodWindow(row){
+ const window=verifiedEndedVodWindow(row);
+ if(!window)return null;
+ const today=taipeiDay(),endMs=Date.parse(window.end);
+ if(taipeiDayForDate(window.start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null;
+ return {...window,day:today};
 }
 async function loadTodayPttPayload(day){
  try{return await api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=1000')}
@@ -1382,24 +1465,24 @@ async function resolvePrimaryPtt(){
  resetPttFeed();
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 專串';
- const archiveWindow=archiveWindows.get(id);
- if(archiveVodEntry){
-  if(!archiveWindow){
-   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
-   updateUrl();
-   showPttUnavailable('缺少可信的 YouTube actualStartTime / actualEndTime；不會改用 scheduled time，也不會查 Live Worker / D1。','VOD 歷史 PTT 無法判定');
-   return;
-  }
-  pttContext={mode:'archive',videoId:id,start:archiveWindow.start,end:archiveWindow.end,
-              scheduledStart:archiveWindow.scheduledStart||'',
-              day:taipeiDayForDate(archiveWindow.start),anchorSource:archiveWindow.anchorSource};
+
+ const suppliedWindow=archiveWindows.get(id);
+ if(suppliedWindow){
+  const endMs=Date.parse(suppliedWindow.end),today=taipeiDay();
+  const sameDay=taipeiDayForDate(suppliedWindow.start)===today&&
+   Number.isFinite(endMs)&&taipeiDayForDate(new Date(endMs-1))===today;
+  pttContext={mode:sameDay?'same-day':'archive',videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
+              scheduledStart:suppliedWindow.scheduledStart||'',
+              day:taipeiDayForDate(suppliedWindow.start),anchorSource:suppliedWindow.anchorSource};
   updateUrl();
-  await loadArchivePtt(pttContext,token);
+  if(sameDay)await loadSameDayVodPtt(pttContext,token);
+  else await loadArchivePtt(pttContext,token);
   return;
  }
- pttMeta.textContent='判定 Live 中';
+
+ pttMeta.textContent='判定影片狀態中';
  try{
-  const row=await api('/v1/catalog/videos/'+encodeURIComponent(id));
+  const row=await videoMetadata(id);
   if(token!==pttResolveToken)return;
   const lifecycle=String(row?.lifecycle_state||row?.state||'').toLowerCase();
   if(lifecycle==='live'){
@@ -1414,10 +1497,49 @@ async function resolvePrimaryPtt(){
    showPttUnavailable('這支影片尚未開始，沒有可連接的 PTT 時間軸。','尚未開始');
    return;
   }
-  const sameDayWindow=verifiedSameDayVodWindow(row);
+  if(lifecycle==='ended'){
+   const sameDayWindow=verifiedSameDayVodWindow(row);
+   if(sameDayWindow){
+    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
+                scheduledStart:sameDayWindow.scheduledStart||'',
+                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
+    updateUrl();
+    await loadSameDayVodPtt(pttContext,token);
+    return;
+   }
+   const archiveWindow=verifiedEndedVodWindow(row);
+   if(archiveWindow){
+    const cached={videoId:id,start:archiveWindow.start,end:archiveWindow.end,
+                  anchorSource:archiveWindow.anchorSource,scheduledStart:archiveWindow.scheduledStart||''};
+    archiveWindows.set(id,cached);
+    pttContext={mode:'archive',videoId:id,start:cached.start,end:cached.end,
+                scheduledStart:cached.scheduledStart,day:archiveWindow.day,anchorSource:cached.anchorSource};
+    updateUrl();
+    await loadArchivePtt(pttContext,token);
+    return;
+   }
+   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
+   updateUrl();
+   showPttUnavailable('這支已結束影片缺少可信的 actualStartTime / actualEndTime，因此不會猜測 PTT 時間軸。','VOD 時間窗不足');
+   return;
+  }
+  pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
+  updateUrl();
+  showPttUnavailable('目前無法判定這支影片的直播狀態，因此不會連接可能錯誤的 PTT。','狀態無法判定');
+ }catch{
+  if(token!==pttResolveToken)return;
+  const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);
+  const todayState=String(todayRow?.lifecycle_state||todayRow?.state||'').toLowerCase();
+  if(todayState==='live'){
+   pttContext={mode:'live',videoId:id,start:'',end:'',day:taipeiDay()};
+   updateUrl();
+   await loadLivePtt();
+   return;
+  }
+  const sameDayWindow=verifiedSameDayVodWindow(todayRow);
   if(sameDayWindow){
    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
-               scheduledStart:String(row?.scheduled_start||''),
+               scheduledStart:sameDayWindow.scheduledStart||'',
                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
    updateUrl();
    await loadSameDayVodPtt(pttContext,token);
@@ -1425,34 +1547,7 @@ async function resolvePrimaryPtt(){
   }
   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
   updateUrl();
-  showPttUnavailable('已結束影片若不是今天稍早的 verified VOD，仍需由 History 傳入 verified actualStartTime / actualEndTime。','VOD 請由歷史頁進入');
- }catch{
-  if(token!==pttResolveToken)return;
-  const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);
-  const todayState=String(todayRow?.lifecycle_state||todayRow?.state||'').toLowerCase();
-  if(requestedPttMode==='live'&&todayState==='live'){
-   pttContext={mode:'live',videoId:id,start:'',end:'',day:taipeiDay()};
-   updateUrl();
-   await loadLivePtt();
-  }else{
-   const sameDayWindow=verifiedSameDayVodWindow(todayRow);
-   if(requestedPttMode==='live'&&sameDayWindow){
-    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
-                scheduledStart:String(todayRow?.scheduled_start||''),
-                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
-    updateUrl();
-    await loadSameDayVodPtt(pttContext,token);
-    return;
-   }
-   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
-   updateUrl();
-   showPttUnavailable(
-    requestedPttMode==='live'
-     ?'這支影片沒有被今日 catalog 驗證為 LIVE，也沒有可用的今日 ended actual_start / actual_end，因此不會誤接今天的 PTT。歷史 VOD 請由 History 提供 verified window。'
-     :'無法自動判定這支影片；未連接錯誤日期的 PTT。',
-    requestedPttMode==='live'?'非今日 LIVE':'無法判定'
-   );
-  }
+  showPttUnavailable('暫時無法取得這支影片的可信 lifecycle / actual time，因此不會誤接其他日期的 PTT。','無法判定');
  }
 }
 async function loadPtt(){
@@ -1540,6 +1635,9 @@ pttFontSize.addEventListener('input',()=>{
  try{localStorage.setItem('holoviewer-viewer-ptt-font',String(size))}catch{}
 });
 pttFeed.addEventListener('scroll',()=>{
+ // Layout/fullscreen/ResizeObserver can change scrollTop without user intent.
+ // Only explicit user scroll gestures are allowed to change follow state.
+ if(pttLayoutTransitionDepth>0||!hasPttUserScrollIntent())return;
  pttFollowing=pttAtBottom();
  pttNewest.hidden=pttFollowing;
  if(!pttFollowing&&pttVodMode()){
@@ -1547,34 +1645,72 @@ pttFeed.addEventListener('scroll',()=>{
   pttNewest.textContent=clock?'最新 · '+clock:'最新';
  }
 },{passive:true});
-pttFeed.addEventListener('wheel',event=>{if(event.deltaY<0)pttFollowing=false},{passive:true});
+pttFeed.addEventListener('wheel',event=>{
+ markPttUserScrollIntent();
+ if(event.deltaY<0){pttFollowing=false;pttNewest.hidden=false}
+},{passive:true});
+pttFeed.addEventListener('touchstart',()=>markPttUserScrollIntent(2400),{passive:true});
+pttFeed.addEventListener('pointerdown',()=>markPttUserScrollIntent(2400),{passive:true});
+if('ResizeObserver' in window){
+ pttResizeObserver=new ResizeObserver(()=>{
+  if(pttFollowing)repinPttAfterLayout({force:true});
+ });
+ pttResizeObserver.observe(pttFeed);
+ pttResizeObserver.observe(pttPanel);
+}
 pttFeed.addEventListener('dblclick',event=>{
  event.preventDefault();
  window.open('/ptt-today','_blank','noopener,noreferrer');
 });
 pttNewest.addEventListener('click',pttToLatest);
 fullscreenButton.addEventListener('click',async()=>{
+ const wasFollowing=pttFollowing||pttAtBottom();
  try{
   if(document.fullscreenElement)await document.exitFullscreen();
   else await document.documentElement.requestFullscreen();
  }catch{}
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
+});
+window.addEventListener('resize',()=>{
+ const wasFollowing=pttFollowing||pttAtBottom();
+ if(!wasFollowing)return;
+ pttFollowing=true;
+ repinPttAfterLayout({force:true});
+},{passive:true});
+window.addEventListener('orientationchange',()=>{
+ const wasFollowing=pttFollowing||pttAtBottom();
+ if(!wasFollowing)return;
+ pttFollowing=true;
+ repinPttAfterLayout({force:true});
 });
 window.addEventListener('blur',()=>{
  if(!callEnabled)return;
  clearTimeout(callWaveTimer);callWaveTimer=null;callHeldDirection='';callSpaceHeld=false;callClearMotion();callUpdateHud('待機');
 });
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden&&pttContext.mode==='live')loadPtt();
+});
 window.addEventListener('pagehide',()=>{
- clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);
+ clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);clearInterval(pttPollTimer);
+ clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);
+ pttResizeObserver?.disconnect();
 });
 document.addEventListener('fullscreenchange',()=>{
+ const wasFollowing=pttFollowing||pttAtBottom();
  const on=Boolean(document.fullscreenElement);
  document.body.classList.toggle('immersive',on);
  fullscreenButton.textContent=on?'退出沉浸模式':'沉浸模式';
+ if(wasFollowing){
+  pttFollowing=true;
+  repinPttAfterLayout({force:true});
+ }
 });
 
 readSettings();
 carousel.checked=currentLayoutPreset()!=='equal';
-if(currentLayoutPreset()==='focus')lockedIndex=primaryIndex;
 renderShell();
 applyModeClass();
 startCarousel();
@@ -1592,7 +1728,7 @@ function tryMountPlayers(){
  tryMountPlayers();
  resolvePrimaryPtt();
 })();
-setInterval(loadPtt,10000);
+const pttPollTimer=setInterval(()=>{if(!document.hidden)loadPtt()},PTT_POLL_MS);
 
 if(window.YT?.Player)tryMountPlayers();
 else window.onYouTubeIframeAPIReady=tryMountPlayers;

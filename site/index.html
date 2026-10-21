@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="zh-Hant" class="home-preboot"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HoloViewer</title><link rel="preconnect" href="https://holoviewer-public-api.singlebagel.workers.dev" crossorigin><link rel="stylesheet" href="assets/app.css"><link id="viewer-4174-css" rel="stylesheet" href="assets/viewer-4174.css" media="not all"><link id="viewer-4174-transplant-css" rel="stylesheet" href="assets/4174-shared-viewing-a144bb3.css" media="not all"></head>
+<html lang="zh-Hant" class="home-preboot"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HoloDocchi</title><link rel="preconnect" href="https://holoviewer-public-api.singlebagel.workers.dev" crossorigin><link rel="stylesheet" href="assets/app.css"><link id="viewer-4174-css" rel="stylesheet" href="assets/viewer-4174.css" media="not all"><link id="viewer-4174-transplant-css" rel="stylesheet" href="assets/4174-shared-viewing-a144bb3.css" media="not all"></head>
 <body>
 <aside class="client-rail" aria-label="主要功能">
-<a class="rail-brand" href="/" aria-label="HoloViewer 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloViewer</span></a>
+<a class="rail-brand" href="/" aria-label="HoloDocchi 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloDocchi</span></a>
 <nav class="rail-nav">
   <a data-route="home" href="/" class="active"><span class="rail-icon">今</span><span class="rail-label">今日直播</span></a>
   <a data-route="history" href="/history" class=""><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
@@ -13,7 +13,7 @@
 </nav></aside>
 <header class="client-topbar">
 <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="開啟導覽">☰</button>
-<a class="mobile-top-brand" href="/">HoloViewer</a>
+<a class="mobile-top-brand" href="/">HoloDocchi</a>
 <div id="page-title" class="top-status">今日直播</div>
 </header>
 <div id="mobileNav" class="mobile-nav" hidden> <a data-mobile-route="home" href="/" class="active">今日直播</a>
@@ -183,6 +183,21 @@
  </section>
  <section id="watchalong" class="page">
  <div class="page-head"><div><h1>同時視聽</h1></div></div>
+ <section class="section" id="watchalong-today">
+  <div class="section-head"><div><h2>今日同時視聽</h2><p>今天符合目前同時視聽辨識規則的直播都會列在這裡，不限是否已開播。</p></div></div>
+  <div id="watchalongTodayGrid" class="watchalong-static-grid"></div>
+  <p id="watchalongTodayEmpty" class="empty-note">讀取今日同時視聽中…</p>
+ </section>
+ <section class="section watchalong-featured-section" id="watchalong-completed">
+  <div class="section-head watchalong-featured-head"><div><span class="eyebrow">HoloDocchi 精選</span><h2>精選同時視聽</h2><p>斷點、同步與字幕都已準備完成，點開即可直接觀看。</p></div></div>
+  <div id="watchalongStaticGrid" class="watchalong-static-grid watchalong-featured-grid"></div>
+  <p id="watchalongStaticEmpty" class="empty-note">載入精選同時視聽中…</p>
+ </section>
+ <section class="section" id="watchalong-past">
+  <div class="section-head"><div><h2>過去直播</h2><p>瀏覽近期曾被辨識為同時視聽的直播；這裡是歷史資料，和上方已完成處理的精選內容分開。</p></div></div>
+  <div id="watchalongPastGrid" class="watchalong-static-grid watchalong-history-grid"></div>
+  <p id="watchalongPastEmpty" class="empty-note">讀取過去同時視聽直播中…</p>
+ </section>
  <section class="section">
   <div class="tool-card manual-shell" id="manual">
    <p id="watch-error" class="form-error" hidden></p>
@@ -231,4 +246,4 @@
  </section>
  </section>
  </main>
- <script src="assets/config.js"></script><script src="assets/4174-shared-viewing-a144bb3-dom.js"></script><script src="assets/4174-shared-viewing-a144bb3.js"></script><script src="assets/app.js"></script></body></html>
+ <script src="assets/config.js"></script><script src="assets/video-metadata-resolver.js"></script><script src="assets/4174-shared-viewing-a144bb3-dom.js"></script><script src="assets/4174-shared-viewing-a144bb3.js"></script><script src="assets/app.js"></script></body></html>
