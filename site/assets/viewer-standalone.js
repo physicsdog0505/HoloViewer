@@ -100,6 +100,15 @@ let collabPollTimer=null;
 let collabVodTimer=null;
 let collabAbsoluteMs=null;
 let collabReconciling=false;
+let viewingSession=null;
+let viewingAdapter=null;
+let viewingTimer=null;
+let viewingReconciling=false;
+let viewingLastUrlSecond=-1;
+const viewingTimelineCore=window.HoloViewerViewingTimeline||null;
+const viewingShareState=window.HoloViewerViewingShareState||null;
+const viewingAdapterFactory=window.HoloViewerTimelineViewerAdapter||null;
+function viewingTimelineActive(){return Boolean(viewingSession&&viewingAdapter)}
 
 const CALL_DEFAULT_BEAT_MS=500;
 let callEnabled=false;
@@ -225,6 +234,20 @@ function updateUrl(){
   q.set('collab_kind',collabKind);
   if(collabDay)q.set('collab_day',collabDay);
   if(collabSyncVerified)q.set('collab_sync','verified');
+ }
+ if(viewingTimelineActive()&&viewingShareState){
+  try{
+   const encoded=viewingShareState.serialize({
+    sessionId:viewingSession.session_id,revision:viewingSession.revision||'',
+    povIds:viewingSession.povs.map(pov=>String(pov.pov_id)),
+    primaryPovId:viewingAdapter.primaryPovId,masterTimeMs:viewingAdapter.masterTimeMs,
+    layout:currentLayoutPreset(),mode:watchMode,pttMode:resolvedPttMode
+   });
+   const shared=new URLSearchParams(encoded);
+   for(const key of ['session','rev','pov','primary_pov','t_ms']){
+    q.delete(key);shared.getAll(key).forEach(value=>q.append(key,value));
+   }
+  }catch{}
  }
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
@@ -568,12 +591,14 @@ function setPrimary(index){
  primaryIndex=index;
  secondaryOffset=0;
  if(currentLayoutPreset()==='focus')lockedIndex=index;
+ if(viewingTimelineActive()&&streams[index]?.povId){
+  try{viewingAdapter.setPrimaryPov(streams[index].povId)}catch{}
+ }
  setAudioMaster(index);
  applyLayout();
  mountCallOverlay();
- // Locking the already-primary stream is a layout-only transition. Re-resolving
- // PTT here resets the live/VOD feed even though the timeline source did not change.
- if(primaryChanged)resolvePrimaryPtt();
+ // Shared-session PTT follows the session absolute clock, never the selected POV.
+ if(primaryChanged&&!viewingTimelineActive())resolvePrimaryPtt();
  if(wasFollowing){
   pttFollowing=true;
   repinPttAfterLayout({force:true});
@@ -640,7 +665,15 @@ function mountPlayerAt(index,autoplay=false,seekSeconds=null){
   }
  });
 }
-function mountPlayers(){streams.forEach((stream,index)=>mountPlayerAt(index,confirmedLiveIds.has(stream.videoId)))}
+function mountPlayers(){
+ streams.forEach((stream,index)=>{
+  if(viewingTimelineActive()&&stream?.povId){
+   const resolved=viewingAdapter.resolution(stream.povId);
+   const seek=resolved?.status==='READY'?resolved.source_time_ms/1000:null;
+   mountPlayerAt(index,false,seek);
+  }else mountPlayerAt(index,confirmedLiveIds.has(stream.videoId));
+ });
+}
 function destroyPlayers(){
  players.forEach(player=>{try{player?.destroy()}catch{}});
  players.splice(0,players.length);
@@ -856,6 +889,7 @@ async function fetchCollabEvent(){
  }
 }
 function currentPrimaryAbsoluteMs(){
+ if(viewingTimelineActive())return viewingAdapter.absoluteTimeMs();
  if(!streams.length)return Number.isFinite(collabAbsoluteMs)?collabAbsoluteMs:null;
  const row=collabRowFor(streams[primaryIndex]?.videoId);
  const start=collabStartMs(row);
@@ -865,6 +899,156 @@ function currentPrimaryAbsoluteMs(){
  if(!Number.isFinite(seconds))return Number.isFinite(collabAbsoluteMs)?collabAbsoluteMs:start;
  return start+Math.max(0,seconds)*1000;
 }
+function collabTimelinePovId(row){
+ const channel=String(row?.channel_id||'');
+ return channel||String(row?.video_id||'');
+}
+function buildCollabViewingSession(event){
+ if(!viewingTimelineCore||!viewingAdapterFactory||collabKind!=='vod'||event?.sync?.available!==true)return null;
+ if(event?.viewing_timeline&&typeof event.viewing_timeline==='object'){
+  try{viewingTimelineCore.validateSession(event.viewing_timeline);return event.viewing_timeline}catch{return null}
+ }
+ const rows=collabStreams(event).map(row=>({
+  row,start:collabStartMs(row),end:collabEndMs(row)
+ })).filter(item=>item.start!==null&&item.end!==null&&item.end>item.start);
+ if(rows.length<2)return null;
+ const absoluteStart=Math.min(...rows.map(item=>item.start));
+ const absoluteEnd=Math.max(...rows.map(item=>item.end));
+ const session={
+  schema_version:viewingTimelineCore.SCHEMA,
+  session_id:String(event?.event_id||collabEventId),
+  absolute_start_ms:absoluteStart,
+  master_end_ms:absoluteEnd-absoluteStart,
+  povs:rows.map(item=>({
+   pov_id:collabTimelinePovId(item.row),
+   segments:[{
+    segment_id:'source:'+String(item.row.video_id),
+    master_start_ms:item.start-absoluteStart,
+    master_end_ms:item.end-absoluteStart,
+    video_id:String(item.row.video_id),
+    source_start_ms:0
+   }]
+  }))
+ };
+ const revision=String(event?.sync?.revision||event?.source_revision||'');
+ if(revision)session.revision=revision;
+ try{viewingTimelineCore.validateSession(session);return session}catch{return null}
+}
+function mapViewingPovsToStreams(session){
+ const assigned=new Set();
+ for(const pov of session.povs){
+  const ids=new Set(pov.segments.map(segment=>String(segment.video_id)));
+  const index=streams.findIndex((stream,i)=>!assigned.has(i)&&ids.has(String(stream.videoId)));
+  if(index<0)return false;
+  streams[index].povId=String(pov.pov_id);assigned.add(index);
+ }
+ return assigned.size===session.povs.length&&assigned.size===streams.length;
+}
+function viewingSharedStateFor(session){
+ if(!viewingShareState)return null;
+ const parsed=viewingShareState.parse(params);
+ if(parsed.status!=='READY'||parsed.state.sessionId!==String(session.session_id))return null;
+ if(session.revision&&parsed.state.revision&&parsed.state.revision!==String(session.revision))return null;
+ const validPovs=new Set(session.povs.map(pov=>String(pov.pov_id)));
+ if(parsed.state.povIds.length!==validPovs.size||parsed.state.povIds.some(id=>!validPovs.has(id)))return null;
+ return parsed.state;
+}
+function replaceTimelinePovSource(index,resolved){
+ if(index<0||index>=streams.length||resolved?.status!=='READY')return false;
+ const stream=streams[index];
+ if(String(stream.videoId)===String(resolved.video_id))return false;
+ const player=players[index],card=playerCards[index];
+ let playing=false,muted=index!==audioMaster;
+ try{playing=player?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{}
+ try{muted=Boolean(player?.isMuted?.())}catch{}
+ try{player?.destroy()}catch{}
+ players[index]=null;
+ stream.videoId=String(resolved.video_id);
+ const row=collabRowFor(stream.videoId);
+ stream.label=catalogName(row);
+ const label=card?.querySelector('.player-label');if(label)label.textContent=stream.label;
+ const oldHost=card?.querySelector('.player-host');oldHost?.remove();
+ if(card){
+  const host=node('div',undefined,'player-host');host.id=playerHostId(stream);card.append(host);
+ }
+ if(window.YT?.Player&&card){
+  mountPlayerAt(index,playing,resolved.source_time_ms/1000);
+  if(muted){try{players[index]?.mute?.()}catch{}}
+ }
+ renderControls();
+ return true;
+}
+function reconcileViewingTimeline({samplePrimary=true}={}){
+ if(!viewingTimelineActive()||viewingReconciling)return;
+ viewingReconciling=true;
+ try{
+  const primaryStream=streams[primaryIndex];
+  if(samplePrimary&&primaryStream?.povId){
+   const player=players[primaryIndex];
+   let seconds=null;try{seconds=player?.getCurrentTime?.()}catch{}
+   if(Number.isFinite(seconds)){
+    const mapped=viewingAdapter.masterFromSource(primaryStream.povId,primaryStream.videoId,seconds*1000);
+    if(Number.isFinite(mapped))viewingAdapter.setMasterTimeMs(mapped);
+   }
+  }
+  const current={};streams.forEach(stream=>{if(stream?.povId)current[stream.povId]=stream.videoId});
+  const plan=viewingAdapter.plan(current);
+  for(const resolved of plan){
+   const index=streams.findIndex(stream=>String(stream?.povId||'')===String(resolved.pov_id));
+   if(index<0)continue;
+   if(resolved.status!=='READY'){
+    try{players[index]?.pauseVideo?.()}catch{}
+    continue;
+   }
+   if(resolved.replace){
+    replaceTimelinePovSource(index,resolved);
+    continue;
+   }
+   const player=players[index];let currentSeconds=null;
+   try{currentSeconds=player?.getCurrentTime?.()}catch{}
+   const target=resolved.source_time_ms/1000;
+   if(player&&(!Number.isFinite(currentSeconds)||Math.abs(currentSeconds-target)>1.2)){
+    try{player.seekTo(target,true)}catch{}
+   }
+  }
+  collabAbsoluteMs=viewingAdapter.absoluteTimeMs();
+  if(pttVodMode()&&pttLoaded)syncVodPttTimeline();
+  const second=Math.floor(viewingAdapter.masterTimeMs/1000);
+  if(second!==viewingLastUrlSecond){viewingLastUrlSecond=second;updateUrl()}
+ }finally{viewingReconciling=false}
+}
+function initViewingTimeline(event){
+ const session=buildCollabViewingSession(event);
+ if(!session||!mapViewingPovsToStreams(session))return false;
+ const restored=viewingSharedStateFor(session);
+ const fallbackPrimary=streams[primaryIndex]?.povId||session.povs[0].pov_id;
+ const primary=restored?.primaryPovId||fallbackPrimary;
+ try{
+  viewingSession=session;
+  viewingAdapter=viewingAdapterFactory.create(session,{
+   timeline:viewingTimelineCore,
+   initialMasterTimeMs:restored?.masterTimeMs||0,
+   primaryPovId:primary
+  });
+ }catch{
+  viewingSession=null;viewingAdapter=null;return false;
+ }
+ const restoredIndex=streams.findIndex(stream=>String(stream.povId)===String(viewingAdapter.primaryPovId));
+ if(restoredIndex>=0){primaryIndex=restoredIndex;audioMaster=restoredIndex}
+ const current={};streams.forEach(stream=>{if(stream?.povId)current[stream.povId]=stream.videoId});
+ for(const resolved of viewingAdapter.plan(current)){
+  if(resolved.status!=='READY')continue;
+  const index=streams.findIndex(stream=>String(stream?.povId||'')===String(resolved.pov_id));
+  if(index>=0)streams[index].videoId=String(resolved.video_id);
+ }
+ collabAbsoluteMs=viewingAdapter.absoluteTimeMs();
+ // Safe here: init runs before YouTube players are mounted.
+ renderShell();
+ clearInterval(viewingTimer);
+ viewingTimer=setInterval(()=>{if(!document.hidden)reconcileViewingTimeline()},500);
+ return true;
+}
+
 function desiredVodRowsAt(absoluteMs){
  if(!Number.isFinite(absoluteMs))return [];
  return [...collabRoster.values()].filter(row=>{
@@ -912,6 +1096,7 @@ async function reconcileLiveCollab(){
  reconcileCollabRows(live);
 }
 function reconcileVodCollab(){
+ if(viewingTimelineActive()){reconcileViewingTimeline();return}
  if(!collabEvent?.sync?.available)return;
  const absolute=currentPrimaryAbsoluteMs();
  if(!Number.isFinite(absolute))return;
@@ -929,6 +1114,7 @@ async function initCollabManager(){
   if(localRows.length){
    const event={event_id:collabEventId,sync:{available:collabSyncVerified},streams:localRows};
    applyCollabEvent(event);
+   if(collabSyncVerified&&localRows.length===streams.length&&initViewingTimeline(event))return;
    if(collabSyncVerified&&localRows.length===streams.length){
     const starts=localRows.map(collabStartMs).filter(Number.isFinite);
     if(starts.length){
@@ -943,6 +1129,7 @@ async function initCollabManager(){
  const event=await fetchCollabEvent();
  if(!event)return;
  applyCollabEvent(event);
+ if(collabKind==='vod'&&event?.sync?.available===true&&initViewingTimeline(event))return;
  if(collabKind==='live'){
   await reconcileLiveCollab();
   collabPollTimer=setInterval(()=>{if(!document.hidden)reconcileLiveCollab()},10000);
@@ -1129,6 +1316,7 @@ function vodPttFetchStartMs(context){
 }
 function pttVodPlaybackMs(){
  if(!pttVodMode())return null;
+ if(viewingTimelineActive())return viewingAdapter.absoluteTimeMs();
  let seconds=null;
  try{seconds=players[primaryIndex]?.getCurrentTime?.()}catch{}
  return vodPttCutoffMs(pttContext,seconds,pttVodHasPlayed);
@@ -1554,7 +1742,25 @@ async function loadArchivePtt(context,token){
   pttFeed.replaceChildren(node('div','歷史 PTT UNKNOWN / UNAVAILABLE：'+detail,'ptt-empty'));
  }
 }
+async function resolveViewingSessionPtt(){
+ clearInterval(pttVodPollTimer);pttVodPollTimer=null;
+ if(!viewingTimelineActive())return false;
+ const token=++pttResolveToken;
+ resetPttFeed();pttPanel.hidden=false;pttTitle.textContent='PTT 專串';
+ const startMs=viewingSession.absolute_start_ms;
+ const endMs=startMs+viewingSession.master_end_ms;
+ const start=new Date(startMs).toISOString(),end=new Date(endMs).toISOString();
+ const today=taipeiDay();
+ const sameDay=taipeiDayForDate(start)===today&&taipeiDayForDate(new Date(endMs-1))===today;
+ pttContext={mode:sameDay?'same-day':'archive',videoId:'',start,end,scheduledStart:'',
+             day:taipeiDayForDate(start),anchorSource:PTT_ARCHIVE_ANCHOR};
+ updateUrl();
+ if(sameDay)await loadSameDayVodPtt(pttContext,token);
+ else await loadArchivePtt(pttContext,token);
+ return true;
+}
 async function resolvePrimaryPtt(){
+ if(viewingTimelineActive()){await resolveViewingSessionPtt();return}
  clearInterval(pttVodPollTimer);pttVodPollTimer=null;
  const stream=streams[primaryIndex];
  if(!stream){showPttUnavailable('沒有可判定的影片。');return}
@@ -1792,7 +1998,7 @@ document.addEventListener('visibilitychange',()=>{
  if(!document.hidden&&pttContext.mode==='live')loadPtt();
 });
 window.addEventListener('pagehide',()=>{
- clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(pttVodPollTimer);clearInterval(pttPollTimer);
+ clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(viewingTimer);clearInterval(pttVodPollTimer);clearInterval(pttPollTimer);
  clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);
  pttResizeObserver?.disconnect();
 });
