@@ -114,7 +114,7 @@ let viewingResyncPending=false;
 let viewingVisiblePovs=null;
 let viewingRunIntent=false;
 const viewingTimelineCore=window.HoloViewerViewingTimeline||null;
-const viewingShareState=window.HoloViewerViewingShareState||null;
+// PARKED: share-link timeline restore is intentionally disabled because browser\n// autoplay/user-gesture rules can make URL-restored master time diverge from\n// the actual YouTube player clock. Keep timeline runtime, but never serialize/restore it.\nconst viewingShareState=null;
 const viewingAdapterFactory=window.HoloViewerTimelineViewerAdapter||null;
 function viewingTimelineActive(){return Boolean(viewingSession&&viewingAdapter)}
 
@@ -242,20 +242,6 @@ function updateUrl(){
   q.set('collab_kind',collabKind);
   if(collabDay)q.set('collab_day',collabDay);
   if(collabSyncVerified)q.set('collab_sync','verified');
- }
- if(viewingTimelineActive()&&viewingShareState){
-  try{
-   const encoded=viewingShareState.serialize({
-    sessionId:viewingSession.session_id,revision:viewingSession.revision||'',
-    povIds:viewingSession.povs.map(pov=>String(pov.pov_id)),
-    primaryPovId:viewingAdapter.primaryPovId,masterTimeMs:viewingAdapter.masterTimeMs,
-    layout:currentLayoutPreset(),mode:watchMode,pttMode:resolvedPttMode
-   });
-   const shared=new URLSearchParams(encoded);
-   for(const key of ['session','rev','pov','primary_pov','t_ms']){
-    q.delete(key);shared.getAll(key).forEach(value=>q.append(key,value));
-   }
-  }catch{}
  }
  history.replaceState(null,'','/viewer/?'+q.toString());
 }
@@ -958,14 +944,9 @@ function mapViewingPovsToStreams(session){
  }
  return assigned.size===session.povs.length&&assigned.size===streams.length;
 }
-function viewingSharedStateFor(session){
- if(!viewingShareState)return null;
- const parsed=viewingShareState.parse(params);
- if(parsed.status!=='READY'||parsed.state.sessionId!==String(session.session_id))return null;
- if(session.revision&&parsed.state.revision&&parsed.state.revision!==String(session.revision))return null;
- const validPovs=new Set(session.povs.map(pov=>String(pov.pov_id)));
- if(parsed.state.povIds.length!==validPovs.size||parsed.state.povIds.some(id=>!validPovs.has(id)))return null;
- return parsed.state;
+function viewingSharedStateFor(_session){
+ // Share-link timeline restore is parked; runtime always starts from its own session origin.
+ return null;
 }
 function replaceTimelinePovSource(index,resolved){
  if(index<0||index>=streams.length||resolved?.status!=='READY')return false;
@@ -1120,8 +1101,6 @@ function reconcileViewingTimeline({sampleClock=true}={}){
   }
   collabAbsoluteMs=viewingAdapter.absoluteTimeMs();
   if(pttVodMode()&&pttLoaded)syncVodPttTimeline();
-  const second=Math.floor(viewingAdapter.masterTimeMs/1000);
-  if(second!==viewingLastUrlSecond){viewingLastUrlSecond=second;updateUrl()}
  }finally{viewingReconciling=false}
 }
 function initViewingTimeline(event){
