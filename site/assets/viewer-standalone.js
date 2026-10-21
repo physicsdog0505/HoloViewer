@@ -105,6 +105,7 @@ let viewingAdapter=null;
 let viewingTimer=null;
 let viewingReconciling=false;
 let viewingLastUrlSecond=-1;
+let viewingClockPovId='';
 const viewingTimelineCore=window.HoloViewerViewingTimeline||null;
 const viewingShareState=window.HoloViewerViewingShareState||null;
 const viewingAdapterFactory=window.HoloViewerTimelineViewerAdapter||null;
@@ -978,19 +979,25 @@ function replaceTimelinePovSource(index,resolved){
  renderControls();
  return true;
 }
-function reconcileViewingTimeline({samplePrimary=true}={}){
+function viewingClockStream(){
+ if(!viewingTimelineActive()||!viewingClockPovId)return null;
+ const index=streams.findIndex(stream=>String(stream?.povId||'')===String(viewingClockPovId));
+ return index>=0?{index,stream:streams[index],player:players[index]}:null;
+}
+function sampleViewingMasterClock(){
+ const owner=viewingClockStream();
+ if(!owner?.stream)return viewingAdapter?.masterTimeMs??null;
+ let seconds=null;try{seconds=owner.player?.getCurrentTime?.()}catch{}
+ if(!Number.isFinite(seconds))return viewingAdapter.masterTimeMs;
+ const mapped=viewingAdapter.masterFromSource(owner.stream.povId,owner.stream.videoId,seconds*1000);
+ if(Number.isFinite(mapped))viewingAdapter.setMasterTimeMs(mapped);
+ return viewingAdapter.masterTimeMs;
+}
+function reconcileViewingTimeline({sampleClock=true}={}){
  if(!viewingTimelineActive()||viewingReconciling)return;
  viewingReconciling=true;
  try{
-  const primaryStream=streams[primaryIndex];
-  if(samplePrimary&&primaryStream?.povId){
-   const player=players[primaryIndex];
-   let seconds=null;try{seconds=player?.getCurrentTime?.()}catch{}
-   if(Number.isFinite(seconds)){
-    const mapped=viewingAdapter.masterFromSource(primaryStream.povId,primaryStream.videoId,seconds*1000);
-    if(Number.isFinite(mapped))viewingAdapter.setMasterTimeMs(mapped);
-   }
-  }
+  if(sampleClock)sampleViewingMasterClock();
   const current={};streams.forEach(stream=>{if(stream?.povId)current[stream.povId]=stream.videoId});
   const plan=viewingAdapter.plan(current);
   for(const resolved of plan){
@@ -1030,8 +1037,9 @@ function initViewingTimeline(event){
    initialMasterTimeMs:restored?.masterTimeMs||0,
    primaryPovId:primary
   });
+  viewingClockPovId=String(session.povs[0]?.pov_id||'');
  }catch{
-  viewingSession=null;viewingAdapter=null;return false;
+  viewingSession=null;viewingAdapter=null;viewingClockPovId='';return false;
  }
  const restoredIndex=streams.findIndex(stream=>String(stream.povId)===String(viewingAdapter.primaryPovId));
  if(restoredIndex>=0){primaryIndex=restoredIndex;audioMaster=restoredIndex}
