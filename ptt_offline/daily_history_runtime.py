@@ -28,7 +28,7 @@ import shlex
 import subprocess
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 from urllib.error import HTTPError
 from urllib.parse import quote
@@ -238,12 +238,70 @@ def make_repair_executor(config: dict[str,Any], *, day: str) -> Callable[[dict[s
     return execute
 
 
+def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
+                                    expected_aids: set[str]) -> tuple[str,bytes]:
+    """Collapse verified hourly exporter payloads into one canonical Taipei-day object.
+
+    The Collector/exporter remains free to use hourly buckets internally.  Static
+    Assets packaging uses one object per finalized Taipei day so partition size is
+    a publication concern rather than a source-storage concern.
+    """
+    day_start=datetime.fromisoformat(day).replace(tzinfo=TPE)
+    day_end=day_start+timedelta(days=1)
+    pushes=[]
+    seen=set()
+    for payload in payloads:
+        rows=payload.get("pushes")
+        if not isinstance(rows,list):
+            raise DailyHistoryRuntimeError("daily source object pushes missing")
+        for raw in rows:
+            if not isinstance(raw,dict):
+                raise DailyHistoryRuntimeError("invalid source push row")
+            row=dict(raw)
+            aid=str(row.get("aid") or "").lstrip("#")
+            if aid not in expected_aids:
+                raise DailyHistoryRuntimeError("daily source contains unexpected AID")
+            if row.get("floor") is None or row.get("floor_quality")!="per-thread-ordinal":
+                raise DailyHistoryRuntimeError("VERIFIED_COMPLETE archive requires authoritative per-thread floor")
+            identity=row.get("source_record_key")
+            if not isinstance(identity,str) or not identity:
+                raise DailyHistoryRuntimeError("daily source requires stable source_record_key")
+            if identity in seen:
+                raise DailyHistoryRuntimeError("duplicate source_record_key across daily source")
+            seen.add(identity)
+            row["coverage_day"]=day
+            row["coverage_status"]="COMPLETE"
+            row["finalized"]=True
+            pushes.append(row)
+    if not pushes:
+        raise DailyHistoryRuntimeError("no archive pushes for finalized day")
+    pushes.sort(key=lambda row:(
+        str(row.get("occurred_at") or ""),
+        str(row.get("aid") or ""),
+        int(row.get("source_line") or 0),
+        str(row.get("source_record_key") or ""),
+    ))
+    payload={
+        "schema_version":"holoviewer-ptt-history-day-v1",
+        "precision":"minute",
+        "timezone":"Asia/Taipei",
+        "partition_kind":"taipei-day",
+        "partition_start":day_start.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"),
+        "partition_end":day_end.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"),
+        "coverage_day":day,
+        "coverage_status":"COMPLETE",
+        "finalized":True,
+        "pushes":pushes,
+    }
+    return "day.json",_canonical_bytes(payload)
+
+
 def _daily_source_objects(*, source: Path, day: str, work_dir: Path,
                           expected_aids: set[str]) -> list[tuple[str,bytes]]:
     archive_root=work_dir/"source-archive"
     with open_source(str(source)) as db:
         receipt=export_archive(db,from_day=day,through_day=day,out_dir=archive_root)
-    objects=[]
+    payloads=[]
     for item in receipt.get("objects",[]):
         key=item.get("key")
         if not isinstance(key,str) or not key.endswith(".json.gz"):
@@ -257,27 +315,13 @@ def _daily_source_objects(*, source: Path, day: str, work_dir: Path,
             payload=json.loads(raw)
         except (OSError,UnicodeDecodeError,json.JSONDecodeError) as exc:
             raise DailyHistoryRuntimeError("invalid daily source archive object") from exc
-        pushes=payload.get("pushes")
-        if not isinstance(pushes,list):
-            raise DailyHistoryRuntimeError("daily source object pushes missing")
-        for row in pushes:
-            if not isinstance(row,dict):
-                raise DailyHistoryRuntimeError("invalid source push row")
-            aid=str(row.get("aid") or "").lstrip("#")
-            if aid not in expected_aids:
-                raise DailyHistoryRuntimeError("daily source contains unexpected AID")
-            if row.get("floor") is None or row.get("floor_quality")!="per-thread-ordinal":
-                raise DailyHistoryRuntimeError("VERIFIED_COMPLETE archive requires authoritative per-thread floor")
-            row["coverage_day"]=day
-            row["coverage_status"]="COMPLETE"
-            row["finalized"]=True
-        canonical=_canonical_bytes(payload)
-        logical=key.removesuffix(".gz")
-        objects.append((logical,canonical))
-    if not objects:
+        if not isinstance(payload,dict):
+            raise DailyHistoryRuntimeError("invalid daily source archive payload")
+        payloads.append(payload)
+    if not payloads:
         raise DailyHistoryRuntimeError("no archive objects for finalized day")
-    return objects
-
+    return [_build_taipei_day_source_object(
+        day=day,payloads=payloads,expected_aids=expected_aids)]
 
 _HEADERS=(
     "/ptt/v1/history/*\n"
