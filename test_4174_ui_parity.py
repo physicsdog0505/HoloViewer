@@ -869,11 +869,11 @@ const controller=new AbortController();controller.abort();
 const third=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{apiBase:'https://api.example',signal:controller.signal,maxAttempts:1});
 
 const config={apiBase:'https://api.example'};
-eval(APP_WRAPPER+"\nglobalThis.__resolveVideoMetadata=resolveVideoMetadata;");
+const resolveVideoMetadata=new Function('window','config',APP_WRAPPER+'\nreturn resolveVideoMetadata;')(window,config);
 window.HoloViewerVideoMetadata={resolve:async()=>{throw new TypeError('resolver transport')}};
-const customRejected=await globalThis.__resolveVideoMetadata('abcdefghijk');
+const customRejected=await resolveVideoMetadata('abcdefghijk');
 window.HoloViewerVideoMetadata={resolve:async()=>({status:'error',row:{error:'transport_error'},httpStatus:0})};
-const customBounded=await globalThis.__resolveVideoMetadata('abcdefghijk');
+const customBounded=await resolveVideoMetadata('abcdefghijk');
 
 process.stdout.write(JSON.stringify({first,second,third,customRejected,customBounded,calls}));
 """.replace("RESOLVER_SOURCE", json.dumps(resolver)).replace("APP_WRAPPER", json.dumps(wrapper))
