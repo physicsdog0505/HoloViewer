@@ -314,7 +314,9 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
         self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
         self.assertIn("[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||'']",viewer)
-        self.assertIn("今日 D1 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整",viewer)
+        self.assertIn("return loadCoverageDrivenVodPtt(context,token);",viewer)
+        self.assertIn("Archive + D1 · ⚠ 尚未完成封存",viewer)
+        self.assertIn("D1 history · ⚠ Archive 尚不可用",viewer)
         self.assertIn("mode:'same-day'",viewer)
 
 
