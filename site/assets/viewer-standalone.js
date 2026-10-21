@@ -90,6 +90,7 @@ let pttResizeObserver=null;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let pttVodRows=[];
+let pttVodPresentationTimes=[];
 let pttVodVisibleCount=0;
 let pttVodPollTimer=null;
 let pttVodLastSample=null;
@@ -1423,6 +1424,7 @@ function resetPttFeed(){
  pttNewest.hidden=true;
  pttNewest.textContent='最新';
  pttVodRows=[];
+ pttVodPresentationTimes=[];
  pttVodVisibleCount=0;
  pttVodLastSample=null;
  pttVodHasPlayed=false;
@@ -1517,11 +1519,33 @@ async function loadPttDayWindowRows(day,startMs,endMs){
  const incomplete=!reachedEnd&&Boolean(lastEnvelope?.page?.has_more);
  return {rows:dedupeArchiveRows(rows),pages,incomplete,envelope:lastEnvelope,source:'history'};
 }
-function vodPttVisibleCountAt(rows,absoluteMs){
+function buildVodPttPresentationTimes(rows){
+ const times=new Array(rows.length);
+ let index=0;
+ while(index<rows.length){
+  const raw=Date.parse(String(rows[index]?.occurred_at||''));
+  const minuteStart=Math.floor(raw/60000)*60000;
+  let end=index+1;
+  while(end<rows.length){
+   const next=Date.parse(String(rows[end]?.occurred_at||''));
+   if(Math.floor(next/60000)*60000!==minuteStart)break;
+   end+=1;
+  }
+  const count=end-index;
+  for(let offset=0;offset<count;offset++){
+   times[index+offset]=minuteStart+Math.floor(offset*60000/Math.max(1,count));
+  }
+  index=end;
+ }
+ return times;
+}
+function vodPttVisibleCountAt(rows,absoluteMs,presentationTimes=null){
+ const times=Array.isArray(presentationTimes)&&presentationTimes.length===rows.length
+  ?presentationTimes:buildVodPttPresentationTimes(rows);
  let low=0,high=rows.length;
  while(low<high){
   const mid=(low+high)>>1;
-  if(Date.parse(String(rows[mid]?.occurred_at||''))<=absoluteMs)low=mid+1;
+  if(times[mid]<=absoluteMs)low=mid+1;
   else high=mid;
  }
  return low;
@@ -1532,6 +1556,7 @@ function setVodPttRows(rows){
  ).slice().sort((a,b)=>
   Date.parse(String(a.occurred_at||''))-Date.parse(String(b.occurred_at||''))||
   String(pttKey(a)).localeCompare(String(pttKey(b))));
+ pttVodPresentationTimes=buildVodPttPresentationTimes(pttVodRows);
  pttVodVisibleCount=0;
  pttVodLastSample=null;
  pttFeed.replaceChildren();
@@ -1553,7 +1578,7 @@ function syncVodPttTimeline({forceFollow=false}={}){
  const currentSeconds=Math.max(0,(absoluteMs-Date.parse(pttContext.start))/1000);
  pttVodLastSample={seconds:currentSeconds,wallMs:now,playing};
 
- const visible=vodPttVisibleCountAt(pttVodRows,absoluteMs);
+ const visible=vodPttVisibleCountAt(pttVodRows,absoluteMs,pttVodPresentationTimes);
  if(visible!==pttVodVisibleCount){
   if(visible>pttVodVisibleCount){
    const fragment=document.createDocumentFragment();
