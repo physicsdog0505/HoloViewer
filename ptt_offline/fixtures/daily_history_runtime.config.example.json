@@ -8,6 +8,7 @@
     "--day",
     "{day}"
   ],
+  "repair_enabled": false,
   "repair_command": [
     "/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer/.venv-frontend/bin/python",
     "/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer/bounded_repair_request.py",
