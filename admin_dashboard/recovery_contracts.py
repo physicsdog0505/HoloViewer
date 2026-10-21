@@ -25,6 +25,16 @@ def _code(value, *, optional=False):
     return value
 
 
+
+
+def _video_ids(value):
+    if not isinstance(value, list) or len(value) > 200:
+        raise ValueError("invalid bounded video identity list")
+    if any(not isinstance(item, str) or not VIDEO_RE.fullmatch(item) for item in value):
+        raise ValueError("invalid video identity")
+    return list(value)
+
+
 def validate_daily_recovery(value: object) -> dict:
     if not isinstance(value, dict):
         raise ValueError("daily recovery object required")
@@ -68,6 +78,20 @@ def validate_daily_recovery(value: object) -> dict:
         raise ValueError("invalid PTT readback flag")
     pt["readback_verified"] = ptt["readback_verified"]
     pt["error_code"] = _code(ptt.get("error_code"), optional=True)
+    aids = ptt.get("unresolved_aids", [])
+    if not isinstance(aids, list) or len(aids) > 200:
+        raise ValueError("invalid PTT unresolved identities")
+    pt["unresolved_aids"] = []
+    for item in aids:
+        if not isinstance(item, dict):
+            raise ValueError("invalid PTT unresolved identity")
+        aid = item.get("aid")
+        if not isinstance(aid, str) or not 1 <= len(aid) <= 32:
+            raise ValueError("invalid PTT AID")
+        pt["unresolved_aids"].append({
+            "aid": aid,
+            "reason_code": _code(item.get("reason_code")),
+        })
 
     tr = {
         key: _int(transcript.get(key))
@@ -76,6 +100,9 @@ def validate_daily_recovery(value: object) -> dict:
             "retry_pending", "failed", "repaired_missing_binding",
         )
     }
+    for key in ("due_video_ids", "retry_pending_video_ids",
+                "no_public_caption_video_ids", "failed_video_ids"):
+        tr[key] = _video_ids(transcript.get(key, []))
     tx = {
         key: _int(translation.get(key))
         for key in (
@@ -83,6 +110,8 @@ def validate_daily_recovery(value: object) -> dict:
             "retry_pending", "failed", "not_requested",
         )
     }
+    for key in ("due_video_ids", "retry_pending_video_ids", "failed_video_ids"):
+        tx[key] = _video_ids(translation.get(key, []))
     return {
         "schema_version": _DAILY_SCHEMA,
         "sanitized": True,
@@ -133,6 +162,7 @@ def validate_data_library(value: object) -> dict:
         clean.append({
             "video_id": video_id,
             "channel_id": _optional_text(row.get("channel_id"), 64) or "",
+            "channel_name": _optional_text(row.get("channel_name"), 160) or "",
             "title": _optional_text(row.get("title"), 500) or "",
             "youtube_url": _optional_text(row.get("youtube_url"), 200) or "",
             "published_at": _optional_text(row.get("published_at"), 64),
@@ -140,6 +170,10 @@ def validate_data_library(value: object) -> dict:
             "actual_start": _optional_text(row.get("actual_start"), 64),
             "actual_end": _optional_text(row.get("actual_end"), 64),
             "lifecycle_state": _code(row.get("lifecycle_state")),
+            "taipei_day": (
+                _optional_text(row.get("taipei_day"), 10)
+                if row.get("taipei_day") is not None else None
+            ),
             "ptt": {
                 "available": available,
                 "completeness": _code(ptt.get("completeness")),
