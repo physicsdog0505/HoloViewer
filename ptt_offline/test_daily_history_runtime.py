@@ -187,33 +187,14 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
                            "succeeded_at":"2026-10-21T07:31:05+08:00",
                            "version_id":"11111111-2222-3333-4444-555555555555",
                        }), \
-                 patch("ptt_offline.daily_history_runtime._verify_http_readback_with_retry",
-                       return_value={
-                           "schema_version":"holoviewer-archive-readback-receipt-v1",
-                           "sanitized":True,
-                           "snapshot_id":"b"*64,
-                           "observed_at":"2026-10-21T07:31:06+08:00",
-                           "target":{"kind":"workers-static-assets","identity":"holoviewer-ptt-static-assets-pilot"},
-                           "job_id":"archive-2026-10-20-deadbeefcafe-a1",
-                           "manifest_digest":"a"*64,
-                           "source_revision":"collector-finalized-2026-10-20-v1",
-                           "scope":{"from_day":DAY,"through_day":DAY,"object_count":1,
-                                    "thread_scope":[AID],"thread_scope_authoritative":True},
-                           "objects_expected":1,"objects_checked":0,"objects_verified":0,
-                           "manifest_verified":False,"manifest_digest_match":False,
-                           "content_hash_match":False,"coverage_scope_match":False,
-                           "object_count_match":False,"unresolved_objects":1,
-                           "pagination_complete":True,"verification_mode":"full_partition",
-                           "job_verified":False,"error_code":"manifest_digest_mismatch",
-                           "contract_gaps":[],
-                       }):
+                 patch("ptt_offline.daily_history_runtime._http_fetcher",
+                       return_value=lambda _key:b"not-yet-propagated"):
                 with self.assertRaises(DailyHistoryRuntimeError):
                     run_closeout(config=config,day=DAY)
 
             prior=json.loads((state/"latest-archive-job.json").read_text())
             package=json.loads((state/"archive"/DAY/"package.json").read_text())
-            prior["manifest"]["digest"]=package["manifest"]["digest"]
-            prior["job_id"]="archive-2026-10-20-recover-a1"
+            self.assertEqual(prior["manifest"]["digest"],package["manifest"]["digest"])
             (state/"archive"/DAY/"archive-job.json").write_text(json.dumps(prior))
             (state/"latest-archive-job.json").write_text(json.dumps(prior))
 
