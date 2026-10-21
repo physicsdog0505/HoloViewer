@@ -49,6 +49,8 @@ def validate_daily_recovery(value: object) -> dict:
         )
     }
     yt["status"] = _code(youtube.get("status"))
+    if yt["search_calls"] != 0:
+        raise ValueError("normal Daily Recovery must not use search.list")
     ids = youtube.get("unresolved_video_ids")
     if not isinstance(ids, list) or len(ids) > 200 or any(
         not isinstance(item, str) or not VIDEO_RE.fullmatch(item) for item in ids
