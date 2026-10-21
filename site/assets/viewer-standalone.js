@@ -1473,13 +1473,6 @@ function verifiedEndedVodWindow(row){
  return {start,end,day:taipeiDayForDate(start),anchorSource:PTT_ARCHIVE_ANCHOR,
   scheduledStart:Number.isFinite(scheduledMs)&&Math.abs(scheduledMs-startMs)<=43200000?scheduledStart:''};
 }
-function verifiedSameDayVodWindow(row){
- const window=verifiedEndedVodWindow(row);
- if(!window)return null;
- const today=taipeiDay(),endMs=Date.parse(window.end);
- if(taipeiDayForDate(window.start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null;
- return {...window,day:today};
-}
 async function loadTodayPttPayload(day){
  return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300');
 }
