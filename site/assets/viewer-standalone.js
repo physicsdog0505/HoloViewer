@@ -73,7 +73,7 @@ const players=[];
 const playerCards=[];
 let catalogRows=[];
 const syncExpected=new WeakMap();
-const timelineGapPaused=new WeakSet();
+const timelineGapPovs=new Set();
 let carouselTimer=null;
 let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;
 // "focus" is accepted only as a legacy URL marker for Lock. Runtime geometry
@@ -109,6 +109,8 @@ let viewingReconciling=false;
 let viewingLastUrlSecond=-1;
 let viewingClockPovId='';
 let viewingClockPolicy=null;
+let viewingClockSample=null;
+let viewingResyncPending=false;
 const viewingTimelineCore=window.HoloViewerViewingTimeline||null;
 const viewingShareState=window.HoloViewerViewingShareState||null;
 const viewingAdapterFactory=window.HoloViewerTimelineViewerAdapter||null;
@@ -996,16 +998,25 @@ function viewingSessionPlaying(){
 function sampleViewingMasterClock(){
  const now=performance.now();
  const owner=viewingClockStream();
- let mapped=null;
+ let mapped=null,ownerState=null;
  if(owner?.stream){
   const resolved=viewingAdapter.resolution(owner.stream.povId);
-  let ownerPlaying=false;
-  try{ownerPlaying=owner.player?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{}
-  if(resolved?.status==='READY'&&ownerPlaying){
+  try{ownerState=owner.player?.getPlayerState?.()}catch{}
+  if(resolved?.status==='READY'&&
+     [YT.PlayerState.PLAYING,YT.PlayerState.PAUSED,YT.PlayerState.BUFFERING].includes(ownerState)){
    let seconds=null;try{seconds=owner.player?.getCurrentTime?.()}catch{}
    if(Number.isFinite(seconds)){
     const candidate=viewingAdapter.masterFromSource(owner.stream.povId,owner.stream.videoId,seconds*1000);
-    if(Number.isFinite(candidate))mapped=candidate;
+    if(Number.isFinite(candidate)){
+     if(viewingClockSample){
+      const elapsed=Math.max(0,now-viewingClockSample.wallMs);
+      const expected=viewingClockSample.masterMs+
+       (ownerState===YT.PlayerState.PLAYING?elapsed:0);
+      if(Math.abs(candidate-expected)>2500)viewingResyncPending=true;
+     }
+     viewingClockSample={wallMs:now,masterMs:candidate};
+     mapped=candidate;
+    }
    }
   }
  }
@@ -1022,15 +1033,18 @@ function reconcileViewingTimeline({sampleClock=true}={}){
   if(sampleClock)sampleViewingMasterClock();
   const current={};streams.forEach(stream=>{if(stream?.povId)current[stream.povId]=stream.videoId});
   const plan=viewingAdapter.plan(current);
+  const resyncOthers=viewingResyncPending;
+  viewingResyncPending=false;
   for(const resolved of plan){
-   const index=streams.findIndex(stream=>String(stream?.povId||'')===String(resolved.pov_id));
+   const povId=String(resolved.pov_id);
+   const index=streams.findIndex(stream=>String(stream?.povId||'')===povId);
    if(index<0)continue;
    if(resolved.status!=='READY'){
+    timelineGapPovs.add(povId);
     const player=players[index];
     if(player){
      try{
       if(player.getPlayerState?.()===YT.PlayerState.PLAYING){
-       timelineGapPaused.add(player);
        syncExpected.set(player,{state:YT.PlayerState.PAUSED,until:Date.now()+900});
        player.pauseVideo?.();
       }
@@ -1038,24 +1052,28 @@ function reconcileViewingTimeline({sampleClock=true}={}){
     }
     continue;
    }
+   const resumedFromGap=timelineGapPovs.delete(povId);
    if(resolved.replace){
     replaceTimelinePovSource(index,resolved);
     continue;
    }
-   const player=players[index];let currentSeconds=null;
-   if(player&&timelineGapPaused.has(player)){
-    timelineGapPaused.delete(player);
+   const player=players[index];
+   const target=resolved.source_time_ms/1000;
+   if(player&&resumedFromGap){
+    try{player.seekTo(target,true)}catch{}
     if(viewingSessionPlaying()){
      try{
       syncExpected.set(player,{state:YT.PlayerState.PLAYING,until:Date.now()+900});
       player.playVideo?.();
      }catch{}
     }
+    continue;
    }
-   try{currentSeconds=player?.getCurrentTime?.()}catch{}
-   const target=resolved.source_time_ms/1000;
-   if(player&&(!Number.isFinite(currentSeconds)||Math.abs(currentSeconds-target)>1.2)){
-    try{player.seekTo(target,true)}catch{}
+   if(player&&resyncOthers&&povId!==viewingClockPovId){
+    let currentSeconds=null;try{currentSeconds=player.getCurrentTime?.()}catch{}
+    if(!Number.isFinite(currentSeconds)||Math.abs(currentSeconds-target)>1.2){
+     try{player.seekTo(target,true)}catch{}
+    }
    }
   }
   collabAbsoluteMs=viewingAdapter.absoluteTimeMs();
@@ -1079,6 +1097,7 @@ function initViewingTimeline(event){
   });
   viewingClockPovId=String(session.povs[0]?.pov_id||'');
   viewingClockPolicy=viewingAdapterFactory.createClock(viewingAdapter,{nowMs:performance.now()});
+  viewingClockSample=null;viewingResyncPending=false;
  }catch{
   viewingSession=null;viewingAdapter=null;viewingClockPovId='';viewingClockPolicy=null;return false;
  }
