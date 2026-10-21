@@ -423,6 +423,17 @@ function taipeiDayForDate(value){
         self.assertIn("credentials:'omit'",archive)
         self.assertIn("cache:'no-cache'",archive)
 
+    def test_recent_unsealed_vod_uses_bounded_yesterday_d1_fallback(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("function recentUnsealedArchiveDay(day)",viewer)
+        self.assertIn("nextIsoDay(day)===taipeiDay()",viewer)
+        self.assertIn("async function supplementRecentArchiveWithD1(context,result)",viewer)
+        self.assertIn("if(!result||result.coverageStatus==='COMPLETE')return {...result,d1FallbackDays:[]};",viewer)
+        self.assertIn("const fallbackDays=(result.coverageDays||[]).filter(recentUnsealedArchiveDay);",viewer)
+        self.assertIn("const d1=await loadPttDayWindowRows(day,rangeStart,rangeEnd);",viewer)
+        self.assertIn("const result=await supplementRecentArchiveWithD1(context,archiveResult);",viewer)
+        self.assertIn("昨日 D1 補讀（未封存）",viewer)
+
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
