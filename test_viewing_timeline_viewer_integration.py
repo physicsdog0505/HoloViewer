@@ -215,6 +215,19 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
         self.assertIn("const resumedFromGap=timelineGapPovs.delete(povId);", body)
         self.assertIn("Math.abs(candidate-expected)>2500", VIEWER)
 
+    def test_collab_vod_visibility_follows_timeline_coverage(self):
+        self.assertIn("let viewingVisiblePovs=null;", VIEWER)
+        self.assertIn("function viewingPovVisible(index)", VIEWER)
+        self.assertIn("function applyViewingCoverage(plan)", VIEWER)
+        self.assertIn("plan.filter(item=>item.status==='READY')", VIEWER)
+        self.assertIn("card.hidden=!viewingPovVisible(index)", VIEWER)
+        self.assertIn("button.hidden=!viewingPovVisible(index)", VIEWER)
+        self.assertIn("const count=Math.max(0,streams.filter((_,index)=>viewingPovVisible(index)).length);", VIEWER)
+        self.assertIn("if(!viewingPovVisible(primaryIndex))", VIEWER)
+        self.assertIn("const nextPrimary=streams.findIndex((_,index)=>viewingPovVisible(index));", VIEWER)
+        self.assertIn("applyViewingCoverage(plan);", VIEWER)
+        self.assertIn("!collabManaged||collabKind!=='vod'", VIEWER)
+
     def test_cross_day_vod_ptt_uses_archive_plus_today_hybrid(self):
         self.assertIn("function vodPttWindowMode(start,end)", VIEWER)
         self.assertIn("if(startDay<today&&endDay===today)return 'hybrid';", VIEWER)
