@@ -406,35 +406,38 @@ function taipeiDayForDate(value){
         pre_payload=json.loads(pre_result.stdout)
         self.assertEqual([x["month"] for x in pre_payload],["2026-09","2026-10"])
 
-    def test_historical_ptt_manifest_failure_is_unavailable_not_empty(self):
+    def test_historical_ptt_manifest_failure_falls_back_without_claiming_empty(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("throw archiveUnavailableError('歷史 PTT '+source.month+' manifest HTTP '+response.status+'：'+url);",viewer)
-        self.assertIn("pttMeta.textContent='歷史 Static Assets · UNKNOWN / UNAVAILABLE';",viewer)
-        self.assertIn("'歷史 PTT UNKNOWN / UNAVAILABLE：'+detail",viewer)
-        load=viewer.split("async function loadArchivePtt(context,token){",1)[1].split("async function resolvePrimaryPtt()",1)[0]
-        self.assertIn("result.coverageStatus==='COMPLETE'?'這段 VOD 時間範圍內沒有 PTT 推文。'",load)
-        self.assertNotIn("UNKNOWN / UNAVAILABLE：'+detail,'ptt-empty'));\n  startVodPttTimeline()",load)
+        self.assertIn("if(!archive||archive.coverageStatus!=='COMPLETE')",viewer)
+        self.assertIn("try{d1=await loadPttDayWindowRows(day,rangeStart,rangeEnd)}",viewer)
+        self.assertIn("const unresolvedDays=dayResults.filter(item=>!item.archive&&!item.d1)",viewer)
+        self.assertIn("result.authoritativeZero",viewer)
+        self.assertIn("Archive 尚未 COMPLETE，不能宣稱這段真正沒有推文",viewer)
+        self.assertIn("VOD PTT · UNKNOWN / UNAVAILABLE",viewer)
 
-    def test_historical_ptt_archive_path_is_read_only(self):
+    def test_historical_ptt_archive_transport_is_read_only(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
-        archive=viewer.split("const archiveManifestCache=new Map();",1)[1].split("async function loadHybridVodPtt(context,token){",1)[0]
+        archive=viewer.split("const archiveManifestCache=new Map();",1)[1].split("function taipeiDayStartMs(day){",1)[0]
         for verb in ("method:'POST'","method:'PUT'","method:'PATCH'","method:'DELETE'","INSERT ","UPDATE ","DELETE FROM","wrangler","D1","R2"):
             self.assertNotIn(verb,archive)
         self.assertIn("credentials:'omit'",archive)
         self.assertIn("cache:'no-cache'",archive)
 
-    def test_recent_unsealed_vod_prefers_bounded_yesterday_d1_before_archive(self):
+    def test_vod_ptt_source_selection_is_coverage_driven_per_taipei_day(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
-        self.assertIn("function recentUnsealedArchiveDay(day)",viewer)
-        self.assertIn("nextIsoDay(day)===taipeiDay()",viewer)
-        self.assertIn("function recentSingleDayVodDay(context)",viewer)
-        self.assertIn("async function loadRecentVodD1First(context)",viewer)
-        self.assertIn("const result=await loadPttDayWindowRows(day,fetchStartMs,endMs);",viewer)
-        self.assertIn("if(d1&&d1.rows.length&&!d1.incomplete)",viewer)
-        self.assertIn("昨日 D1 history · 對齊播放時間 · 未封存",viewer)
-        self.assertIn("const archiveResult=await resolveArchivePttResult(context);",viewer)
-        self.assertIn("rows=dedupeArchiveRows([...(d1.rows||[]),...archiveResult.rows]);",viewer)
-        self.assertNotIn("async function supplementRecentArchiveWithD1(context,result)",viewer)
+        self.assertIn("function archiveDayCoverageStatus(manifest,day)",viewer)
+        self.assertIn("async function resolveArchiveDaySlice(day,rangeStart,rangeEnd)",viewer)
+        self.assertIn("async function resolveCoverageDrivenVodPtt(context)",viewer)
+        self.assertIn("const days=archiveCoverageDays(fetchStartMs,endMs);",viewer)
+        self.assertIn("if(!archive||archive.coverageStatus!=='COMPLETE')",viewer)
+        self.assertIn("d1=await loadPttDayWindowRows(day,rangeStart,rangeEnd)",viewer)
+        self.assertIn("rows:merged,days:dayResults.map(item=>item.day)",viewer)
+        self.assertIn("allArchiveComplete,authoritativeZero:allArchiveComplete&&merged.length===0",viewer)
+        self.assertIn("d1IncompleteDays",viewer)
+        self.assertIn("Archive + D1 · ⚠ 尚未完成封存",viewer)
+        self.assertNotIn("function recentUnsealedArchiveDay(day)",viewer)
+        self.assertNotIn("function recentSingleDayVodDay(context)",viewer)
 
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
