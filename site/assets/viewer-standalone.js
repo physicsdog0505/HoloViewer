@@ -231,7 +231,7 @@ function updateUrl(){
  streams.forEach(stream=>q.append('stream',stream.videoId));
  q.set('layout',layout);
  q.set('workspace',currentLayoutPreset()==='focus'?'focus':'sidebar');
- const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day','hybrid'].includes(pttContext.mode)?'video':requestedPttMode);
+ const resolvedPttMode=pttContext.mode==='live'?'live':(pttContext.mode==='vod'?'video':requestedPttMode);
  q.set('ptt',resolvedPttMode);
  archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|')));
  q.set('primary',String(primaryIndex));
@@ -1381,7 +1381,7 @@ function preservePttFollowDuringLayout(change){
   repinPttAfterLayout({force:true});
  }
 }
-function pttVodMode(){return ['archive','same-day','hybrid'].includes(pttContext.mode)}
+function pttVodMode(){return pttContext.mode==='vod'}
 function pttTimelineClock(ms){
  const date=new Date(ms);
  if(!Number.isFinite(date.getTime()))return '';
@@ -1596,19 +1596,6 @@ function startVodPttTimeline(){
  clearInterval(pttVodPollTimer);
  pttVodPollTimer=setInterval(()=>syncVodPttTimeline(),500);
  syncVodPttTimeline({forceFollow:true});
-}
-function vodPttWindowMode(start,end){
- const startMs=Date.parse(String(start||'')),endMs=Date.parse(String(end||''));
- if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return 'archive';
- const today=taipeiDay();
- const startDay=taipeiDayForDate(new Date(startMs));
- const endDay=taipeiDayForDate(new Date(endMs-1));
- if(startDay===today&&endDay===today)return 'same-day';
- if(startDay<today&&endDay===today)return 'hybrid';
- return 'archive';
-}
-async function loadSameDayVodPtt(context,token){
- return loadCoverageDrivenVodPtt(context,token);
 }
 const archiveManifestCache=new Map();
 function archiveIntegrityError(message){
@@ -1950,12 +1937,6 @@ async function loadCoverageDrivenVodPtt(context,token){
   pttFeed.replaceChildren(node('div','VOD PTT UNKNOWN / UNAVAILABLE：'+detail,'ptt-empty'));
  }
 }
-async function loadArchivePtt(context,token){
- return loadCoverageDrivenVodPtt(context,token);
-}
-async function loadHybridVodPtt(context,token){
- return loadCoverageDrivenVodPtt(context,token);
-}
 async function resolveViewingSessionPtt(){
  clearInterval(pttVodPollTimer);pttVodPollTimer=null;
  if(!viewingTimelineActive())return false;
@@ -1964,13 +1945,10 @@ async function resolveViewingSessionPtt(){
  const startMs=viewingSession.absolute_start_ms;
  const endMs=startMs+viewingSession.master_end_ms;
  const start=new Date(startMs).toISOString(),end=new Date(endMs).toISOString();
- const mode=vodPttWindowMode(start,end);
- pttContext={mode,videoId:'',start,end,scheduledStart:'',
+ pttContext={mode:'vod',videoId:'',start,end,scheduledStart:'',
              day:taipeiDayForDate(start),anchorSource:PTT_ARCHIVE_ANCHOR};
  updateUrl();
- if(mode==='same-day')await loadSameDayVodPtt(pttContext,token);
- else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);
- else await loadArchivePtt(pttContext,token);
+ await loadCoverageDrivenVodPtt(pttContext,token);
  return true;
 }
 async function resolvePrimaryPtt(){
@@ -1986,14 +1964,11 @@ async function resolvePrimaryPtt(){
 
  const suppliedWindow=archiveWindows.get(id);
  if(suppliedWindow){
-  const mode=vodPttWindowMode(suppliedWindow.start,suppliedWindow.end);
-  pttContext={mode,videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
+  pttContext={mode:'vod',videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
               scheduledStart:suppliedWindow.scheduledStart||'',
               day:taipeiDayForDate(suppliedWindow.start),anchorSource:suppliedWindow.anchorSource};
   updateUrl();
-  if(mode==='same-day')await loadSameDayVodPtt(pttContext,token);
-  else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);
-  else await loadArchivePtt(pttContext,token);
+  await loadCoverageDrivenVodPtt(pttContext,token);
   return;
  }
 
@@ -2015,24 +1990,15 @@ async function resolvePrimaryPtt(){
    return;
   }
   if(lifecycle==='ended'){
-   const sameDayWindow=verifiedSameDayVodWindow(row);
-   if(sameDayWindow){
-    pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
-                scheduledStart:sameDayWindow.scheduledStart||'',
-                day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
-    updateUrl();
-    await loadSameDayVodPtt(pttContext,token);
-    return;
-   }
-   const archiveWindow=verifiedEndedVodWindow(row);
-   if(archiveWindow){
-    const cached={videoId:id,start:archiveWindow.start,end:archiveWindow.end,
-                  anchorSource:archiveWindow.anchorSource,scheduledStart:archiveWindow.scheduledStart||''};
+   const vodWindow=verifiedEndedVodWindow(row);
+   if(vodWindow){
+    const cached={videoId:id,start:vodWindow.start,end:vodWindow.end,
+                  anchorSource:vodWindow.anchorSource,scheduledStart:vodWindow.scheduledStart||''};
     archiveWindows.set(id,cached);
-    pttContext={mode:'archive',videoId:id,start:cached.start,end:cached.end,
-                scheduledStart:cached.scheduledStart,day:archiveWindow.day,anchorSource:cached.anchorSource};
+    pttContext={mode:'vod',videoId:id,start:cached.start,end:cached.end,
+                scheduledStart:cached.scheduledStart,day:vodWindow.day,anchorSource:cached.anchorSource};
     updateUrl();
-    await loadArchivePtt(pttContext,token);
+    await loadCoverageDrivenVodPtt(pttContext,token);
     return;
    }
    pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
@@ -2053,13 +2019,13 @@ async function resolvePrimaryPtt(){
    await loadLivePtt();
    return;
   }
-  const sameDayWindow=verifiedSameDayVodWindow(todayRow);
-  if(sameDayWindow){
-   pttContext={mode:'same-day',videoId:id,start:sameDayWindow.start,end:sameDayWindow.end,
-               scheduledStart:sameDayWindow.scheduledStart||'',
-               day:sameDayWindow.day,anchorSource:sameDayWindow.anchorSource};
+  const vodWindow=verifiedEndedVodWindow(todayRow);
+  if(vodWindow){
+   pttContext={mode:'vod',videoId:id,start:vodWindow.start,end:vodWindow.end,
+               scheduledStart:vodWindow.scheduledStart||'',
+               day:vodWindow.day,anchorSource:vodWindow.anchorSource};
    updateUrl();
-   await loadSameDayVodPtt(pttContext,token);
+   await loadCoverageDrivenVodPtt(pttContext,token);
    return;
   }
   pttContext={mode:'unavailable',videoId:id,start:'',end:'',day:''};
