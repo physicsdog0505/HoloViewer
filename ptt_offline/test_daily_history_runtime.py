@@ -17,6 +17,7 @@ from ptt_offline.daily_history_runtime import (
     CONFIG_SCHEMA,
     DailyHistoryRuntimeError,
     load_config,
+    make_repair_executor,
     run_closeout,
 )
 
@@ -123,6 +124,17 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(DailyHistoryRuntimeError,"evidence_digest mismatch"):
                     run_closeout(config=config,day=DAY)
             coverage.assert_not_called()
+
+    def test_repair_command_is_inert_until_explicitly_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path,_=self._config(Path(tmp),deploy=False)
+            body=json.loads(config_path.read_text())
+            body["repair_command"]=["python3","bounded_repair_request.py"]
+            config_path.write_text(json.dumps(body),encoding="utf-8")
+            config=load_config(config_path)
+            self.assertIsNone(make_repair_executor(config,day=DAY))
+            config["repair_enabled"]=True
+            self.assertTrue(callable(make_repair_executor(config,day=DAY)))
 
     def test_noncomplete_day_stops_before_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
