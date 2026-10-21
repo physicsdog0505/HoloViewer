@@ -73,5 +73,28 @@
    masterFromSource,
   });
  }
- return Object.freeze({create});
+ function createClock(adapter,{nowMs=0}={}){
+  invariant(adapter&&typeof adapter.setMasterTimeMs==='function','timeline adapter missing');
+  let lastWallMs=Number.isFinite(Number(nowMs))?Number(nowMs):0;
+  function step({nowMs,running=false,mappedMasterMs=null}={}){
+   const now=Number(nowMs);
+   invariant(Number.isFinite(now),'clock now invalid');
+   const elapsed=Math.max(0,now-lastWallMs);
+   lastWallMs=now;
+   if(Number.isFinite(Number(mappedMasterMs))){
+    adapter.setMasterTimeMs(Number(mappedMasterMs));
+   }else if(running&&elapsed>0){
+    adapter.setMasterTimeMs(adapter.masterTimeMs+Math.trunc(elapsed));
+   }
+   return adapter.masterTimeMs;
+  }
+  function reset(nowMs=lastWallMs){
+   const now=Number(nowMs);
+   invariant(Number.isFinite(now),'clock now invalid');
+   lastWallMs=now;
+   return adapter.masterTimeMs;
+  }
+  return Object.freeze({step,reset,get lastWallMs(){return lastWallMs}});
+ }
+ return Object.freeze({create,createClock});
 });
