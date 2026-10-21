@@ -1491,13 +1491,14 @@ async function resolveArchiveRows(context,archives){
  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
  if(context.anchorSource!==PTT_ARCHIVE_ANCHOR||!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)
   throw new Error('缺少可信的 YouTube actualStartTime / actualEndTime');
+ const fetchStartMs=vodPttFetchStartMs(context)??startMs;
  const rows=[];
- const plan=archiveChunkPlan(archives,startMs,endMs);
+ const plan=archiveChunkPlan(archives,fetchStartMs,endMs);
  for(const entry of plan){
   const pushes=await fetchArchiveChunk(entry.source,entry.item);
   for(const row of pushes){
    const occurred=Date.parse(String(row?.occurred_at||''));
-   if(Number.isFinite(occurred)&&occurred>=startMs&&occurred<endMs)rows.push(row);
+   if(Number.isFinite(occurred)&&occurred>=fetchStartMs&&occurred<endMs)rows.push(row);
   }
  }
  const coverage=combineArchiveCoverage(archives.map(archive=>
@@ -1517,7 +1518,8 @@ async function loadArchivePtt(context,token){
  let result=null;
  try{
   const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
-  const sources=archiveSourcesForWindow(startMs,endMs);
+  const fetchStartMs=vodPttFetchStartMs(context)??startMs;
+  const sources=archiveSourcesForWindow(fetchStartMs,endMs);
   for(let attempt=0;attempt<2;attempt++){
    try{
     const archives=await Promise.all(sources.map(async source=>({source,manifest:await fetchArchiveManifest(source,attempt===1)})));
