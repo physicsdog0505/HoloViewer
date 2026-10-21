@@ -81,7 +81,8 @@
    invariant(Number.isFinite(now),'clock now invalid');
    const elapsed=Math.max(0,now-lastWallMs);
    lastWallMs=now;
-   if(Number.isFinite(Number(mappedMasterMs))){
+   const hasMapped=mappedMasterMs!==null&&mappedMasterMs!==undefined&&mappedMasterMs!==''&&Number.isFinite(Number(mappedMasterMs));
+   if(hasMapped){
     adapter.setMasterTimeMs(Number(mappedMasterMs));
    }else if(running&&elapsed>0){
     adapter.setMasterTimeMs(adapter.masterTimeMs+Math.trunc(elapsed));
