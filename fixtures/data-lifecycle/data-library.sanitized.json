@@ -1,0 +1,107 @@
+{
+  "schema_version": "holoviewer-authoritative-data-library-v1",
+  "sanitized": true,
+  "reconciled_at": "2026-10-21T07:42:00+08:00",
+  "row_count": 3,
+  "rows": [
+    {
+      "video_id": "abcDEF12345",
+      "channel_id": "UC0000000000000000000000",
+      "title": "Fixture ended stream",
+      "youtube_url": "https://www.youtube.com/watch?v=abcDEF12345",
+      "published_at": "2026-10-20T00:00:00Z",
+      "scheduled_start": "2026-10-20T01:00:00Z",
+      "actual_start": "2026-10-20T01:02:00Z",
+      "actual_end": "2026-10-20T03:00:00Z",
+      "lifecycle_state": "ended",
+      "ptt": {
+        "available": true,
+        "completeness": "VERIFIED_COMPLETE",
+        "day": "2026-10-20"
+      },
+      "transcript": {
+        "status": "READY",
+        "transcript_id": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+        "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_type": "youtube_caption",
+        "language": "ja",
+        "observed_at": "2026-10-20T04:00:00Z",
+        "segment_count": 220
+      },
+      "translation": {
+        "status": "COMPLETED",
+        "artifact_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "transcript_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "job_status": "completed"
+      },
+      "history_updated_at": "2026-10-20T03:05:00Z",
+      "reconciled_at": "2026-10-21T07:42:00+08:00"
+    },
+    {
+      "video_id": "xyzABC98765",
+      "channel_id": "UC1111111111111111111111",
+      "title": "Fixture transcript pending",
+      "youtube_url": "https://www.youtube.com/watch?v=xyzABC98765",
+      "published_at": "2026-10-20T05:00:00Z",
+      "scheduled_start": "2026-10-20T06:00:00Z",
+      "actual_start": "2026-10-20T06:01:00Z",
+      "actual_end": "2026-10-20T08:00:00Z",
+      "lifecycle_state": "ended",
+      "ptt": {
+        "available": true,
+        "completeness": "VERIFIED_COMPLETE",
+        "day": "2026-10-20"
+      },
+      "transcript": {
+        "status": "MISSING",
+        "transcript_id": null,
+        "content_hash": null,
+        "source_type": null,
+        "language": null,
+        "observed_at": null,
+        "segment_count": null
+      },
+      "translation": {
+        "status": "NO_TRANSCRIPT",
+        "artifact_id": null,
+        "transcript_hash": null,
+        "job_status": null
+      },
+      "history_updated_at": "2026-10-20T08:02:00Z",
+      "reconciled_at": "2026-10-21T07:42:00+08:00"
+    },
+    {
+      "video_id": "mnoPQR24680",
+      "channel_id": "UC2222222222222222222222",
+      "title": "Fixture not requested translation",
+      "youtube_url": "https://www.youtube.com/watch?v=mnoPQR24680",
+      "published_at": "2026-10-19T05:00:00Z",
+      "scheduled_start": null,
+      "actual_start": null,
+      "actual_end": null,
+      "lifecycle_state": "unknown",
+      "ptt": {
+        "available": null,
+        "completeness": "UNKNOWN",
+        "day": "2026-10-19"
+      },
+      "transcript": {
+        "status": "READY",
+        "transcript_id": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "source_type": "youtube_caption",
+        "language": "ja",
+        "observed_at": "2026-10-19T06:00:00Z",
+        "segment_count": 40
+      },
+      "translation": {
+        "status": "NOT_REQUESTED",
+        "artifact_id": null,
+        "transcript_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "job_status": null
+      },
+      "history_updated_at": "2026-10-19T06:02:00Z",
+      "reconciled_at": "2026-10-21T07:42:00+08:00"
+    }
+  ]
+}
