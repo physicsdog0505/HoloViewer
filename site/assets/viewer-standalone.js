@@ -1532,8 +1532,14 @@ function buildVodPttPresentationTimes(rows){
    end+=1;
   }
   const count=end-index;
+  const minuteOnly=Array.from({length:count},(_,offset)=>
+   Date.parse(String(rows[index+offset]?.occurred_at||''))===minuteStart
+  ).every(Boolean);
   for(let offset=0;offset<count;offset++){
-   times[index+offset]=minuteStart+Math.floor(offset*60000/Math.max(1,count));
+   const occurred=Date.parse(String(rows[index+offset]?.occurred_at||''));
+   times[index+offset]=minuteOnly
+    ?minuteStart+Math.floor(offset*60000/Math.max(1,count))
+    :occurred;
   }
   index=end;
  }
