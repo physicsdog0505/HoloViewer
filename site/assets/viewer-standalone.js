@@ -112,6 +112,7 @@ let viewingClockPolicy=null;
 let viewingClockSample=null;
 let viewingResyncPending=false;
 let viewingVisiblePovs=null;
+let viewingRunIntent=false;
 const viewingTimelineCore=window.HoloViewerViewingTimeline||null;
 const viewingShareState=window.HoloViewerViewingShareState||null;
 const viewingAdapterFactory=window.HoloViewerTimelineViewerAdapter||null;
@@ -649,6 +650,10 @@ function handlePlayerStateChange(player,state){
   syncExpected.delete(player);
   return;
  }
+ if(viewingTimelineActive()){
+  if(state===YT.PlayerState.PLAYING)viewingRunIntent=true;
+  else if(state===YT.PlayerState.PAUSED)viewingRunIntent=false;
+ }
  const sourceIndex=players.indexOf(player);
  if(sourceIndex>=0)syncPlayers(state,sourceIndex);
 }
@@ -994,6 +999,7 @@ function viewingClockStream(){
  return index>=0?{index,stream:streams[index],player:players[index]}:null;
 }
 function viewingSessionPlaying(){
+ if(viewingTimelineActive()&&viewingRunIntent)return true;
  return players.some(player=>{
   try{return player?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{return false}
  });
@@ -1133,10 +1139,10 @@ function initViewingTimeline(event){
   });
   viewingClockPovId=String(session.povs[0]?.pov_id||'');
   viewingClockPolicy=viewingAdapterFactory.createClock(viewingAdapter,{nowMs:performance.now()});
-  viewingClockSample=null;viewingResyncPending=false;
+  viewingClockSample=null;viewingResyncPending=false;viewingRunIntent=false;
   viewingVisiblePovs=new Set(viewingAdapter.plan({}).filter(item=>item.status==='READY').map(item=>String(item.pov_id)));
  }catch{
-  viewingSession=null;viewingAdapter=null;viewingClockPovId='';viewingClockPolicy=null;viewingVisiblePovs=null;return false;
+  viewingSession=null;viewingAdapter=null;viewingClockPovId='';viewingClockPolicy=null;viewingVisiblePovs=null;viewingRunIntent=false;return false;
  }
  const restoredIndex=streams.findIndex(stream=>String(stream.povId)===String(viewingAdapter.primaryPovId));
  if(restoredIndex>=0){primaryIndex=restoredIndex;audioMaster=restoredIndex}
