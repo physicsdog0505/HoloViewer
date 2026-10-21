@@ -238,13 +238,15 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
         self.assertIn("else if(state===YT.PlayerState.PAUSED)viewingRunIntent=false;", VIEWER)
         self.assertIn("viewingClockSample=null;viewingResyncPending=false;viewingRunIntent=false;", VIEWER)
 
-    def test_cross_day_vod_ptt_uses_archive_plus_today_hybrid(self):
+    def test_cross_day_vod_ptt_uses_per_day_coverage_policy(self):
         self.assertIn("function vodPttWindowMode(start,end)", VIEWER)
         self.assertIn("if(startDay<today&&endDay===today)return 'hybrid';", VIEWER)
         self.assertIn("async function loadHybridVodPtt(context,token)", VIEWER)
-        self.assertIn("resolveArchivePttResult(archiveContext)", VIEWER)
-        self.assertIn("loadPttDayWindowRows(today,boundaryMs,endMs)", VIEWER)
-        self.assertIn("else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);", VIEWER)
+        self.assertIn("return loadCoverageDrivenVodPtt(context,token);", VIEWER)
+        self.assertIn("async function resolveCoverageDrivenVodPtt(context)", VIEWER)
+        self.assertIn("const days=archiveCoverageDays(fetchStartMs,endMs);", VIEWER)
+        self.assertIn("if(!archive||archive.coverageStatus!=='COMPLETE')", VIEWER)
+        self.assertIn("d1=await loadPttDayWindowRows(day,rangeStart,rangeEnd)", VIEWER)
         self.assertIn("['archive','same-day','hybrid'].includes(pttContext.mode)", VIEWER)
         self.assertIn("const VOD_PTT_HISTORY_PAGE_CAP=20;", VIEWER)
         self.assertIn("'/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300'", VIEWER)
