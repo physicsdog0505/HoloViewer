@@ -58,9 +58,14 @@ class AdminRecoveryProjectionTests(unittest.TestCase):
         self.assertEqual(result["data_library"]["payload"]["schema_version"],
                          "holoviewer-authoritative-data-library-v1")
 
-    def test_daily_recovery_rejects_unbounded_or_nonzero_search_shape(self):
+    def test_daily_recovery_rejects_invalid_identity_or_search_usage(self):
         value = json.loads((ROOT / "daily-recovery.sanitized.json").read_text())
         value["youtube"]["unresolved_video_ids"] = ["not a video id"]
+        with self.assertRaises(ValueError):
+            validate_daily_recovery(value)
+
+        value = json.loads((ROOT / "daily-recovery.sanitized.json").read_text())
+        value["youtube"]["search_calls"] = 1
         with self.assertRaises(ValueError):
             validate_daily_recovery(value)
 
