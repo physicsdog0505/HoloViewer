@@ -103,6 +103,9 @@ class PublicSmokeTests(unittest.TestCase):
         frontend_config = (ROOT / "site/assets/config.js").read_text()
         self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
         self.assertIn("https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", frontend_config)
+        self.assertIn("https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev", frontend_config)
+        self.assertIn("/ptt/v1/manifests/static-assets-full-2026-08.json", frontend_config)
+        self.assertIn("/ptt/v1/manifests/static-assets-full-2026-09.json", frontend_config)
         self.assertIn("/ptt/v1/manifests/static-assets-full-2026-10.json", frontend_config)
         self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
 
@@ -169,11 +172,12 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("setInterval(()=>{if(!document.hidden)reconcileVodCollab()},500)", js)
         self.assertIn("const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';", js)
         self.assertIn("const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';", js)
-        self.assertIn("async function fetchArchiveManifest(force=false)", js)
-        self.assertIn("async function fetchArchiveChunk(item)", js)
+        self.assertIn("async function fetchArchiveManifest(source,force=false)", js)
+        self.assertIn("async function fetchArchiveChunk(source,item)", js)
+        self.assertIn("function archiveSourcesForWindow(startMs,endMs)", js)
+        self.assertIn("function archiveChunkPlan(archives,startMs,endMs)", js)
         self.assertIn("crypto.subtle.digest('SHA-256',buffer)", js)
-        self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs", js)
-        self.assertIn("occurred>=fetchStartMs&&occurred<endMs", js)
+        self.assertIn("occurred>=startMs&&occurred<endMs", js)
         self.assertIn("row?.source_record_key||row?.push_id", js)
         self.assertIn("Number.isInteger(row?.floor)&&row.floor>0", js)
         self.assertNotIn("/v1/ptt/history?day=", js)
@@ -461,7 +465,7 @@ class PublicSmokeTests(unittest.TestCase):
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
-        for directive in ("default-src 'none'", "script-src 'self'", "connect-src 'self' https://holoviewer-public-api.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
+        for directive in ("default-src 'none'", "script-src 'self'", "connect-src 'self' https://holoviewer-public-api.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
             self.assertIn(directive, headers)
         self.assertNotIn("'unsafe-inline'", headers)
         self.assertNotIn("'unsafe-eval'", headers)
