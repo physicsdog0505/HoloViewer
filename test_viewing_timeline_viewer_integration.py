@@ -204,9 +204,16 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
         self.assertIn("if(startDay<today&&endDay===today)return 'hybrid';", VIEWER)
         self.assertIn("async function loadHybridVodPtt(context,token)", VIEWER)
         self.assertIn("resolveArchivePttResult(archiveContext)", VIEWER)
-        self.assertIn("loadTodayPttPayload(today)", VIEWER)
+        self.assertIn("loadPttDayWindowRows(today,boundaryMs,endMs)", VIEWER)
         self.assertIn("else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);", VIEWER)
         self.assertIn("['archive','same-day','hybrid'].includes(pttContext.mode)", VIEWER)
+        self.assertIn("const VOD_PTT_HISTORY_PAGE_CAP=20;", VIEWER)
+        self.assertIn("async function loadPttDayWindowRows(day,startMs,endMs)", VIEWER)
+        self.assertIn("'/v1/ptt/history?day='", VIEWER)
+        self.assertIn("&limit=200", VIEWER)
+        self.assertIn("data.page.next_checkpoint", VIEWER)
+        self.assertIn("if(reachedEnd||!data.page.has_more)break;", VIEWER)
+        self.assertIn("const incomplete=!reachedEnd&&Boolean(lastEnvelope?.page?.has_more);", VIEWER)
 
 if __name__ == "__main__":
     unittest.main()
