@@ -190,7 +190,14 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
             "syncExpected.set(player,{state:YT.PlayerState.PAUSED,until:Date.now()+900});",
             body,
         )
+        self.assertIn("timelineGapPaused.add(player);", body)
         self.assertIn("player.pauseVideo?.();", body)
+        self.assertIn("if(player&&timelineGapPaused.has(player))", body)
+        self.assertIn(
+            "syncExpected.set(player,{state:YT.PlayerState.PLAYING,until:Date.now()+900});",
+            body,
+        )
+        self.assertIn("player.playVideo?.();", body)
 
     def test_cross_day_vod_ptt_uses_archive_plus_today_hybrid(self):
         self.assertIn("function vodPttWindowMode(start,end)", VIEWER)
