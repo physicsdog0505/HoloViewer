@@ -1688,7 +1688,7 @@ async function fetchArchiveManifest(source,force=false){
  archiveManifestCache.set(cacheKey,manifest);
  return manifest;
 }
-async function fetchArchiveChunk(source,item){
+async function fetchArchiveObject(source,item){
  const url=source.base+'/'+item.key;
  let response;
  try{
@@ -1713,27 +1713,6 @@ async function fetchArchiveChunk(source,item){
     payloadRange.endMs!==expectedRange.endMs)throw archiveIntegrityError('歷史 PTT '+source.month+' object range 不符：'+url);
  return payload.pushes;
 }
-function archiveCoverageStatus(manifest,startMs,endMs,month=''){
- const priority={COMPLETE:0,UNKNOWN:1,PARTIAL:2,MISSING:3};
- const byDay=new Map(manifest.days.map(item=>[String(item?.day||''),String(item?.coverage_status||'MISSING')]));
- const days=archiveCoverageDays(startMs,endMs).filter(day=>!month||day.startsWith(month+'-'));
- let status='COMPLETE';
- for(const day of days){
-  const candidate=priority[byDay.get(day)]===undefined?'MISSING':byDay.get(day);
-  if(priority[candidate]>priority[status])status=candidate;
- }
- return {status,days};
-}
-function combineArchiveCoverage(parts){
- const priority={COMPLETE:0,UNKNOWN:1,PARTIAL:2,MISSING:3};
- let status='COMPLETE';
- const days=[];
- for(const part of parts){
-  days.push(...part.days);
-  if(priority[part.status]>priority[status])status=part.status;
- }
- return {status,days:[...new Set(days)].sort()};
-}
 function taipeiDayStartMs(day){
  const ms=Date.parse(String(day||'')+'T00:00:00+08:00');
  return Number.isFinite(ms)?ms:null;
@@ -1755,14 +1734,14 @@ async function resolveArchiveDaySlice(day,rangeStart,rangeEnd){
    const plan=archiveObjectPlan([{source,manifest}],rangeStart,rangeEnd);
    const rows=[];
    for(const entry of plan){
-    const pushes=await fetchArchiveChunk(entry.source,entry.item);
+    const pushes=await fetchArchiveObject(entry.source,entry.item);
     for(const row of pushes){
      const occurred=Date.parse(String(row?.occurred_at||''));
      if(Number.isFinite(occurred)&&occurred>=rangeStart&&occurred<rangeEnd)rows.push(row);
     }
    }
    return {day,source,coverageStatus,rows:dedupeArchiveRows(rows),
-           chunkRequests:plan.map(entry=>entry.source.base+'/'+entry.item.key)};
+           objectRequests:plan.map(entry=>entry.source.base+'/'+entry.item.key)};
   }catch(error){
    lastError=error;
    if(attempt===0&&error?.archiveIntegrity){
@@ -1845,50 +1824,6 @@ function archiveObjectPlan(archives,startMs,endMs){
  }
  return plan.sort((a,b)=>a.range.startMs-b.range.startMs||
   a.range.endMs-b.range.endMs||String(a.item.key).localeCompare(String(b.item.key)));
-}
-async function resolveArchiveRows(context,archives){
- const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
- if(context.anchorSource!==PTT_ARCHIVE_ANCHOR||!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)
-  throw new Error('缺少可信的 YouTube actualStartTime / actualEndTime');
- const fetchStartMs=vodPttFetchStartMs(context)??startMs;
- const rows=[];
- const plan=archiveObjectPlan(archives,fetchStartMs,endMs);
- for(const entry of plan){
-  const pushes=await fetchArchiveChunk(entry.source,entry.item);
-  for(const row of pushes){
-   const occurred=Date.parse(String(row?.occurred_at||''));
-   if(Number.isFinite(occurred)&&occurred>=fetchStartMs&&occurred<endMs)rows.push(row);
-  }
- }
- const coverage=combineArchiveCoverage(archives.map(archive=>
-  archiveCoverageStatus(archive.manifest,startMs,endMs,archive.source.month)));
- return {
-  rows:dedupeArchiveRows(rows),
-  coverageStatus:coverage.status,
-  coverageDays:coverage.days,
-  archiveMonths:archives.map(archive=>archive.source.month),
-  chunkRequests:plan.map(entry=>entry.source.base+'/'+entry.item.key)
- };
-}
-async function resolveArchivePttResult(context){
- let result=null;
- const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
- const fetchStartMs=vodPttFetchStartMs(context)??startMs;
- const sources=archiveSourcesForWindow(fetchStartMs,endMs);
- for(let attempt=0;attempt<2;attempt++){
-  try{
-   const archives=await Promise.all(sources.map(async source=>({source,manifest:await fetchArchiveManifest(source,attempt===1)})));
-   result=await resolveArchiveRows(context,archives);
-   break;
-  }catch(error){
-   if(attempt===0&&error?.archiveIntegrity){
-    archiveManifestCache.clear();
-    continue;
-   }
-   throw error;
-  }
- }
- return result;
 }
 async function loadCoverageDrivenVodPtt(context,token){
  pttPanel.hidden=false;
