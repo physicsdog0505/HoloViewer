@@ -45,9 +45,7 @@ const mobileAlignNow=document.getElementById('mobileAlignNow');
 const mobilePrevSegment=document.getElementById('mobilePrevSegment');
 const mobileNextSegment=document.getElementById('mobileNextSegment');
 const mobileSubtitleMode=document.getElementById('mobileSubtitleMode');
-const mobileCopyCheckpoint=document.getElementById('mobileCopyCheckpoint');
 const mobileFullscreen=document.getElementById('mobileFullscreen');
-const copyCheckpoint=document.getElementById('copyCheckpoint');
 const resumeStatus=document.getElementById('resumeStatus');
 const segmentStatus=document.getElementById('segmentStatus');
 const immersiveToolbarTrigger=document.getElementById('immersiveToolbarTrigger');
@@ -89,7 +87,6 @@ let checkpointTimer=null;
 let resumeApplied=false;
 const mobileWatchMedia=window.matchMedia('(max-width:760px)');
 // PARKED: URL time restore/share is disabled. Local progress resume remains available.
-const requestedResumeSeconds=null;
 let pendingResumeSeconds=null;
 
 function validVideoId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{11}$/.test(id)?id:''}
