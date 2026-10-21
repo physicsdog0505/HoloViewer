@@ -72,6 +72,7 @@ const players=[];
 const playerCards=[];
 let catalogRows=[];
 const syncExpected=new WeakMap();
+const timelineGapPaused=new WeakSet();
 let carouselTimer=null;
 let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;
 // "focus" is accepted only as a legacy URL marker for Lock. Runtime geometry
@@ -1024,7 +1025,16 @@ function reconcileViewingTimeline({sampleClock=true}={}){
    const index=streams.findIndex(stream=>String(stream?.povId||'')===String(resolved.pov_id));
    if(index<0)continue;
    if(resolved.status!=='READY'){
-    try{players[index]?.pauseVideo?.()}catch{}
+    const player=players[index];
+    if(player){
+     try{
+      if(player.getPlayerState?.()===YT.PlayerState.PLAYING){
+       timelineGapPaused.add(player);
+       syncExpected.set(player,{state:YT.PlayerState.PAUSED,until:Date.now()+900});
+       player.pauseVideo?.();
+      }
+     }catch{}
+    }
     continue;
    }
    if(resolved.replace){
@@ -1032,6 +1042,15 @@ function reconcileViewingTimeline({sampleClock=true}={}){
     continue;
    }
    const player=players[index];let currentSeconds=null;
+   if(player&&timelineGapPaused.has(player)){
+    timelineGapPaused.delete(player);
+    if(viewingSessionPlaying()){
+     try{
+      syncExpected.set(player,{state:YT.PlayerState.PLAYING,until:Date.now()+900});
+      player.playVideo?.();
+     }catch{}
+    }
+   }
    try{currentSeconds=player?.getCurrentTime?.()}catch{}
    const target=resolved.source_time_ms/1000;
    if(player&&(!Number.isFinite(currentSeconds)||Math.abs(currentSeconds-target)>1.2)){

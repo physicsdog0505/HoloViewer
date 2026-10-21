@@ -120,7 +120,7 @@ assert.equal(adapter.masterFromSource('A','AAAAAAAAAAA',45000),40000);
         reconcile_end = VIEWER.index("function initViewingTimeline", reconcile_start)
         body = VIEWER[reconcile_start:reconcile_end]
         self.assertIn("const owner=viewingClockStream();", VIEWER)
-        self.assertIn("if(!Number.isFinite(seconds))return viewingAdapter.masterTimeMs;", VIEWER)
+        self.assertIn("if(Number.isFinite(seconds)){", VIEWER)
         self.assertIn("if(resolved.status!=='READY')", body)
         self.assertIn("if(resolved.replace){", body)
         self.assertNotIn("viewingClockPovId=", body)
@@ -179,6 +179,25 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
         self.assertIn("if(resolved.replace){\n    replaceTimelinePovSource(index,resolved);", VIEWER)
         self.assertIn("continue;\n   }\n   const player=players[index]", VIEWER)
 
+
+    def test_no_coverage_pause_does_not_feedback_into_sync_playback(self):
+        reconcile_start = VIEWER.index("function reconcileViewingTimeline")
+        reconcile_end = VIEWER.index("function initViewingTimeline", reconcile_start)
+        body = VIEWER[reconcile_start:reconcile_end]
+        self.assertIn("if(resolved.status!=='READY')", body)
+        self.assertIn("player.getPlayerState?.()===YT.PlayerState.PLAYING", body)
+        self.assertIn("timelineGapPaused.add(player);", body)
+        self.assertIn(
+            "syncExpected.set(player,{state:YT.PlayerState.PAUSED,until:Date.now()+900});",
+            body,
+        )
+        self.assertIn("player.pauseVideo?.();", body)
+        self.assertIn("if(player&&timelineGapPaused.has(player))", body)
+        self.assertIn(
+            "syncExpected.set(player,{state:YT.PlayerState.PLAYING,until:Date.now()+900});",
+            body,
+        )
+        self.assertIn("player.playVideo?.();", body)
 
 if __name__ == "__main__":
     unittest.main()
