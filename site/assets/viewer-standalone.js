@@ -1842,7 +1842,9 @@ function archiveRowIdentity(row){
 function dedupeArchiveRows(rows){
  const sorted=rows.slice().sort((a,b)=>Date.parse(String(a.occurred_at||''))-Date.parse(String(b.occurred_at||''))||
   String(a.aid||'').localeCompare(String(b.aid||''))||
-  (Number(a.floor)||0)-(Number(b.floor)||0)||(Number(a.source_line)||0)-(Number(b.source_line)||0));
+  (Number(a.source_line)||0)-(Number(b.source_line)||0)||
+  String(a.push_id||'').localeCompare(String(b.push_id||''))||
+  (Number(a.floor)||0)-(Number(b.floor)||0));
  const seen=new Set(),deduped=[];
  for(const row of sorted){
   const key=archiveRowIdentity(row);
