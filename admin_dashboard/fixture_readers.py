@@ -12,6 +12,7 @@ from pathlib import Path
 from data_lifecycle.readback_contracts import validate_api_semantic_health, validate_d1_snapshot
 from .coverage import project_coverage
 from .isolated import SharedFixtureCache
+from .recovery_contracts import validate_daily_recovery, validate_data_library
 
 
 class FixtureReaders:
@@ -84,6 +85,12 @@ class FixtureReaders:
         return {"d1_snapshot": snapshot, "d1_cache_status": cache_status,
                 "archive_sync_job": self._read_archive_sync_job()}
 
+    def daily_recovery(self):
+        return validate_daily_recovery(self._fixture("daily-recovery.sanitized.json"))
+
+    def data_library(self):
+        return validate_data_library(self._fixture("data-library.sanitized.json"))
+
     def system_health(self):
         try:
             data = validate_api_semantic_health(self._fixture("api-semantic-health.sanitized.json"))
@@ -142,5 +149,7 @@ class FixtureReaders:
     def injected(self):
         return {"data_coverage": self.coverage,
                 "daily_finalization": self.daily_finalization,
+                "daily_recovery": self.daily_recovery,
+                "data_library": self.data_library,
                 "sync_monitor": self.sync_monitor,
                 "system_health": self.system_health}
