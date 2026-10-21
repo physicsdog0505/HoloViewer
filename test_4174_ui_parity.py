@@ -236,12 +236,13 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const row=await videoMetadata(id)",viewer)
         self.assertIn("if(lifecycle==='live')",viewer)
         self.assertIn("if(lifecycle==='ended')",viewer)
-        self.assertIn("const sameDayWindow=verifiedSameDayVodWindow(row)",viewer)
-        self.assertIn("const archiveWindow=verifiedEndedVodWindow(row)",viewer)
+        self.assertIn("const vodWindow=verifiedEndedVodWindow(row)",viewer)
         self.assertIn("archiveWindows.set(id,cached)",viewer)
-        self.assertIn("await loadSameDayVodPtt(pttContext,token)",viewer)
-        self.assertIn("await loadArchivePtt(pttContext,token)",viewer)
-        self.assertIn("const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day','hybrid'].includes(pttContext.mode)?'video':requestedPttMode)",viewer)
+        self.assertIn("await loadCoverageDrivenVodPtt(pttContext,token)",viewer)
+        self.assertIn("const resolvedPttMode=pttContext.mode==='live'?'live':(pttContext.mode==='vod'?'video':requestedPttMode)",viewer)
+        self.assertNotIn("verifiedSameDayVodWindow",viewer)
+        self.assertNotIn("loadSameDayVodPtt",viewer)
+        self.assertNotIn("loadHybridVodPtt",viewer)
         resolver=viewer.split("async function resolvePrimaryPtt(){",1)[1].split("async function loadPtt(){",1)[0]
         self.assertNotIn("if(archiveVodEntry)",resolver)
         self.assertNotIn("requestedPttMode==='live'&&todayState==='live'",resolver)
@@ -271,10 +272,12 @@ class ParityContract(unittest.TestCase):
         self.assertIn("static-assets-full-2026-10.json",config)
         self.assertIn("params.getAll('ptt_window')",viewer)
         self.assertIn("anchorSource!==PTT_ARCHIVE_ANCHOR",viewer)
-        self.assertIn("archiveHourKeys(startMs,endMs)",viewer)
-        self.assertIn("const objects=new Map(archive.manifest.objects.map(item=>[item.key,item]));",viewer)
+        self.assertIn("function archiveObjectRange(item)",viewer)
+        self.assertIn("function archiveObjectPlan(archives,startMs,endMs)",viewer)
+        self.assertIn("for(const item of archive.manifest.objects)",viewer)
+        self.assertIn("archiveRangesIntersect(range.startMs,range.endMs,startMs,endMs)",viewer)
         self.assertIn("crypto.subtle.digest('SHA-256',buffer)",viewer)
-        self.assertIn("payload.pushes.length!==item.pushes",viewer)
+        self.assertIn("payload.pushes.length!==expectedPushCount",viewer)
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
         self.assertIn("archiveSourcesForWindow(fetchStartMs,endMs)",viewer)
         self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
@@ -301,7 +304,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("el.append(kindEl,time,floorEl,body);",viewer)
         self.assertIn("if(floor!==null)el.classList.add('has-floor');",viewer)
         self.assertIn("const todayRow=catalogRows.find(row=>String(row?.video_id||'')===id);",viewer)
-        self.assertIn("function verifiedSameDayVodWindow(row)",viewer)
+        self.assertNotIn("function verifiedSameDayVodWindow(row)",viewer)
         self.assertIn("lifecycle!=='ended'",viewer)
         self.assertIn("function verifiedEndedVodWindow(row)",viewer)
         self.assertIn("if(taipeiDayForDate(window.start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null",viewer)
@@ -317,15 +320,15 @@ class ParityContract(unittest.TestCase):
         self.assertIn("return loadCoverageDrivenVodPtt(context,token);",viewer)
         self.assertIn("Archive + D1 · ⚠ 尚未完成封存",viewer)
         self.assertIn("D1 history · ⚠ Archive 尚不可用",viewer)
-        self.assertIn("mode:'same-day'",viewer)
+        self.assertIn("mode:'vod'",viewer)
 
 
-    def test_historical_ptt_month_registry_and_cross_month_plan(self):
+    def test_historical_ptt_manifest_drives_partition_neutral_object_plan(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         config=(ROOT/'site/assets/config.js').read_text(encoding='utf-8')
-        start=viewer.index("function nextIsoDay(day){")
-        end=viewer.index("async function archiveSha256Hex(buffer){",start)
-        helpers=viewer[start:end]
+        helper_start=viewer.index("function nextIsoDay(day){")
+        helper_end=viewer.index("async function archiveSha256Hex(buffer){",helper_start)
+        helpers=viewer[helper_start:helper_end]
         row_start=viewer.index("function archiveRowIdentity(row){")
         row_end=viewer.index("async function resolveArchiveRows(context,archives){",row_start)
         row_helpers=viewer[row_start:row_end]
@@ -349,64 +352,104 @@ function archiveUnavailableError(message){const error=new Error(message);error.a
 HELPERS
 ROW_HELPERS
 VISIBLE_HELPER
-const aug=archiveSourcesForWindow(Date.parse('2026-08-15T00:00:00Z'),Date.parse('2026-08-15T01:00:00Z'));
 const sep=archiveSourcesForWindow(Date.parse('2026-09-18T11:00:25Z'),Date.parse('2026-09-18T16:13:34Z'));
-const oct=archiveSourcesForWindow(Date.parse('2026-10-18T00:00:00Z'),Date.parse('2026-10-18T01:00:00Z'));
-const cross=archiveSourcesForWindow(Date.parse('2026-09-30T15:59:00Z'),Date.parse('2026-09-30T16:01:00Z'));
-const keys=archiveHourKeys(Date.parse('2026-09-18T11:00:25Z'),Date.parse('2026-09-18T16:13:34Z'));
-const manifest={objects:keys.map(key=>({key}))};
-const plan=archiveChunkPlan([{source:sep[0],manifest}],Date.parse('2026-09-18T11:00:25Z'),Date.parse('2026-09-18T16:13:34Z'));
+const crossSources=archiveSourcesForWindow(Date.parse('2026-09-30T15:59:00Z'),Date.parse('2026-09-30T16:01:00Z'));
+
+const hourlyObjects=Array.from({length:7},(_,i)=>({
+ key:'ptt/v1/chunks/2026/09/18/'+String(1100+i*100).padStart(4,'0')+'.json',
+ bucket_start:new Date(Date.parse('2026-09-18T11:00:00Z')+i*3600000).toISOString(),
+ bucket_end:new Date(Date.parse('2026-09-18T12:00:00Z')+i*3600000).toISOString(),
+ sha256:'a'.repeat(64),pushes:10
+}));
+const hourlyPlan=archiveObjectPlan(
+ [{source:sep[0],manifest:{objects:hourlyObjects}}],
+ Date.parse('2026-09-18T11:00:25Z'),Date.parse('2026-09-18T16:13:34Z')
+);
+
+const dailyObject={
+ key:'ptt/v1/days/2026-10-21/day.json',
+ partition_start:'2026-10-20T16:00:00Z',
+ partition_end:'2026-10-21T16:00:00Z',
+ sha256:'b'.repeat(64),push_count:2400
+};
+const dailyPlan=archiveObjectPlan(
+ [{source:{month:'2026-10',base:'https://example.invalid'},manifest:{objects:[dailyObject]}}],
+ Date.parse('2026-10-21T01:00:00Z'),Date.parse('2026-10-21T03:00:00Z')
+);
+
+const previousDay={
+ key:'ptt/v1/days/2026-10-20/day.json',
+ range_start:'2026-10-19T16:00:00Z',range_end:'2026-10-20T16:00:00Z',
+ sha256:'c'.repeat(64),push_count:2000
+};
+const nextDay={
+ key:'ptt/v1/days/2026-10-21/day.json',
+ range_start:'2026-10-20T16:00:00Z',range_end:'2026-10-21T16:00:00Z',
+ sha256:'d'.repeat(64),push_count:2100
+};
+const crossDayPlan=archiveObjectPlan(
+ [{source:{month:'2026-10',base:'https://example.invalid'},manifest:{objects:[previousDay,nextDay]}}],
+ Date.parse('2026-10-20T15:30:00Z'),Date.parse('2026-10-20T17:30:00Z')
+);
+
+const twelveHour={
+ key:'ptt/v1/partitions/2026-10-21-a.json',
+ range_start:'2026-10-20T16:00:00Z',range_end:'2026-10-21T04:00:00Z',
+ sha256:'e'.repeat(64),push_count:1200
+};
+const twelveHourPlan=archiveObjectPlan(
+ [{source:{month:'2026-10',base:'https://example.invalid'},manifest:{objects:[twelveHour]}}],
+ Date.parse('2026-10-21T02:00:00Z'),Date.parse('2026-10-21T03:00:00Z')
+);
+
 const rows=Array.from({length:2019},(_,i)=>({
  source_record_key:'J33JnrVJiIQ:'+i,
  occurred_at:new Date(Date.parse('2026-09-18T11:00:25Z')+i*9000).toISOString(),
- aid:'J33JnrVJiIQ',source_line:247+i,floor:i+1
+ aid:'J33JnrVJiIQ',source_line:247+i,push_id:'push-'+i,floor:i+1
 }));
 rows.push({...rows[1000]});
 const deduped=dedupeArchiveRows(rows);
 const visible=vodPttVisibleCountAt(deduped,Date.parse('2026-09-18T16:13:34Z'));
-process.stdout.write(JSON.stringify({aug,sep,oct,cross,keys,plan:plan.map(x=>x.source.base+'/'+x.item.key),deduped:deduped.length,visible}));
+
+process.stdout.write(JSON.stringify({
+ crossSources,
+ hourlyPlan:hourlyPlan.map(x=>x.item.key),
+ dailyPlan:dailyPlan.map(x=>x.item.key),
+ crossDayPlan:crossDayPlan.map(x=>x.item.key),
+ twelveHourPlan:twelveHourPlan.map(x=>x.item.key),
+ oldRange:archiveObjectRange(hourlyObjects[0]),
+ dailyRange:archiveObjectRange(dailyObject),
+ oldCount:archiveObjectPushCount(hourlyObjects[0]),
+ dailyCount:archiveObjectPushCount(dailyObject),
+ deduped:deduped.length,visible
+}));
 """.replace("REGISTRY",registry).replace("ROW_HELPERS",row_helpers).replace("VISIBLE_HELPER",visible_helper).replace("HELPERS",helpers)
         result=subprocess.run(["node","-e",script],check=True,capture_output=True,text=True)
         payload=json.loads(result.stdout)
-        self.assertEqual(payload["aug"][0]["month"],"2026-08")
-        self.assertIn("full-offline",payload["aug"][0]["base"])
-        self.assertEqual(payload["sep"][0]["month"],"2026-09")
-        self.assertIn("static-assets-pilot",payload["sep"][0]["base"])
-        self.assertEqual(payload["oct"][0]["month"],"2026-10")
-        self.assertIn("full-offline",payload["oct"][0]["base"])
-        self.assertEqual([x["month"] for x in payload["cross"]],["2026-09","2026-10"])
-        self.assertEqual(payload["keys"],[
-            "ptt/v1/chunks/2026/09/18/1100.json",
-            "ptt/v1/chunks/2026/09/18/1200.json",
-            "ptt/v1/chunks/2026/09/18/1300.json",
-            "ptt/v1/chunks/2026/09/18/1400.json",
-            "ptt/v1/chunks/2026/09/18/1500.json",
-            "ptt/v1/chunks/2026/09/18/1600.json",
+        self.assertEqual([x["month"] for x in payload["crossSources"]],["2026-09","2026-10"])
+        self.assertEqual(len(payload["hourlyPlan"]),6)
+        self.assertEqual(payload["dailyPlan"],["ptt/v1/days/2026-10-21/day.json"])
+        self.assertEqual(payload["crossDayPlan"],[
+            "ptt/v1/days/2026-10-20/day.json",
+            "ptt/v1/days/2026-10-21/day.json",
         ])
-        self.assertEqual(len(payload["plan"]),6)
-        self.assertTrue(all("static-assets-pilot.singlebagel.workers.dev" in url for url in payload["plan"]))
+        self.assertEqual(payload["twelveHourPlan"],["ptt/v1/partitions/2026-10-21-a.json"])
+        self.assertEqual(payload["oldCount"],10)
+        self.assertEqual(payload["dailyCount"],2400)
         self.assertEqual(payload["deduped"],2019)
         self.assertEqual(payload["visible"],2019)
         self.assertIn('"2026-09": Object.freeze({',config)
 
-        # Archive reads must preserve the existing VOD pre-roll contract:
-        # scheduled/actual anchor minus one hour, while coverage remains actual-window only.
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
-        self.assertIn("archiveChunkPlan(archives,fetchStartMs,endMs)",viewer)
+        self.assertIn("archiveObjectPlan(archives,fetchStartMs,endMs)",viewer)
         self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
         self.assertIn("archiveCoverageStatus(archive.manifest,startMs,endMs,archive.source.month)",viewer)
-
-        pre_script="""
-function taipeiDayForDate(value){
- const d=value instanceof Date?value:new Date(value);
- const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
- const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
- return out.year+'-'+out.month+'-'+out.day;
-}
-"""+helpers+"\nconst PTT_ARCHIVE_MONTHS="+registry+";function archiveUnavailableError(message){const error=new Error(message);error.archiveUnavailable=true;return error;}process.stdout.write(JSON.stringify(archiveSourcesForWindow(Date.parse('2026-09-30T15:00:25Z'),Date.parse('2026-09-30T16:01:25Z'))));"
-        pre_result=subprocess.run(["node","-e",pre_script],check=True,capture_output=True,text=True)
-        pre_payload=json.loads(pre_result.stdout)
-        self.assertEqual([x["month"] for x in pre_payload],["2026-09","2026-10"])
+        self.assertNotIn("archiveHourKey(",viewer)
+        self.assertNotIn("archiveHourKeys(",viewer)
+        self.assertNotIn("archiveHourTaipeiMonth(",viewer)
+        self.assertNotIn("chunk_minutes!==60",viewer)
+        self.assertNotIn("if daily",viewer.lower())
+        self.assertNotIn("if hourly",viewer.lower())
 
     def test_historical_ptt_manifest_failure_falls_back_without_claiming_empty(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
