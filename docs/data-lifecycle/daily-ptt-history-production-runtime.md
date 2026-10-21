@@ -2,7 +2,7 @@
 
 This branch is the integration seam for the Owner-approved daily closeout:
 
-`07:30 Asia/Taipei -> previous day -> expected AIDs -> Collector coverage -> bounded repair hook -> reverify -> immutable Static Assets package -> assets-only deploy -> full HTTP readback -> Admin evidence`.
+`07:30 Asia/Taipei -> previous day -> expected AIDs -> Collector coverage -> bounded repair hook -> reverify -> one canonical Taipei-day Static Assets payload -> assets-only deploy -> full HTTP readback -> Admin evidence`.
 
 ## Inputs
 
@@ -52,12 +52,14 @@ The runtime keeps:
 - `archive/YYYY-MM-DD/delivery-plan.json`
 - `archive/YYYY-MM-DD/archive-job.json`
 - `latest-archive-job.json`
-- `static-public/` — persistent union of immutable historical assets
+- `static-public/` — persistent union of immutable historical assets; newly finalized days are packaged as one `day.json` payload per Taipei day
 - `wrangler.daily-history.json`
 - `last-static-assets-deploy.log`
 
 Do not delete `static-public/` between deployments. Workers Static Assets
-versions are deployed from that complete local asset root.
+versions are deployed from that complete local asset root. Existing hourly
+historical assets are preserved; the daily packaging change applies only to
+newly built finalized-day generations unless an explicit offline repack is run.
 
 ## Build-only acceptance
 
