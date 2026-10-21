@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "holoviewer-archive-readback-receipt-v1",
+  "title": "HoloViewer Archive Independent Readback Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sanitized",
+    "snapshot_id",
+    "observed_at",
+    "target",
+    "job_id",
+    "manifest_digest",
+    "source_revision",
+    "scope",
+    "objects_expected",
+    "objects_checked",
+    "objects_verified",
+    "manifest_verified",
+    "manifest_digest_match",
+    "content_hash_match",
+    "coverage_scope_match",
+    "object_count_match",
+    "unresolved_objects",
+    "pagination_complete",
+    "verification_mode",
+    "job_verified",
+    "error_code",
+    "contract_gaps"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "holoviewer-archive-readback-receipt-v1"
+    },
+    "sanitized": {
+      "const": true
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observed_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "target": {
+      "type": "object"
+    },
+    "job_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "manifest_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scope": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "objects_expected": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "objects_checked": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "objects_verified": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "manifest_verified": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "manifest_digest_match": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "content_hash_match": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "coverage_scope_match": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "object_count_match": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "unresolved_objects": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "pagination_complete": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "verification_mode": {
+      "enum": [
+        "bounded_sample",
+        "full_partition",
+        null
+      ]
+    },
+    "job_verified": {
+      "type": "boolean"
+    },
+    "error_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contract_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}
