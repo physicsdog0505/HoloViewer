@@ -27,7 +27,8 @@
     "state": "VERIFIED_COMPLETE",
     "archive_job_status": "completed",
     "readback_verified": true,
-    "error_code": null
+    "error_code": null,
+    "unresolved_aids": []
   },
   "transcript": {
     "due": 3,
@@ -36,7 +37,17 @@
     "no_public_caption": 1,
     "retry_pending": 1,
     "failed": 0,
-    "repaired_missing_binding": 0
+    "repaired_missing_binding": 0,
+    "due_video_ids": [
+      "xyzABC98765"
+    ],
+    "retry_pending_video_ids": [
+      "xyzABC98765"
+    ],
+    "no_public_caption_video_ids": [
+      "mnoPQR24680"
+    ],
+    "failed_video_ids": []
   },
   "translation": {
     "due_requested_jobs": 1,
@@ -44,6 +55,11 @@
     "completed": 4,
     "retry_pending": 0,
     "failed": 0,
-    "not_requested": 7
+    "not_requested": 7,
+    "due_video_ids": [
+      "abcDEF12345"
+    ],
+    "retry_pending_video_ids": [],
+    "failed_video_ids": []
   }
 }
