@@ -70,9 +70,14 @@ class WatchalongAssetTests(unittest.TestCase):
         self.assertEqual(event["artifacts"]["sync"]["status"], "REPAIRED")
         self.assertEqual(event["artifacts"]["translation"]["artifact_id"], "62b0a69f53a7e754b424b1ce298566d0f8e733414fe1dbea9bbda9e009f4e8ca")
 
-    def test_data_only_pr_does_not_ship_a_second_watchalong_player(self):
-        self.assertFalse((ROOT / "site/assets/watchalong-standalone.js").exists())
-        self.assertFalse((ROOT / "site/watchalong-viewer").exists())
+    def test_integrated_release_uses_existing_static_watchalong_assets(self):
+        player = ROOT / "site/assets/watchalong-standalone.js"
+        viewer = ROOT / "site/watchalong-viewer/index.html"
+        self.assertTrue(player.exists())
+        self.assertTrue(viewer.exists())
+        source = player.read_text(encoding="utf-8")
+        self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", source)
+        self.assertIn("STATIC_EVENT_MODE", source)
 
     def test_exporter_has_no_network_or_provider_write_path(self):
         source = (ROOT / "scripts/export_watchalong_assets.py").read_text(encoding="utf-8")
