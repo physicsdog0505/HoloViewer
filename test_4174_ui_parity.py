@@ -241,7 +241,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("archiveWindows.set(id,cached)",viewer)
         self.assertIn("await loadSameDayVodPtt(pttContext,token)",viewer)
         self.assertIn("await loadArchivePtt(pttContext,token)",viewer)
-        self.assertIn("const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode)",viewer)
+        self.assertIn("const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day','hybrid'].includes(pttContext.mode)?'video':requestedPttMode)",viewer)
         resolver=viewer.split("async function resolvePrimaryPtt(){",1)[1].split("async function loadPtt(){",1)[0]
         self.assertNotIn("if(archiveVodEntry)",resolver)
         self.assertNotIn("requestedPttMode==='live'&&todayState==='live'",resolver)
@@ -281,7 +281,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("row?.source_record_key||row?.push_id",viewer)
         self.assertIn("Number.isInteger(row?.floor)&&row.floor>0",viewer)
         self.assertIn("資料可能不完整",viewer)
-        self.assertNotIn("/v1/ptt/history?day=",viewer)
+        self.assertIn("async function loadPttDayWindowRows(day,startMs,endMs)",viewer)
+        self.assertIn("/v1/ptt/history?day=",viewer)
         self.assertIn("if(!archiveVodEntry)await loadCatalog();",viewer)
         self.assertIn(".ptt-floor{",css)
         self.assertIn(".ptt-row.has-floor{grid-template-columns:max-content max-content max-content minmax(0,1fr)}",css)
@@ -306,12 +307,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn("if(taipeiDayForDate(window.start)!==today||taipeiDayForDate(new Date(endMs-1))!==today)return null",viewer)
         self.assertIn("taipeiDayForDate(new Date(endMs-1))!==today",viewer)
         self.assertIn("async function loadTodayPttPayload(day)",viewer)
-        self.assertIn("&limit=1000",viewer)
+        self.assertIn("&limit=300",viewer)
+        self.assertNotIn("&limit=1000",viewer)
+        self.assertIn("const VOD_PTT_HISTORY_PAGE_CAP=20;",viewer)
         self.assertIn("async function loadSameDayVodPtt(context,token)",viewer)
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
         self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
         self.assertIn("[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||'']",viewer)
-        self.assertIn("今日暫存 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整",viewer)
+        self.assertIn("今日 D1 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整",viewer)
         self.assertIn("mode:'same-day'",viewer)
 
 
@@ -414,7 +417,7 @@ function taipeiDayForDate(value){
 
     def test_historical_ptt_archive_path_is_read_only(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
-        archive=viewer.split("const archiveManifestCache=new Map();",1)[1].split("async function resolvePrimaryPtt()",1)[0]
+        archive=viewer.split("const archiveManifestCache=new Map();",1)[1].split("async function loadHybridVodPtt(context,token){",1)[0]
         for verb in ("method:'POST'","method:'PUT'","method:'PATCH'","method:'DELETE'","INSERT ","UPDATE ","DELETE FROM","wrangler","D1","R2"):
             self.assertNotIn(verb,archive)
         self.assertIn("credentials:'omit'",archive)
@@ -1043,7 +1046,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         js=(ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
         self.assertIn("const previousIndex=primaryIndex;", js)
         self.assertIn("const primaryChanged=index!==previousIndex;", js)
-        self.assertIn("if(primaryChanged)resolvePrimaryPtt();", js)
+        self.assertIn("if(primaryChanged&&!viewingTimelineActive())resolvePrimaryPtt();", js)
         self.assertIn("if(index!==primaryIndex)setPrimary(index);", js)
         self.assertIn("setLayoutPreset('focus');", js)
 

@@ -5,6 +5,7 @@ const PTT_ARCHIVE_MONTHS=window.HOLOVIEWER_CONFIG?.pttArchiveMonths||{};
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
 const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';
 const PTT_POLL_MS=60000;
+const VOD_PTT_HISTORY_PAGE_CAP=20;
 const params=new URLSearchParams(location.search);
 const MAX_STREAMS=16;
 const FOCUS_VISIBLE_SLOTS=4;
@@ -226,7 +227,7 @@ function updateUrl(){
  streams.forEach(stream=>q.append('stream',stream.videoId));
  q.set('layout',layout);
  q.set('workspace',currentLayoutPreset()==='focus'?'focus':'sidebar');
- const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode);
+ const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day','hybrid'].includes(pttContext.mode)?'video':requestedPttMode);
  q.set('ptt',resolvedPttMode);
  archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|')));
  q.set('primary',String(primaryIndex));
@@ -1339,7 +1340,7 @@ function preservePttFollowDuringLayout(change){
   repinPttAfterLayout({force:true});
  }
 }
-function pttVodMode(){return pttContext.mode==='archive'||pttContext.mode==='same-day'}
+function pttVodMode(){return ['archive','same-day','hybrid'].includes(pttContext.mode)}
 function pttTimelineClock(ms){
  const date=new Date(ms);
  if(!Number.isFinite(date.getTime()))return '';
@@ -1439,8 +1440,48 @@ function verifiedSameDayVodWindow(row){
  return {...window,day:today};
 }
 async function loadTodayPttPayload(day){
- try{return await api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=1000')}
- catch{return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300')}
+ return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300');
+}
+async function loadPttDayWindowRows(day,startMs,endMs){
+ if(day===taipeiDay()){
+  try{
+   const latest=await loadTodayPttPayload(day);
+   if(latest?.schema_version==='public-consumer-v1'&&Array.isArray(latest.pushes)){
+    const timed=latest.pushes.map(row=>({row,ms:Date.parse(String(row?.occurred_at||''))}))
+     .filter(item=>item.row&&typeof item.row.content==='string'&&Number.isFinite(item.ms))
+     .sort((a,b)=>a.ms-b.ms);
+    if(timed.length&&timed[0].ms<=startMs&&timed[timed.length-1].ms>=endMs){
+     return {
+      rows:dedupeArchiveRows(timed.filter(item=>item.ms>=startMs&&item.ms<endMs).map(item=>item.row)),
+      pages:0,incomplete:false,envelope:latest,source:'today-tail'
+     };
+    }
+   }
+  }catch{}
+ }
+ const rows=[],seenCheckpoints=new Set();
+ let after='',pages=0,lastEnvelope=null,reachedEnd=false;
+ while(pages<VOD_PTT_HISTORY_PAGE_CAP){
+  const path='/v1/ptt/history?day='+encodeURIComponent(day)+'&limit=200'+
+   (after?'&after='+encodeURIComponent(after):'');
+  const data=await api(path);
+  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes)||
+     !data.page||typeof data.page.has_more!=='boolean')throw new Error('PTT history 資料格式錯誤');
+  lastEnvelope=data;pages+=1;
+  for(const row of data.pushes){
+   if(!row||typeof row.content!=='string')continue;
+   const occurred=Date.parse(String(row.occurred_at||''));
+   if(!Number.isFinite(occurred))continue;
+   if(occurred>=endMs){reachedEnd=true;break}
+   if(occurred>=startMs)rows.push(row);
+  }
+  if(reachedEnd||!data.page.has_more)break;
+  const next=String(data.page.next_checkpoint||'');
+  if(!next||seenCheckpoints.has(next))throw new Error('PTT history continuation 無法前進');
+  seenCheckpoints.add(next);after=next;
+ }
+ const incomplete=!reachedEnd&&Boolean(lastEnvelope?.page?.has_more);
+ return {rows:dedupeArchiveRows(rows),pages,incomplete,envelope:lastEnvelope,source:'history'};
 }
 function vodPttVisibleCountAt(rows,absoluteMs){
  let low=0,high=rows.length;
@@ -1515,31 +1556,33 @@ function startVodPttTimeline(){
  pttVodPollTimer=setInterval(()=>syncVodPttTimeline(),500);
  syncVodPttTimeline({forceFollow:true});
 }
+function vodPttWindowMode(start,end){
+ const startMs=Date.parse(String(start||'')),endMs=Date.parse(String(end||''));
+ if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return 'archive';
+ const today=taipeiDay();
+ const startDay=taipeiDayForDate(new Date(startMs));
+ const endDay=taipeiDayForDate(new Date(endMs-1));
+ if(startDay===today&&endDay===today)return 'same-day';
+ if(startDay<today&&endDay===today)return 'hybrid';
+ return 'archive';
+}
 async function loadSameDayVodPtt(context,token){
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 今日專串';
  pttMeta.textContent=context.day.replaceAll('-','/')+' · 今日暫存 · 讀取中';
  try{
-  const data=await loadTodayPttPayload(context.day);
-  if(token!==pttResolveToken)return;
-  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw new Error('資料格式錯誤');
   const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
   const fetchStartMs=vodPttFetchStartMs(context)??startMs;
-  const rows=data.pushes.filter(row=>{
-   if(!row||typeof row.content!=='string')return false;
-   const occurred=Date.parse(String(row.occurred_at||''));
-   return Number.isFinite(occurred)&&occurred>=fetchStartMs&&occurred<endMs;
-  });
-  const seen=new Set(),deduped=[];
-  for(const row of rows){
-   const key=pttKey(row);
-   if(!key||seen.has(key))continue;
-   seen.add(key);deduped.push(row);
-  }
-  setVodPttRows(deduped);
+  const result=await loadPttDayWindowRows(context.day,fetchStartMs,endMs);
+  if(token!==pttResolveToken)return;
+  setVodPttRows(result.rows);
   pttLoaded=true;pttFollowing=true;pttNewest.hidden=true;
-  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+deduped.length+' 則 · 今日暫存 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整';
-  if(!deduped.length)pttFeed.replaceChildren(node('div','這段今日 VOD 時間範圍內目前沒有可顯示的 PTT 推文；資料尚未封存。','ptt-empty'));
+  const paging=result.incomplete?' · ⚠ 分頁上限，資料可能不完整':'';
+  pttMeta.textContent=context.day.replaceAll('-','/')+' · '+result.rows.length+
+   ' 則 · 今日 D1 · 對齊播放時間 · ⚠ 尚未封存，不宣稱完整'+paging;
+  if(!result.rows.length)pttFeed.replaceChildren(node('div',
+   result.incomplete?'今日 VOD PTT 分頁達安全上限，尚未取得播放時間窗內的資料。':'這段今日 VOD 時間範圍內目前沒有可顯示的 PTT 推文；資料尚未封存。',
+   'ptt-empty'));
   startVodPttTimeline();
  }catch(error){
   if(token!==pttResolveToken)return;
@@ -1747,28 +1790,32 @@ async function resolveArchiveRows(context,archives){
   chunkRequests:plan.map(entry=>entry.source.base+'/'+entry.item.key)
  };
 }
+async function resolveArchivePttResult(context){
+ let result=null;
+ const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
+ const fetchStartMs=vodPttFetchStartMs(context)??startMs;
+ const sources=archiveSourcesForWindow(fetchStartMs,endMs);
+ for(let attempt=0;attempt<2;attempt++){
+  try{
+   const archives=await Promise.all(sources.map(async source=>({source,manifest:await fetchArchiveManifest(source,attempt===1)})));
+   result=await resolveArchiveRows(context,archives);
+   break;
+  }catch(error){
+   if(attempt===0&&error?.archiveIntegrity){
+    archiveManifestCache.clear();
+    continue;
+   }
+   throw error;
+  }
+ }
+ return result;
+}
 async function loadArchivePtt(context,token){
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 歷史專串';
  pttMeta.textContent='歷史 Static Assets · 讀取中';
- let result=null;
  try{
-  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
-  const fetchStartMs=vodPttFetchStartMs(context)??startMs;
-  const sources=archiveSourcesForWindow(fetchStartMs,endMs);
-  for(let attempt=0;attempt<2;attempt++){
-   try{
-    const archives=await Promise.all(sources.map(async source=>({source,manifest:await fetchArchiveManifest(source,attempt===1)})));
-    result=await resolveArchiveRows(context,archives);
-    break;
-   }catch(error){
-    if(attempt===0&&error?.archiveIntegrity){
-     archiveManifestCache.clear();
-     continue;
-    }
-    throw error;
-   }
-  }
+  const result=await resolveArchivePttResult(context);
   if(token!==pttResolveToken||!result)return;
   setVodPttRows(result.rows);
   pttLoaded=true;
@@ -1790,6 +1837,40 @@ async function loadArchivePtt(context,token){
   pttFeed.replaceChildren(node('div','歷史 PTT UNKNOWN / UNAVAILABLE：'+detail,'ptt-empty'));
  }
 }
+async function loadHybridVodPtt(context,token){
+ pttPanel.hidden=false;
+ pttTitle.textContent='PTT 歷史專串';
+ pttMeta.textContent='歷史封存 + 今日暫存 · 讀取中';
+ try{
+  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
+  const today=taipeiDay();
+  const boundaryMs=Date.parse(today+'T00:00:00+08:00');
+  if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||!Number.isFinite(boundaryMs)||
+     !(startMs<boundaryMs&&boundaryMs<endMs))throw new Error('跨日 VOD 時間窗無效');
+  const archiveContext={...context,end:new Date(boundaryMs).toISOString()};
+  const [archiveResult,todayResult]=await Promise.all([
+   resolveArchivePttResult(archiveContext),
+   loadPttDayWindowRows(today,boundaryMs,endMs)
+  ]);
+  if(token!==pttResolveToken)return;
+  if(!archiveResult)throw new Error('跨日 PTT 歷史資料無法讀取');
+  const rows=dedupeArchiveRows([...archiveResult.rows,...todayResult.rows]);
+  setVodPttRows(rows);
+  pttLoaded=true;pttFollowing=true;pttNewest.hidden=true;
+  const archiveWarning=archiveResult.coverageStatus==='COMPLETE'
+   ?'昨日封存完整'
+   :'⚠ 昨日 '+archiveResult.coverageStatus;
+  const paging=todayResult.incomplete?' · ⚠ 今日分頁上限':'';
+  pttMeta.textContent=taipeiDayForDate(new Date(startMs))+'～'+today+
+   ' · '+rows.length+' 則 · VOD · '+archiveWarning+' + 今日 D1（未封存）'+paging;
+  if(!rows.length)pttFeed.replaceChildren(node('div','這段跨日 VOD 目前沒有可顯示的 PTT 推文。','ptt-empty'));
+  startVodPttTimeline();
+ }catch(error){
+  if(token!==pttResolveToken)return;
+  pttMeta.textContent='歷史封存 + 今日暫存 · 讀取失敗';
+  pttFeed.replaceChildren(node('div','跨日 VOD 的 PTT 暫時無法讀取：'+String(error?.message||error),'ptt-empty'));
+ }
+}
 async function resolveViewingSessionPtt(){
  clearInterval(pttVodPollTimer);pttVodPollTimer=null;
  if(!viewingTimelineActive())return false;
@@ -1798,12 +1879,12 @@ async function resolveViewingSessionPtt(){
  const startMs=viewingSession.absolute_start_ms;
  const endMs=startMs+viewingSession.master_end_ms;
  const start=new Date(startMs).toISOString(),end=new Date(endMs).toISOString();
- const today=taipeiDay();
- const sameDay=taipeiDayForDate(start)===today&&taipeiDayForDate(new Date(endMs-1))===today;
- pttContext={mode:sameDay?'same-day':'archive',videoId:'',start,end,scheduledStart:'',
+ const mode=vodPttWindowMode(start,end);
+ pttContext={mode,videoId:'',start,end,scheduledStart:'',
              day:taipeiDayForDate(start),anchorSource:PTT_ARCHIVE_ANCHOR};
  updateUrl();
- if(sameDay)await loadSameDayVodPtt(pttContext,token);
+ if(mode==='same-day')await loadSameDayVodPtt(pttContext,token);
+ else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);
  else await loadArchivePtt(pttContext,token);
  return true;
 }
@@ -1820,14 +1901,13 @@ async function resolvePrimaryPtt(){
 
  const suppliedWindow=archiveWindows.get(id);
  if(suppliedWindow){
-  const endMs=Date.parse(suppliedWindow.end),today=taipeiDay();
-  const sameDay=taipeiDayForDate(suppliedWindow.start)===today&&
-   Number.isFinite(endMs)&&taipeiDayForDate(new Date(endMs-1))===today;
-  pttContext={mode:sameDay?'same-day':'archive',videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
+  const mode=vodPttWindowMode(suppliedWindow.start,suppliedWindow.end);
+  pttContext={mode,videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
               scheduledStart:suppliedWindow.scheduledStart||'',
               day:taipeiDayForDate(suppliedWindow.start),anchorSource:suppliedWindow.anchorSource};
   updateUrl();
-  if(sameDay)await loadSameDayVodPtt(pttContext,token);
+  if(mode==='same-day')await loadSameDayVodPtt(pttContext,token);
+  else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);
   else await loadArchivePtt(pttContext,token);
   return;
  }

@@ -186,11 +186,11 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
         body = VIEWER[reconcile_start:reconcile_end]
         self.assertIn("if(resolved.status!=='READY')", body)
         self.assertIn("player.getPlayerState?.()===YT.PlayerState.PLAYING", body)
-        self.assertIn("timelineGapPaused.add(player);", body)
         self.assertIn(
             "syncExpected.set(player,{state:YT.PlayerState.PAUSED,until:Date.now()+900});",
             body,
         )
+        self.assertIn("timelineGapPaused.add(player);", body)
         self.assertIn("player.pauseVideo?.();", body)
         self.assertIn("if(player&&timelineGapPaused.has(player))", body)
         self.assertIn(
@@ -198,6 +198,26 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
             body,
         )
         self.assertIn("player.playVideo?.();", body)
+
+    def test_cross_day_vod_ptt_uses_archive_plus_today_hybrid(self):
+        self.assertIn("function vodPttWindowMode(start,end)", VIEWER)
+        self.assertIn("if(startDay<today&&endDay===today)return 'hybrid';", VIEWER)
+        self.assertIn("async function loadHybridVodPtt(context,token)", VIEWER)
+        self.assertIn("resolveArchivePttResult(archiveContext)", VIEWER)
+        self.assertIn("loadPttDayWindowRows(today,boundaryMs,endMs)", VIEWER)
+        self.assertIn("else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);", VIEWER)
+        self.assertIn("['archive','same-day','hybrid'].includes(pttContext.mode)", VIEWER)
+        self.assertIn("const VOD_PTT_HISTORY_PAGE_CAP=20;", VIEWER)
+        self.assertIn("'/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300'", VIEWER)
+        self.assertNotIn("&limit=1000", VIEWER)
+        self.assertIn("source:'today-tail'", VIEWER)
+        self.assertIn("source:'history'", VIEWER)
+        self.assertIn("async function loadPttDayWindowRows(day,startMs,endMs)", VIEWER)
+        self.assertIn("'/v1/ptt/history?day='", VIEWER)
+        self.assertIn("&limit=200", VIEWER)
+        self.assertIn("data.page.next_checkpoint", VIEWER)
+        self.assertIn("if(reachedEnd||!data.page.has_more)break;", VIEWER)
+        self.assertIn("const incomplete=!reachedEnd&&Boolean(lastEnvelope?.page?.has_more);", VIEWER)
 
 if __name__ == "__main__":
     unittest.main()
