@@ -1659,23 +1659,20 @@ function archiveSourcesForWindow(startMs,endMs){
  if(missing.length)throw archiveUnavailableError('歷史 PTT 月份來源未設定：'+missing.join(', '));
  return months.map(month=>archiveSourceForMonth(month));
 }
-function archiveHourKey(ms){
- const date=new Date(ms);
- return 'ptt/v1/chunks/'+date.getUTCFullYear()+'/'+String(date.getUTCMonth()+1).padStart(2,'0')+'/'+
-  String(date.getUTCDate()).padStart(2,'0')+'/'+String(date.getUTCHours()).padStart(2,'0')+'00.json';
+function archiveObjectRange(item){
+ const startRaw=item?.partition_start??item?.range_start??item?.bucket_start;
+ const endRaw=item?.partition_end??item?.range_end??item?.bucket_end;
+ const startMs=Date.parse(String(startRaw||'')),endMs=Date.parse(String(endRaw||''));
+ if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return null;
+ return {startMs,endMs,start:String(startRaw),end:String(endRaw)};
 }
-function archiveHourKeys(startMs,endMs){
- const keys=[];
- let cursor=Math.floor(startMs/3600000)*3600000;
- while(cursor<endMs){keys.push(archiveHourKey(cursor));cursor+=3600000}
- return keys;
+function archiveObjectPushCount(item){
+ const value=item?.push_count??item?.pushes;
+ return Number.isInteger(value)&&value>=0?value:null;
 }
-function archiveHourTaipeiMonth(key){
- const match=String(key||'').match(/^ptt\/v1\/chunks\/(\d{4})\/(\d{2})\/(\d{2})\/(\d{2})00\.json$/);
- if(!match)return '';
- const ms=Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3]),Number(match[4]));
- const day=taipeiDayForDate(new Date(ms));
- return /^\d{4}-\d{2}-\d{2}$/.test(day)?day.slice(0,7):'';
+function archiveRangesIntersect(aStart,aEnd,bStart,bEnd){
+ return Number.isFinite(aStart)&&Number.isFinite(aEnd)&&Number.isFinite(bStart)&&Number.isFinite(bEnd)&&
+  aStart<bEnd&&bStart<aEnd;
 }
 async function archiveSha256Hex(buffer){
  if(!globalThis.crypto?.subtle)throw new Error('瀏覽器不支援歷史檔案完整性驗證');
@@ -1684,12 +1681,13 @@ async function archiveSha256Hex(buffer){
 }
 function validateArchiveManifest(manifest){
  if(manifest?.schema_version!==PTT_ARCHIVE_SCHEMA||manifest?.precision!=='minute'||
-    manifest?.chunk_minutes!==60||manifest?.timezone!=='UTC'||
-    !Array.isArray(manifest?.objects)||!Array.isArray(manifest?.days))throw new Error('歷史 PTT manifest 格式不支援');
+    manifest?.timezone!=='UTC'||!Array.isArray(manifest?.objects)||!Array.isArray(manifest?.days))
+  throw new Error('歷史 PTT manifest 格式不支援');
  const seen=new Set();
  for(const item of manifest.objects){
+  const range=archiveObjectRange(item),pushCount=archiveObjectPushCount(item);
   if(!item||typeof item.key!=='string'||!item.key.endsWith('.json')||seen.has(item.key)||
-     !/^[0-9a-f]{64}$/.test(String(item.sha256||''))||!Number.isInteger(item.pushes)||item.pushes<0)
+     !/^[0-9a-f]{64}$/.test(String(item.sha256||''))||!range||pushCount===null)
     throw new Error('歷史 PTT manifest 物件索引無效');
   seen.add(item.key);
  }
@@ -1726,10 +1724,13 @@ async function fetchArchiveChunk(source,item){
  if(digest!==String(item.sha256))throw archiveIntegrityError('歷史 PTT '+source.month+' chunk SHA 不符：'+url);
  let payload;
  try{payload=JSON.parse(new TextDecoder().decode(buffer))}catch{throw archiveIntegrityError('歷史 PTT '+source.month+' chunk JSON 無效：'+url)}
+ const expectedRange=archiveObjectRange(item);
+ const payloadRange=archiveObjectRange(payload);
+ const expectedPushCount=archiveObjectPushCount(item);
  if(payload?.schema_version!==PTT_ARCHIVE_SCHEMA||!Array.isArray(payload?.pushes)||
-    payload.pushes.length!==item.pushes)throw archiveIntegrityError('歷史 PTT '+source.month+' chunk push count 不符：'+url);
- if(String(payload.bucket_start||'')!==String(item.bucket_start||'')||
-    String(payload.bucket_end||'')!==String(item.bucket_end||''))throw archiveIntegrityError('歷史 PTT '+source.month+' chunk bucket 不符：'+url);
+    payload.pushes.length!==expectedPushCount)throw archiveIntegrityError('歷史 PTT '+source.month+' object push count 不符：'+url);
+ if(!expectedRange||!payloadRange||payloadRange.startMs!==expectedRange.startMs||
+    payloadRange.endMs!==expectedRange.endMs)throw archiveIntegrityError('歷史 PTT '+source.month+' object range 不符：'+url);
  return payload.pushes;
 }
 function archiveCoverageStatus(manifest,startMs,endMs,month=''){
@@ -1771,7 +1772,7 @@ async function resolveArchiveDaySlice(day,rangeStart,rangeEnd){
   try{
    const manifest=await fetchArchiveManifest(source,attempt===1);
    const coverageStatus=archiveDayCoverageStatus(manifest,day);
-   const plan=archiveChunkPlan([{source,manifest}],rangeStart,rangeEnd);
+   const plan=archiveObjectPlan([{source,manifest}],rangeStart,rangeEnd);
    const rows=[];
    for(const entry of plan){
     const pushes=await fetchArchiveChunk(entry.source,entry.item);
@@ -1853,18 +1854,17 @@ function dedupeArchiveRows(rows){
  }
  return deduped;
 }
-function archiveChunkPlan(archives,startMs,endMs){
- const keys=archiveHourKeys(startMs,endMs);
+function archiveObjectPlan(archives,startMs,endMs){
  const plan=[];
  for(const archive of archives){
-  const objects=new Map(archive.manifest.objects.map(item=>[item.key,item]));
-  for(const key of keys){
-   if(archiveHourTaipeiMonth(key)!==archive.source.month)continue;
-   const item=objects.get(key);
-   if(item)plan.push({source:archive.source,item});
+  for(const item of archive.manifest.objects){
+   const range=archiveObjectRange(item);
+   if(!range||!archiveRangesIntersect(range.startMs,range.endMs,startMs,endMs))continue;
+   plan.push({source:archive.source,item,range});
   }
  }
- return plan;
+ return plan.sort((a,b)=>a.range.startMs-b.range.startMs||
+  a.range.endMs-b.range.endMs||String(a.item.key).localeCompare(String(b.item.key)));
 }
 async function resolveArchiveRows(context,archives){
  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
@@ -1872,7 +1872,7 @@ async function resolveArchiveRows(context,archives){
   throw new Error('缺少可信的 YouTube actualStartTime / actualEndTime');
  const fetchStartMs=vodPttFetchStartMs(context)??startMs;
  const rows=[];
- const plan=archiveChunkPlan(archives,fetchStartMs,endMs);
+ const plan=archiveObjectPlan(archives,fetchStartMs,endMs);
  for(const entry of plan){
   const pushes=await fetchArchiveChunk(entry.source,entry.item);
   for(const row of pushes){
