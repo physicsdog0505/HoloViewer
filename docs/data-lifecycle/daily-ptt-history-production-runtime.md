@@ -18,9 +18,12 @@ The expected-AID producer is intentionally external. The reviewed companion is
 Hololive-PTT-Viewer PR #422, `daily_expected_aid_export.py`, which uses the
 existing public PTT date-search path and performs no PTT login.
 
-The repair command is optional. If absent, a proven source gap remains
-`REPAIR_NEEDED` and Archive is not attempted. If configured, it receives only
-the exact request JSON produced by #48:
+The repair command is optional and separately gated by `repair_enabled`. The
+checked-in example keeps `repair_enabled=false`, so build-only acceptance stays
+read-only even though a repair command path is configured. If repair is disabled
+or absent, a proven source gap remains `REPAIR_NEEDED` and Archive is not
+attempted. When explicitly enabled, it receives only the exact request JSON
+produced by #48:
 
 ```json
 {
@@ -88,9 +91,11 @@ repair is still pending, the runtime exits fail-closed with
 
 ## Production deployment gate
 
-Only after Owner-local build-only acceptance, set:
+Only after Owner-local build-only acceptance, enable the two mutation gates explicitly:
 
-`"deploy": true`
+`"repair_enabled": true` (permits bounded Collector repair queue requests)
+
+`"deploy": true` (permits Workers Static Assets deploy)
 
 The runtime then executes only:
 
@@ -133,7 +138,7 @@ This integration does not:
 - trust a repair command's success text as completeness;
 - silently overwrite immutable historical object identity.
 
-The current first Production gap still requiring a concrete owner-side binding
-is the bounded Collector repair command. Until that command is configured, days
-with no source gaps can auto-finalize/archive; gap days stop safely at
-`REPAIR_NEEDED`.
+The reviewed private-side companion is Hololive-PTT-Viewer PR #422. It supplies
+both the public date-search expected-AID producer and the bounded repair bridge.
+Until that exact private-side HEAD is owner-tested and `repair_enabled=true`,
+gap days still stop safely at `REPAIR_NEEDED`.
