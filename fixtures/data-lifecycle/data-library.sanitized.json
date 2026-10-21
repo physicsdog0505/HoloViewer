@@ -35,7 +35,9 @@
         "job_status": "completed"
       },
       "history_updated_at": "2026-10-20T03:05:00Z",
-      "reconciled_at": "2026-10-21T07:42:00+08:00"
+      "reconciled_at": "2026-10-21T07:42:00+08:00",
+      "channel_name": "Fixture Channel A",
+      "taipei_day": "2026-10-20"
     },
     {
       "video_id": "xyzABC98765",
@@ -68,7 +70,9 @@
         "job_status": null
       },
       "history_updated_at": "2026-10-20T08:02:00Z",
-      "reconciled_at": "2026-10-21T07:42:00+08:00"
+      "reconciled_at": "2026-10-21T07:42:00+08:00",
+      "channel_name": "Fixture Channel B",
+      "taipei_day": "2026-10-20"
     },
     {
       "video_id": "mnoPQR24680",
@@ -101,7 +105,9 @@
         "job_status": null
       },
       "history_updated_at": "2026-10-19T06:02:00Z",
-      "reconciled_at": "2026-10-21T07:42:00+08:00"
+      "reconciled_at": "2026-10-21T07:42:00+08:00",
+      "channel_name": "Fixture Channel C",
+      "taipei_day": "2026-10-19"
     }
   ]
 }
