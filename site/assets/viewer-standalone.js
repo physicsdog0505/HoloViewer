@@ -1440,10 +1440,25 @@ function verifiedSameDayVodWindow(row){
  return {...window,day:today};
 }
 async function loadTodayPttPayload(day){
- try{return await api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=1000')}
- catch{return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300')}
+ return api('/v1/ptt/today?day='+encodeURIComponent(day)+'&limit=300');
 }
 async function loadPttDayWindowRows(day,startMs,endMs){
+ if(day===taipeiDay()){
+  try{
+   const latest=await loadTodayPttPayload(day);
+   if(latest?.schema_version==='public-consumer-v1'&&Array.isArray(latest.pushes)){
+    const timed=latest.pushes.map(row=>({row,ms:Date.parse(String(row?.occurred_at||''))}))
+     .filter(item=>item.row&&typeof item.row.content==='string'&&Number.isFinite(item.ms))
+     .sort((a,b)=>a.ms-b.ms);
+    if(timed.length&&timed[0].ms<=startMs&&timed[timed.length-1].ms>=endMs){
+     return {
+      rows:dedupeArchiveRows(timed.filter(item=>item.ms>=startMs&&item.ms<endMs).map(item=>item.row)),
+      pages:0,incomplete:false,envelope:latest,source:'today-tail'
+     };
+    }
+   }
+  }catch{}
+ }
  const rows=[],seenCheckpoints=new Set();
  let after='',pages=0,lastEnvelope=null,reachedEnd=false;
  while(pages<VOD_PTT_HISTORY_PAGE_CAP){
@@ -1466,7 +1481,7 @@ async function loadPttDayWindowRows(day,startMs,endMs){
   seenCheckpoints.add(next);after=next;
  }
  const incomplete=!reachedEnd&&Boolean(lastEnvelope?.page?.has_more);
- return {rows:dedupeArchiveRows(rows),pages,incomplete,envelope:lastEnvelope};
+ return {rows:dedupeArchiveRows(rows),pages,incomplete,envelope:lastEnvelope,source:'history'};
 }
 function vodPttVisibleCountAt(rows,absoluteMs){
  let low=0,high=rows.length;
