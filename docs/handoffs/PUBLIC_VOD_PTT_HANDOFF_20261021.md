@@ -1,3 +1,11 @@
+# Superseded as primary handoff
+
+This file is only the VOD / Historical PTT sub-handoff. For the complete Public frontend ownership handoff, read:
+
+`docs/handoffs/PUBLIC_FRONTEND_HANDOFF_20261021.md`
+
+---
+
 # Public VOD / Historical PTT handoff — 2026-10-21
 
 ## Current production baseline
