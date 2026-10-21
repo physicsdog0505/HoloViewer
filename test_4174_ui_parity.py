@@ -483,6 +483,90 @@ process.stdout.write(JSON.stringify({
         self.assertNotIn("function recentUnsealedArchiveDay(day)",viewer)
         self.assertNotIn("function recentSingleDayVodDay(context)",viewer)
 
+    def test_vod_ptt_coverage_resolver_executes_complete_partial_unavailable_and_incomplete_cases(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        day_start=viewer.index("function nextIsoDay(day){")
+        day_end=viewer.index("function archiveMonthKeys(startMs,endMs){",day_start)
+        day_helpers=viewer[day_start:day_end]
+        resolver_start=viewer.index("async function resolveCoverageDrivenVodPtt(context){")
+        resolver_end=viewer.index("function archiveRowIdentity(row){",resolver_start)
+        resolver=viewer[resolver_start:resolver_end]
+        row_start=viewer.index("function archiveRowIdentity(row){")
+        row_end=viewer.index("function archiveObjectPlan(archives,startMs,endMs){",row_start)
+        row_helpers=viewer[row_start:row_end]
+        script=r"""
+const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
+function taipeiDayForDate(value){
+ const d=value instanceof Date?value:new Date(value);
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+ const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return out.year+'-'+out.month+'-'+out.day;
+}
+function taipeiDayStartMs(day){
+ const ms=Date.parse(String(day||'')+'T00:00:00+08:00');
+ return Number.isFinite(ms)?ms:null;
+}
+function vodPttFetchStartMs(context){return Date.parse(context.start)}
+DAY_HELPERS
+ROW_HELPERS
+RESOLVER
+function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',source_line:Number(key.replace(/\D/g,''))||1,occurred_at:occurred,author:'u',content:key}}
+
+(async()=>{
+ let d1Calls=[];
+ resolveArchiveDaySlice=async(day)=>{
+  if(day==='2026-10-20')return {day,coverageStatus:'COMPLETE',rows:[row('a1','2026-10-20T15:45:00Z')]};
+  return {day,coverageStatus:'PARTIAL',rows:[row('x2','2026-10-20T16:30:00Z')]};
+ };
+ loadPttDayWindowRows=async(day)=>{d1Calls.push(day);return {rows:[row('x2','2026-10-20T16:30:00Z'),row('y3','2026-10-20T17:00:00Z')],incomplete:false}};
+ const cross=await resolveCoverageDrivenVodPtt({
+  start:'2026-10-20T15:30:00Z',end:'2026-10-20T17:30:00Z',anchorSource:PTT_ARCHIVE_ANCHOR
+ });
+
+ let completeD1=0;
+ resolveArchiveDaySlice=async(day)=>({day,coverageStatus:'COMPLETE',rows:[]});
+ loadPttDayWindowRows=async()=>{completeD1+=1;return {rows:[],incomplete:false}};
+ const completeZero=await resolveCoverageDrivenVodPtt({
+  start:'2026-10-21T01:00:00Z',end:'2026-10-21T03:00:00Z',anchorSource:PTT_ARCHIVE_ANCHOR
+ });
+
+ let fallbackD1=0;
+ resolveArchiveDaySlice=async()=>{throw new Error('archive unavailable')};
+ loadPttDayWindowRows=async()=>{fallbackD1+=1;return {rows:[row('f4','2026-10-21T01:30:00Z')],incomplete:false}};
+ const unavailable=await resolveCoverageDrivenVodPtt({
+  start:'2026-10-21T01:00:00Z',end:'2026-10-21T03:00:00Z',anchorSource:PTT_ARCHIVE_ANCHOR
+ });
+
+ resolveArchiveDaySlice=async(day)=>({day,coverageStatus:'PARTIAL',rows:[]});
+ loadPttDayWindowRows=async()=>({rows:[],incomplete:true});
+ const capped=await resolveCoverageDrivenVodPtt({
+  start:'2026-10-21T01:00:00Z',end:'2026-10-21T03:00:00Z',anchorSource:PTT_ARCHIVE_ANCHOR
+ });
+
+ process.stdout.write(JSON.stringify({
+  crossRows:cross.rows.map(x=>x.source_record_key),
+  crossD1:d1Calls,
+  crossDays:cross.days,
+  completeD1,completeZero:completeZero.authoritativeZero,
+  fallbackD1,unavailableRows:unavailable.rows.length,unavailableDays:unavailable.archiveUnavailableDays,
+  cappedIncomplete:capped.d1IncompleteDays,cappedZero:capped.authoritativeZero
+ }));
+})().catch(error=>{console.error(error);process.exit(1)});
+""".replace("DAY_HELPERS",day_helpers).replace("ROW_HELPERS",row_helpers).replace("RESOLVER",resolver)
+        result=subprocess.run(["node","-e",script],check=True,capture_output=True,text=True)
+        payload=json.loads(result.stdout)
+        self.assertEqual(payload["crossDays"],["2026-10-20","2026-10-21"])
+        self.assertEqual(payload["crossD1"],["2026-10-21"])
+        self.assertEqual(payload["crossRows"],["a1","x2","y3"])
+        self.assertEqual(payload["completeD1"],0)
+        self.assertTrue(payload["completeZero"])
+        self.assertEqual(payload["fallbackD1"],1)
+        self.assertEqual(payload["unavailableRows"],1)
+        self.assertEqual(payload["unavailableDays"],["2026-10-21"])
+        self.assertEqual(payload["cappedIncomplete"],["2026-10-21"])
+        self.assertFalse(payload["cappedZero"])
+        self.assertIn("if(token!==pttResolveToken)return;",viewer)
+
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
