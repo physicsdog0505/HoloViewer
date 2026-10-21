@@ -111,6 +111,7 @@ let viewingClockPovId='';
 let viewingClockPolicy=null;
 let viewingClockSample=null;
 let viewingResyncPending=false;
+let viewingVisiblePovs=null;
 const viewingTimelineCore=window.HoloViewerViewingTimeline||null;
 const viewingShareState=window.HoloViewerViewingShareState||null;
 const viewingAdapterFactory=window.HoloViewerTimelineViewerAdapter||null;
@@ -535,6 +536,7 @@ function refreshControlState(){
   button.setAttribute('aria-pressed',String(active));
  });
  [...focusChoices.children].forEach((button,index)=>{
+  button.hidden=!viewingPovVisible(index);
   const locked=currentLayoutPreset()==='focus'&&index===lockedIndex;
   button.classList.toggle('active',locked);
   button.setAttribute('aria-pressed',String(locked));
@@ -545,11 +547,12 @@ function refreshControlState(){
  const preset=currentLayoutPreset();
  playerCards.forEach((card,index)=>{
   if(!card)return;
+  card.hidden=!viewingPovVisible(index);
   card.classList.remove('primary','secondary-1','secondary-2','secondary-3','viewer-hidden');
-  if(preset!=='equal')card.classList.toggle('primary',index===primaryIndex);
+  if(preset!=='equal'&&viewingPovVisible(index))card.classList.toggle('primary',index===primaryIndex);
  });
  if(preset!=='equal'){
-  const secondaryIndexes=playerCards.map((card,index)=>card&&index!==primaryIndex?index:-1).filter(index=>index>=0);
+  const secondaryIndexes=playerCards.map((card,index)=>card&&viewingPovVisible(index)&&index!==primaryIndex?index:-1).filter(index=>index>=0);
   const visibleCount=Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryIndexes.length);
   const offset=secondaryIndexes.length?secondaryOffset%secondaryIndexes.length:0;
   const visible=new Set(Array.from({length:visibleCount},(_,slot)=>secondaryIndexes[(offset+slot)%secondaryIndexes.length]));
@@ -559,10 +562,10 @@ function refreshControlState(){
 }
 function applyLayout(){
  const wasFollowing=pttFollowing||pttAtBottom();
- const effective=watchMode==='multi'&&streams.length>1?layout:'equal';
- stage.className='viewer-stage layout-'+effective+' count-'+streams.length;
- workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+streams.length;
- const count=streams.length;
+ const count=Math.max(0,streams.filter((_,index)=>viewingPovVisible(index)).length);
+ const effective=watchMode==='multi'&&count>1?layout:'equal';
+ stage.className='viewer-stage layout-'+effective+' count-'+Math.max(1,count);
+ workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+Math.max(1,count);
  const cols=count<=1?1:count<=4?2:count<=9?3:4;
  const rows=Math.max(1,Math.ceil(count/cols));
  const focusSecondaryCount=Math.min(FOCUS_VISIBLE_SLOTS-1,Math.max(0,count-1));
@@ -995,6 +998,38 @@ function viewingSessionPlaying(){
   try{return player?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{return false}
  });
 }
+function viewingPovVisible(index){
+ if(!viewingTimelineActive()||!collabManaged||collabKind!=='vod'||!viewingVisiblePovs)return true;
+ const povId=String(streams[index]?.povId||'');
+ return Boolean(povId&&viewingVisiblePovs.has(povId));
+}
+function applyViewingCoverage(plan){
+ if(!viewingTimelineActive()||!collabManaged||collabKind!=='vod')return false;
+ const next=new Set(plan.filter(item=>item.status==='READY').map(item=>String(item.pov_id)));
+ const previous=viewingVisiblePovs||new Set();
+ const changed=next.size!==previous.size||[...next].some(id=>!previous.has(id));
+ viewingVisiblePovs=next;
+ if(!changed)return false;
+
+ playerCards.forEach((card,index)=>{if(card)card.hidden=!viewingPovVisible(index)});
+ [...focusChoices.children].forEach((button,index)=>{button.hidden=!viewingPovVisible(index)});
+
+ if(!viewingPovVisible(primaryIndex)){
+  const nextPrimary=streams.findIndex((_,index)=>viewingPovVisible(index));
+  if(nextPrimary>=0){
+   primaryIndex=nextPrimary;
+   audioMaster=nextPrimary;
+   try{viewingAdapter.setPrimaryPov(streams[nextPrimary].povId)}catch{}
+   players.forEach((player,index)=>{
+    if(!player)return;
+    try{if(index===audioMaster)player.unMute();else player.mute()}catch{}
+   });
+  }
+ }
+ applyLayout();
+ mountCallOverlay();
+ return true;
+}
 function sampleViewingMasterClock(){
  const now=performance.now();
  const owner=viewingClockStream();
@@ -1033,6 +1068,7 @@ function reconcileViewingTimeline({sampleClock=true}={}){
   if(sampleClock)sampleViewingMasterClock();
   const current={};streams.forEach(stream=>{if(stream?.povId)current[stream.povId]=stream.videoId});
   const plan=viewingAdapter.plan(current);
+  applyViewingCoverage(plan);
   const resyncOthers=viewingResyncPending;
   viewingResyncPending=false;
   for(const resolved of plan){
@@ -1098,8 +1134,9 @@ function initViewingTimeline(event){
   viewingClockPovId=String(session.povs[0]?.pov_id||'');
   viewingClockPolicy=viewingAdapterFactory.createClock(viewingAdapter,{nowMs:performance.now()});
   viewingClockSample=null;viewingResyncPending=false;
+  viewingVisiblePovs=new Set(viewingAdapter.plan({}).filter(item=>item.status==='READY').map(item=>String(item.pov_id)));
  }catch{
-  viewingSession=null;viewingAdapter=null;viewingClockPovId='';viewingClockPolicy=null;return false;
+  viewingSession=null;viewingAdapter=null;viewingClockPovId='';viewingClockPolicy=null;viewingVisiblePovs=null;return false;
  }
  const restoredIndex=streams.findIndex(stream=>String(stream.povId)===String(viewingAdapter.primaryPovId));
  if(restoredIndex>=0){primaryIndex=restoredIndex;audioMaster=restoredIndex}
