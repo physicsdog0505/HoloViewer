@@ -436,6 +436,7 @@ function taipeiDayForDate(value){
         self.assertIn("allArchiveComplete,authoritativeZero:allArchiveComplete&&merged.length===0",viewer)
         self.assertIn("d1IncompleteDays",viewer)
         self.assertIn("Archive + D1 · ⚠ 尚未完成封存",viewer)
+        self.assertIn("D1 history · ⚠ Archive 尚不可用",viewer)
         self.assertNotIn("function recentUnsealedArchiveDay(day)",viewer)
         self.assertNotIn("function recentSingleDayVodDay(context)",viewer)
 
