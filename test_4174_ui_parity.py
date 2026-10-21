@@ -336,7 +336,7 @@ class ParityContract(unittest.TestCase):
         plan_start=viewer.index("function archiveObjectPlan(archives,startMs,endMs){")
         plan_end=viewer.index("async function loadCoverageDrivenVodPtt(context,token){",plan_start)
         plan_helper=viewer[plan_start:plan_end]
-        visible_start=viewer.index("function vodPttVisibleCountAt(rows,absoluteMs){")
+        visible_start=viewer.index("function buildVodPttPresentationTimes(rows){")
         visible_end=viewer.index("function setVodPttRows(rows){",visible_start)
         visible_helper=viewer[visible_start:visible_end]
         registry="""{
