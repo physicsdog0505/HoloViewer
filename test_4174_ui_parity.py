@@ -391,7 +391,14 @@ process.stdout.write(JSON.stringify({aug,sep,oct,cross,keys,plan:plan.map(x=>x.s
         self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
         self.assertIn("archiveCoverageStatus(archive.manifest,startMs,endMs,archive.source.month)",viewer)
 
-        pre_script=helpers+"\nconst PTT_ARCHIVE_MONTHS="+registry+";function archiveUnavailableError(message){const error=new Error(message);error.archiveUnavailable=true;return error;}process.stdout.write(JSON.stringify(archiveSourcesForWindow(Date.parse('2026-09-30T15:00:25Z'),Date.parse('2026-09-30T16:01:25Z'))));"
+        pre_script="""
+function taipeiDayForDate(value){
+ const d=value instanceof Date?value:new Date(value);
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+ const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return out.year+'-'+out.month+'-'+out.day;
+}
+"""+helpers+"\nconst PTT_ARCHIVE_MONTHS="+registry+";function archiveUnavailableError(message){const error=new Error(message);error.archiveUnavailable=true;return error;}process.stdout.write(JSON.stringify(archiveSourcesForWindow(Date.parse('2026-09-30T15:00:25Z'),Date.parse('2026-09-30T16:01:25Z'))));"
         pre_result=subprocess.run(["node","-e",pre_script],check=True,capture_output=True,text=True)
         pre_payload=json.loads(pre_result.stdout)
         self.assertEqual([x["month"] for x in pre_payload],["2026-09","2026-10"])
