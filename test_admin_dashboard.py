@@ -31,12 +31,12 @@ class DashboardTests(unittest.TestCase):
     def test_refresh_calls_readers_only_and_cooldown_bounds_reads(self):
         calls = []
         readers = {name: (lambda name=name: calls.append(name) or ({"sources": []} if name == "data_coverage" else {}))
-                   for name in ("data_coverage", "daily_finalization", "sync_monitor", "system_health")}
+                   for name in ("data_coverage", "daily_finalization", "daily_recovery", "data_library", "sync_monitor", "system_health")}
         controller = DashboardController(readers, cooldown_seconds=30)
         first = controller.refresh(now=NOW)
         second = controller.refresh(now=NOW + timedelta(seconds=5))
         third = controller.refresh("sync_monitor", now=NOW + timedelta(seconds=31))
-        self.assertEqual(calls, ["data_coverage", "daily_finalization", "sync_monitor", "system_health", "sync_monitor"])
+        self.assertEqual(calls, ["data_coverage", "daily_finalization", "daily_recovery", "data_library", "sync_monitor", "system_health", "sync_monitor"])
         self.assertTrue(all(value["refresh"]["status"] == "refreshed" for value in first.values()))
         self.assertTrue(all(value["refresh"]["status"] == "cooldown" for value in second.values()))
         self.assertEqual(third["sync_monitor"]["refresh"]["status"], "refreshed")
@@ -128,11 +128,14 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(captured["status"], "405 Method Not Allowed")
         self.assertEqual(json.loads(body)["error"], "read-only endpoint")
         html = render_dashboard()
-        for label in ("Data Coverage", "Daily Finalization", "Sync Monitor", "System Health", "重新整理全部"):
+        for label in ("Data Coverage", "Daily Finalization", "Daily Recovery", "Data Library", "Sync Monitor", "System Health", "重新整理全部"):
             self.assertIn(label, html)
         for forbidden_control in ("Retry Publisher", "Retry Repair", "Replay", "Re-sync", "Upload", "Deploy", "Restart Collector", "Restart Publisher"):
             self.assertNotIn(forbidden_control, html)
         self.assertIn('id="coverage-filter"', html)
+        self.assertIn('id="recovery-rows"', html)
+        self.assertIn('id="library-rows"', html)
+        self.assertIn('id="library-search"', html)
         self.assertNotIn("method:'POST'", html)
 
     def test_status_get_refreshes_requested_section(self):
