@@ -8,7 +8,7 @@ from .contracts import build_sync_monitor, build_system_health, coverage_sync_co
 from .finalization import build_daily_finalization
 from .privacy import sanitize_for_browser
 
-SECTIONS = ("data_coverage", "daily_finalization", "sync_monitor", "system_health")
+SECTIONS = ("data_coverage", "daily_finalization", "daily_recovery", "data_library", "sync_monitor", "system_health")
 
 
 class DashboardController:
@@ -53,7 +53,7 @@ class DashboardController:
             if not callable(reader):
                 raise RuntimeError("monitor source unavailable")
             raw = reader()
-            if section == "data_coverage":
+            if section in {"data_coverage", "daily_recovery", "data_library"}:
                 payload = raw
             elif section == "daily_finalization":
                 payload = build_daily_finalization(raw)
