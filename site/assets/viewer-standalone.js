@@ -1922,9 +1922,11 @@ async function loadCoverageDrivenVodPtt(context,token){
   const dayLabel=result.days.length?result.days.join('～'):(context.day||'').replaceAll('-','/');
   const usedD1=result.d1Days.length>0;
   const archiveUnavailable=result.archiveUnavailableDays.length>0;
+  const archiveUnavailableAll=result.days.length>0&&result.archiveUnavailableDays.length===result.days.length;
   const incomplete=result.d1IncompleteDays.length>0;
   let sourceLabel='';
   if(result.allArchiveComplete)sourceLabel='歷史封存完整';
+  else if(usedD1&&archiveUnavailableAll)sourceLabel='D1 history · ⚠ Archive 尚不可用';
   else if(usedD1&&!archiveUnavailable)sourceLabel='Archive + D1 · ⚠ 尚未完成封存';
   else if(usedD1&&archiveUnavailable)sourceLabel='Archive + D1 · ⚠ Archive 部分尚不可用';
   else if(archiveUnavailable)sourceLabel='⚠ Archive 尚不可用';
