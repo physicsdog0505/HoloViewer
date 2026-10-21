@@ -27,6 +27,7 @@ import re
 import shlex
 import subprocess
 import tempfile
+import time
 from datetime import datetime
 from typing import Any, Callable
 from urllib.error import HTTPError
@@ -362,6 +363,30 @@ def _previous_attempt(path: Path) -> dict[str,Any] | None:
     return body
 
 
+def _verify_http_readback_with_retry(*, package: dict[str,Any], job_id: str,
+                                     base_url: str, target_identity: str,
+                                     timeout: int, attempts: int,
+                                     delay_seconds: float) -> dict[str,Any]:
+    if not 1<=attempts<=12:
+        raise DailyHistoryRuntimeError("readback_attempts outside 1..12")
+    if not 0<=delay_seconds<=30:
+        raise DailyHistoryRuntimeError("readback_retry_seconds outside 0..30")
+    fetch=_http_fetcher(base_url,timeout=timeout)
+    receipt=None
+    for index in range(attempts):
+        receipt=verify_http_readback(
+            package=package,job_id=job_id,fetch_bytes=fetch,
+            observed_at=datetime.now(TPE).isoformat(),
+            target_identity=target_identity,
+        )
+        if receipt.get("job_verified") is True:
+            return receipt
+        if index+1<attempts and delay_seconds:
+            time.sleep(delay_seconds)
+    assert receipt is not None
+    return receipt
+
+
 def _stable_finalization_material(receipt: object) -> object:
     """Compare finalization semantics while ignoring observation-only identity.
 
@@ -461,6 +486,47 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
         }
 
     previous_attempt=int(prior.get("attempt_count") or 0) if prior else 0
+
+    # Workers Static Assets can become edge-readable moments after Wrangler
+    # reports deploy success. If this exact manifest was already delivered but
+    # its first readback missed propagation, retry readback before creating a
+    # second deployment/version.
+    if (prior and prior.get("job_status")=="succeeded"
+            and isinstance(prior.get("manifest"),dict)
+            and prior["manifest"].get("digest")==package["manifest"]["digest"]
+            and isinstance(prior.get("job_id"),str)):
+        recovered=_verify_http_readback_with_retry(
+            package=package,job_id=prior["job_id"],
+            base_url=str(config["base_url"]),
+            target_identity=str(config["static_target"]),
+            timeout=int(config.get("readback_timeout_seconds",20)),
+            attempts=int(config.get("readback_attempts",6)),
+            delay_seconds=float(config.get("readback_retry_seconds",2)),
+        )
+        if recovered.get("job_verified") is True:
+            recovered_evidence=build_archive_delivery_evidence(
+                package=package,finalization_receipt=finalization,
+                job_id=prior["job_id"],job_status="succeeded",
+                attempted_at=prior.get("attempted_at"),
+                succeeded_at=prior.get("succeeded_at"),
+                attempt_count=previous_attempt,
+                uploaded_count=prior.get("uploaded_count"),
+                readback_receipt=recovered,error_code=None,
+                target_identity=str(config["static_target"]),
+            )
+            _atomic_json(prior_path,recovered_evidence)
+            _atomic_json(state_root/"latest-archive-job.json",recovered_evidence)
+            return {
+                "status":"VERIFIED_COMPLETE_PUBLISHED",
+                "day":target_day,
+                "manifest_digest":package["manifest"]["digest"],
+                "object_count":package["object_count"],
+                "push_count":package["push_count"],
+                "archive_deployed":False,
+                "readback_recovered":True,
+                "archive_job":str(prior_path),
+            }
+
     attempt_count=previous_attempt+1
     job_id=f"archive-{target_day}-{package['manifest']['digest'][:12]}-a{attempt_count}"
     plan=prepare_static_assets_delivery(
@@ -499,12 +565,13 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
         _atomic_json(state_root/"latest-archive-job.json",evidence)
         raise
 
-    readback=verify_http_readback(
+    readback=_verify_http_readback_with_retry(
         package=package,job_id=job_id,
-        fetch_bytes=_http_fetcher(str(config["base_url"]),
-                                  timeout=int(config.get("readback_timeout_seconds",20))),
-        observed_at=datetime.now(TPE).isoformat(),
+        base_url=str(config["base_url"]),
         target_identity=str(config["static_target"]),
+        timeout=int(config.get("readback_timeout_seconds",20)),
+        attempts=int(config.get("readback_attempts",6)),
+        delay_seconds=float(config.get("readback_retry_seconds",2)),
     )
     evidence=build_archive_delivery_evidence(
         package=package,finalization_receipt=finalization,job_id=job_id,
