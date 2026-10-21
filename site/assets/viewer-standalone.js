@@ -1694,16 +1694,16 @@ async function fetchArchiveObject(source,item){
  try{
   response=await fetch(url,{mode:'cors',credentials:'omit',cache:'no-cache',headers:{Accept:'application/json'}});
  }catch(error){
-  throw archiveUnavailableError('歷史 PTT '+source.month+' chunk 無法讀取：'+url+' · '+String(error?.message||error));
+  throw archiveUnavailableError('歷史 PTT '+source.month+' object 無法讀取：'+url+' · '+String(error?.message||error));
  }
- if(!response.ok)throw archiveUnavailableError('歷史 PTT '+source.month+' chunk HTTP '+response.status+'：'+url);
+ if(!response.ok)throw archiveUnavailableError('歷史 PTT '+source.month+' object HTTP '+response.status+'：'+url);
  const contentType=String(response.headers.get('content-type')||'').toLowerCase();
- if(!contentType.startsWith('application/json'))throw archiveIntegrityError('歷史 PTT '+source.month+' chunk Content-Type 不符：'+url);
+ if(!contentType.startsWith('application/json'))throw archiveIntegrityError('歷史 PTT '+source.month+' object Content-Type 不符：'+url);
  const buffer=await response.arrayBuffer();
  const digest=await archiveSha256Hex(buffer);
- if(digest!==String(item.sha256))throw archiveIntegrityError('歷史 PTT '+source.month+' chunk SHA 不符：'+url);
+ if(digest!==String(item.sha256))throw archiveIntegrityError('歷史 PTT '+source.month+' object SHA 不符：'+url);
  let payload;
- try{payload=JSON.parse(new TextDecoder().decode(buffer))}catch{throw archiveIntegrityError('歷史 PTT '+source.month+' chunk JSON 無效：'+url)}
+ try{payload=JSON.parse(new TextDecoder().decode(buffer))}catch{throw archiveIntegrityError('歷史 PTT '+source.month+' object JSON 無效：'+url)}
  const expectedRange=archiveObjectRange(item);
  const payloadRange=archiveObjectRange(payload);
  const expectedPushCount=archiveObjectPushCount(item);
