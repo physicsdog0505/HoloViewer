@@ -278,6 +278,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("archiveRangesIntersect(range.startMs,range.endMs,startMs,endMs)",viewer)
         self.assertIn("crypto.subtle.digest('SHA-256',buffer)",viewer)
         self.assertIn("payload.pushes.length!==expectedPushCount",viewer)
+        self.assertIn("async function fetchArchiveObject(source,item)",viewer)
+        self.assertNotIn("fetchArchiveChunk",viewer)
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
         self.assertIn("archiveSourcesForWindow(fetchStartMs,endMs)",viewer)
         self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
@@ -328,7 +330,7 @@ class ParityContract(unittest.TestCase):
         helper_end=viewer.index("async function archiveSha256Hex(buffer){",helper_start)
         helpers=viewer[helper_start:helper_end]
         row_start=viewer.index("function archiveRowIdentity(row){")
-        row_end=viewer.index("async function resolveArchiveRows(context,archives){",row_start)
+        row_end=viewer.index("function archiveObjectPlan(archives,startMs,endMs){",row_start)
         row_helpers=viewer[row_start:row_end]
         visible_start=viewer.index("function vodPttVisibleCountAt(rows,absoluteMs){")
         visible_end=viewer.index("function setVodPttRows(rows){",visible_start)
@@ -441,7 +443,7 @@ process.stdout.write(JSON.stringify({
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
         self.assertIn("archiveObjectPlan(archives,fetchStartMs,endMs)",viewer)
         self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
-        self.assertIn("archiveCoverageStatus(archive.manifest,startMs,endMs,archive.source.month)",viewer)
+        self.assertIn("const coverageStatus=archiveDayCoverageStatus(manifest,day)",viewer)
         self.assertNotIn("archiveHourKey(",viewer)
         self.assertNotIn("archiveHourKeys(",viewer)
         self.assertNotIn("archiveHourTaipeiMonth(",viewer)
