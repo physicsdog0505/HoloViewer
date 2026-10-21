@@ -136,6 +136,25 @@ def _run_json_command(command: list[str], *, timeout: int, stdin: dict[str,Any] 
     return body
 
 
+def _validate_expected_contract_digest(body: dict[str,Any]) -> None:
+    digest=body.get("evidence_digest")
+    if not isinstance(digest,str) or not re.fullmatch(r"[0-9a-f]{64}",digest):
+        raise DailyHistoryRuntimeError("expected-AID evidence_digest missing")
+    material=json.loads(json.dumps(body))
+    material.pop("evidence_digest",None)
+    authority=material.get("authority")
+    if isinstance(authority,dict):
+        evidence_hash=authority.get("evidence_hash")
+        # The reviewed v1 builders bind the body while evidence_hash is null,
+        # then mirror the resulting digest into authority.evidence_hash.
+        if evidence_hash==digest:
+            authority["evidence_hash"]=None
+        elif evidence_hash not in (None,digest):
+            raise DailyHistoryRuntimeError("expected-AID authority evidence_hash mismatch")
+    if sha256(_canonical_bytes(material)).hexdigest()!=digest:
+        raise DailyHistoryRuntimeError("expected-AID evidence_digest mismatch")
+
+
 def load_expected_contract(config: dict[str,Any], *, day: str) -> dict[str,Any]:
     source: Path=config["_collector_path"]
     if isinstance(config.get("expected_contract_path"),str):
@@ -148,6 +167,7 @@ def load_expected_contract(config: dict[str,Any], *, day: str) -> dict[str,Any]:
         raise DailyHistoryRuntimeError("expected-AID contract schema mismatch")
     if body.get("day")!=day:
         raise DailyHistoryRuntimeError("expected-AID contract day mismatch")
+    _validate_expected_contract_digest(body)
     return body
 
 
