@@ -173,6 +173,61 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             self.assertTrue((public/package["manifest"]["key"]).is_file())
             self.assertTrue((public/package["objects"][0]["key"]).is_file())
 
+    def test_reobserved_expected_authority_reuses_verified_finalization_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path,state=self._config(Path(tmp),deploy=False)
+            config=load_config(config_path)
+
+            with patch("ptt_offline.daily_history_runtime.coverage_from_collector",
+                       return_value={AID:complete_coverage()}), \
+                 patch("ptt_offline.daily_history_runtime._daily_source_objects",
+                       return_value=[source_object()]):
+                first=run_closeout(config=config,day=DAY)
+
+            self.assertEqual(first["status"],"READY_TO_DEPLOY")
+            first_package=json.loads(Path(first["package"]).read_text())
+            first_receipt=json.loads((state/"finalization"/f"{DAY}.json").read_text())
+
+            # Re-observe the exact same authoritative day/AID set later. The
+            # expected-AID contract gets a new observed_at/evidence digest, but
+            # this must not create another immutable historical revision.
+            path=Path(config["expected_contract_path"])
+            later=expected_contract()
+            later["authority"]["observed_at"]="2026-10-21T01:00:00Z"
+            from ptt_offline.data_lifecycle_evidence import build_expected_aid_contract
+            later=build_expected_aid_contract(
+                day=DAY,
+                entries=[{
+                    "period":"all_day","part":1,"aid":AID,
+                    "source_url":"https://example.invalid/thread",
+                    "authority_record_id":"fixture:all_day:1",
+                }],
+                authority={
+                    "kind":"collector-discovery-receipt",
+                    "evidence_id":"fixture-authority",
+                    "observed_at":"2026-10-21T01:00:00Z",
+                    "verified":True,
+                    "version":"fixture-v1",
+                    "issuer":"collector-discovery",
+                },
+            )
+            path.write_text(json.dumps(later),encoding="utf-8")
+
+            with patch("ptt_offline.daily_history_runtime.coverage_from_collector",
+                       return_value={AID:complete_coverage()}), \
+                 patch("ptt_offline.daily_history_runtime._daily_source_objects",
+                       return_value=[source_object()]):
+                second=run_closeout(config=config,day=DAY)
+
+            self.assertEqual(second["status"],"READY_TO_DEPLOY")
+            second_package=json.loads(Path(second["package"]).read_text())
+            second_receipt=json.loads((state/"finalization"/f"{DAY}.json").read_text())
+            self.assertEqual(first_package["manifest"]["digest"],
+                             second_package["manifest"]["digest"])
+            self.assertEqual(first_package["source_hash"],second_package["source_hash"])
+            self.assertEqual(first_receipt["evidence_digest"],
+                             second_receipt["evidence_digest"])
+
     def test_succeeded_unverified_prior_recovers_readback_without_redeploy(self):
         with tempfile.TemporaryDirectory() as tmp:
             config_path,state=self._config(Path(tmp),deploy=True)
