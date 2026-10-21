@@ -391,9 +391,7 @@ process.stdout.write(JSON.stringify({aug,sep,oct,cross,keys,plan:plan.map(x=>x.s
         self.assertIn("occurred>=fetchStartMs&&occurred<endMs",viewer)
         self.assertIn("archiveCoverageStatus(archive.manifest,startMs,endMs,archive.source.month)",viewer)
 
-        pre_start=Date.parse("2026-10-01T00:00:25+08:00")
-        pre_fetch=pre_start-3600000
-        pre_script=helpers+"\nconst PTT_ARCHIVE_MONTHS="+registry+";function archiveUnavailableError(message){const error=new Error(message);error.archiveUnavailable=true;return error;}process.stdout.write(JSON.stringify(archiveSourcesForWindow("+str(pre_fetch)+","+str(pre_start+60000)+")));"
+        pre_script=helpers+"\nconst PTT_ARCHIVE_MONTHS="+registry+";function archiveUnavailableError(message){const error=new Error(message);error.archiveUnavailable=true;return error;}process.stdout.write(JSON.stringify(archiveSourcesForWindow(Date.parse('2026-09-30T15:00:25Z'),Date.parse('2026-09-30T16:01:25Z'))));"
         pre_result=subprocess.run(["node","-e",pre_script],check=True,capture_output=True,text=True)
         pre_payload=json.loads(pre_result.stdout)
         self.assertEqual([x["month"] for x in pre_payload],["2026-09","2026-10"])
