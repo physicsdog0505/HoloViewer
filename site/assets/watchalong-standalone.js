@@ -88,8 +88,9 @@ let immersiveToolbarTimer=null;
 let checkpointTimer=null;
 let resumeApplied=false;
 const mobileWatchMedia=window.matchMedia('(max-width:760px)');
-const requestedResumeSeconds=parseCheckpointSeconds(params.get('t'));
-let pendingResumeSeconds=requestedResumeSeconds;
+// PARKED: URL time restore/share is disabled. Local progress resume remains available.
+const requestedResumeSeconds=null;
+let pendingResumeSeconds=null;
 
 function validVideoId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{11}$/.test(id)?id:''}
 function validPlaylistId(value){const id=String(value||'');return /^[A-Za-z0-9_-]{10,64}$/.test(id)?id:''}
@@ -208,36 +209,8 @@ function saveCheckpoint(){
   return true;
  }catch{return false}
 }
-function checkpointUrl(seconds){
- const q=new URLSearchParams(location.search);
- q.set('t',String(Math.round(Math.max(0,seconds)*10)/10));
- return location.origin+location.pathname+'?'+q.toString();
-}
-async function copyCurrentCheckpoint(){
- const seconds=currentHostSeconds();
- if(seconds==null){
-  if(resumeStatus)resumeStatus.textContent='播放位置尚未就緒';
-  return;
- }
- const url=checkpointUrl(seconds);
- try{
-  if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(url);
-  else{
-   const area=document.createElement('textarea');area.value=url;area.setAttribute('readonly','');
-   area.style.position='fixed';area.style.opacity='0';document.body.append(area);area.select();
-   document.execCommand('copy');area.remove();
-  }
-  saveCheckpoint();
-  if(resumeStatus)resumeStatus.textContent='已複製 '+clock(seconds);
-  if(mobileCopyCheckpoint)mobileCopyCheckpoint.textContent='已複製 '+clock(seconds);
-  setTimeout(()=>{
-   if(resumeStatus?.textContent.startsWith('已複製'))resumeStatus.textContent='';
-   if(mobileCopyCheckpoint?.textContent.startsWith('已複製'))mobileCopyCheckpoint.textContent='複製目前位置';
-  },2200);
- }catch{
-  if(resumeStatus)resumeStatus.textContent='無法複製連結';
- }
-}
+// Share-link checkpoint generation is intentionally disabled; browser autoplay/user-gesture
+// restrictions can make a URL-restored time diverge from the actual player clock.
 function seekWatchalongToHost(seconds){
  if(!hostPlayer||!Number.isFinite(seconds))return false;
  const hostSeconds=Math.max(0,seconds);
@@ -272,15 +245,13 @@ function maybeApplyResume(){
  }
  if(seekWatchalongToHost(pendingResumeSeconds)){
   resumeApplied=true;
-  if(resumeStatus)resumeStatus.textContent=(requestedResumeSeconds!=null?'已開啟分享位置 ':'繼續上次位置 ')+clock(pendingResumeSeconds);
+  if(resumeStatus)resumeStatus.textContent='繼續上次位置 '+clock(pendingResumeSeconds);
  }
 }
 function startCheckpointLoop(){
  if(checkpointTimer)return;
  checkpointTimer=setInterval(()=>{if(!document.hidden)saveCheckpoint()},5000);
 }
-copyCheckpoint?.addEventListener('click',copyCurrentCheckpoint);
-mobileCopyCheckpoint?.addEventListener('click',copyCurrentCheckpoint);
 function refreshOffsetUi(){
  offsetValue.textContent=timelineAligned?'Offset '+(sourceOffsetSeconds>=0?'+':'')+sourceOffsetSeconds.toFixed(1)+'s':'尚未對齊';
  offsetMinus.disabled=!timelineAligned;
