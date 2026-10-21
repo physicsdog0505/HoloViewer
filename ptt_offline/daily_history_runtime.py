@@ -338,6 +338,38 @@ def _previous_attempt(path: Path) -> dict[str,Any] | None:
     return body
 
 
+def _stable_finalization_material(receipt: object) -> object:
+    """Compare finalization semantics while ignoring observation-only identity.
+
+    #48 receipts intentionally include observed_at in evidence_digest. A daily
+    closeout rerun minutes later must not mint a new historical package merely
+    because the observation clock changed. Coverage digests / expected-set
+    evidence still participate, so any source/authority change invalidates
+    reuse.
+    """
+    if not isinstance(receipt,dict):
+        return None
+    body=json.loads(json.dumps(receipt))
+    body.pop("observed_at",None)
+    body.pop("evidence_digest",None)
+    return body
+
+
+def _reuse_verified_finalization(path: Path, current: dict[str,Any]) -> dict[str,Any]:
+    if current.get("state")!="VERIFIED_COMPLETE" or not path.is_file():
+        return current
+    try:
+        previous=_load_json(path)
+    except DailyHistoryRuntimeError:
+        return current
+    if (previous.get("state")=="VERIFIED_COMPLETE"
+            and previous.get("archive_ready") is True
+            and _stable_finalization_material(previous)
+                ==_stable_finalization_material(current)):
+        return previous
+    return current
+
+
 def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any]:
     source: Path=config["_collector_path"]
     state_root: Path=config["_state_path"]
@@ -354,6 +386,7 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
         observed_at=datetime.now(TPE).isoformat(),
     )
     finalization_path=state_root/"finalization"/f"{target_day}.json"
+    finalization=_reuse_verified_finalization(finalization_path,finalization)
     _atomic_json(finalization_path,finalization)
     _atomic_json(state_root/"latest-finalization.json",finalization)
 
