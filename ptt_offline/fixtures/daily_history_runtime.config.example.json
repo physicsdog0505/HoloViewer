@@ -8,9 +8,14 @@
     "--day",
     "{day}"
   ],
-  "repair_command": null,
-  "static_target": "holoviewer-ptt-static-assets-pilot",
-  "base_url": "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev",
+  "repair_command": [
+    "/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer/.venv-frontend/bin/python",
+    "/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer/bounded_repair_request.py",
+    "--source",
+    "{source}"
+  ],
+  "static_target": "holoviewer-ptt-static-assets",
+  "base_url": "https://holoviewer-ptt-static-assets.singlebagel.workers.dev",
   "deploy": false,
   "wrangler_command": [
     "npx",
