@@ -1,0 +1,49 @@
+{
+  "schema_version": "holoviewer-admin-daily-recovery-v1",
+  "sanitized": true,
+  "target_day": "2026-10-20",
+  "last_run_at": "2026-10-21T07:42:00+08:00",
+  "dry_run": false,
+  "overall_state": "NEEDS_ATTENTION",
+  "youtube": {
+    "candidate_ids": 5,
+    "new_video_ids": 2,
+    "inserted": 2,
+    "updated": 1,
+    "unresolved": 1,
+    "playlist_calls": 66,
+    "video_lookup_calls": 1,
+    "search_calls": 0,
+    "status": "OK",
+    "unresolved_video_ids": [
+      "abcDEF12345"
+    ]
+  },
+  "ptt": {
+    "expected_aids": 2,
+    "finalized": 2,
+    "repaired": 1,
+    "unresolved": 0,
+    "state": "VERIFIED_COMPLETE",
+    "archive_job_status": "completed",
+    "readback_verified": true,
+    "error_code": null
+  },
+  "transcript": {
+    "due": 3,
+    "recovered": 1,
+    "already_complete": 8,
+    "no_public_caption": 1,
+    "retry_pending": 1,
+    "failed": 0,
+    "repaired_missing_binding": 0
+  },
+  "translation": {
+    "due_requested_jobs": 1,
+    "resumed": 1,
+    "completed": 4,
+    "retry_pending": 0,
+    "failed": 0,
+    "not_requested": 7
+  }
+}
