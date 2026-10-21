@@ -111,6 +111,19 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             with self.assertRaisesRegex(DailyHistoryRuntimeError,"Collector SQLite unavailable"):
                 load_config(config)
 
+    def test_tampered_expected_contract_fails_before_coverage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path,_=self._config(Path(tmp),deploy=False)
+            config=load_config(config_path)
+            path=Path(config["expected_contract_path"])
+            body=json.loads(path.read_text())
+            body["expected"][0]["aid"]="1tampered"
+            path.write_text(json.dumps(body),encoding="utf-8")
+            with patch("ptt_offline.daily_history_runtime.coverage_from_collector") as coverage:
+                with self.assertRaisesRegex(DailyHistoryRuntimeError,"evidence_digest mismatch"):
+                    run_closeout(config=config,day=DAY)
+            coverage.assert_not_called()
+
     def test_noncomplete_day_stops_before_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
             config_path,state=self._config(Path(tmp),deploy=False)
