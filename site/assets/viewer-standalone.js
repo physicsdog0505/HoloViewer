@@ -1774,6 +1774,32 @@ function combineArchiveCoverage(parts){
  }
  return {status,days:[...new Set(days)].sort()};
 }
+function recentUnsealedArchiveDay(day){
+ return /^\d{4}-\d{2}-\d{2}$/.test(String(day||''))&&nextIsoDay(day)===taipeiDay();
+}
+function taipeiDayStartMs(day){
+ const ms=Date.parse(String(day||'')+'T00:00:00+08:00');
+ return Number.isFinite(ms)?ms:null;
+}
+async function supplementRecentArchiveWithD1(context,result){
+ if(!result||result.coverageStatus==='COMPLETE')return {...result,d1FallbackDays:[]};
+ const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
+ const fetchStartMs=vodPttFetchStartMs(context)??startMs;
+ if(!Number.isFinite(fetchStartMs)||!Number.isFinite(endMs)||endMs<=fetchStartMs)return {...result,d1FallbackDays:[]};
+ const fallbackDays=(result.coverageDays||[]).filter(recentUnsealedArchiveDay);
+ if(!fallbackDays.length)return {...result,d1FallbackDays:[]};
+ const extra=[];
+ for(const day of fallbackDays){
+  const dayStart=taipeiDayStartMs(day),nextStart=taipeiDayStartMs(nextIsoDay(day));
+  if(!Number.isFinite(dayStart)||!Number.isFinite(nextStart))continue;
+  const rangeStart=Math.max(fetchStartMs,dayStart);
+  const rangeEnd=Math.min(endMs,nextStart);
+  if(rangeEnd<=rangeStart)continue;
+  const d1=await loadPttDayWindowRows(day,rangeStart,rangeEnd);
+  extra.push(...d1.rows);
+ }
+ return {...result,rows:dedupeArchiveRows([...(result.rows||[]),...extra]),d1FallbackDays:fallbackDays};
+}
 function archiveRowIdentity(row){
  const stable=String(row?.source_record_key||row?.push_id||'');
  if(stable)return stable;
@@ -1856,20 +1882,27 @@ async function loadArchivePtt(context,token){
  pttTitle.textContent='PTT 歷史專串';
  pttMeta.textContent='歷史 Static Assets · 讀取中';
  try{
-  const result=await resolveArchivePttResult(context);
-  if(token!==pttResolveToken||!result)return;
+  const archiveResult=await resolveArchivePttResult(context);
+  if(token!==pttResolveToken||!archiveResult)return;
+  const result=await supplementRecentArchiveWithD1(context,archiveResult);
+  if(token!==pttResolveToken)return;
   setVodPttRows(result.rows);
   pttLoaded=true;
   pttFollowing=true;
   pttNewest.hidden=true;
   const dayLabel=result.coverageDays.length?result.coverageDays.join('～'):(context.day||'').replaceAll('-','/');
+  const usedD1=Array.isArray(result.d1FallbackDays)&&result.d1FallbackDays.length>0;
   const warning=result.coverageStatus==='COMPLETE'
    ?'完整涵蓋'
-   :'⚠ '+result.coverageStatus+' · 資料可能不完整';
+   :usedD1
+    ?'⚠ '+result.coverageStatus+' + 昨日 D1 補讀（未封存）'
+    :'⚠ '+result.coverageStatus+' · 資料可能不完整';
   const sourceLabel=result.archiveMonths.length?' · '+result.archiveMonths.join(' + '):'';
   pttMeta.textContent=dayLabel+' · '+result.rows.length+' 則 · VOD · 對齊播放時間 · '+warning+sourceLabel;
   if(!result.rows.length)pttFeed.replaceChildren(node('div',
-   result.coverageStatus==='COMPLETE'?'這段 VOD 時間範圍內沒有 PTT 推文。':'這段 VOD 沒有可顯示推文；歷史涵蓋狀態為 '+result.coverageStatus+'。','ptt-empty'));
+   result.coverageStatus==='COMPLETE'?'這段 VOD 時間範圍內沒有 PTT 推文。':
+   usedD1?'這段昨日 VOD 在 Archive 與 D1 history 都沒有可顯示的 PTT 推文。':
+   '這段 VOD 沒有可顯示推文；歷史涵蓋狀態為 '+result.coverageStatus+'。','ptt-empty'));
   startVodPttTimeline();
  }catch(error){
   if(token!==pttResolveToken)return;
