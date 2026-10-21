@@ -173,6 +173,71 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             self.assertTrue((public/package["manifest"]["key"]).is_file())
             self.assertTrue((public/package["objects"][0]["key"]).is_file())
 
+    def test_succeeded_unverified_prior_recovers_readback_without_redeploy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path,state=self._config(Path(tmp),deploy=True)
+            config=load_config(config_path)
+            with patch("ptt_offline.daily_history_runtime.coverage_from_collector",
+                       return_value={AID:complete_coverage()}), \
+                 patch("ptt_offline.daily_history_runtime._daily_source_objects",
+                       return_value=[source_object()]), \
+                 patch("ptt_offline.daily_history_runtime._deploy_static_assets",
+                       return_value={
+                           "attempted_at":"2026-10-21T07:31:00+08:00",
+                           "succeeded_at":"2026-10-21T07:31:05+08:00",
+                           "version_id":"11111111-2222-3333-4444-555555555555",
+                       }), \
+                 patch("ptt_offline.daily_history_runtime._verify_http_readback_with_retry",
+                       return_value={
+                           "schema_version":"holoviewer-archive-readback-receipt-v1",
+                           "sanitized":True,
+                           "snapshot_id":"b"*64,
+                           "observed_at":"2026-10-21T07:31:06+08:00",
+                           "target":{"kind":"workers-static-assets","identity":"holoviewer-ptt-static-assets-pilot"},
+                           "job_id":"archive-2026-10-20-deadbeefcafe-a1",
+                           "manifest_digest":"a"*64,
+                           "source_revision":"collector-finalized-2026-10-20-v1",
+                           "scope":{"from_day":DAY,"through_day":DAY,"object_count":1,
+                                    "thread_scope":[AID],"thread_scope_authoritative":True},
+                           "objects_expected":1,"objects_checked":0,"objects_verified":0,
+                           "manifest_verified":False,"manifest_digest_match":False,
+                           "content_hash_match":False,"coverage_scope_match":False,
+                           "object_count_match":False,"unresolved_objects":1,
+                           "pagination_complete":True,"verification_mode":"full_partition",
+                           "job_verified":False,"error_code":"manifest_digest_mismatch",
+                           "contract_gaps":[],
+                       }):
+                with self.assertRaises(DailyHistoryRuntimeError):
+                    run_closeout(config=config,day=DAY)
+
+            prior=json.loads((state/"latest-archive-job.json").read_text())
+            package=json.loads((state/"archive"/DAY/"package.json").read_text())
+            prior["manifest"]["digest"]=package["manifest"]["digest"]
+            prior["job_id"]="archive-2026-10-20-recover-a1"
+            (state/"archive"/DAY/"archive-job.json").write_text(json.dumps(prior))
+            (state/"latest-archive-job.json").write_text(json.dumps(prior))
+
+            public=state/"static-public"
+            def local_fetcher(_base_url,timeout=20):
+                return lambda key:(public/key).read_bytes()
+
+            with patch("ptt_offline.daily_history_runtime.coverage_from_collector",
+                       return_value={AID:complete_coverage()}), \
+                 patch("ptt_offline.daily_history_runtime._daily_source_objects",
+                       return_value=[source_object()]), \
+                 patch("ptt_offline.daily_history_runtime._http_fetcher",
+                       side_effect=local_fetcher), \
+                 patch("ptt_offline.daily_history_runtime._deploy_static_assets") as deploy:
+                result=run_closeout(config=config,day=DAY)
+
+            self.assertEqual(result["status"],"VERIFIED_COMPLETE_PUBLISHED")
+            self.assertTrue(result["readback_recovered"])
+            self.assertFalse(result["archive_deployed"])
+            deploy.assert_not_called()
+            evidence=json.loads((state/"latest-archive-job.json").read_text())
+            self.assertTrue(evidence["job_verified"])
+            self.assertEqual(evidence["attempt_count"],1)
+
     def test_deploy_then_full_readback_writes_verified_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             config_path,state=self._config(Path(tmp),deploy=True)
