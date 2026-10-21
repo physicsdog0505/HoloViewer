@@ -423,16 +423,18 @@ function taipeiDayForDate(value){
         self.assertIn("credentials:'omit'",archive)
         self.assertIn("cache:'no-cache'",archive)
 
-    def test_recent_unsealed_vod_uses_bounded_yesterday_d1_fallback(self):
+    def test_recent_unsealed_vod_prefers_bounded_yesterday_d1_before_archive(self):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("function recentUnsealedArchiveDay(day)",viewer)
         self.assertIn("nextIsoDay(day)===taipeiDay()",viewer)
-        self.assertIn("async function supplementRecentArchiveWithD1(context,result)",viewer)
-        self.assertIn("if(!result||result.coverageStatus==='COMPLETE')return {...result,d1FallbackDays:[]};",viewer)
-        self.assertIn("const fallbackDays=(result.coverageDays||[]).filter(recentUnsealedArchiveDay);",viewer)
-        self.assertIn("const d1=await loadPttDayWindowRows(day,rangeStart,rangeEnd);",viewer)
-        self.assertIn("const result=await supplementRecentArchiveWithD1(context,archiveResult);",viewer)
-        self.assertIn("昨日 D1 補讀（未封存）",viewer)
+        self.assertIn("function recentSingleDayVodDay(context)",viewer)
+        self.assertIn("async function loadRecentVodD1First(context)",viewer)
+        self.assertIn("const result=await loadPttDayWindowRows(day,fetchStartMs,endMs);",viewer)
+        self.assertIn("if(d1&&d1.rows.length&&!d1.incomplete)",viewer)
+        self.assertIn("昨日 D1 history · 對齊播放時間 · 未封存",viewer)
+        self.assertIn("const archiveResult=await resolveArchivePttResult(context);",viewer)
+        self.assertIn("rows=dedupeArchiveRows([...(d1.rows||[]),...archiveResult.rows]);",viewer)
+        self.assertNotIn("async function supplementRecentArchiveWithD1(context,result)",viewer)
 
     def test_public_collab_context_reaches_standalone_viewer(self):
         app=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
