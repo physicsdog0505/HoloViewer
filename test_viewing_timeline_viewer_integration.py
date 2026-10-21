@@ -70,7 +70,6 @@ assert.equal(adapter.masterFromSource('A','AAAAAAAAAAA',45000),40000);
     def test_viewer_loads_shared_modules_before_runtime(self):
         expected = [
             '/assets/viewing-timeline-core.js',
-            '/assets/viewing-share-state.js',
             '/assets/viewing-timeline-viewer-adapter.js',
             '/assets/viewer-standalone.js',
         ]
@@ -93,13 +92,17 @@ assert.equal(adapter.masterFromSource('A','AAAAAAAAAAA',45000),40000);
         self.assertIn("if(player&&resyncOthers&&povId!==viewingClockPovId)", VIEWER)
         self.assertNotIn("destroyPlayers();\n  const plan=viewingAdapter.plan", VIEWER)
 
-    def test_share_state_runtime_reconstruction_is_real(self):
-        self.assertIn("const parsed=viewingShareState.parse(params);", VIEWER)
-        self.assertIn("viewingShareState.serialize({", VIEWER)
-        self.assertIn("sessionId:viewingSession.session_id", VIEWER)
-        self.assertIn("primaryPovId:viewingAdapter.primaryPovId", VIEWER)
-        self.assertIn("masterTimeMs:viewingAdapter.masterTimeMs", VIEWER)
-        self.assertIn("q.append(key,value)", VIEWER)
+    def test_share_time_state_is_parked_without_disabling_timeline_runtime(self):
+        self.assertNotIn('/assets/viewing-share-state.js', HTML)
+        self.assertIn("const viewingShareState=null;", VIEWER)
+        self.assertIn("function viewingSharedStateFor(_session)", VIEWER)
+        self.assertIn("return null;", VIEWER)
+        self.assertNotIn("viewingShareState.parse(params)", VIEWER)
+        self.assertNotIn("viewingShareState.serialize({", VIEWER)
+        self.assertNotIn("q.append(key,value)", VIEWER)
+        self.assertNotIn("const second=Math.floor(viewingAdapter.masterTimeMs/1000);", VIEWER)
+        self.assertIn("function reconcileViewingTimeline", VIEWER)
+        self.assertIn("function initViewingTimeline", VIEWER)
 
     def test_runtime_clock_owner_is_independent_of_primary(self):
         self.assertIn("let viewingClockPovId='';", VIEWER)
