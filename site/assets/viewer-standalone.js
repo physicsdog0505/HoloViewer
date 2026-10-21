@@ -106,6 +106,7 @@ let viewingTimer=null;
 let viewingReconciling=false;
 let viewingLastUrlSecond=-1;
 let viewingClockPovId='';
+let viewingClockPolicy=null;
 const viewingTimelineCore=window.HoloViewerViewingTimeline||null;
 const viewingShareState=window.HoloViewerViewingShareState||null;
 const viewingAdapterFactory=window.HoloViewerTimelineViewerAdapter||null;
@@ -961,6 +962,7 @@ function replaceTimelinePovSource(index,resolved){
  const player=players[index],card=playerCards[index];
  let playing=false,muted=index!==audioMaster;
  try{playing=player?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{}
+ if(viewingTimelineActive()&&viewingSessionPlaying())playing=true;
  try{muted=Boolean(player?.isMuted?.())}catch{}
  try{player?.destroy()}catch{}
  players[index]=null;
@@ -984,12 +986,30 @@ function viewingClockStream(){
  const index=streams.findIndex(stream=>String(stream?.povId||'')===String(viewingClockPovId));
  return index>=0?{index,stream:streams[index],player:players[index]}:null;
 }
+function viewingSessionPlaying(){
+ return players.some(player=>{
+  try{return player?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{return false}
+ });
+}
 function sampleViewingMasterClock(){
+ const now=performance.now();
  const owner=viewingClockStream();
- if(!owner?.stream)return viewingAdapter?.masterTimeMs??null;
- let seconds=null;try{seconds=owner.player?.getCurrentTime?.()}catch{}
- if(!Number.isFinite(seconds))return viewingAdapter.masterTimeMs;
- const mapped=viewingAdapter.masterFromSource(owner.stream.povId,owner.stream.videoId,seconds*1000);
+ let mapped=null;
+ if(owner?.stream){
+  const resolved=viewingAdapter.resolution(owner.stream.povId);
+  let ownerPlaying=false;
+  try{ownerPlaying=owner.player?.getPlayerState?.()===YT.PlayerState.PLAYING}catch{}
+  if(resolved?.status==='READY'&&ownerPlaying){
+   let seconds=null;try{seconds=owner.player?.getCurrentTime?.()}catch{}
+   if(Number.isFinite(seconds)){
+    const candidate=viewingAdapter.masterFromSource(owner.stream.povId,owner.stream.videoId,seconds*1000);
+    if(Number.isFinite(candidate))mapped=candidate;
+   }
+  }
+ }
+ if(viewingClockPolicy){
+  return viewingClockPolicy.step({nowMs:now,running:viewingSessionPlaying(),mappedMasterMs:mapped});
+ }
  if(Number.isFinite(mapped))viewingAdapter.setMasterTimeMs(mapped);
  return viewingAdapter.masterTimeMs;
 }
@@ -1038,8 +1058,9 @@ function initViewingTimeline(event){
    primaryPovId:primary
   });
   viewingClockPovId=String(session.povs[0]?.pov_id||'');
+  viewingClockPolicy=viewingAdapterFactory.createClock(viewingAdapter,{nowMs:performance.now()});
  }catch{
-  viewingSession=null;viewingAdapter=null;viewingClockPovId='';return false;
+  viewingSession=null;viewingAdapter=null;viewingClockPovId='';viewingClockPolicy=null;return false;
  }
  const restoredIndex=streams.findIndex(stream=>String(stream.povId)===String(viewingAdapter.primaryPovId));
  if(restoredIndex>=0){primaryIndex=restoredIndex;audioMaster=restoredIndex}
