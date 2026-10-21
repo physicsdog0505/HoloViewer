@@ -171,8 +171,9 @@ def validate_data_library(value: object) -> dict:
             "actual_end": _optional_text(row.get("actual_end"), 64),
             "lifecycle_state": _code(row.get("lifecycle_state")),
             "taipei_day": (
-                _optional_text(row.get("taipei_day"), 10)
-                if row.get("taipei_day") is not None else None
+                row.get("taipei_day")
+                if isinstance(row.get("taipei_day"), str) and DAY_RE.fullmatch(row.get("taipei_day"))
+                else None
             ),
             "ptt": {
                 "available": available,
