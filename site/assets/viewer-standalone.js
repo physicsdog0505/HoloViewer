@@ -225,7 +225,7 @@ function updateUrl(){
  streams.forEach(stream=>q.append('stream',stream.videoId));
  q.set('layout',layout);
  q.set('workspace',currentLayoutPreset()==='focus'?'focus':'sidebar');
- const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day'].includes(pttContext.mode)?'video':requestedPttMode);
+ const resolvedPttMode=pttContext.mode==='live'?'live':(['archive','same-day','hybrid'].includes(pttContext.mode)?'video':requestedPttMode);
  q.set('ptt',resolvedPttMode);
  archiveWindows.forEach(window=>q.append('ptt_window',[window.videoId,window.start,window.end,window.anchorSource,window.scheduledStart||''].join('|')));
  q.set('primary',String(primaryIndex));
@@ -1024,7 +1024,15 @@ function reconcileViewingTimeline({sampleClock=true}={}){
    const index=streams.findIndex(stream=>String(stream?.povId||'')===String(resolved.pov_id));
    if(index<0)continue;
    if(resolved.status!=='READY'){
-    try{players[index]?.pauseVideo?.()}catch{}
+    const player=players[index];
+    if(player){
+     try{
+      if(player.getPlayerState?.()===YT.PlayerState.PLAYING){
+       syncExpected.set(player,{state:YT.PlayerState.PAUSED,until:Date.now()+900});
+       player.pauseVideo?.();
+      }
+     }catch{}
+    }
     continue;
    }
    if(resolved.replace){
@@ -1320,7 +1328,7 @@ function preservePttFollowDuringLayout(change){
   repinPttAfterLayout({force:true});
  }
 }
-function pttVodMode(){return pttContext.mode==='archive'||pttContext.mode==='same-day'}
+function pttVodMode(){return ['archive','same-day','hybrid'].includes(pttContext.mode)}
 function pttTimelineClock(ms){
  const date=new Date(ms);
  if(!Number.isFinite(date.getTime()))return '';
@@ -1495,6 +1503,16 @@ function startVodPttTimeline(){
  clearInterval(pttVodPollTimer);
  pttVodPollTimer=setInterval(()=>syncVodPttTimeline(),500);
  syncVodPttTimeline({forceFollow:true});
+}
+function vodPttWindowMode(start,end){
+ const startMs=Date.parse(String(start||'')),endMs=Date.parse(String(end||''));
+ if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return 'archive';
+ const today=taipeiDay();
+ const startDay=taipeiDayForDate(new Date(startMs));
+ const endDay=taipeiDayForDate(new Date(endMs-1));
+ if(startDay===today&&endDay===today)return 'same-day';
+ if(startDay<today&&endDay===today)return 'hybrid';
+ return 'archive';
 }
 async function loadSameDayVodPtt(context,token){
  pttPanel.hidden=false;
@@ -1728,28 +1746,32 @@ async function resolveArchiveRows(context,archives){
   chunkRequests:plan.map(entry=>entry.source.base+'/'+entry.item.key)
  };
 }
+async function resolveArchivePttResult(context){
+ let result=null;
+ const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
+ const fetchStartMs=vodPttFetchStartMs(context)??startMs;
+ const sources=archiveSourcesForWindow(fetchStartMs,endMs);
+ for(let attempt=0;attempt<2;attempt++){
+  try{
+   const archives=await Promise.all(sources.map(async source=>({source,manifest:await fetchArchiveManifest(source,attempt===1)})));
+   result=await resolveArchiveRows(context,archives);
+   break;
+  }catch(error){
+   if(attempt===0&&error?.archiveIntegrity){
+    archiveManifestCache.clear();
+    continue;
+   }
+   throw error;
+  }
+ }
+ return result;
+}
 async function loadArchivePtt(context,token){
  pttPanel.hidden=false;
  pttTitle.textContent='PTT 歷史專串';
  pttMeta.textContent='歷史 Static Assets · 讀取中';
- let result=null;
  try{
-  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
-  const fetchStartMs=vodPttFetchStartMs(context)??startMs;
-  const sources=archiveSourcesForWindow(fetchStartMs,endMs);
-  for(let attempt=0;attempt<2;attempt++){
-   try{
-    const archives=await Promise.all(sources.map(async source=>({source,manifest:await fetchArchiveManifest(source,attempt===1)})));
-    result=await resolveArchiveRows(context,archives);
-    break;
-   }catch(error){
-    if(attempt===0&&error?.archiveIntegrity){
-     archiveManifestCache.clear();
-     continue;
-    }
-    throw error;
-   }
-  }
+  const result=await resolveArchivePttResult(context);
   if(token!==pttResolveToken||!result)return;
   setVodPttRows(result.rows);
   pttLoaded=true;
@@ -1771,6 +1793,45 @@ async function loadArchivePtt(context,token){
   pttFeed.replaceChildren(node('div','歷史 PTT UNKNOWN / UNAVAILABLE：'+detail,'ptt-empty'));
  }
 }
+async function loadHybridVodPtt(context,token){
+ pttPanel.hidden=false;
+ pttTitle.textContent='PTT 歷史專串';
+ pttMeta.textContent='歷史封存 + 今日暫存 · 讀取中';
+ try{
+  const startMs=Date.parse(context.start),endMs=Date.parse(context.end);
+  const today=taipeiDay();
+  const boundaryMs=Date.parse(today+'T00:00:00+08:00');
+  if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||!Number.isFinite(boundaryMs)||
+     !(startMs<boundaryMs&&boundaryMs<endMs))throw new Error('跨日 VOD 時間窗無效');
+  const archiveContext={...context,end:new Date(boundaryMs).toISOString()};
+  const [archiveResult,todayData]=await Promise.all([
+   resolveArchivePttResult(archiveContext),
+   loadTodayPttPayload(today)
+  ]);
+  if(token!==pttResolveToken)return;
+  if(!archiveResult||todayData?.schema_version!=='public-consumer-v1'||!Array.isArray(todayData.pushes))
+   throw new Error('跨日 PTT 資料格式錯誤');
+  const todayRows=todayData.pushes.filter(row=>{
+   if(!row||typeof row.content!=='string')return false;
+   const occurred=Date.parse(String(row.occurred_at||''));
+   return Number.isFinite(occurred)&&occurred>=boundaryMs&&occurred<endMs;
+  });
+  const rows=dedupeArchiveRows([...archiveResult.rows,...todayRows]);
+  setVodPttRows(rows);
+  pttLoaded=true;pttFollowing=true;pttNewest.hidden=true;
+  const archiveWarning=archiveResult.coverageStatus==='COMPLETE'
+   ?'昨日封存完整'
+   :'⚠ 昨日 '+archiveResult.coverageStatus;
+  pttMeta.textContent=taipeiDayForDate(new Date(startMs))+'～'+today+
+   ' · '+rows.length+' 則 · VOD · '+archiveWarning+' + 今日暫存（未封存）';
+  if(!rows.length)pttFeed.replaceChildren(node('div','這段跨日 VOD 目前沒有可顯示的 PTT 推文。','ptt-empty'));
+  startVodPttTimeline();
+ }catch(error){
+  if(token!==pttResolveToken)return;
+  pttMeta.textContent='歷史封存 + 今日暫存 · 讀取失敗';
+  pttFeed.replaceChildren(node('div','跨日 VOD 的 PTT 暫時無法讀取：'+String(error?.message||error),'ptt-empty'));
+ }
+}
 async function resolveViewingSessionPtt(){
  clearInterval(pttVodPollTimer);pttVodPollTimer=null;
  if(!viewingTimelineActive())return false;
@@ -1779,12 +1840,12 @@ async function resolveViewingSessionPtt(){
  const startMs=viewingSession.absolute_start_ms;
  const endMs=startMs+viewingSession.master_end_ms;
  const start=new Date(startMs).toISOString(),end=new Date(endMs).toISOString();
- const today=taipeiDay();
- const sameDay=taipeiDayForDate(start)===today&&taipeiDayForDate(new Date(endMs-1))===today;
- pttContext={mode:sameDay?'same-day':'archive',videoId:'',start,end,scheduledStart:'',
+ const mode=vodPttWindowMode(start,end);
+ pttContext={mode,videoId:'',start,end,scheduledStart:'',
              day:taipeiDayForDate(start),anchorSource:PTT_ARCHIVE_ANCHOR};
  updateUrl();
- if(sameDay)await loadSameDayVodPtt(pttContext,token);
+ if(mode==='same-day')await loadSameDayVodPtt(pttContext,token);
+ else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);
  else await loadArchivePtt(pttContext,token);
  return true;
 }
@@ -1801,14 +1862,13 @@ async function resolvePrimaryPtt(){
 
  const suppliedWindow=archiveWindows.get(id);
  if(suppliedWindow){
-  const endMs=Date.parse(suppliedWindow.end),today=taipeiDay();
-  const sameDay=taipeiDayForDate(suppliedWindow.start)===today&&
-   Number.isFinite(endMs)&&taipeiDayForDate(new Date(endMs-1))===today;
-  pttContext={mode:sameDay?'same-day':'archive',videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
+  const mode=vodPttWindowMode(suppliedWindow.start,suppliedWindow.end);
+  pttContext={mode,videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
               scheduledStart:suppliedWindow.scheduledStart||'',
               day:taipeiDayForDate(suppliedWindow.start),anchorSource:suppliedWindow.anchorSource};
   updateUrl();
-  if(sameDay)await loadSameDayVodPtt(pttContext,token);
+  if(mode==='same-day')await loadSameDayVodPtt(pttContext,token);
+  else if(mode==='hybrid')await loadHybridVodPtt(pttContext,token);
   else await loadArchivePtt(pttContext,token);
   return;
  }
