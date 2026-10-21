@@ -100,6 +100,31 @@ assert.equal(adapter.masterFromSource('A','AAAAAAAAAAA',45000),40000);
         self.assertIn("masterTimeMs:viewingAdapter.masterTimeMs", VIEWER)
         self.assertIn("q.append(key,value)", VIEWER)
 
+    def test_runtime_clock_owner_is_independent_of_primary(self):
+        self.assertIn("let viewingClockPovId='';", VIEWER)
+        self.assertIn("function viewingClockStream()", VIEWER)
+        self.assertIn("function sampleViewingMasterClock()", VIEWER)
+        self.assertIn("viewingClockPovId=String(session.povs[0]?.pov_id||'');", VIEWER)
+        self.assertIn("if(sampleClock)sampleViewingMasterClock();", VIEWER)
+        self.assertNotIn("const primaryStream=streams[primaryIndex];\n  if(samplePrimary", VIEWER)
+
+    def test_primary_switch_does_not_reassign_clock_owner(self):
+        start = VIEWER.index("function setPrimary(index){")
+        end = VIEWER.index("function handleFocusAvatarClick", start)
+        body = VIEWER[start:end]
+        self.assertIn("viewingAdapter.setPrimaryPov(streams[index].povId)", body)
+        self.assertNotIn("viewingClockPovId=", body)
+
+    def test_buffering_gap_and_breakpoint_do_not_change_clock_owner(self):
+        reconcile_start = VIEWER.index("function reconcileViewingTimeline")
+        reconcile_end = VIEWER.index("function initViewingTimeline", reconcile_start)
+        body = VIEWER[reconcile_start:reconcile_end]
+        self.assertIn("const owner=viewingClockStream();", VIEWER)
+        self.assertIn("if(!Number.isFinite(seconds))return viewingAdapter.masterTimeMs;", VIEWER)
+        self.assertIn("if(resolved.status!=='READY')", body)
+        self.assertIn("if(resolved.replace){", body)
+        self.assertNotIn("viewingClockPovId=", body)
+
 
 if __name__ == "__main__":
     unittest.main()
