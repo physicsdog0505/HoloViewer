@@ -925,14 +925,17 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("function pttVodPlaybackMs()",viewer)
         self.assertIn("const raw=startMs+Math.max(0,seconds)*1000",viewer)
-        self.assertIn("function vodPttVisibleCountAt(rows,absoluteMs)",viewer)
+        self.assertIn("function buildVodPttPresentationTimes(rows)",viewer)
+        self.assertIn("function vodPttVisibleCountAt(rows,absoluteMs,presentationTimes=null)",viewer)
         self.assertIn("function syncVodPttTimeline({forceFollow=false}={})",viewer)
-        helper_start=viewer.index("function vodPttVisibleCountAt(rows,absoluteMs){")
+        helper_start=viewer.index("function buildVodPttPresentationTimes(rows){")
         helper_end=viewer.index("function setVodPttRows(rows){",helper_start)
         helper=viewer[helper_start:helper_end]
         script=helper+"\nconst rows=[{occurred_at:'2026-10-18T08:14:59Z'},{occurred_at:'2026-10-18T08:15:00Z'},{occurred_at:'2026-10-18T08:15:01Z'}];process.stdout.write(String(vodPttVisibleCountAt(rows,Date.parse('2026-10-18T08:15:00Z'))));"
         result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
         self.assertEqual(result.stdout,'2')
+        self.assertIn("pttVodPresentationTimes=buildVodPttPresentationTimes(pttVodRows)",viewer)
+        self.assertIn("vodPttVisibleCountAt(pttVodRows,absoluteMs,pttVodPresentationTimes)",viewer)
         self.assertIn("if(visible>pttVodVisibleCount)",viewer)
         self.assertIn("pttFeed.replaceChildren(...pttVodRows.slice(0,visible).map(pttRow))",viewer)
         self.assertIn("currentSeconds<pttVodLastSample.seconds-.75",viewer)
@@ -942,6 +945,36 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         self.assertIn("最新 · '+clock",viewer)
         self.assertIn("對齊播放時間",viewer)
         self.assertNotIn("pttFeed.scrollTop=0;\n  pttMeta.textContent=context.day",viewer)
+
+    def test_vod_ptt_dense_minute_is_paced_in_stable_order(self):
+        viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+        helper_start=viewer.index("function buildVodPttPresentationTimes(rows){")
+        helper_end=viewer.index("function setVodPttRows(rows){",helper_start)
+        helper=viewer[helper_start:helper_end]
+        script=helper+r"""
+const base='2026-10-17T06:10:00Z';
+const rows=Array.from({length:60},(_,i)=>({occurred_at:base,push_id:'p'+String(i).padStart(2,'0')}));
+const times=buildVodPttPresentationTimes(rows);
+const t0=Date.parse(base);
+process.stdout.write(JSON.stringify({
+ first:times[0]-t0,
+ second:times[1]-t0,
+ middle:times[30]-t0,
+ last:times[59]-t0,
+ at10s:vodPttVisibleCountAt(rows,t0+10000,times),
+ at30s:vodPttVisibleCountAt(rows,t0+30000,times),
+ at59s:vodPttVisibleCountAt(rows,t0+59000,times)
+}));
+"""
+        result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
+        payload=json.loads(result.stdout)
+        self.assertEqual(payload["first"],0)
+        self.assertEqual(payload["second"],1000)
+        self.assertEqual(payload["middle"],30000)
+        self.assertEqual(payload["last"],59000)
+        self.assertEqual(payload["at10s"],11)
+        self.assertEqual(payload["at30s"],31)
+        self.assertEqual(payload["at59s"],60)
 
     def test_public_viewer_does_not_mount_uncertified_ptt_or_collapse_video(self):
         dom=(ROOT/'site/assets/4174-shared-viewing-a144bb3-dom.js').read_text(encoding='utf-8')
