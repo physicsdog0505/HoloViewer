@@ -388,19 +388,31 @@ def _verify_http_readback_with_retry(*, package: dict[str,Any], job_id: str,
 
 
 def _stable_finalization_material(receipt: object) -> object:
-    """Compare finalization semantics while ignoring observation-only identity.
+    """Compare closeout semantics while ignoring observation-only identity.
 
-    #48 receipts intentionally include observed_at in evidence_digest. A daily
-    closeout rerun minutes later must not mint a new historical package merely
-    because the observation clock changed. Coverage digests / expected-set
-    evidence still participate, so any source/authority change invalidates
-    reuse.
+    Both the #48 finalization receipt and the public date-search expected-AID
+    contract are freshly observed on every invocation. Their timestamps and
+    digest mirrors therefore change even when the authoritative day/AID set and
+    Collector coverage are byte-for-byte unchanged. Those observation-only
+    fields must not mint another immutable historical revision.
+
+    We still retain the authority kind/day/version/issuer/evidence_id,
+    expected_aids/status, per-thread coverage digests, gaps/conflicts and safety
+    state. A real authority/AID/coverage change therefore invalidates reuse.
     """
     if not isinstance(receipt,dict):
         return None
     body=json.loads(json.dumps(receipt))
     body.pop("observed_at",None)
     body.pop("evidence_digest",None)
+
+    expected=body.get("expected_set")
+    if isinstance(expected,dict):
+        expected.pop("evidence_digest",None)
+        authority=expected.get("authority")
+        if isinstance(authority,dict):
+            authority.pop("observed_at",None)
+            authority.pop("evidence_hash",None)
     return body
 
 
