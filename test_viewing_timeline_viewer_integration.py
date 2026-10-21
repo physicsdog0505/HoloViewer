@@ -228,6 +228,13 @@ assert.equal(adapter.absoluteTimeMs(),1060500);
         self.assertIn("applyViewingCoverage(plan);", VIEWER)
         self.assertIn("!collabManaged||collabKind!=='vod'", VIEWER)
 
+    def test_collab_clock_keeps_running_across_zero_coverage_gap(self):
+        self.assertIn("let viewingRunIntent=false;", VIEWER)
+        self.assertIn("if(viewingTimelineActive()&&viewingRunIntent)return true;", VIEWER)
+        self.assertIn("if(state===YT.PlayerState.PLAYING)viewingRunIntent=true;", VIEWER)
+        self.assertIn("else if(state===YT.PlayerState.PAUSED)viewingRunIntent=false;", VIEWER)
+        self.assertIn("viewingClockSample=null;viewingResyncPending=false;viewingRunIntent=false;", VIEWER)
+
     def test_cross_day_vod_ptt_uses_archive_plus_today_hybrid(self):
         self.assertIn("function vodPttWindowMode(start,end)", VIEWER)
         self.assertIn("if(startDay<today&&endDay===today)return 'hybrid';", VIEWER)
