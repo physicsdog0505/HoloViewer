@@ -125,6 +125,60 @@ assert.equal(adapter.masterFromSource('A','AAAAAAAAAAA',45000),40000);
         self.assertIn("if(resolved.replace){", body)
         self.assertNotIn("viewingClockPovId=", body)
 
+    def test_session_clock_continues_through_clock_owner_gap(self):
+        script = r"""
+const assert=require('node:assert/strict');
+const timeline=require('./site/assets/viewing-timeline-core.js');
+const factory=require('./site/assets/viewing-timeline-viewer-adapter.js');
+const session={
+ schema_version:timeline.SCHEMA,session_id:'gap-event',absolute_start_ms:1000000,master_end_ms:90000,
+ povs:[
+  {pov_id:'A',segments:[
+   {segment_id:'a1',master_start_ms:0,master_end_ms:40000,video_id:'AAAAAAAAAAA',source_start_ms:0},
+   {segment_id:'a2',master_start_ms:60000,master_end_ms:90000,video_id:'BBBBBBBBBBB',source_start_ms:0},
+  ]},
+  {pov_id:'B',segments:[
+   {segment_id:'b1',master_start_ms:0,master_end_ms:90000,video_id:'CCCCCCCCCCC',source_start_ms:0},
+  ]},
+ ]
+};
+const adapter=factory.create(session,{timeline,initialMasterTimeMs:40000,primaryPovId:'B'});
+const clock=factory.createClock(adapter,{nowMs:1000});
+const before=adapter.absoluteTimeMs();
+assert.equal(timeline.resolvePov(session,'A',40000).status,'NO_COVERAGE');
+clock.step({nowMs:11000,running:true,mappedMasterMs:null});
+assert.equal(adapter.masterTimeMs,50000);
+assert.equal(adapter.absoluteTimeMs(),before+10000);
+clock.step({nowMs:21000,running:true,mappedMasterMs:null});
+assert.equal(adapter.masterTimeMs,60000);
+assert.equal(timeline.resolvePov(session,'A',60000).video_id,'BBBBBBBBBBB');
+const absoluteAtResume=adapter.absoluteTimeMs();
+adapter.setPrimaryPov('A');
+assert.equal(adapter.absoluteTimeMs(),absoluteAtResume);
+clock.step({nowMs:21500,running:true,mappedMasterMs:60500});
+assert.equal(adapter.masterTimeMs,60500);
+assert.equal(adapter.absoluteTimeMs(),1060500);
+"""
+        self.run_node(textwrap.dedent(script))
+
+    def test_runtime_gap_fallback_uses_session_clock_policy(self):
+        self.assertIn("let viewingClockPolicy=null;", VIEWER)
+        self.assertIn("function viewingSessionPlaying()", VIEWER)
+        self.assertIn("resolved?.status==='READY'&&ownerPlaying", VIEWER)
+        self.assertIn(
+            "viewingClockPolicy.step({nowMs:now,running:viewingSessionPlaying(),mappedMasterMs:mapped})",
+            VIEWER,
+        )
+        self.assertIn(
+            "viewingClockPolicy=viewingAdapterFactory.createClock(viewingAdapter,{nowMs:performance.now()});",
+            VIEWER,
+        )
+
+    def test_gap_resume_replaces_only_owner_pov_without_master_jump(self):
+        self.assertIn("if(viewingTimelineActive()&&viewingSessionPlaying())playing=true;", VIEWER)
+        self.assertIn("if(resolved.replace){\n    replaceTimelinePovSource(index,resolved);", VIEWER)
+        self.assertIn("continue;\n   }\n   const player=players[index]", VIEWER)
+
 
 if __name__ == "__main__":
     unittest.main()
