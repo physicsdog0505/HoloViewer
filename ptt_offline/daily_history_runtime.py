@@ -193,9 +193,13 @@ def coverage_from_collector(*, source: Path, day: str, expected_contract: dict[s
 
 
 def make_repair_executor(config: dict[str,Any], *, day: str) -> Callable[[dict[str,Any]],dict[str,Any]] | None:
+    # Repair is an explicit owner-local mutation gate, independent of deploy.
+    # A build-only/dry-run with a configured command must remain read-only.
+    if config.get("repair_enabled") is not True:
+        return None
     raw=config.get("repair_command")
     if raw is None:
-        return None
+        raise DailyHistoryRuntimeError("repair_enabled=true but repair_command is unavailable")
     source: Path=config["_collector_path"]
     command=_expand_command(raw,day=day,source=source)
     timeout=int(config.get("repair_timeout_seconds",600))
