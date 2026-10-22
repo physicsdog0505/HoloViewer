@@ -1,5 +1,3 @@
-import {readToday} from './store.mjs';
-
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
 const DAY=/^\d{4}-\d{2}-\d{2}$/;
@@ -228,31 +226,68 @@ async function historyVideoMetadata(db,videoId){
  };
 }
 
-async function collabLive(db,{now=new Date(),profileTableEnabled=false}={}){
- const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
- const today=await readToday(db,{day,limit:200,offset:0,now,profileTableEnabled});
+function parseCanonicalCollabRow(row){
+ if(!row)return null;
+ let event;
+ try{event=JSON.parse(row.payload_json);}catch{return null;}
+ if(!event||event.event_id!==row.event_id||!Array.isArray(event.streams))return null;
  return {
-  schema_version:'public-experience-v1',
-  kind:'collab',
-  scope:'live',
-  day,
-  completeness:today.completeness,
-  events:detectCollabCandidates(today.streams)
+  ...event,
+  event_id:row.event_id,
+  event_key:row.event_key,
+  label:row.label,
+  confidence:row.confidence,
+  review_status:row.review_status,
+  source_revision:row.source_revision,
+  published_at:row.published_at,
+  candidate:row.review_status!=='approved'
  };
 }
-async function collabHistory(db,day,{limit=50,offset=0}={}){
- const source=await historyRows(db,day);
- const events=detectCollabCandidates(source.streams);
+async function collabProjectionMeta(db){
+ return await db.prepare(`SELECT source_revision,published_at,source_event_count,effective_event_count
+ FROM public_collab_projection_meta WHERE singleton=1`).first();
+}
+async function canonicalCollabLive(db,{now=new Date()}={}){
+ const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+ const meta=await collabProjectionMeta(db);
+ if(!meta)throw Error('canonical collab projection missing');
+ const rows=await db.prepare(`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
+ FROM public_collab_events
+ WHERE is_current=1 AND live_scope=1 AND review_status!='rejected'
+ ORDER BY start_at DESC,event_id DESC LIMIT 100`).all();
+ const events=(rows.results??[]).map(parseCanonicalCollabRow).filter(Boolean);
  return {
-  schema_version:'public-experience-v1',
-  kind:'collab',
-  scope:'history',
-  day,
-  completeness:{limited:source.limited,has_more:offset+limit<events.length},
-  total:events.length,
-  limit,offset,
-  events:events.slice(offset,offset+limit)
+  schema_version:'public-experience-v1',kind:'collab',scope:'live',day,
+  completeness:{limited:false,has_more:false,projection:'canonical'},
+  projection:{source_revision:meta.source_revision,published_at:meta.published_at},
+  events
  };
+}
+async function canonicalCollabHistory(db,day,{limit=50,offset=0}={}){
+ const meta=await collabProjectionMeta(db);
+ if(!meta)throw Error('canonical collab projection missing');
+ const rows=await db.prepare(`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
+ FROM public_collab_events
+ WHERE event_date=? AND is_current=1 AND review_status!='rejected'
+ ORDER BY start_at DESC,event_id DESC LIMIT ? OFFSET ?`).bind(day,limit+1,offset).all();
+ const raw=rows.results??[],has_more=raw.length>limit;
+ const events=raw.slice(0,limit).map(parseCanonicalCollabRow).filter(Boolean);
+ return {
+  schema_version:'public-experience-v1',kind:'collab',scope:'history',day,
+  completeness:{limited:false,has_more,projection:'canonical'},
+  projection:{source_revision:meta.source_revision,published_at:meta.published_at},
+  total:offset+events.length+(has_more?1:0),limit,offset,events
+ };
+}
+async function canonicalCollabDetail(db,eventId,day=null){
+ const meta=await collabProjectionMeta(db);
+ if(!meta)throw Error('canonical collab projection missing');
+ let query=`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
+ FROM public_collab_events WHERE event_id=? AND is_current=1 AND review_status!='rejected'`;
+ let row;
+ if(day!=null)row=await db.prepare(query+' AND event_date=?').bind(eventId,day).first();
+ else row=await db.prepare(query).bind(eventId).first();
+ return parseCanonicalCollabRow(row);
 }
 function publicWatchEvent(row,streams){
  return {
@@ -312,26 +347,21 @@ export async function handleExperienceRead(request,env,now=new Date()){
    return video?json(video,200,30):json({error:'not_found',verified:false},404,0);
   }
   if(url.pathname==='/v1/collab/live'){
-   return json(await collabLive(env.DB,{now,profileTableEnabled:env.TODAY_PROFILES_ENABLED==='true'}));
+   return json(await canonicalCollabLive(env.DB,{now}));
   }
   if(url.pathname==='/v1/collab/history'){
    const day=url.searchParams.get('day')??'';
    const limit=intParam(url.searchParams.get('limit'),{min:1,max:100,def:50});
    const offset=intParam(url.searchParams.get('offset'),{min:0,max:1000,def:0});
    if(!validDay(day)||limit==null||offset==null)return json({error:'invalid_collab_query'},400,0);
-   return json(await collabHistory(env.DB,day,{limit,offset}));
+   return json(await canonicalCollabHistory(env.DB,day,{limit,offset}));
   }
   if(url.pathname.startsWith('/v1/collab/events/')){
    const eventId=decodeURIComponent(url.pathname.slice('/v1/collab/events/'.length));
    if(!EVENT_ID.test(eventId))return json({error:'invalid_event_id'},400,0);
    const day=url.searchParams.get('day');
-   let events;
-   if(day!=null){
-    if(!validDay(day))return json({error:'invalid_day'},400,0);
-    const source=await historyRows(env.DB,day);
-    events=detectCollabCandidates(source.streams);
-   }else events=(await collabLive(env.DB,{now,profileTableEnabled:env.TODAY_PROFILES_ENABLED==='true'})).events;
-   const event=events.find(x=>x.event_id===eventId);
+   if(day!=null&&!validDay(day))return json({error:'invalid_day'},400,0);
+   const event=await canonicalCollabDetail(env.DB,eventId,day);
    return event?json({schema_version:'public-experience-v1',event}):json({error:'not_found'},404,0);
   }
   if(url.pathname==='/v1/watchalong/recent'){
