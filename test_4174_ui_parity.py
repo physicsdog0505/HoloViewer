@@ -1620,11 +1620,11 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
     def test_time_hub_identity_registry_uses_verified_channel_mapping(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         expected=[
-            ("UCjLEmnpCNeisMxy134KPwWw","こぼ・かなえる"),
-            ("UCYz_5n-uDuChHtLo7My1HnQ","クレイジー・オリー"),
-            ("UCOyYb1c43VlX9rc_lT6NKQw","アユンダ・リス"),
-            ("UCP0BspO_AMEe3aQqqpo89Dg","ムーナ・ホシノヴァ"),
-            ("UCAoy6rzhSf4ydcYjJw3WoVg","アイラニ・イオフィフティーン"),
+            ("UCjLEmnpCNeisMxy134KPwWw","Kobo Kanaeru"),
+            ("UCYz_5n-uDuChHtLo7My1HnQ","Kureiji Ollie"),
+            ("UCOyYb1c43VlX9rc_lT6NKQw","Ayunda Risu"),
+            ("UCP0BspO_AMEe3aQqqpo89Dg","Moona Hoshinova"),
+            ("UCAoy6rzhSf4ydcYjJw3WoVg","Airani Iofifteen"),
             ("UCWQtYtq9EOB4-I5P-3fh8lA","音乃瀬奏"),
             ("UCtyWhCj3AqKh2dXctLkDtng","一条莉々華"),
             ("UCdXAk5MpyLD8594lm_OvtGQ","儒烏風亭らでん"),
@@ -1651,6 +1651,26 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('content:"★"',css)
         self.assertIn(".time-hub-special .time-hub-avatar{width:50px;height:50px}",css)
         self.assertIn(".time-hub-special-copy strong{font-size:15px",css)
+
+
+
+    def test_time_hub_locale_name_policy_jp_dev_is_japanese_en_id_english(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        # JP / DEV_IS: Japanese display names.
+        for value in (
+            "UC1DCedRgGHBdm81E1llLhOQ|兎田ぺこら|",
+            "UCWQtYtq9EOB4-I5P-3fh8lA|音乃瀬奏|",
+            "UCGzTVXqMQHa4AgJVJIVvtDQ|綺々羅々ヴィヴィ|",
+        ):
+            self.assertIn(value,js)
+        # ID / EN: English display names.
+        for value in (
+            "UCjLEmnpCNeisMxy134KPwWw|Kobo Kanaeru|",
+            "UCYz_5n-uDuChHtLo7My1HnQ|Kureiji Ollie|",
+            "UCL_qhgtOy0dy1Agp8vkySQg|Mori Calliope|",
+        ):
+            self.assertIn(value,js)
+        self.assertNotIn("UCjLEmnpCNeisMxy134KPwWw|こぼ・かなえる|",js)
 
 
 
