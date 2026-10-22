@@ -1501,7 +1501,7 @@ function watchalongLandingCard({videoId,title,day='',detail='',action='開始同
  const card=document.createElement('a');card.className='watchalong-static-card'+(featured?' watchalong-featured-card':'')+(compact?' watchalong-compact-card':'');
  applyHomeSupportStyle(card,{...item,channel_name:label});
  card.href=href||'#manual';
- if(typeof onpick==='function')card.onclick=event=>{event.preventDefault();onpick()};
+ if(typeof onpick==='function')card.onclick=event=>{if(event.target.closest('[data-youtube-href]'))return;event.preventDefault();onpick()};
  card.append(watchalongCardImage(videoId,title,badge));
  const body=document.createElement('div');body.className='watchalong-static-body';
  const meta=document.createElement('div');meta.className='watchalong-static-meta';
@@ -1509,8 +1509,13 @@ function watchalongLandingCard({videoId,title,day='',detail='',action='開始同
  if(detail){const detailEl=document.createElement('span');detailEl.textContent=String(detail);meta.append(detailEl)}
  if(status){const statusEl=document.createElement('span');statusEl.className='watchalong-card-status';statusEl.textContent=String(status);meta.append(statusEl)}
  const titleEl=document.createElement('strong');titleEl.textContent=String(title||videoId);
+ const actions=document.createElement('div');actions.className='watchalong-card-actions';
  const actionEl=document.createElement('span');actionEl.className='watchalong-static-action';actionEl.textContent=action;
- body.append(meta,watchalongIdentity(item,label),titleEl,actionEl);card.append(body);return card;
+ const youtube=document.createElement('span');youtube.className='watchalong-youtube-link';youtube.role='link';youtube.tabIndex=0;youtube.dataset.youtubeHref='https://www.youtube.com/watch?v='+videoId;youtube.textContent='YouTube ↗';
+ youtube.onclick=event=>{event.preventDefault();event.stopPropagation();window.open(youtube.dataset.youtubeHref,'_blank','noopener,noreferrer')};
+ youtube.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();window.open(youtube.dataset.youtubeHref,'_blank','noopener,noreferrer')}};
+ actions.append(actionEl,youtube);
+ body.append(meta,watchalongIdentity(item,label),titleEl,actions);card.append(body);return card;
 }
 function pickWatchalongHost(videoId){
  const input=document.querySelector('#watchalongBuilder input[name="master"]');
