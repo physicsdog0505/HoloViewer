@@ -1530,5 +1530,19 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_ptt_midnight_rollover_keeps_previous_tail_at_1000_rows(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+
+        self.assertNotIn("if(pttLastGoodDay&&pttLastGoodDay!==today)",js)
+        self.assertIn("pttCarryLoadedFor!==today",js)
+        self.assertIn("const previous=shiftDay(today,-1)",js)
+        self.assertIn("/v1/ptt/today?day='+encodeURIComponent(previous)+'&limit=1000",js)
+        self.assertIn("/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000",js)
+        self.assertIn("const rows=[...carryRows,...todayRows]",js)
+        self.assertIn("}).slice(-1000)",js)
+        self.assertIn("while(list.children.length>1000)",js)
+
+
+
 if __name__ == "__main__":
     unittest.main()
