@@ -1,0 +1,30 @@
+name: Today D1 and API shell offline tests
+on:
+  push:
+    branches: [issue47-public-today-offline-ingestion]
+    paths: ['backend/today/**', '.github/workflows/today-d1-offline.yml']
+  pull_request:
+    paths: ['backend/today/**', '.github/workflows/today-d1-offline.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exact HEAD
+        run: git rev-parse HEAD
+      - name: D1 and API shell offline tests
+        run: node --test backend/today/d1/verify-support-color-handoff.test.mjs backend/today/d1/support-colors.test.mjs
+          node backend/today/d1/verify-support-color-handoff-cli.mjs backend/today/d1/legacy-66.roster.json <(node -e "const r=require('fs').readFileSync('backend/today/d1/legacy-66.roster.json','utf8');const j=JSON.parse(r);console.log(JSON.stringify({schema_version:1,fallback:'neutral',channels:j.channels.map((x,i)=>({channel_id:x.channel_id,display_mode:'solid',verification_status:'verified',color_hex:'#123456'}))}))") backend/today/d1/channel-profile-refresh.test.mjs backend/today/d1/websub-hardening.test.mjs backend/today/d1/websub-leases.test.mjs backend/today/d1/feed-reconcile.test.mjs backend/today/d1/websub-renewal-send.test.mjs backend/today/d1/websub-renewal.test.mjs backend/today/d1/cloud-scheduled.test.mjs backend/today/d1/websub-status.test.mjs backend/today/d1/websub-store.test.mjs backend/today/d1/websub-receiver.test.mjs backend/today/d1/today-private-post.test.mjs backend/today/d1/one-shot-writer.test.mjs backend/today/d1/sqlite-api-e2e.test.mjs backend/today/d1/api-deploy-config.test.mjs backend/today/d1/api-worker-entry.test.mjs backend/today/d1/owner-wrangler-migration.test.mjs backend/today/d1/owner-migration.test.mjs backend/today/d1/check-release-preflight.test.mjs backend/today/d1/migrate.test.mjs backend/today/d1/store.test.mjs backend/today/d1/worker-read.test.mjs backend/today/d1/api-shell.test.mjs backend/today/d1/legacy-compat.test.mjs
+      - name: Pin migration SHA-256 receipt (offline only)
+        run: node backend/today/d1/check-release-preflight.mjs
+      - name: Python provider and contract tests
+        run: python -B -m unittest -v backend.today.test_today_offline backend.today.test_provider_ingest backend.today.test_today_contract backend.today.test_youtube_readonly backend.today.test_today_owner_once
