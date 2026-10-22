@@ -664,7 +664,7 @@ function spawnDanmaku(row){
  const lane=(Number(row.index)||0)%4;
  item.style.setProperty('--danmaku-top',(8+lane*18)+'%');
  item.style.setProperty('--danmaku-color','var(--watchalong-host-accent,#4b97c8)');
- const duration=Math.max(6,Math.min(12,6+text.length*0.06));
+ const duration=Math.max(9,Math.min(18,9+text.length*0.09));
  item.style.setProperty('--danmaku-duration',duration.toFixed(1)+'s');
  item.addEventListener('animationend',()=>item.remove(),{once:true});
  danmakuLayer.append(item);
