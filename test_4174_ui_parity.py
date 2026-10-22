@@ -1396,5 +1396,15 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_viewer_primary_carousel_geometry_caps_at_visible_slots(self):
+        js=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+
+        self.assertIn("const geometryCount=effective==='primary'?Math.min(FOCUS_VISIBLE_SLOTS,count):count;",js)
+        self.assertIn("stage.className='viewer-stage layout-'+effective+' count-'+Math.max(1,geometryCount);",js)
+        self.assertIn("workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+Math.max(1,geometryCount);",js)
+        self.assertIn("Math.max(0,geometryCount-1)",js)
+
+
+
 if __name__ == "__main__":
     unittest.main()
