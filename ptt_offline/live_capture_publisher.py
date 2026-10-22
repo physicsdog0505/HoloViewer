@@ -321,7 +321,9 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
         # recovery rows, so this changes priority rather than the D1 budget.
         fresh=[row for row in missing if _fresh_for_burst(row,now=now)]
         recovery=[row for row in missing if not _fresh_for_burst(row,now=now)]
-        selected=(fresh+recovery)[:batch_cap]
+        priority=fresh+recovery
+        batch_day=priority[0]["day"]
+        selected=[row for row in priority if row["day"]==batch_day][:batch_cap]
         rows=[]
         floor_map=plan.get("floor_by_source_line",{}) if plan.get("floor_authoritative") else {}
         for source_row in selected:
@@ -331,8 +333,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
                 outbound["floor"]=floor
             outbound["time_proof"]=sign_time_proof(outbound,secret)
             rows.append({k:outbound.get(k) for k in OUTPUT_KEYS})
-        day=rows[0]["day"]
-        rows=[r for r in rows if r["day"]==day]
+        day=batch_day
         checkpoint=new_checkpoint(source_identity=plan["source_identity"],day=day,aids=[plan["aid"]])
         batch=make_batch(checkpoint=checkpoint,rows=rows,batch_cap=batch_cap)
         atomic_receipt(path,{"status":"REMOTE_UNCERTAIN","source_identity":plan["source_identity"],
