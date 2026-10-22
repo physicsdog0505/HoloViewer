@@ -636,7 +636,7 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         classifier_start=js.index('function homeLifecycleBucket(item){')
         classifier_end=js.index('function homeCard(',classifier_start)
         rules_start=js.index('const HOME_HIGHLIGHT_RULES=')
-        choose_end=js.index('function renderHomeHighlights(rows){',rules_start)
+        choose_end=js.index('function renderHomeHighlights(rows,filter=homeFilter()){',rules_start)
         script=js[classifier_start:classifier_end]+js[rules_start:choose_end]
         cases=[
             {'video_id':'stale000001','lifecycle_state':'live','stale':True,'title':'重大告知'},
@@ -667,7 +667,7 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         self.assertIn('id="home-announcements"',html)
         for name in ('三期生告知','重大告知','初配信','周年','新衣裝','生日','3D LIVE','大型聯動','歌回','新造型'):
             self.assertIn(name,js)
-        self.assertIn('renderHomeHighlights(rows)',js)
+        self.assertIn("renderHomeHighlights(homeCatalogRows,value);",js)
         self.assertIn("const homePollTimer=setInterval(",js)
         self.assertIn("$('custom-session').classList.contains('active')",js)
         self.assertIn("},30000);",js)
@@ -1385,6 +1385,17 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("label.textContent=playerDisplayLabel(streams[0])",js)
         self.assertIn("label.textContent=playerDisplayLabel(stream)",js)
         self.assertNotIn("node('div',stream.label,'player-label')",js)
+
+
+
+    def test_home_highlights_follow_active_home_filter(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+
+        self.assertIn("function renderHomeHighlights(rows,filter=homeFilter())",js)
+        self.assertIn("const visibleRows=(filter==='all'?rows:rows.filter(row=>String(row?.group||row?.channel_group||'other').toLowerCase()===filter));",js)
+        self.assertIn("const picks=chooseHomeHighlights(visibleRows);",js)
+        self.assertIn("renderHomeHighlights(homeCatalogRows,value);",js)
+        self.assertNotIn("homeRail(buckets.live);\n renderHomeHighlights(rows);\n applyHomeFilter();",js)
 
 
 

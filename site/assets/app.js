@@ -127,6 +127,7 @@ function applyHomeFilter(value=homeFilter()){
  document.querySelectorAll('#homeDynamic .stream-card').forEach(card=>{card.hidden=value!=='all'&&card.dataset.group!==value});
  document.querySelectorAll('#live-channel-list .live-channel-rail-item').forEach(card=>{card.hidden=(value!=='all'&&card.dataset.group!==value)||(watchMode==='multi'&&viewing.ids.includes(card.dataset.liveVideoId))});
  document.querySelectorAll('#homeDynamic .stream-filter-button').forEach(button=>button.classList.toggle('active',button.dataset.filter===value));
+ renderHomeHighlights(homeCatalogRows,value);
 }
 function homeSelection(){
  document.querySelectorAll('#homeDynamic .stream-card[data-multiview-id],#historyDynamic .stream-card[data-multiview-id]').forEach(card=>{const on=selectedHomeVideos.has(card.dataset.multiviewId);card.classList.toggle('multi-selected',on);card.setAttribute('aria-selected',String(on))});
@@ -425,8 +426,9 @@ function chooseHomeHighlights(rows){
  // video ID only, never invent shared event identity from titles or dates.
  return candidates.slice(0,6);
 }
-function renderHomeHighlights(rows){
- const picks=chooseHomeHighlights(rows);
+function renderHomeHighlights(rows,filter=homeFilter()){
+ const visibleRows=(filter==='all'?rows:rows.filter(row=>String(row?.group||row?.channel_group||'other').toLowerCase()===filter));
+ const picks=chooseHomeHighlights(visibleRows);
  const highlights=$('home-highlights'),announcement=$('home-announcements');
  highlights.replaceChildren();announcement.replaceChildren();
  const announce=picks.filter(x=>['生日','重大告知','三期生告知'].includes(x.label));
@@ -516,7 +518,6 @@ function renderHomeRows(rows){
  for(const id of selectedHomeVideos){if(!allowed.has(id))selectedHomeVideos.delete(id)}
  homeSelection();
  homeRail(buckets.live);
- renderHomeHighlights(rows);
  applyHomeFilter();
  $('home-empty').textContent=rows.length?'':'目前沒有今天的直播資料。';
  document.documentElement.classList.add('home-hydrated');
