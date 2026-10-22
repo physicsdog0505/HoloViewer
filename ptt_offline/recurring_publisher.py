@@ -71,7 +71,7 @@ def seconds_until_next_snapshot(now=None):
         target=local.replace(hour=next_minute//60,minute=next_minute%60,second=0,microsecond=0)
     return max(0,(target-local).total_seconds())
 
-def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=1,burst_max_batches=None,max_articles=4):
+def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=1,burst_max_batches=None,max_articles=4,rotation_interval_seconds=None):
     if type(max_batches) is not int or not 1<=max_batches<=16:
         raise ContractError('invalid bounded batches per snapshot')
     if burst_max_batches is None:
@@ -86,7 +86,12 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             # This lets a strict global max_batches=1 remain safe without a
             # permanently busy newest thread starving the other active AIDs.
             now=datetime.fromtimestamp(started,timezone.utc)
-            slot=int(started//snapshot_interval(now))
+            rotation_seconds=(rotation_interval_seconds
+                              if rotation_interval_seconds is not None
+                              else snapshot_interval(now))
+            if type(rotation_seconds) is not int or rotation_seconds<=0:
+                raise ContractError("invalid rotation interval")
+            slot=int(started//rotation_seconds)
             offset=slot%len(article_ids)
             article_ids=article_ids[offset:]+article_ids[:offset]
         if not article_ids:
@@ -288,7 +293,8 @@ def main(argv=None):
                 effective_burst=(args.max_batches if args.adaptive_live_cadence else args.burst_max_batches)
                 result=run_snapshot(source=args.source,state_dir=args.state_dir,send=send_this_tick,
                                     secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches,
-                                    burst_max_batches=effective_burst,max_articles=args.max_articles)
+                                    burst_max_batches=effective_burst,max_articles=args.max_articles,
+                                    rotation_interval_seconds=(LIVE_INTERVAL_SECONDS if args.adaptive_live_cadence else None))
                 posts=result.get("http_posts",0)
                 sent_rows=result.get("sent",0)
                 modeled_queries=result.get("modeled_d1_queries_ceiling",0)
