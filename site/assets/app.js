@@ -157,15 +157,22 @@ function route(r){
  document.querySelectorAll('[data-route]').forEach(el=>el.classList.toggle('active',el.dataset.route===activeNav));
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
  updateClientTopbar(r);$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
- // Preserve session stream parameters while entering the player.
- const sessionHash=r==='custom-session'&&viewing.ids.length
-  ?'#custom-session?'+new URLSearchParams([
+ // Canonical public routes use clean paths. Only the internal viewing session
+ // keeps hash state because it carries mounted-player/session parameters.
+ const canonicalPath={
+  home:'/',history:'/history',single:'/custom-view',multi:'/collab',
+  watchalong:'/watchalong',ptt:'/ptt-today', 'ptt-focus':'/ptt-today?focus=1'
+ }[r]||'/';
+ const sessionUrl=r==='custom-session'&&viewing.ids.length
+  ?'/custom-view#custom-session?'+new URLSearchParams([
     ...viewing.ids.map(id=>['stream',id]),
     ['layout',viewing.layout],['primary',String(viewing.primary)],
     ['audio',String(viewing.audio)],['ptt',viewing.ptt||'video']
    ]).toString()
-  :r==='custom-session'&&location.hash.startsWith('#custom-session?')?location.hash:'#'+r;
- history.replaceState(null,'',sessionHash);
+  :r==='custom-session'&&location.hash.startsWith('#custom-session?')
+   ?'/custom-view'+location.hash
+   :canonicalPath;
+ history.replaceState(null,'',sessionUrl);
  const viewerActive=r==='custom-session';
  if(!viewerActive)window.hvStopFocusCarousel?.();
  $('viewer-4174-css').media='not all';
@@ -1396,11 +1403,12 @@ document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('c
 const hashRoute=location.hash.substring(1).split('?')[0];
 const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):
- location.pathname==='/custom-view'?'single':
+ location.pathname==='/custom-view'?(hashRoute==='custom-session'?'custom-session':'single'):
  location.pathname==='/collab'?'multi':
  location.pathname==='/watchalong'?'watchalong':
  location.pathname==='/'?'home':'';
-route(hashRoute||pathRoute||'home');
+const legacyHashRoute=['home','history','single','multi','watchalong'].includes(hashRoute)?hashRoute:'';
+route(pathRoute||legacyHashRoute||hashRoute||'home');
 
 const homePollTimer=setInterval(()=>{
  if(!document.hidden&&($('home').classList.contains('active')||$('custom-session').classList.contains('active')))loadHome();
