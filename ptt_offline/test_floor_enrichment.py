@@ -8,6 +8,7 @@ from ptt_offline.controlled_floor_enrichment import run_one
 from ptt_offline.floor_enrichment_plan import build_plan
 from ptt_offline.ptt_aid_identity import aid_from_article_url
 from ptt_offline.public_today_contract import ContractError
+from ptt_offline.d1_publisher import canonical_record
 
 
 class FloorEnrichmentTests(unittest.TestCase):
@@ -106,6 +107,43 @@ class FloorEnrichmentTests(unittest.TestCase):
             run_one(source=str(self.source),aid=self.aid,plan_json=str(self.plan),
                 remote_json=str(self.remote),batch_no=1,approved_digest=digest,send=True,
                 receipt_path=str(self.receipt),executor=executor,proof_secret="k"*40)
+
+
+    def test_persisted_pending_row_can_still_receive_authoritative_floor(self):
+        # source_line 10 is intentionally no longer live-publish eligible, but
+        # the row is already persisted remotely and article-start coverage
+        # proves its ordinal. Floor enrichment must validate identity without
+        # re-opening live publication eligibility.
+        persisted=canonical_record({
+            "source_line":10,"source_page":1,"kind":"推","author":"a","content":"old",
+            "ptt_date":"10/14","ptt_time":"09:00","collected_at":"2026-10-15T10:00:00Z",
+            "aid":self.aid,"source_url":"https://www.ptt.cc/bbs/C_Chat/M.1789081207.A.5FC.html",
+            "occurred_at":"2026-10-14T01:00:00Z","origin":"collector",
+            "source_record_key":f"{self.aid}:10","floor":None,
+        })
+        self._write_remote([{
+            "aid":self.aid,
+            "source_line":10,
+            "source_record_key":persisted["source_record_key"],
+            "push_id":persisted["push_id"],
+            "occurred_at":persisted["occurred_at"],
+            "floor":None,
+        }])
+        plan=build_plan(source=str(self.source),aid=self.aid,remote_json=str(self.remote))
+        self.assertEqual(plan["enrichment_rows"],1)
+        self.assertEqual(plan["skipped_noncanonical"],0)
+        row=plan["batches"][0]["rows"][0]
+        self.assertEqual(row["source_line"],10)
+        self.assertEqual(row["floor"],1)
+        self.plan.write_text(json.dumps(plan),encoding="utf-8")
+        inspected=run_one(
+            source=str(self.source),aid=self.aid,plan_json=str(self.plan),
+            remote_json=str(self.remote),batch_no=1,
+            approved_digest=plan["batches"][0]["queue_digest"],send=False,
+        )
+        self.assertEqual(inspected["status"],"READY_TO_ENRICH")
+        self.assertEqual(inspected["source_lines"],[10])
+        self.assertEqual(inspected["floors"],[1])
 
     def test_non_null_conflicting_remote_floor_blocks(self):
         self._write_remote([
