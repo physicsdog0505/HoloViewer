@@ -1406,5 +1406,33 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_viewer_carousel_keeps_all_povs_in_rotation_while_showing_four_slots(self):
+        js=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+
+        # Carousel mode rotates the primary across the full stream list.
+        self.assertIn(
+            "carouselTimer=setInterval(()=>setPrimary((primaryIndex+1)%streams.length),ms);",
+            js,
+        )
+
+        # Focus/lock keeps the primary fixed and rotates only the secondary window.
+        self.assertIn(
+            "const secondaryCount=Math.max(0,streams.length-1);",
+            js,
+        )
+        self.assertIn(
+            "secondaryOffset=(secondaryOffset+Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryCount))%secondaryCount;",
+            js,
+        )
+
+        # Visible geometry remains bounded at one primary + three secondary POVs.
+        self.assertIn("const FOCUS_VISIBLE_SLOTS=4;",js)
+        self.assertIn(
+            "const geometryCount=effective==='primary'?Math.min(FOCUS_VISIBLE_SLOTS,count):count;",
+            js,
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()
