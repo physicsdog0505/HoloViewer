@@ -154,11 +154,12 @@ For a finalized Taipei day, membership is:
 
 1. every included row must occur inside that exact Taipei calendar-day interval;
 2. rows from that day's authoritative expected AIDs belong;
-3. before the first expected thread starts, rows from exactly one **direct
-   predecessor thread** may belong. The direct predecessor is the unexpected
+3. rows from exactly one **direct predecessor thread** may belong anywhere
+   inside the target Taipei day. The direct predecessor is the unexpected
    candidate with the latest authoritative PTT article-post epoch before the
    first expected thread's article-post epoch;
-4. this preserves the previous evening thread's legal cross-midnight pushes;
+4. this preserves all legal target-day pushes from the previous evening thread,
+   including late replies that arrive after the first expected thread starts;
 5. older predecessor candidates are outside scope because the direct predecessor
    has superseded them; unexpected threads at/after the first expected-thread
    start are outside the authoritative expected-thread set;
