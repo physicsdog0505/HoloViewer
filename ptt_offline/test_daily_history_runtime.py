@@ -13,6 +13,7 @@ from ptt_offline.data_lifecycle_evidence import (
     build_expected_aid_contract,
     build_source_coverage,
 )
+from ptt_offline.expected_aid_discovery_adapter import expected_aids_from_discovery
 from ptt_offline.daily_ptt_finalization import finalize_day
 from ptt_offline.daily_history_runtime import (
     CONFIG_SCHEMA,
@@ -437,6 +438,41 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(
                 DailyHistoryRuntimeError,"evidence_digest mismatch"):
             _validate_expected_contract_digest(tampered)
+
+    def test_discovery_adapter_contract_validates_builder_digest_scope(self):
+        contract=expected_aids_from_discovery(
+            day=DAY,
+            targets=[{
+                "aid":AID,
+                "url":"https://www.ptt.cc/bbs/C_Chat/M.1792450800.A.111.html",
+                "period":"本日",
+                "timestamp":1792450800,
+            }],
+            authority={
+                "kind":"ptt-public-index-discovery",
+                "evidence_id":"fixture-discovery",
+                "observed_at":"2026-10-21T00:00:00Z",
+                "verified":True,
+                "version":"thread-discovery-v1",
+                "issuer":"fixture",
+                "evidence_hash":"f"*64,
+            },
+        )
+        self.assertEqual(contract["source_kind"],"sanitized-collector-discovery")
+        self.assertEqual(contract["discovery_target_count"],1)
+        _validate_expected_contract_digest(contract)
+
+        tampered=json.loads(json.dumps(contract))
+        tampered["expected"][0]["aid"]="1tampered"
+        with self.assertRaisesRegex(
+                DailyHistoryRuntimeError,"evidence_digest mismatch"):
+            _validate_expected_contract_digest(tampered)
+
+        bad_count=json.loads(json.dumps(contract))
+        bad_count["discovery_target_count"]=2
+        with self.assertRaisesRegex(
+                DailyHistoryRuntimeError,"discovery target count mismatch"):
+            _validate_expected_contract_digest(bad_count)
 
     def test_repair_command_is_inert_until_explicitly_enabled(self):
         with tempfile.TemporaryDirectory() as tmp:
