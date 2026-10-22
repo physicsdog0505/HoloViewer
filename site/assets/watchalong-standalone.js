@@ -88,6 +88,7 @@ let lastDanmakuCueId='';
 let immersiveToolbarTimer=null;
 let checkpointTimer=null;
 let resumeApplied=false;
+let resumePending=false;
 const mobileWatchMedia=window.matchMedia('(max-width:760px)');
 // PARKED: URL time restore/share is disabled. Local progress resume remains available.
 let pendingResumeSeconds=null;
@@ -247,19 +248,31 @@ function resumeClockApplied(targetSeconds){
  const actual=currentHostSeconds();
  return actual!=null&&Math.abs(actual-targetSeconds)<=2.5;
 }
+function verifyResumeClock(target,attempt=0){
+ const delays=[120,400,1000];
+ const delay=delays[Math.min(attempt,delays.length-1)];
+ setTimeout(()=>{
+  if(resumeApplied){resumePending=false;return}
+  if(resumeClockApplied(target)){
+   resumeApplied=true;
+   resumePending=false;
+   if(resumeStatus)resumeStatus.textContent='繼續上次位置 '+clock(target);
+   return;
+  }
+  if(attempt+1<delays.length){verifyResumeClock(target,attempt+1);return}
+  resumePending=false;
+ },delay);
+}
 function maybeApplyResume(){
- if(resumeApplied||!hostPlayerReady||!sourcePlayerReady||!hostPlayer||!sourcePlayer)return;
+ if(resumeApplied||resumePending||!hostPlayerReady||!sourcePlayerReady||!hostPlayer||!sourcePlayer)return;
  if(pendingResumeSeconds==null){
   pendingResumeSeconds=readSavedCheckpoint();
   if(pendingResumeSeconds==null){resumeApplied=true;return}
  }
  const target=pendingResumeSeconds;
- if(!seekWatchalongToHost(target))return;
- setTimeout(()=>{
-  if(resumeApplied||!resumeClockApplied(target))return;
-  resumeApplied=true;
-  if(resumeStatus)resumeStatus.textContent='繼續上次位置 '+clock(target);
- },120);
+ resumePending=true;
+ if(!seekWatchalongToHost(target)){resumePending=false;return}
+ verifyResumeClock(target);
 }
 function startCheckpointLoop(){
  if(checkpointTimer)return;
@@ -562,7 +575,7 @@ window.onYouTubeIframeAPIReady=maybeMountPlayers;
 if(window.YT?.Player)maybeMountPlayers();
 
 function startSyncLoop(){
- if(syncTimer||!hostPlayer||!sourcePlayer)return;
+ if(syncTimer||!hostPlayerReady||!sourcePlayerReady||!hostPlayer||!sourcePlayer)return;
  syncTimer=setInterval(()=>{
   let host=null;
   try{host=hostPlayer.getCurrentTime()}catch{return}
