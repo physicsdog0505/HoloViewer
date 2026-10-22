@@ -1620,11 +1620,11 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
     def test_time_hub_identity_registry_uses_verified_channel_mapping(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         expected=[
-            ("UCjLEmnpCNeisMxy134KPwWw","Kobo Kanaeru"),
-            ("UCYz_5n-uDuChHtLo7My1HnQ","Kureiji Ollie"),
-            ("UCOyYb1c43VlX9rc_lT6NKQw","Ayunda Risu"),
-            ("UCP0BspO_AMEe3aQqqpo89Dg","Moona Hoshinova"),
-            ("UCAoy6rzhSf4ydcYjJw3WoVg","Airani Iofifteen"),
+            ("UCjLEmnpCNeisMxy134KPwWw","こぼ・かなえる"),
+            ("UCYz_5n-uDuChHtLo7My1HnQ","クレイジー・オリー"),
+            ("UCOyYb1c43VlX9rc_lT6NKQw","アユンダ・リス"),
+            ("UCP0BspO_AMEe3aQqqpo89Dg","ムーナ・ホシノヴァ"),
+            ("UCAoy6rzhSf4ydcYjJw3WoVg","アイラニ・イオフィフティーン"),
             ("UCWQtYtq9EOB4-I5P-3fh8lA","音乃瀬奏"),
             ("UCtyWhCj3AqKh2dXctLkDtng","一条莉々華"),
             ("UCdXAk5MpyLD8594lm_OvtGQ","儒烏風亭らでん"),
