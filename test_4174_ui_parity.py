@@ -1388,5 +1388,16 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_home_highlights_follow_active_home_filter(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+
+        self.assertIn("function renderHomeHighlights(rows,filter=homeFilter())",js)
+        self.assertIn("const visibleRows=(filter==='all'?rows:rows.filter(row=>String(row?.group||row?.channel_group||'other').toLowerCase()===filter));",js)
+        self.assertIn("const picks=chooseHomeHighlights(visibleRows);",js)
+        self.assertIn("renderHomeHighlights(homeCatalogRows,value);",js)
+        self.assertNotIn("homeRail(buckets.live);\n renderHomeHighlights(rows);\n applyHomeFilter();",js)
+
+
+
 if __name__ == "__main__":
     unittest.main()
