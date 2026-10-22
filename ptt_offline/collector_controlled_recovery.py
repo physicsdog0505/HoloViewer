@@ -1,0 +1,152 @@
+"""Owner-local, single-attempt Collector recovery adapter for #48.
+
+This adapter never stores a password. It delegates launch to the existing
+Hololive-PTT-Viewer collector_control.launch_collector(), which uses the local
+Keychain, launch lock, single-instance lock and startup guard.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+import importlib.util
+import json
+from pathlib import Path
+import sys
+import time
+from typing import Any, Callable
+
+from .collector_runtime_health import read_collector_health
+from .public_today_contract import ContractError
+
+
+SCHEMA_VERSION="holoviewer-ptt-collector-recovery-v1"
+
+
+def _atomic_json(path: Path, body: dict[str,Any]) -> None:
+    path.parent.mkdir(parents=True,exist_ok=True)
+    tmp=path.with_suffix(path.suffix+".tmp")
+    tmp.write_text(json.dumps(body,ensure_ascii=False,sort_keys=True)+"\n",encoding="utf-8")
+    tmp.replace(path)
+
+
+def load_recovery_config(path: str | Path) -> dict[str,Any]:
+    try:
+        body=json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError,ValueError,TypeError) as exc:
+        raise ContractError("collector recovery config unavailable") from exc
+    if not isinstance(body,dict) or body.get("enabled") is not True:
+        raise ContractError("collector recovery is not explicitly enabled")
+    username=body.get("username")
+    if not isinstance(username,str) or not username.isascii() or not username.isalnum():
+        raise ContractError("invalid collector recovery username")
+    test_account=body.get("test_account",False)
+    if type(test_account) is not bool:
+        raise ContractError("invalid collector recovery test_account")
+    return {"username":username,"test_account":test_account}
+
+
+def _load_collector_control(root: Path):
+    path=root/"collector_control.py"
+    if not path.is_file():
+        raise ContractError("collector_control.py unavailable")
+    # Existing collector modules import each other by checkout-local name.
+    root_text=str(root)
+    if root_text not in sys.path:
+        sys.path.insert(0,root_text)
+    spec=importlib.util.spec_from_file_location("_ptt48_collector_control",path)
+    if spec is None or spec.loader is None:
+        raise ContractError("cannot load collector_control")
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def controlled_start_once(
+    *,
+    collector_root: str | Path,
+    config_path: str | Path,
+    receipt_path: str | Path,
+    run_key: str,
+    health_probe: Callable[[],dict[str,Any]] | None=None,
+    sleep: Callable[[float],None]=time.sleep,
+    confirm_timeout_seconds: int=30,
+    confirm_interval_seconds: int=2,
+) -> dict[str,Any]:
+    """Launch a dead Collector at most once for one durable run_key."""
+    root=Path(collector_root)
+    receipt=Path(receipt_path)
+    if not run_key or not isinstance(run_key,str):
+        raise ContractError("recovery run_key required")
+
+    before=(health_probe or (lambda:read_collector_health(root)))()
+    if before.get("process_alive") is True and before.get("heartbeat_fresh") is True:
+        return {
+            "schema_version":SCHEMA_VERSION,
+            "run_key":run_key,
+            "status":"NOT_NEEDED",
+            "attempted":False,
+            "collector_health_after":before,
+        }
+    if before.get("phase")=="blocked":
+        raise ContractError("collector blocked; automatic start forbidden")
+
+    if receipt.exists():
+        try:
+            prior=json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError,ValueError,TypeError):
+            prior={}
+        if isinstance(prior,dict) and prior.get("run_key")==run_key and prior.get("attempted") is True:
+            raise ContractError("collector recovery already attempted for run_key")
+
+    cfg=load_recovery_config(config_path)
+    attempt={
+        "schema_version":SCHEMA_VERSION,
+        "run_key":run_key,
+        "attempted":True,
+        "status":"ATTEMPTING",
+        "attempted_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "test_account":cfg["test_account"],
+        # Deliberately omit username from receipt.
+        "password_storage":"macOS-keychain-existing-entry",
+        "restart_attempts":1,
+        "checkpoint_reset":False,
+        "db_clear":False,
+        "duplicate_launch_allowed":False,
+    }
+    _atomic_json(receipt,attempt)
+
+    control=_load_collector_control(root)
+    try:
+        message=control.launch_collector(cfg["username"],test_account=cfg["test_account"])
+    except Exception as exc:
+        failed={**attempt,"status":"FAILED","failure_code":"launch-"+type(exc).__name__}
+        _atomic_json(receipt,failed)
+        return failed
+
+    deadline=time.monotonic()+confirm_timeout_seconds
+    after=None
+    while time.monotonic()<deadline:
+        after=(health_probe or (lambda:read_collector_health(root)))()
+        if (
+            after.get("process_alive") is True
+            and after.get("heartbeat_fresh") is True
+            and after.get("live_context_valid") is True
+            and after.get("frontier_progressing") is True
+        ):
+            ok={
+                **attempt,
+                "status":"RECOVERED",
+                "launch_message":message,
+                "collector_health_after":after,
+            }
+            _atomic_json(receipt,ok)
+            return ok
+        sleep(confirm_interval_seconds)
+
+    uncertain={
+        **attempt,
+        "status":"STARTED_UNCONFIRMED",
+        "launch_message":message,
+        "collector_health_after":after,
+    }
+    _atomic_json(receipt,uncertain)
+    return uncertain
