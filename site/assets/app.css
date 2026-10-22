@@ -98,6 +98,51 @@ body.viewer-wide .viewer-frame iframe{height:calc(100vh - 126px);min-height:720p
 #home .feature-card strong{font-size:18px}
 #home .eyebrow{font-size:11px}
 
+/* Homepage lifecycle sections: strengthen hierarchy without changing cards or data flow. */
+#home-live-section>.section-head,
+#home-upcoming-section>.section-head{margin-bottom:13px}
+#home-live-section>.section-head h2,
+#home-upcoming-section>.section-head h2{
+  font-weight:850;
+  letter-spacing:-.025em;
+  color:#2b2927;
+}
+#home-live-section>.section-head p,
+#home-upcoming-section>.section-head p{
+  margin-top:6px;
+  font-size:13.5px;
+  line-height:1.5;
+  color:#6f6a64;
+}
+#home-upcoming-section{
+  position:relative;
+  margin-top:36px!important;
+  padding:20px 18px 22px;
+  border:1px solid color-mix(in srgb,var(--accent) 18%,var(--line));
+  border-radius:20px;
+  background:color-mix(in srgb,var(--accent-soft) 54%,var(--bg));
+}
+#home-upcoming-section::before{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:-19px;
+  height:1px;
+  background:color-mix(in srgb,var(--text) 11%,transparent);
+}
+#home-upcoming-section>.section-head h2{
+  color:#355f72;
+}
+@media(max-width:760px){
+  #home-upcoming-section{
+    margin-top:30px!important;
+    padding:16px 12px 18px;
+    border-radius:16px;
+  }
+  #home-upcoming-section::before{top:-16px}
+}
+
 
 body.home-wide .client-main{max-width:1580px;padding-top:24px}
 /* One FUWAMOCO card receives an ordered dual-color community penlight accent. */
