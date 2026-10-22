@@ -22,7 +22,8 @@ function db({threads=['aid-day','aid-night'],rows=[],gap=false}={}){
               const limit=args.at(-1);
               const anchor=sql.includes('(occurred_at,aid,source_line,push_id)>')?args.slice(1,5):null;
               const cmp=(a,b)=>a.occurred_at.localeCompare(b.occurred_at)||a.aid.localeCompare(b.aid)||a.source_line-b.source_line||a.push_id.localeCompare(b.push_id);
-              return {results:rows.filter(r=>!anchor||cmp(r,{occurred_at:anchor[0],aid:anchor[1],source_line:anchor[2],push_id:anchor[3]})>0).sort((a,b)=>ascending?cmp(a,b):-cmp(a,b)).slice(0,limit)};
+              const dayScoped=sql.includes('WHERE day=?')?rows.filter(r=>r.day===args[0]):rows;
+              return {results:dayScoped.filter(r=>!anchor||cmp(r,{occurred_at:anchor[0],aid:anchor[1],source_line:anchor[2],push_id:anchor[3]})>0).sort((a,b)=>ascending?cmp(a,b):-cmp(a,b)).slice(0,limit)};
             }
             return {results:[]};
           },
@@ -36,14 +37,14 @@ function db({threads=['aid-day','aid-night'],rows=[],gap=false}={}){
   };
 }
 const url=(route)=>new Request('https://public-api.example'+route);
-const row=(id,aid,line,t)=>({push_id:id,aid,source_line:line,kind:'推',author:'viewer',content:'fixture',occurred_at:t,floor:line,source_url:'https://www.ptt.cc',});
+const row=(id,aid,line,t,day=t.slice(0,10))=>({push_id:id,aid,day,source_line:line,kind:'推',author:'viewer',content:'fixture',occurred_at:t,floor:line,source_url:'https://www.ptt.cc',});
 const day='2026-10-16';
 test('recent tail merges previous and current Taipei day without writes',async()=>{
   const rows=[
-    row('p-old','aid-night',98,'2026-10-15T15:58:00Z'),
-    row('p-last','aid-night',99,'2026-10-15T15:59:00Z'),
-    row('p-mid','aid-day',1,'2026-10-15T16:00:00Z'),
-    row('p-new','aid-day',2,'2026-10-15T16:01:00Z'),
+    row('p-old','aid-night',98,'2026-10-15T15:58:00Z','2026-10-15'),
+    row('p-last','aid-night',99,'2026-10-15T15:59:00Z','2026-10-15'),
+    row('p-mid','aid-day',1,'2026-10-15T16:00:00Z','2026-10-16'),
+    row('p-new','aid-day',2,'2026-10-15T16:01:00Z','2026-10-16'),
   ];
   const DB=db({rows});
   const original=Date.now;
@@ -58,6 +59,22 @@ test('recent tail merges previous and current Taipei day without writes',async()
     assert.equal(body.page.limit,3);
     assert.equal(body.page.has_more,true);
     assert.equal(DB.writes,0);
+  }finally{Date.now=original;}
+});
+test('recent tail handles only-current and only-previous day',async()=>{
+  const original=Date.now;
+  Date.now=()=>Date.parse('2026-10-15T16:05:00Z');
+  try{
+    for(const fixture of [
+      [row('current','aid-day',1,'2026-10-15T16:01:00Z','2026-10-16')],
+      [row('previous','aid-night',9,'2026-10-15T15:59:00Z','2026-10-15')],
+    ]){
+      const DB=db({rows:fixture});
+      const response=await host.fetch(url('/v1/ptt/recent?limit=1000'),{DB});
+      assert.equal(response.status,200);
+      assert.deepEqual((await response.json()).pushes.map(r=>r.push_id),[fixture[0].push_id]);
+      assert.equal(DB.writes,0);
+    }
   }finally{Date.now=original;}
 });
 test('recent tail rejects unbounded limit',async()=>{
