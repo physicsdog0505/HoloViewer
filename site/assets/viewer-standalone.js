@@ -558,11 +558,12 @@ function applyLayout(){
  const wasFollowing=pttFollowing||pttAtBottom();
  const count=Math.max(0,streams.filter((_,index)=>viewingPovVisible(index)).length);
  const effective=watchMode==='multi'&&count>1?layout:'equal';
- stage.className='viewer-stage layout-'+effective+' count-'+Math.max(1,count);
- workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+Math.max(1,count);
+ const geometryCount=effective==='primary'?Math.min(FOCUS_VISIBLE_SLOTS,count):count;
+ stage.className='viewer-stage layout-'+effective+' count-'+Math.max(1,geometryCount);
+ workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+Math.max(1,geometryCount);
  const cols=count<=1?1:count<=4?2:count<=9?3:4;
  const rows=Math.max(1,Math.ceil(count/cols));
- const focusSecondaryCount=Math.min(FOCUS_VISIBLE_SLOTS-1,Math.max(0,count-1));
+ const focusSecondaryCount=Math.min(FOCUS_VISIBLE_SLOTS-1,Math.max(0,geometryCount-1));
  stage.style.setProperty('--viewer-cols',String(cols));
  stage.style.setProperty('--viewer-rows',String(rows));
  stage.style.setProperty('--focus-rows',String(Math.max(1,focusSecondaryCount)));
