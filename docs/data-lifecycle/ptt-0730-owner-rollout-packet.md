@@ -180,6 +180,9 @@ body={
   "WorkingDirectory":runtime,
   "StartCalendarInterval":{"Hour":7,"Minute":30},
   "RunAtLoad":False,
+  "EnvironmentVariables":{
+    "PATH":"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+  },
   "StandardOutPath":str(__import__("pathlib").Path.home()/"Library/Logs/com.holoviewer.ptt-history-closeout.out.log"),
   "StandardErrorPath":str(__import__("pathlib").Path.home()/"Library/Logs/com.holoviewer.ptt-history-closeout.err.log"),
 }
@@ -281,3 +284,18 @@ This rollout packet does not authorize:
 - new completeness logic;
 - GitHub Actions/CI as Production authority;
 - replacing any scheduler other than `com.holoviewer.ptt-history-closeout`.
+
+
+## LaunchAgent executable environment requirement
+
+Owner acceptance on 2026-10-23 proved that launchd's default PATH
+`/usr/bin:/bin:/usr/sbin:/sbin` cannot resolve the configured
+`npx wrangler` Static Assets deploy command.
+
+The 07:30 LaunchAgent therefore MUST set:
+
+```text
+EnvironmentVariables.PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+```
+
+This is an execution-environment requirement, not an archive or completeness semantic change.
