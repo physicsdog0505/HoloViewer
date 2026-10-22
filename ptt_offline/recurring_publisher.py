@@ -123,6 +123,10 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     result=run_live_once(db,state_path=state,secret=secret,
                        executor=executor,send=False,batch_cap=batch_cap,article_id=article_id)
                     pending+=result.get("eligible",0)
+                    # A budget-blocked adaptive tick probes without sending. Its
+                    # recoverable backlog still requires 10s polling, even if
+                    # there are no fresh rows and no ACK in this snapshot.
+                    backlog=backlog or result.get("eligible",0)>0
                     legacy_baseline_candidates+=result.get("legacy_baseline_candidates",0)
                     retained_recovery_candidates+=result.get("retained_recovery_candidates",0)
                     baseline_skipped_candidates+=result.get("baseline_skipped_candidates",0)
