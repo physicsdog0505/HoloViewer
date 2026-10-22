@@ -55,7 +55,7 @@ def validate(doc: dict) -> list[dict]:
         raise ValueError("source must be an object")
     start = _parse_time(source.get("range_start"))
     end = _parse_time(source.get("range_end"))
-    if end <= start or (end - start).days > MAX_RANGE_DAYS:
+    if end <= start or (end - start).total_seconds() > MAX_RANGE_DAYS * 86400:
         raise ValueError("invalid/broad source range")
     detection_version = source.get("detection_version")
     if not isinstance(detection_version, str) or not detection_version:
@@ -84,6 +84,8 @@ def validate(doc: dict) -> list[dict]:
             raise ValueError("event_key mismatch")
         if payload.get("label") != row.get("label"):
             raise ValueError("label mismatch")
+        if payload.get("confidence") != row.get("confidence"):
+            raise ValueError("confidence mismatch")
         if payload.get("event_date") != row.get("event_date"):
             raise ValueError("event_date mismatch")
         if payload.get("event_start_at") != row.get("start_at"):
@@ -141,8 +143,7 @@ def render_sql(doc: dict) -> str:
     projection_key = doc["projection_key"]
     revision = doc["source_revision"]
     published = doc.get("generated_at")
-    if not isinstance(published, str):
-        raise ValueError("generated_at missing")
+    _parse_time(published)
 
     statements = [
         "BEGIN TRANSACTION;",
