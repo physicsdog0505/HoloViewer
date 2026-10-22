@@ -251,11 +251,19 @@ function canonicalProjectionDb(){
  return {
   prepare(sql){
    if(sql.includes('FROM public_collab_projection_meta')){
-    return {bind(key){return {async first(){return key==='live'?{
-     projection_key:'live',source_revision:row.source_revision,published_at:row.published_at,
-     range_start:'2026-10-21T16:00:00Z',range_end:'2026-10-22T16:00:00Z',
-     source_event_count:1,effective_event_count:1
-    }:null;}}};
+    return {
+     bind(key){
+      return {
+       async first(){
+        return key==='live'?{
+         projection_key:'live',source_revision:row.source_revision,published_at:row.published_at,
+         range_start:'2026-10-21T16:00:00Z',range_end:'2026-10-22T16:00:00Z',
+         source_event_count:1,effective_event_count:1
+        }:null;
+       }
+      };
+     }
+    };
    }
    if(sql.includes('FROM public_collab_events')&&sql.includes('live_scope=1')){
     return {async all(){return {results:[row]};}};
