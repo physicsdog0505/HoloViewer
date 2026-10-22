@@ -25,7 +25,7 @@ def validate(doc: dict) -> list[dict]:
     if doc.get("schema_version") != SCHEMA_VERSION:
         raise ValueError("unsupported schema_version")
     revision = doc.get("source_revision")
-    if not isinstance(revision, str) or not revision.startswith("sha256:"):
+    if not isinstance(revision, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", revision):
         raise ValueError("invalid source_revision")
     events = doc.get("events")
     if not isinstance(events, list):
