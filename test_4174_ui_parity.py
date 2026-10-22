@@ -1469,5 +1469,19 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_home_lifecycle_labels_and_ended_section_hierarchy(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+
+        self.assertIn("<h2>現在直播中</h2><p>LIVE NOW</p>",html)
+        self.assertIn("<h2>即將開始</h2><p>UP NEXT</p>",html)
+        self.assertIn("<h2>已結束</h2><p>PAST STREAMS</p>",html)
+        self.assertIn("#home-ended-section{",css)
+        self.assertIn("background:color-mix(in srgb,#e9e4dd 46%,var(--bg));",css)
+        self.assertIn("#home-ended-section::before{",css)
+        self.assertIn("#home-ended-section>.section-head h2{",css)
+
+
+
 if __name__ == "__main__":
     unittest.main()
