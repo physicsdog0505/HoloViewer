@@ -2,8 +2,7 @@
 
 const config=window.HOLOVIEWER_CONFIG||{};
 const API_BASE=String(config.apiBase||'').replace(/\/$/,'');
-const PTT_ARCHIVE_BASE=String(config.pttArchiveBase||'').replace(/\/$/,'');
-const PTT_ARCHIVE_MANIFEST=String(config.pttArchiveManifest||'/ptt/v1/manifests/static-assets-full-2026-10.json');
+const PTT_ARCHIVE_MONTHS=config.pttArchiveMonths||{};
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
 const PTT_ARCHIVE_SCHEMA='ptt-r2-archive-v1';
 const PTT_POLL_MS=60000;
@@ -71,7 +70,7 @@ let hostWindow=null;
 let pttRows=[];
 let pttVisible=0;
 let pttFollowing=true;
-let archiveManifestCache=null;
+const archiveManifestCache=new Map();
 let segments=[];
 let subtitles=[];
 let activeSegmentIndex=-1;
@@ -865,15 +864,35 @@ async function loadTodayPtt(day,windowInfo=null){
 function archiveHourKey(ms){const d=new Date(ms);return 'ptt/v1/chunks/'+d.getUTCFullYear()+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCHours()).padStart(2,'0')+'00.json'}
 function archiveHourKeys(startMs,endMs){const out=[];for(let t=Math.floor(startMs/3600000)*3600000;t<endMs;t+=3600000)out.push(archiveHourKey(t));return out}
 async function archiveSha256Hex(buffer){const digest=await crypto.subtle.digest('SHA-256',buffer);return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('')}
-async function fetchArchiveManifest(){
- if(archiveManifestCache)return archiveManifestCache;
- const r=await fetch(PTT_ARCHIVE_BASE+PTT_ARCHIVE_MANIFEST,{mode:'cors',credentials:'omit',cache:'no-cache'});
+function archiveMonthForMs(ms){
+ const day=taipeiDay(new Date(ms));
+ return /^\d{4}-\d{2}-\d{2}$/.test(day)?day.slice(0,7):'';
+}
+function archiveSourceForMonth(month){
+ const raw=PTT_ARCHIVE_MONTHS?.[month];
+ const base=String(raw?.base||'').replace(/\/$/,'');
+ const manifest=String(raw?.manifest||'');
+ if(!/^\d{4}-\d{2}$/.test(month)||!/^https:\/\//.test(base)||!manifest.startsWith('/'))return null;
+ return {month,base,manifest};
+}
+function archiveSourcesForWindow(startMs,endMs){
+ const first=archiveMonthForMs(startMs),last=archiveMonthForMs(endMs-1);
+ if(!first||!last)throw new Error('歷史 PTT 無法判定 VOD 月份');
+ if(first!==last)throw new Error('歷史 PTT Watchalong 暫不支援跨月份 VOD');
+ const source=archiveSourceForMonth(first);
+ if(!source)throw new Error('歷史 PTT 月份來源未設定：'+first);
+ return [source];
+}
+async function fetchArchiveManifest(source){
+ const cacheKey=source.base+source.manifest;
+ if(archiveManifestCache.has(cacheKey))return archiveManifestCache.get(cacheKey);
+ const r=await fetch(cacheKey,{mode:'cors',credentials:'omit',cache:'no-cache'});
  if(!r.ok)throw new Error('歷史 PTT manifest HTTP '+r.status);
  const m=await r.json();if(m?.schema_version!==PTT_ARCHIVE_SCHEMA||!Array.isArray(m.objects))throw new Error('歷史 PTT manifest 格式不支援');
- archiveManifestCache=m;return m;
+ archiveManifestCache.set(cacheKey,m);return m;
 }
-async function fetchArchiveChunk(item){
- const r=await fetch(PTT_ARCHIVE_BASE+'/'+item.key,{mode:'cors',credentials:'omit',cache:'no-cache'});
+async function fetchArchiveChunk(source,item){
+ const r=await fetch(source.base+'/'+item.key,{mode:'cors',credentials:'omit',cache:'no-cache'});
  if(!r.ok)throw new Error('歷史 PTT chunk HTTP '+r.status);
  const buffer=await r.arrayBuffer(),digest=await archiveSha256Hex(buffer);
  if(digest!==String(item.sha256||''))throw new Error('歷史 PTT chunk SHA 不符');
@@ -882,9 +901,18 @@ async function fetchArchiveChunk(item){
 async function loadArchivePtt(windowInfo){
  pttTitle.textContent='PTT 歷史專串';pttMeta.textContent='歷史資料 · 讀取中';
  try{
-  const manifest=await fetchArchiveManifest(),objects=new Map(manifest.objects.map(item=>[item.key,item]));
   const startMs=Date.parse(windowInfo.start),endMs=Date.parse(windowInfo.end),rows=[];
-  for(const key of archiveHourKeys(startMs-3600000,endMs)){const item=objects.get(key);if(!item)continue;for(const row of await fetchArchiveChunk(item)){const t=Date.parse(String(row?.occurred_at||''));if(Number.isFinite(t)&&t>=startMs-3600000&&t<endMs)rows.push(row)}}
+  const sources=archiveSourcesForWindow(startMs,endMs);
+  for(const source of sources){
+   const manifest=await fetchArchiveManifest(source),objects=new Map(manifest.objects.map(item=>[item.key,item]));
+   for(const key of archiveHourKeys(startMs-3600000,endMs)){
+    const item=objects.get(key);if(!item)continue;
+    for(const row of await fetchArchiveChunk(source,item)){
+     const t=Date.parse(String(row?.occurred_at||''));
+     if(Number.isFinite(t)&&t>=startMs-3600000&&t<endMs)rows.push(row);
+    }
+   }
+  }
   setPttRows(rows);pttMeta.textContent=taipeiDay(windowInfo.start).replaceAll('-','/')+' · '+rows.length+' 則 · VOD · 對齊播放時間';primePttToHost();
  }catch(e){pttFeed.replaceChildren();const m=document.createElement('div');m.className='ptt-empty';m.textContent='歷史 PTT 暫時無法讀取：'+String(e?.message||e);pttFeed.append(m)}
 }
