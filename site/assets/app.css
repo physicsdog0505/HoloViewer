@@ -549,3 +549,41 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 
 /* Hide the static Home fallback before last-good data or the first fetch is ready. */
 html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
+
+
+/* HoloDocchi Time Hub V1 — custom month board, intentionally independent from native date inputs. */
+.top-date-trigger{appearance:none;border:0;background:transparent;padding:6px 8px;border-radius:9px;cursor:pointer;font:inherit}
+.top-date-trigger:not(:disabled):hover,.top-date-trigger:not(:disabled):focus-visible{background:var(--surface-2);outline:none}
+.top-date-trigger:disabled{cursor:default}
+.time-hub{width:min(1180px,calc(100vw - 48px));max-width:none;height:min(780px,calc(100vh - 72px));padding:0;border:1px solid var(--line);border-radius:28px;background:var(--surface);color:var(--text);box-shadow:0 28px 90px rgba(32,28,24,.22);overflow:hidden}
+.time-hub::backdrop{background:rgba(28,25,22,.34);backdrop-filter:blur(7px)}
+.time-hub-shell{height:100%;display:grid;grid-template-rows:auto auto minmax(0,1fr)}
+.time-hub-head{display:flex;justify-content:space-between;align-items:center;padding:24px 28px 15px;border-bottom:1px solid var(--line)}
+.time-hub-kicker{margin:0 0 5px;font-size:10px;font-weight:900;letter-spacing:.15em;color:var(--muted)}
+.time-hub-head h2{margin:0;font-size:27px;letter-spacing:-.035em}
+.time-hub-head-actions{display:flex;gap:8px}.time-hub-head-actions button,.time-hub-toolbar>button{border:1px solid var(--line);background:var(--surface);border-radius:11px;min-height:36px;padding:0 12px;font-weight:850;cursor:pointer}
+#timeHubClose{font-size:22px;width:38px;padding:0}.time-hub-toolbar{display:flex;align-items:center;gap:10px;padding:12px 28px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--surface-2) 45%,var(--surface))}
+.time-hub-toolbar strong{font-size:14px;min-width:150px;letter-spacing:.04em}.time-hub-legend{margin-left:auto;display:flex;gap:14px;font-size:9px;font-weight:850;letter-spacing:.08em;color:var(--muted)}
+.time-hub-legend span{display:flex;align-items:center;gap:5px}.time-hub-legend i,.time-hub-day-markers i{display:inline-block;width:7px;height:7px;border-radius:999px}
+.time-hub-legend .birthday,.time-hub-day-markers .birthday{background:#d56e91}.time-hub-legend .anniversary,.time-hub-day-markers .anniversary{background:#c49a3d}.time-hub-legend .stream,.time-hub-day-markers .stream{background:#5d9eb6}
+.time-hub-body{min-height:0;display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.75fr)}
+.time-hub-calendar{min-width:0;padding:20px 24px 24px}.time-hub-weekdays,.time-hub-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.time-hub-weekdays span{padding:0 8px 9px;font-size:9px;font-weight:900;letter-spacing:.09em;color:var(--muted)}
+.time-hub-grid{height:calc(100% - 22px);grid-template-rows:repeat(6,minmax(68px,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);border-radius:14px;overflow:hidden}
+.time-hub-day{position:relative;min-width:0;text-align:left;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px;background:var(--surface);color:var(--text);cursor:pointer;overflow:hidden}
+.time-hub-day:hover{background:var(--surface-2)}.time-hub-day.is-empty{background:color-mix(in srgb,var(--surface-2) 45%,var(--surface));pointer-events:none}
+.time-hub-day.is-selected{background:#edf7fa;box-shadow:inset 0 0 0 2px #6fa5b7}.time-hub-day.is-today .time-hub-day-number{background:var(--text);color:white}
+.time-hub-day-number{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;font-size:11px}.time-hub-day-markers{display:flex;gap:4px;margin:7px 0 4px}.time-hub-day small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;font-weight:750;color:#5f5a54}.time-hub-day .time-hub-more{color:var(--muted)}
+.time-hub-agenda{min-width:0;padding:23px 24px;overflow:auto;border-left:1px solid var(--line);background:color-mix(in srgb,var(--surface-2) 52%,var(--surface))}
+.time-hub-selected-label{margin:0 0 18px;font-size:19px;font-weight:900;letter-spacing:.025em}.time-hub-specials{display:grid;gap:8px;margin-bottom:22px}
+.time-hub-special{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:var(--surface)}
+.time-hub-special.birthday{border-color:#e9c1cf;background:#fff8fa}.time-hub-special.anniversary{border-color:#e5d3a8;background:#fffaf0}.time-hub-special-type{font-size:9px;font-weight:900;letter-spacing:.08em;color:var(--muted)}
+.time-hub-agenda-head{display:flex;justify-content:space-between;padding-bottom:8px;border-bottom:1px solid var(--line);font-size:9px;font-weight:900;letter-spacing:.1em;color:var(--muted)}
+.time-hub-streams{display:grid}.time-hub-stream{display:grid;grid-template-columns:54px minmax(0,1fr);gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:11px;line-height:1.45;white-space:pre-line}.time-hub-stream time{font-weight:900}.time-hub-empty{margin:8px 0;color:var(--muted);font-size:11px;line-height:1.55}
+@media(max-width:760px){
+ .time-hub{width:calc(100vw - 20px);height:calc(100vh - 20px);border-radius:22px}
+ .time-hub-head{padding:18px 16px 12px}.time-hub-head h2{font-size:22px}.time-hub-toolbar{padding:10px 16px;flex-wrap:wrap}.time-hub-legend{width:100%;margin-left:0}
+ .time-hub-body{grid-template-columns:1fr;grid-template-rows:auto minmax(220px,1fr);overflow:auto}.time-hub-calendar{padding:14px 12px 6px}
+ .time-hub-grid{height:auto;grid-template-rows:repeat(6,62px)}.time-hub-day{padding:6px}.time-hub-day small{display:none}
+ .time-hub-agenda{border-left:0;border-top:1px solid var(--line);padding:18px 16px}
+}
