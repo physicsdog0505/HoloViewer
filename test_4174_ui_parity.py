@@ -1205,7 +1205,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("workspaceLayout='sidebar';", js)
         self.assertIn("return lockedIndex!==null?'focus':'primary';", js)
         self.assertIn("else if(preset==='focus'){layout='primary';lockedIndex=primaryIndex}", js)
-        self.assertIn("workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+Math.max(1,count);", js)
+        self.assertIn("workspace.className='viewer-workspace workspace-sidebar layout-'+effective+' count-'+Math.max(1,geometryCount);", js)
         self.assertIn("const count=Math.max(0,streams.filter((_,index)=>viewingPovVisible(index)).length);", js)
         self.assertIn("q.set('workspace',currentLayoutPreset()==='focus'?'focus':'sidebar');", js)
 
