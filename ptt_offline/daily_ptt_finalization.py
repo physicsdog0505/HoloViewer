@@ -24,7 +24,7 @@ STATES=("VERIFIED_COMPLETE","REPAIR_NEEDED","UNKNOWN","CONFLICT")
 REPAIRABLE_COVERAGE_GAPS={
     "source-line-gap",
     "collector-source-line-gap",
-    "collector-screen-coverage-behind-final-source-line",
+    "collector-screen-coverage-behind-local-tail",
 }
 
 
@@ -112,9 +112,14 @@ def _classify_coverage(*,day: str,aid: str,coverage: dict[str,Any] | None) -> di
         base.update(state="CONFLICT",conflicts=sorted(set(conflicts or ["coverage-conflict"])),
                     contract_gaps=sorted(set(gaps)))
         return base
+    tail_parity=coverage.get("tail_parity_confirmed")
     if (coverage.get("status")=="COMPLETE" and start_line==1
-            and type(final_line) is int and final_line>=1 and not missing and not gaps):
+            and type(final_line) is int and final_line>=1 and not missing and not gaps
+            and tail_parity is True):
         base["state"]="VERIFIED_COMPLETE"
+        return base
+    if coverage.get("status")=="COMPLETE" and tail_parity is not True:
+        base["contract_gaps"]=["authoritative-tail-parity-unconfirmed"]
         return base
     repair_gaps=set(gaps)
     repair_authority_complete=repair_gaps.issubset(REPAIRABLE_COVERAGE_GAPS)
@@ -269,3 +274,219 @@ def finalize_previous_day(
         repair_executor=repair_executor,
         observed_at=local_now.isoformat(),
     )
+
+
+def classify_collector_health(health: dict[str,Any] | None) -> dict[str,Any]:
+    """Normalize the 07:30 Collector health gate without performing recovery."""
+    required=("process_alive","heartbeat_fresh","live_context_valid","frontier_progressing")
+    if not isinstance(health,dict):
+        return {
+            "status":"UNHEALTHY",
+            "healthy":False,
+            "failure_codes":["collector-health-unavailable"],
+            "live_aid":None,
+            "frontier":None,
+        }
+    failures=[]
+    for key in required:
+        if health.get(key) is not True:
+            failures.append({
+                "process_alive":"collector-process-dead",
+                "heartbeat_fresh":"collector-heartbeat-stale",
+                "live_context_valid":"collector-live-context-invalid",
+                "frontier_progressing":"collector-frontier-stalled",
+            }[key])
+    return {
+        "status":"HEALTHY" if not failures else "UNHEALTHY",
+        "healthy":not failures,
+        "failure_codes":failures,
+        "live_aid":health.get("live_aid"),
+        "frontier":health.get("frontier"),
+    }
+
+
+def run_0730_closeout(
+    *,
+    expected_contract: dict[str,Any],
+    coverage_by_aid: dict[str,dict[str,Any]],
+    collector_health_probe: Callable[[],dict[str,Any]],
+    now: datetime | None=None,
+    repair_executor: Callable[[dict[str,Any]],dict[str,Any]] | None=None,
+    recovery_executor: Callable[[],dict[str,Any]] | None=None,
+    return_to_live_executor: Callable[[dict[str,Any]],dict[str,Any]] | None=None,
+) -> dict[str,Any]:
+    """07:30 fail-closed orchestration with at most one Collector recovery.
+
+    All runtime-affecting actions are injected. This function never logs in,
+    starts/stops Collector, clears DB, resets checkpoints, or publishes archive.
+    """
+    local_now=(now or datetime.now(TAIPEI)).astimezone(TAIPEI)
+    observed_at=local_now.isoformat()
+
+    raw_before=collector_health_probe()
+    health_before=classify_collector_health(raw_before)
+    saved_live_context={
+        "live_aid":health_before.get("live_aid"),
+        "frontier":health_before.get("frontier"),
+    }
+
+    restart_attempted=False
+    restart_result=None
+    raw_after=raw_before
+    if not health_before["healthy"]:
+        if recovery_executor is None:
+            return {
+                "schema_version":SCHEMA_VERSION,
+                "day":previous_taipei_day(local_now),
+                "state":"UNKNOWN",
+                "observed_at":observed_at,
+                "collector_health_before":health_before,
+                "restart_attempted":False,
+                "restart_result":"NOT_AVAILABLE",
+                "collector_health_after":health_before,
+                "resolved_live_aid":health_before.get("live_aid"),
+                "resolved_live_frontier":health_before.get("frontier"),
+                "previous_day_result":None,
+                "repair_result":None,
+                "return_to_live_result":"NOT_RUN",
+                "archive_ready":False,
+                "pr147_ready":False,
+                "failure_code":"collector-unhealthy-no-controlled-recovery",
+                "safety":{
+                    "restart_attempts":0,
+                    "checkpoint_reset":False,
+                    "db_clear":False,
+                    "duplicate_collector_launch":False,
+                    "auto_login":False,
+                },
+            }
+        restart_attempted=True
+        try:
+            recovery_result=recovery_executor()
+        except Exception as exc:
+            return {
+                "schema_version":SCHEMA_VERSION,
+                "day":previous_taipei_day(local_now),
+                "state":"UNKNOWN",
+                "observed_at":observed_at,
+                "collector_health_before":health_before,
+                "restart_attempted":True,
+                "restart_result":"FAILED",
+                "collector_health_after":None,
+                "resolved_live_aid":None,
+                "resolved_live_frontier":None,
+                "previous_day_result":None,
+                "repair_result":None,
+                "return_to_live_result":"NOT_RUN",
+                "archive_ready":False,
+                "pr147_ready":False,
+                "failure_code":"collector-recovery-"+type(exc).__name__,
+                "safety":{
+                    "restart_attempts":1,
+                    "checkpoint_reset":False,
+                    "db_clear":False,
+                    "duplicate_collector_launch":False,
+                    "auto_login":False,
+                },
+            }
+        restart_result=(
+            recovery_result.get("status")
+            if isinstance(recovery_result,dict) else "ATTEMPTED"
+        )
+        raw_after=collector_health_probe()
+
+    health_after=classify_collector_health(raw_after)
+    if not health_after["healthy"]:
+        return {
+            "schema_version":SCHEMA_VERSION,
+            "day":previous_taipei_day(local_now),
+            "state":"UNKNOWN",
+            "observed_at":observed_at,
+            "collector_health_before":health_before,
+            "restart_attempted":restart_attempted,
+            "restart_result":restart_result,
+            "collector_health_after":health_after,
+            "resolved_live_aid":health_after.get("live_aid"),
+            "resolved_live_frontier":health_after.get("frontier"),
+            "previous_day_result":None,
+            "repair_result":None,
+            "return_to_live_result":"NOT_RUN",
+            "archive_ready":False,
+            "pr147_ready":False,
+            "failure_code":"collector-health-not-restored",
+            "safety":{
+                "restart_attempts":1 if restart_attempted else 0,
+                "checkpoint_reset":False,
+                "db_clear":False,
+                "duplicate_collector_launch":False,
+                "auto_login":False,
+            },
+        }
+
+    resolved_live_context={
+        "live_aid":health_after.get("live_aid"),
+        "frontier":health_after.get("frontier"),
+    }
+    finalization=finalize_previous_day(
+        expected_contract=expected_contract,
+        coverage_by_aid=coverage_by_aid,
+        now=local_now,
+        repair_executor=repair_executor,
+    )
+
+    repair_attempted=finalization.get("summary",{}).get("repair_attempts",0)>0
+    return_result="NOT_REQUIRED"
+    return_ok=True
+    if repair_attempted:
+        if return_to_live_executor is None:
+            return_ok=False
+            return_result="NOT_AVAILABLE"
+        else:
+            try:
+                restored=return_to_live_executor(resolved_live_context)
+            except Exception as exc:
+                return_ok=False
+                return_result="FAILED:"+type(exc).__name__
+            else:
+                restored_health=classify_collector_health(restored)
+                same_live=(
+                    restored_health.get("live_aid")==resolved_live_context.get("live_aid")
+                    and restored_health.get("frontier") is not None
+                )
+                return_ok=restored_health["healthy"] and same_live
+                return_result="PASS" if return_ok else "FAILED"
+
+    archive_ready=bool(finalization.get("archive_ready")) and return_ok
+    state=finalization.get("state") if archive_ready or finalization.get("state")!="VERIFIED_COMPLETE" else "UNKNOWN"
+    failure_code=None
+    if finalization.get("state")=="VERIFIED_COMPLETE" and not return_ok:
+        failure_code="return-to-live-failed"
+
+    return {
+        "schema_version":SCHEMA_VERSION,
+        "day":finalization.get("day"),
+        "state":state,
+        "observed_at":observed_at,
+        "collector_health_before":health_before,
+        "restart_attempted":restart_attempted,
+        "restart_result":restart_result,
+        "collector_health_after":health_after,
+        "resolved_live_aid":resolved_live_context.get("live_aid"),
+        "resolved_live_frontier":resolved_live_context.get("frontier"),
+        "previous_day_result":finalization,
+        "repair_result":{
+            "attempts":finalization.get("summary",{}).get("repair_attempts",0),
+            "state":finalization.get("state"),
+        },
+        "return_to_live_result":return_result,
+        "archive_ready":archive_ready,
+        "pr147_ready":archive_ready,
+        "failure_code":failure_code,
+        "safety":{
+            "restart_attempts":1 if restart_attempted else 0,
+            "checkpoint_reset":False,
+            "db_clear":False,
+            "duplicate_collector_launch":False,
+            "auto_login":False,
+        },
+    }
