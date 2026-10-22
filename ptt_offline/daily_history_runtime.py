@@ -272,10 +272,10 @@ def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
     Canonical membership:
     1. every row must occur inside the exact Taipei calendar-day interval;
     2. rows from the authoritative expected AIDs for this finalized day belong;
-    3. before the first expected thread starts, rows from exactly one direct
-       predecessor thread may belong.  That predecessor is the candidate with
-       the latest authoritative article-post epoch before the first expected
-       thread's article-post epoch;
+    3. rows from exactly one direct predecessor thread may belong anywhere inside
+       the target Taipei day. That predecessor is the candidate with the latest
+       authoritative article-post epoch before the first expected thread's
+       article-post epoch;
     4. older predecessor candidates are proven superseded by that direct
        predecessor; unexpected threads at/after the first expected thread start
        are outside the authoritative day/thread scope;
@@ -350,8 +350,7 @@ def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
         if aid in normalized_expected:
             include=True
             membership_reason="expected-thread"
-        elif (predecessor_aid is not None and aid==predecessor_aid
-              and first_expected_epoch is not None and occurred<first_expected_epoch):
+        elif predecessor_aid is not None and aid==predecessor_aid:
             include=True
             membership_reason="direct-predecessor-cross-midnight"
             carry_in_count+=1
