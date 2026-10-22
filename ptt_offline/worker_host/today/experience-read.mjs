@@ -311,7 +311,7 @@ async function canonicalCollabLive(db,{now=new Date(),maxAgeSeconds=null}={}){
  const events=raw.slice(0,100).map(parseCanonicalCollabRow);
  return {
   schema_version:'public-experience-v1',kind:'collab',scope:'live',day,
-  completeness:{limited:has_more,has_more,projection:'canonical',degraded:freshness.stale===true,freshness_known:freshness.stale!==null},
+  completeness:{limited:has_more,has_more,projection:'canonical',degraded:freshness.stale!==false,freshness_known:freshness.stale!==null},
   projection:{source_revision:meta.source_revision,published_at:meta.published_at,...freshness},
   events
  };
