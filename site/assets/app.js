@@ -27,10 +27,126 @@ function clientTopbarDate(day){
  const parts=Object.fromEntries(pieces.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
  return (parts.weekday+' · '+parts.month+' '+parts.day+', '+parts.year).toUpperCase();
 }
+
+// Time Hub V1 static registry. UI pilot only: migrate to canonical channel profile/calendar data after product acceptance.
+const TIME_HUB_MEMBERS=["Tokino Sora|05-15|2017-09-07","Robocosan|05-23|","AZKi|07-01|2018-11-15","Sakura Miko|03-05|2018-08-01","Hoshimachi Suisei|03-22|2018-03-22","Aki Rosenthal|02-17|2018-06-01","Akai Haato|08-10|2018-06-02","Shirakami Fubuki|10-05|2018-06-01","Natsuiro Matsuri|07-22|2018-06-01","Nakiri Ayame|12-13|2018-09-03","Yuzuki Choco|02-14|2018-09-04","Oozora Subaru|07-02|2018-09-16","Ookami Mio|08-20|2018-12-07","Nekomata Okayu|02-22|2019-04-06","Inugami Korone|10-01|2019-04-13","Usada Pekora|01-12|2019-07-17","Shiranui Flare|04-02|2019-08-07","Shirogane Noel|11-24|2019-08-08","Houshou Marine|07-30|2019-08-11","Tsunomaki Watame|06-06|2019-12-29","Tokoyami Towa|08-08|2020-01-03","Himemori Luna|10-10|2020-01-04","Yukihana Lamy|11-15|2020-08-12","Momosuzu Nene|03-02|2020-08-13","Shishiro Botan|09-08|2020-08-14","Omaru Polka|01-30|2020-08-16","La+ Darknesss|05-25|2021-11-26","Takane Lui|06-11|2021-11-27","Hakui Koyori|03-15|2021-11-28","Sakamata Chloe|05-18|2021-11-29","Kazama Iroha|06-18|2021-11-30","Ayunda Risu|01-15|2020-04-10","Moona Hoshinova|02-15|2020-04-11","Airani Iofifteen|07-15|2020-04-12","Kureiji Ollie|10-13|2020-12-04","Anya Melfissa|03-12|2020-12-05","Pavolia Reine|09-09|2020-12-06","Vestia Zeta|11-07|2022-03-25","Kaela Kovalskia|08-30|2022-03-26","Kobo Kanaeru|12-12|2022-03-27","Mori Calliope|04-04|2020-09-12","Takanashi Kiara|07-06|2020-09-12","Ninomae Ina'nis|05-20|2020-09-13","Watson Amelia|01-06|2020-09-13","IRyS|03-07|2021-07-11","Ouro Kronii|03-14|2021-08-23","Hakos Baelz|02-29|2021-08-23","Shiori Novella|05-02|2023-07-30","Koseki Bijou|04-14|2023-07-30","Nerissa Ravencroft|11-21|2023-07-31","Fuwawa Abyssgard|02-01|2023-07-31","Mococo Abyssgard|02-02|2023-07-31","Elizabeth Rose Bloodflame|04-25|2024-06-22","Gigi Murin|10-18|2024-06-22","Cecilia Immergreen|11-11|2024-06-23","Raora Panthera|05-11|2024-06-23","Otonose Kanade|04-20|2023-09-09","Ichijou Ririka|05-12|2023-09-09","Juufuutei Raden|02-04|2023-09-10","Todoroki Hajime|06-07|2023-09-10","Isaki Riona|05-29|2024-11-09","Koganei Niko|07-25|2024-11-09","Mizumiya Su|06-16|2024-11-09","Rindo Chihaya|07-08|2024-11-09","Kikirara Vivi|08-27|2024-11-09","Achichi Mela|04-16|2026-09-24","Sorashina Sopia|06-13|2026-09-24","Suzuna Tsuzuri|06-28|2026-09-25","Hyakuto Kyoko|05-08|2026-09-25"].map(row=>{
+ const [name,birthday,debut]=row.split('|');
+ return {name,birthday,debut};
+});
+const TIME_HUB_BRAND_EVENTS=[
+ {name:'hololive production Anniversary',monthDay:'09-07',origin:'2017-09-07',type:'anniversary'},
+];
+let timeHubMonth=taipeiDay().slice(0,7);
+let timeHubSelected=taipeiDay();
+
+function timeHubDayParts(day){
+ const [year,month,date]=String(day).split('-').map(Number);
+ return {year,month,date,monthDay:String(month).padStart(2,'0')+'-'+String(date).padStart(2,'0')};
+}
+function timeHubMonthShift(monthKey,delta){
+ const [year,month]=monthKey.split('-').map(Number);
+ const date=new Date(Date.UTC(year,month-1+delta,1,12));
+ return date.getUTCFullYear()+'-'+String(date.getUTCMonth()+1).padStart(2,'0');
+}
+function timeHubMonthLabel(monthKey){
+ const [year,month]=monthKey.split('-').map(Number);
+ return new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'long',year:'numeric'}).format(new Date(Date.UTC(year,month-1,1))).toUpperCase();
+}
+function timeHubRecurringEvents(day){
+ const {year,monthDay}=timeHubDayParts(day);
+ const events=[];
+ for(const member of TIME_HUB_MEMBERS){
+  if(member.birthday===monthDay)events.push({type:'birthday',name:member.name,label:'BIRTHDAY'});
+  if(member.debut&&member.debut.slice(5)===monthDay){
+   const years=year-Number(member.debut.slice(0,4));
+   if(years>=1)events.push({type:'anniversary',name:member.name,label:years+'TH ANNIV.'});
+  }
+ }
+ for(const event of TIME_HUB_BRAND_EVENTS){
+  if(event.monthDay===monthDay){
+   const years=year-Number(event.origin.slice(0,4));
+   if(years>=1)events.push({...event,label:years+'TH ANNIV.'});
+  }
+ }
+ return events;
+}
+function timeHubStreamDay(row){
+ const raw=String(row?.actual_start||row?.scheduled_start||row?.start_at||'');
+ const date=new Date(raw);if(!Number.isFinite(date.getTime()))return '';
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+ const p=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return p.year+'-'+p.month+'-'+p.day;
+}
+function timeHubStreamsForDay(day){
+ return homeCatalogRows.filter(row=>timeHubStreamDay(row)===day).slice().sort((a,b)=>{
+  const at=Date.parse(String(a.actual_start||a.scheduled_start||a.start_at||'')),bt=Date.parse(String(b.actual_start||b.scheduled_start||b.start_at||''));
+  return (Number.isFinite(at)?at:Infinity)-(Number.isFinite(bt)?bt:Infinity);
+ });
+}
+function timeHubTime(row){
+ const raw=String(row?.actual_start||row?.scheduled_start||row?.start_at||'');
+ const date=new Date(raw);if(!Number.isFinite(date.getTime()))return 'TIME TBD';
+ return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(date);
+}
+function renderTimeHubAgenda(){
+ const day=timeHubSelected;
+ const date=new Date(day+'T12:00:00Z');
+ $('timeHubSelectedLabel').textContent=new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'2-digit'}).format(date).toUpperCase();
+ const specials=$('timeHubSpecials');specials.replaceChildren();
+ const fixed=timeHubRecurringEvents(day);
+ fixed.forEach(event=>{
+  const item=node('div',undefined,'time-hub-special '+event.type);
+  item.append(node('span',event.label,'time-hub-special-type'),node('strong',event.name));
+  specials.append(item);
+ });
+ if(!fixed.length)specials.append(node('p','這天沒有固定生日或週年。','time-hub-empty'));
+ const streams=timeHubStreamsForDay(day),box=$('timeHubStreams');box.replaceChildren();
+ $('timeHubStreamCount').textContent=streams.length?streams.length+' STREAMS':'';
+ streams.forEach(row=>{
+  const item=node('div',undefined,'time-hub-stream');
+  item.append(node('time',timeHubTime(row)),node('div',String(row.channel_title||row.channel_name||'頻道資訊待補')+'\n'+String(row.title||'')));
+  box.append(item);
+ });
+ if(!streams.length)box.append(node('p',day===taipeiDay()?'今天目前沒有可顯示的直播時程。':'V1 尚未載入這一天的完整直播時程。','time-hub-empty'));
+}
+function renderTimeHub(){
+ const [year,month]=timeHubMonth.split('-').map(Number);
+ $('timeHubMonth').textContent=timeHubMonthLabel(timeHubMonth);
+ const grid=$('timeHubGrid');grid.replaceChildren();
+ const first=new Date(Date.UTC(year,month-1,1,12)),start=first.getUTCDay();
+ const days=new Date(Date.UTC(year,month,0,12)).getUTCDate();
+ for(let slot=0;slot<42;slot++){
+  const number=slot-start+1;
+  if(number<1||number>days){grid.append(node('span',undefined,'time-hub-day is-empty'));continue}
+  const day=timeHubMonth+'-'+String(number).padStart(2,'0');
+  const fixed=timeHubRecurringEvents(day),streams=timeHubStreamsForDay(day);
+  const button=node('button',undefined,'time-hub-day');
+  button.type='button';button.dataset.day=day;button.classList.toggle('is-today',day===taipeiDay());button.classList.toggle('is-selected',day===timeHubSelected);
+  button.append(node('strong',String(number),'time-hub-day-number'));
+  const markers=node('span',undefined,'time-hub-day-markers');
+  fixed.slice(0,2).forEach(event=>markers.append(node('i',undefined,event.type)));
+  if(streams.length)markers.append(node('i',undefined,'stream'));
+  button.append(markers);
+  const names=fixed.slice(0,2).map(event=>event.name.split(' ')[0]);
+  if(names.length)button.append(node('small',names.join(' · ')));
+  if(fixed.length>2)button.append(node('small','+'+(fixed.length-2)+' EVENTS','time-hub-more'));
+  button.onclick=()=>{timeHubSelected=day;renderTimeHub()};
+  grid.append(button);
+ }
+ renderTimeHubAgenda();
+}
+function openTimeHub(){
+ if(!$('timeHub')||$('page-title').disabled)return;
+ timeHubMonth=taipeiDay().slice(0,7);timeHubSelected=taipeiDay();renderTimeHub();
+ $('timeHub').showModal();
+}
+
 function updateClientTopbar(routeName){
  const label=routeName==='home'?clientTopbarDate(taipeiDay()):
   routeName==='history'?clientTopbarDate($('historyDate').value||historyBounds().latest):'';
  $('page-title').textContent=label;
+ $('page-title').disabled=routeName!=='home';
+ $('page-title').setAttribute('aria-label',routeName==='home'?'開啟月份行程':'目前頁面日期');
 }
 
 
@@ -521,6 +637,7 @@ function renderHomeRows(rows){
  applyHomeFilter();
  $('home-empty').textContent=rows.length?'':'目前沒有今天的直播資料。';
  document.documentElement.classList.add('home-hydrated');
+ if($('timeHub')?.open)renderTimeHub();
 }
 function homeTimestamp(item,fields){
  for(const field of fields){
@@ -594,6 +711,13 @@ async function loadHome(){
  }
  finally{homeLoadInFlight=false}
 }
+$('page-title').onclick=openTimeHub;
+$('timeHubClose').onclick=()=>$('timeHub').close();
+$('timeHubToday').onclick=()=>{timeHubMonth=taipeiDay().slice(0,7);timeHubSelected=taipeiDay();renderTimeHub()};
+$('timeHubPrev').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,-1);if(!timeHubSelected.startsWith(timeHubMonth))timeHubSelected=timeHubMonth+'-01';renderTimeHub()};
+$('timeHubNext').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,1);if(!timeHubSelected.startsWith(timeHubMonth))timeHubSelected=timeHubMonth+'-01';renderTimeHub()};
+$('timeHub').addEventListener('click',event=>{if(event.target===$('timeHub'))$('timeHub').close()});
+
 function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));return o.year+'-'+o.month+'-'+o.day}
 function shiftDay(day,delta){const date=new Date(day+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+delta);return date.toISOString().slice(0,10)}
 function historyBounds(){const today=taipeiDay();return {earliest:shiftDay(today,-30),latest:shiftDay(today,-1)}}
