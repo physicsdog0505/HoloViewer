@@ -15,6 +15,8 @@ import json
 from pathlib import Path
 import re
 from typing import Any, Callable
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from urllib.parse import quote
 
 from .archive_job_evidence import (
@@ -114,7 +116,13 @@ def _validate_payload(*,raw: bytes,day: str,
 
     membership=payload.get("membership")
     predecessor_aid=None
+    day_start=datetime.fromisoformat(day).replace(tzinfo=ZoneInfo("Asia/Taipei")).astimezone(timezone.utc)
+    day_end=day_start+timedelta(days=1)
     if payload.get("schema_version")=="holoviewer-ptt-history-day-v1":
+        expected_start=day_start.isoformat(timespec="seconds").replace("+00:00","Z")
+        expected_end=day_end.isoformat(timespec="seconds").replace("+00:00","Z")
+        if payload.get("partition_start")!=expected_start or payload.get("partition_end")!=expected_end:
+            raise DailyArchiveError("day.json Taipei partition bounds mismatch")
         if not isinstance(membership,dict):
             raise DailyArchiveError("day.json membership audit required")
         if membership.get("rule")!="taipei-day-expected-plus-direct-predecessor-v1":
@@ -155,6 +163,18 @@ def _validate_payload(*,raw: bytes,day: str,
             raise DailyArchiveError("object contains AID outside verified expected set")
         if row.get("coverage_day")!=day:
             raise DailyArchiveError("object contains row outside target Taipei day")
+        occurred=row.get("occurred_at")
+        if not isinstance(occurred,str):
+            raise DailyArchiveError("push occurred_at required")
+        try:
+            occurred_at=datetime.fromisoformat(occurred.replace("Z","+00:00"))
+        except ValueError as exc:
+            raise DailyArchiveError("push occurred_at invalid") from exc
+        if occurred_at.tzinfo is None:
+            raise DailyArchiveError("push occurred_at must be timezone-aware")
+        occurred_utc=occurred_at.astimezone(timezone.utc)
+        if not day_start<=occurred_utc<day_end:
+            raise DailyArchiveError("push occurred_at outside Taipei partition bounds")
         identity=row.get("source_record_key")
         if not isinstance(identity,str) or not identity:
             raise DailyArchiveError("source_record_key required")
