@@ -43,7 +43,8 @@ class CollectorControlledRecoveryTests(unittest.TestCase):
         self.assertFalse(body["attempted"])
         self.assertFalse(self.receipt.exists())
 
-    def test_dead_launches_once_and_confirms_health(self):
+    @patch("ptt_offline.collector_controlled_recovery.time.time",return_value=1000.0)
+    def test_dead_launches_once_and_confirms_health(self, _now):
         calls=[]
         def probe(**kwargs):
             calls.append(kwargs)
@@ -69,6 +70,9 @@ class CollectorControlledRecoveryTests(unittest.TestCase):
         self.assertEqual(body["status"],"RECOVERED")
         self.assertTrue(body["attempted"])
         self.assertEqual(body["restart_attempts"],1)
+        self.assertGreaterEqual(len(calls),2)
+        self.assertIn("refresh_after_timestamp",calls[1])
+        self.assertEqual(calls[1]["refresh_after_timestamp"],1000.0)
         saved=json.loads(self.receipt.read_text())
         self.assertNotIn("username",saved)
         self.assertFalse(saved["checkpoint_reset"])
