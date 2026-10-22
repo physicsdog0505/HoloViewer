@@ -172,3 +172,47 @@ count, and every excluded AID/count/reason. `silent_drop=false` is explicit.
 
 All included rows still require unique `source_record_key`, authoritative
 `floor_quality=per-thread-ordinal`, and stable chronological ordering.
+
+
+## Fresh-finalization packaging-only acceptance
+
+After #48 has already produced a trusted post-authority finalization, Archive
+acceptance must **not** re-run Collector completeness, bounded repair, or
+`finalize_day()`.
+
+Use the dedicated packaging-only command:
+
+```bash
+python3 -B -m ptt_offline.daily_history_runtime accept-package \
+  --config ~/Documents/HoloViewer-Historical/daily-ptt-history.config.json \
+  --day 2026-10-21 \
+  --expected-contract ~/Documents/HoloViewer-Historical/daily-ptt-history/expected-aids/2026-10-21.json \
+  --finalization ~/Documents/HoloViewer-Historical/daily-ptt-history/daily-finalization/2026-10-21.post-authority.json
+```
+
+Safety requirements are enforced by code:
+- `deploy=false`;
+- `repair_enabled=false`;
+- finalization schema/digest validated;
+- finalization state must be `VERIFIED_COMPLETE`;
+- `archive_ready=true`;
+- expected contract must be COMPLETE and digest-valid;
+- finalization expected-set digest must exactly match the supplied expected contract;
+- exact expected AID sets must match;
+- no coverage reclassification, no authoritative-tail recalculation, no repair executor;
+- Collector SQLite is opened only read-only by the archive exporter;
+- output must be exactly one canonical `day.json` package object.
+
+Successful output is `READY_TO_DEPLOY` and includes:
+`finalization_digest`, `expected_set_digest`, `expected_aids`,
+`packaged_aids`, `direct_predecessor_aid`, `excluded_aids`,
+`unexpected_aids`, package/day.json paths, manifest/source hashes, and
+`deploy=false`.
+
+For the 2026-10-21 acceptance, the only accepted #48 handoff is:
+- expected AIDs: `#1gr_AonI`, `#1gs9Smav`;
+- expected-set digest: `437a499a62ea69770c153e235a32b91758376972bc13f2fd6658afa9f6e432d7`;
+- fresh finalization digest: `010e9905207555cd5ebac2e66890c404b6386c5bddf0f4b7827752c56d64451e`.
+
+The 2026-10-22 live thread `#1gsKFqhv` is not an expected AID for this
+partition and must not survive canonical `day.json` selection.
