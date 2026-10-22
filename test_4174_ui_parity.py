@@ -1523,7 +1523,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('aria-controls="timeHub"',html)
         self.assertIn("const TIME_HUB_MEMBERS=",js)
         self.assertIn("function renderTimeHub()",js)
-        self.assertIn("function timeHubStreamsForDay(day)",js)
+        self.assertNotIn("function timeHubStreamsForDay(day)",js)
         self.assertIn("$('timeHub').showModal()",js)
         self.assertIn(".time-hub-grid{",css)
         self.assertIn(".time-hub-agenda{",css)
@@ -1563,6 +1563,38 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("writePttCarryCache(day,tail)",js)
         self.assertIn("carryRows=await loadPttHistoryTail(previous)",js)
         self.assertNotIn("encodeURIComponent(previous)+'&limit=1000",js)
+
+
+
+    def test_time_hub_v2_uses_stable_channel_identity_without_stream_schedule(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+
+        self.assertNotIn('LIVE SCHEDULE',html)
+        self.assertNotIn('id="timeHubStreams"',html)
+        self.assertNotIn('<i class="stream"></i>STREAM',html)
+        self.assertNotIn('timeHubStreamsForDay',js)
+        self.assertIn("function timeHubProfileRow(channelId)",js)
+        self.assertIn("row?.channel_id",js)
+        self.assertIn("function timeHubAvatar(event)",js)
+        self.assertIn("wrap.dataset.channelId",js)
+        self.assertIn("UC1DCedRgGHBdm81E1llLhOQ|Usada Pekora",js)
+        self.assertIn("UCt9H_RpQzhxzlyBxFqrdHqA|Fuwawa Abyssgard",js)
+        self.assertIn("UCt9H_RpQzhxzlyBxFqrdHqA|Mococo Abyssgard",js)
+        hub=js[js.index('// Time Hub V2 static event registry.'):js.index('function updateClientTopbar(routeName){')]
+        self.assertNotIn('.includes(key)',hub)
+        self.assertNotIn('key.includes(',hub)
+        self.assertIn('.time-hub-avatar.is-birthday',css)
+        self.assertIn('.time-hub-avatar.is-anniversary',css)
+
+    def test_time_hub_trigger_preserves_existing_top_status_typography(self):
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        self.assertIn('.top-status{margin-left:auto;color:#856C86;font-size:13px;font-weight:800;letter-spacing:.065em;background:transparent;border:0;border-radius:0;padding:6px 0}',css)
+        trigger=css[css.index('.top-date-trigger{'):css.index('.time-hub{')]
+        self.assertNotIn('padding:6px 8px',trigger)
+        self.assertNotIn('border-radius:9px',trigger)
+        self.assertNotIn('font:inherit',trigger)
 
 
 
