@@ -47,6 +47,19 @@ button,input,select,output{font:inherit}
  padding:4px 7px;border-radius:6px;background:rgba(0,0,0,.68);color:#fff;font-size:11px
 }
 .video-label span{opacity:.72}
+.host-volume-control{
+ display:none;position:absolute;right:8px;top:8px;z-index:8;align-items:center;gap:5px;
+ padding:4px 6px;border-radius:999px;background:rgba(0,0,0,.72);color:#fff;
+ box-shadow:0 2px 8px rgba(0,0,0,.22)
+}
+.watchalong-workspace.layout-source .host-volume-control{display:flex}
+.watchalong-workspace.layout-source .host-card .video-label{max-width:calc(100% - 170px)}
+.host-volume-control button{
+ width:28px;height:28px;padding:0;border:0;border-radius:999px;background:rgba(255,255,255,.12);
+ color:#fff;cursor:pointer;display:grid;place-items:center
+}
+.host-volume-control input{width:86px;accent-color:#fff;cursor:pointer}
+.host-volume-control output{min-width:34px;text-align:right;font-size:10px;font-variant-numeric:tabular-nums}
 .mobile-swap-button{display:none}
 .source-standby{
  position:absolute;inset:0;z-index:5;display:grid;place-content:center;gap:7px;padding:24px;
