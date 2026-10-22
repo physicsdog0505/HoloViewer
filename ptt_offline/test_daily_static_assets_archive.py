@@ -319,6 +319,66 @@ class DailyStaticAssetsArchiveTests(unittest.TestCase):
                 source_objects=[("day.json",raw)],
             )
 
+    def test_day_json_rejects_wrong_taipei_partition_bounds(self):
+        payload={
+            "schema_version":"holoviewer-ptt-history-day-v1",
+            "partition_start":"2026-10-19T15:00:00Z",
+            "partition_end":"2026-10-20T16:00:00Z",
+            "membership":{
+                "rule":"taipei-day-expected-plus-direct-predecessor-v1",
+                "expected_aids":["1abcDAY","1abcNIGHT"],
+                "direct_predecessor_aid":None,
+                "first_expected_thread_start":"2026-10-20T00:00:00Z",
+                "cross_midnight_carry_in_pushes":0,
+                "excluded_aids":[],
+                "silent_drop":False,
+            },
+            "pushes":[{
+                "aid":"1abcDAY","coverage_day":DAY,"source_line":101,
+                "source_record_key":"day:101","floor":1,
+                "floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T00:30:00Z",
+                "day_membership":"expected-thread",
+            }],
+        }
+        raw=json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()
+        with self.assertRaisesRegex(DailyArchiveError,"partition bounds mismatch"):
+            compute_source_snapshot_hash(
+                finalization_receipt=_receipt(),
+                source_revision=SOURCE_REVISION,
+                source_objects=[("day.json",raw)],
+            )
+
+    def test_day_json_rejects_row_timestamp_outside_taipei_partition(self):
+        payload={
+            "schema_version":"holoviewer-ptt-history-day-v1",
+            "partition_start":"2026-10-19T16:00:00Z",
+            "partition_end":"2026-10-20T16:00:00Z",
+            "membership":{
+                "rule":"taipei-day-expected-plus-direct-predecessor-v1",
+                "expected_aids":["1abcDAY","1abcNIGHT"],
+                "direct_predecessor_aid":None,
+                "first_expected_thread_start":"2026-10-20T00:00:00Z",
+                "cross_midnight_carry_in_pushes":0,
+                "excluded_aids":[],
+                "silent_drop":False,
+            },
+            "pushes":[{
+                "aid":"1abcDAY","coverage_day":DAY,"source_line":101,
+                "source_record_key":"day:101","floor":1,
+                "floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T16:00:00Z",
+                "day_membership":"expected-thread",
+            }],
+        }
+        raw=json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()
+        with self.assertRaisesRegex(DailyArchiveError,"occurred_at outside Taipei partition bounds"):
+            compute_source_snapshot_hash(
+                finalization_receipt=_receipt(),
+                source_revision=SOURCE_REVISION,
+                source_objects=[("day.json",raw)],
+            )
+
     def test_package_rejects_rows_outside_verified_identity_scope(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(DailyArchiveError,"outside verified expected set"):
