@@ -636,7 +636,7 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         classifier_start=js.index('function homeLifecycleBucket(item){')
         classifier_end=js.index('function homeCard(',classifier_start)
         rules_start=js.index('const HOME_HIGHLIGHT_RULES=')
-        choose_end=js.index('function renderHomeHighlights(rows){',rules_start)
+        choose_end=js.index('function renderHomeHighlights(rows,filter=homeFilter()){',rules_start)
         script=js[classifier_start:classifier_end]+js[rules_start:choose_end]
         cases=[
             {'video_id':'stale000001','lifecycle_state':'live','stale':True,'title':'重大告知'},
@@ -667,7 +667,7 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         self.assertIn('id="home-announcements"',html)
         for name in ('三期生告知','重大告知','初配信','周年','新衣裝','生日','3D LIVE','大型聯動','歌回','新造型'):
             self.assertIn(name,js)
-        self.assertIn('renderHomeHighlights(rows)',js)
+        self.assertIn('renderHomeHighlights(homeCatalogRows,value)',js)
         self.assertIn("const homePollTimer=setInterval(",js)
         self.assertIn("$('custom-session').classList.contains('active')",js)
         self.assertIn("},30000);",js)
@@ -1491,6 +1491,24 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("const visibleRows=(filter==='all'?rows:rows.filter",js)
         self.assertIn("const picks=chooseHomeHighlights(visibleRows);",js)
         self.assertNotIn("renderHomeHighlights(rows);\n applyHomeFilter();",js)
+
+
+
+    def test_home_stream_cards_have_consistent_base_surface(self):
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+
+        self.assertIn(
+            ".stream-card{position:relative;border:1px solid var(--line);background:var(--surface);",
+            css,
+        )
+        self.assertIn(
+            ".stream-card[data-support-accent=\"1\"]{background:color-mix(in srgb,var(--member-accent) 4%,var(--surface));",
+            css,
+        )
+        self.assertNotIn(
+            ".stream-card{position:relative;border:1px solid transparent;background:transparent;",
+            css,
+        )
 
 
 
