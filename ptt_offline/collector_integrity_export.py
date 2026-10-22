@@ -41,7 +41,7 @@ def _merge_ranges(ranges: list[tuple[int,int]]) -> tuple[int|None,int|None,list[
     return start,end,gaps
 
 
-def export_article_integrity(db, *, day: str, aid: str) -> dict[str,Any]:
+def export_article_integrity(db, *, day: str, aid: str, authoritative_remote_tail: int | None=None) -> dict[str,Any]:
     verify_schema(db)
     article_cols=_table_columns(db,"articles")
     screen_cols=_table_columns(db,"article_screens")
@@ -91,7 +91,17 @@ def export_article_integrity(db, *, day: str, aid: str) -> dict[str,Any]:
 
     contract_gaps=[]
     conflicts=[]
-    final_source_line=int(stored_final) if isinstance(stored_final,int) else coverage_end
+    local_tail=int(stored_final) if isinstance(stored_final,int) else coverage_end
+    if authoritative_remote_tail is None:
+        contract_gaps.append("authoritative-remote-tail-unavailable")
+        final_source_line=local_tail
+    elif type(authoritative_remote_tail) is not int or authoritative_remote_tail<1:
+        conflicts.append("invalid-authoritative-remote-tail")
+        final_source_line=local_tail
+    else:
+        final_source_line=authoritative_remote_tail
+        if local_tail is not None and authoritative_remote_tail<local_tail:
+            conflicts.append("authoritative-remote-tail-behind-local-tail")
     if stored_final is None:
         contract_gaps.append("collector-article-last-source-line-unavailable")
     if coverage_start is None:
@@ -100,12 +110,12 @@ def export_article_integrity(db, *, day: str, aid: str) -> dict[str,Any]:
         contract_gaps.append("collector-coverage-does-not-start-at-line-1")
     if coverage_gaps:
         contract_gaps.append("collector-source-line-gap")
-    if (isinstance(stored_final,int) and coverage_end is not None
-            and coverage_end<stored_final):
-        contract_gaps.append("collector-screen-coverage-behind-final-source-line")
-    if (isinstance(stored_final,int) and coverage_end is not None
-            and coverage_end>stored_final):
-        conflicts.append("collector-screen-coverage-exceeds-final-source-line")
+    if (local_tail is not None and coverage_end is not None
+            and coverage_end<local_tail):
+        contract_gaps.append("collector-screen-coverage-behind-local-tail")
+    if (local_tail is not None and coverage_end is not None
+            and coverage_end>local_tail):
+        conflicts.append("collector-screen-coverage-exceeds-local-tail")
     if duplicate_push_lines:
         conflicts.append("duplicate-push-source-line")
 
@@ -142,6 +152,22 @@ def export_article_integrity(db, *, day: str, aid: str) -> dict[str,Any]:
         final_source_line=final_source_line,
         lines=line_evidence,
     )
+    remote_tail_confirmed=(
+        isinstance(authoritative_remote_tail,int)
+        and local_tail is not None
+        and authoritative_remote_tail==local_tail
+    )
+    repair_range=(
+        [local_tail+1,authoritative_remote_tail]
+        if isinstance(authoritative_remote_tail,int)
+        and local_tail is not None
+        and authoritative_remote_tail>local_tail
+        else None
+    )
+    coverage["local_tail_source_line"]=local_tail
+    coverage["authoritative_remote_tail"]=authoritative_remote_tail
+    coverage["tail_parity_confirmed"]=remote_tail_confirmed
+    coverage["tail_repair_range"]=repair_range
     coverage["contract_gaps"]=sorted(set(
         coverage.get("contract_gaps",[])+contract_gaps
     ))
@@ -150,14 +176,14 @@ def export_article_integrity(db, *, day: str, aid: str) -> dict[str,Any]:
     ))
     if coverage["conflicts"]:
         coverage["status"]="CONFLICT"
-    elif coverage["contract_gaps"]:
+    elif coverage["contract_gaps"] or not remote_tail_confirmed:
         coverage["status"]="REPAIR_NEEDED"
 
     observed_at=last_seen_at if isinstance(last_seen_at,str) else None
     semantic=build_collector_semantic_evidence(
         observed_at=observed_at,
         active_aid=canonical,
-        watermark_source_line=coverage_end,
+        watermark_source_line=local_tail,
         final_source_line=final_source_line,
         source_line_gaps=coverage_gaps,
         scan_truncated=False,
@@ -192,6 +218,12 @@ def export_article_integrity(db, *, day: str, aid: str) -> dict[str,Any]:
             ),
             "lines":line_evidence,
         },
+        "tail_completeness":{
+            "local_tail_source_line":local_tail,
+            "authoritative_remote_tail":authoritative_remote_tail,
+            "tail_parity_confirmed":remote_tail_confirmed,
+            "repair_range":repair_range,
+        },
         "contract_gaps":coverage["contract_gaps"],
         "conflicts":coverage["conflicts"],
     }
@@ -202,10 +234,14 @@ def main(argv=None):
     p.add_argument("--source",required=True)
     p.add_argument("--day",required=True)
     p.add_argument("--aid",required=True)
+    p.add_argument("--authoritative-remote-tail",required=True,type=int)
     p.add_argument("--out",required=True)
     args=p.parse_args(argv)
     with open_source(args.source) as db:
-        body=export_article_integrity(db,day=args.day,aid=args.aid)
+        body=export_article_integrity(
+            db,day=args.day,aid=args.aid,
+            authoritative_remote_tail=args.authoritative_remote_tail,
+        )
     out=Path(args.out)
     with out.open("x",encoding="utf-8") as handle:
         json.dump(body,handle,ensure_ascii=False,sort_keys=True,indent=2)
