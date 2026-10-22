@@ -48,12 +48,15 @@ def run_orchestration(
     *,
     gate_command: list[str],
     downstream_command: list[str],
+    mode: str,
     command_runner: Callable[[list[str]],tuple[int,dict[str,Any]]] | None=None,
 ) -> dict[str,Any]:
     if not gate_command or not all(isinstance(x,str) and x for x in gate_command):
         raise DailyPttOrchestrationError("gate command required")
     if not downstream_command or not all(isinstance(x,str) and x for x in downstream_command):
         raise DailyPttOrchestrationError("downstream command required")
+    if mode not in {"production","acceptance"}:
+        raise DailyPttOrchestrationError("mode must be production or acceptance")
 
     runner=command_runner or _run_json_command
     gate_rc,gate=runner(gate_command)
@@ -75,30 +78,57 @@ def run_orchestration(
             "gate_receipt":gate,
         }
 
+    gate_day=gate.get("day")
+    if not isinstance(gate_day,str) or not gate_day:
+        return {
+            "schema_version":SCHEMA_VERSION,
+            "status":"FAILED",
+            "day":None,
+            "mode":mode,
+            "gate_returncode":gate_rc,
+            "health_gate_passed":True,
+            "downstream_invoked":False,
+            "downstream_status":"NOT_RUN",
+            "failure_code":"gate-day-missing",
+            "gate_receipt":gate,
+        }
+
     downstream_rc,downstream=runner(downstream_command)
     downstream_status=downstream.get("status")
-    success=(
-        downstream_rc==0
-        and downstream_status in {
-            "READY_TO_DEPLOY",
-            "ALREADY_VERIFIED",
-            "VERIFIED_COMPLETE_PUBLISHED",
-        }
-    )
+    downstream_day=downstream.get("day")
+    if not isinstance(downstream_day,str) or not downstream_day:
+        success=False
+        failure_code="downstream-day-missing"
+    elif downstream_day!=gate_day:
+        success=False
+        failure_code="gate-downstream-day-mismatch"
+    else:
+        allowed_statuses=(
+            {"VERIFIED_COMPLETE_PUBLISHED","ALREADY_VERIFIED"}
+            if mode=="production"
+            else {"READY_TO_DEPLOY","VERIFIED_COMPLETE_PUBLISHED","ALREADY_VERIFIED"}
+        )
+        success=downstream_rc==0 and downstream_status in allowed_statuses
+        failure_code=None if success else (
+            "ready-to-deploy-not-valid-in-production"
+            if mode=="production" and downstream_status=="READY_TO_DEPLOY"
+            else (
+                downstream.get("failure_code")
+                if isinstance(downstream.get("failure_code"),str)
+                else "daily-history-runtime-failed"
+            )
+        )
     return {
         "schema_version":SCHEMA_VERSION,
         "status":"SUCCEEDED" if success else "FAILED",
-        "day":downstream.get("day") or gate.get("day"),
+        "day":gate_day,
+        "mode":mode,
         "gate_returncode":gate_rc,
         "health_gate_passed":True,
         "downstream_invoked":True,
         "downstream_returncode":downstream_rc,
         "downstream_status":downstream_status,
-        "failure_code":None if success else (
-            downstream.get("failure_code")
-            if isinstance(downstream.get("failure_code"),str)
-            else "daily-history-runtime-failed"
-        ),
+        "failure_code":failure_code,
         "gate_receipt":gate,
         "downstream_receipt":downstream,
     }
@@ -108,6 +138,7 @@ def main(argv=None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gate-command-json",required=True)
     parser.add_argument("--downstream-command-json",required=True)
+    parser.add_argument("--mode",choices=("production","acceptance"),required=True)
     args=parser.parse_args(argv)
 
     try:
@@ -116,6 +147,7 @@ def main(argv=None) -> int:
         body=run_orchestration(
             gate_command=gate_command,
             downstream_command=downstream_command,
+            mode=args.mode,
         )
     except (ValueError,TypeError,DailyPttOrchestrationError) as exc:
         print(json.dumps({
