@@ -144,6 +144,22 @@ def _validate_expected_contract_digest(body: dict[str,Any]) -> None:
         raise DailyHistoryRuntimeError("expected-AID evidence_digest missing")
     material=json.loads(json.dumps(body))
     material.pop("evidence_digest",None)
+
+    # expected_aids_from_discovery() is a reviewed v1 adapter layered on top of
+    # build_expected_aid_contract(). The builder computes evidence_digest first;
+    # the adapter then appends these two provenance annotations. They are not part
+    # of the builder-signed material, so validate their consistency separately
+    # and exclude them from digest recomputation.
+    if material.get("source_kind")=="sanitized-collector-discovery":
+        target_count=material.get("discovery_target_count")
+        expected_rows=material.get("expected")
+        if not isinstance(target_count,int) or not isinstance(expected_rows,list):
+            raise DailyHistoryRuntimeError("expected-AID discovery annotation invalid")
+        if material.get("status")=="COMPLETE" and target_count!=len(expected_rows):
+            raise DailyHistoryRuntimeError("expected-AID discovery target count mismatch")
+        material.pop("source_kind",None)
+        material.pop("discovery_target_count",None)
+
     authority=material.get("authority")
     if isinstance(authority,dict):
         evidence_hash=authority.get("evidence_hash")
