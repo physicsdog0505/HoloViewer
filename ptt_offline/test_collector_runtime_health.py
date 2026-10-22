@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from ptt_offline.collector_runtime_health import read_collector_health
 
@@ -71,6 +71,17 @@ class CollectorRuntimeHealthTests(unittest.TestCase):
         self.assertFalse(body["heartbeat_fresh"])
         self.assertFalse(body["live_context_valid"])
         self.assertFalse(body["frontier_progressing"])
+
+
+    @patch("ptt_offline.collector_runtime_health.subprocess.run")
+    @patch("os.kill")
+    def test_zombie_pid_is_treated_as_dead(self, kill, run):
+        self.write_status()
+        self.write_refresh()
+        run.return_value=Mock(stdout="Z    \n",returncode=0)
+        body=read_collector_health(self.root,now=1000.0)
+        self.assertFalse(body["process_alive"])
+        self.assertEqual(body["process_state"],"Z")
 
 
 if __name__=="__main__":
