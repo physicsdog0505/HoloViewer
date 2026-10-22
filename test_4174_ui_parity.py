@@ -1512,5 +1512,23 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_home_time_hub_v1_is_custom_and_frontend_only(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+
+        self.assertIn('id="timeHub"',html)
+        self.assertIn('id="timeHubGrid"',html)
+        self.assertIn('aria-controls="timeHub"',html)
+        self.assertIn("const TIME_HUB_MEMBERS=",js)
+        self.assertIn("function renderTimeHub()",js)
+        self.assertIn("function timeHubStreamsForDay(day)",js)
+        self.assertIn("$('timeHub').showModal()",js)
+        self.assertIn(".time-hub-grid{",css)
+        self.assertIn(".time-hub-agenda{",css)
+        self.assertNotIn('type="date"',html[html.index('id="timeHub"'):html.index('id="connection"')])
+
+
+
 if __name__ == "__main__":
     unittest.main()
