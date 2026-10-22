@@ -1376,5 +1376,17 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_viewer_hides_raw_video_ids_but_keeps_human_labels(self):
+        js=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
+
+        self.assertIn("function playerDisplayLabel(stream)",js)
+        self.assertIn("if(!label||label===videoId||/^[A-Za-z0-9_-]{11}$/.test(label))return '';",js)
+        self.assertIn("node('div',playerDisplayLabel(stream),'player-label')",js)
+        self.assertIn("label.textContent=playerDisplayLabel(streams[0])",js)
+        self.assertIn("label.textContent=playerDisplayLabel(stream)",js)
+        self.assertNotIn("node('div',stream.label,'player-label')",js)
+
+
+
 if __name__ == "__main__":
     unittest.main()
