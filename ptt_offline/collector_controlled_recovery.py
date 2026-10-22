@@ -104,6 +104,10 @@ def controlled_start_once(
             "collector_health_after":before,
         }
 
+    allowed_dead_phases={"stopped"}
+    if before.get("phase") not in allowed_dead_phases:
+        raise ContractError("collector phase not eligible for automatic start")
+
     if receipt.exists():
         try:
             prior=json.loads(receipt.read_text(encoding="utf-8"))
@@ -159,9 +163,10 @@ def controlled_start_once(
                 or after.get("run_id")!=pre_attempt_run_id
             )
         )
+        heartbeat_timestamp=after.get("heartbeat_timestamp")
         heartbeat_after_attempt=(
-            isinstance(after.get("heartbeat_age_seconds"),(int,float))
-            and after.get("heartbeat_age_seconds")>=0
+            isinstance(heartbeat_timestamp,(int,float))
+            and heartbeat_timestamp>attempt_timestamp
         )
         if (
             after.get("process_alive") is True
