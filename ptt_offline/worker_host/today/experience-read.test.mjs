@@ -256,14 +256,6 @@ function canonicalProjectionDb(){
    if(sql.includes('FROM public_collab_events')&&sql.includes('live_scope=1')){
     return {async all(){return {results:[row]};}};
    }
-   if(sql.includes('FROM public_collab_events')&&sql.includes('event_date=?')){
-    return {bind(day){
-      return {
-       async all(){assert.equal(day,'2026-10-22');return {results:[row]};},
-       async first(){assert.equal(day,row.event_id);return null;}
-      };
-    }};
-   }
    if(sql.includes('FROM public_collab_events')&&sql.includes('event_id=?')){
     return {bind(eventId,day){
       return {async first(){
@@ -271,6 +263,11 @@ function canonicalProjectionDb(){
        if(day!=null&&day!=='2026-10-22')return null;
        return row;
       }};
+    }};
+   }
+   if(sql.includes('FROM public_collab_events')&&sql.includes('event_date=?')){
+    return {bind(day){
+      return {async all(){assert.equal(day,'2026-10-22');return {results:[row]};}};
     }};
    }
    throw Error('unexpected SQL: '+sql);
