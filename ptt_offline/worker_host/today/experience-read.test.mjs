@@ -265,6 +265,9 @@ function canonicalProjectionDb(){
       }};
     }};
    }
+   if(sql.includes('COUNT(*) AS n FROM public_collab_events')){
+    return {bind(day){return {async first(){assert.equal(day,'2026-10-22');return {n:1};}};}};
+   }
    if(sql.includes('FROM public_collab_events')&&sql.includes('event_date=?')){
     return {bind(day){
       return {async all(){assert.equal(day,'2026-10-22');return {results:[row]};}};
