@@ -351,6 +351,41 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertEqual(recovered["status"],"NO_NEW_ROWS")
         self.assertEqual(Path(self.state).read_bytes(),before)
 
+    def test_fresh_row_bypasses_recovery_fifo_without_increasing_batch_budget(self):
+        from unittest.mock import patch
+        aid="1priority"
+        identity="e"*64
+        url="https://www.ptt.cc/bbs/C_Chat/M.1792180800.A.002.html"
+        def row(line,occurred_at):
+            return {"push_id":f"p{line}","aid":aid,"day":"2026-10-17",
+                "source_line":line,"kind":"推","author":"u","content":f"line-{line}",
+                "occurred_at":occurred_at,"floor":line,"source_url":url,
+                "source_record_key":f"{aid}:{line}"}
+        rows=([row(line,"2026-10-17T09:00:00Z") for line in range(1,13)]+
+              [row(13,"2026-10-17T09:59:00Z")])
+        plan={"status":"READY","aid":aid,"source_identity":identity,
+              "candidate_rows":rows,"pending_source_lines":[],"scan_truncated":False}
+        Path(self.state).write_text(json.dumps({"status":"ACKED",
+            "source_identity":identity,"accepted":{},
+            "legacy_backlog_fence_v2":True}),encoding="utf-8")
+        sent=[]
+        def approve(batch):
+            sent.extend(batch["rows"])
+            return {"status":"ACK","batch_id":batch["batch_id"],"digest":batch["digest"],
+                "logical_rows_acked":len(batch["rows"]),"d1_query_count":52,
+                "d1_rows_written":22,"http_requests":1}
+        with patch("ptt_offline.live_capture_publisher.inspect_latest_article",return_value=plan):
+            result=run_live_once(self.db,state_path=self.state,send=True,
+                secret="k"*40,executor=approve,batch_cap=10,
+                now=datetime.fromisoformat("2026-10-17T10:00:00+00:00"))
+        self.assertEqual(result["status"],"ACK")
+        self.assertEqual(result["sent"],10)
+        self.assertEqual(len(sent),10)
+        self.assertEqual(sent[0]["source_line"],13)
+        self.assertEqual([x["source_line"] for x in sent[1:]],list(range(1,10)))
+        self.assertEqual(result["fresh_eligible"],1)
+        self.assertEqual(result["retained_recovery_candidates"],13)
+
     def test_runtime_fence_with_migration_marker_drops_1800_stale_and_sends_20_recoverable(self):
         from unittest.mock import patch
         aid="1runtime"
