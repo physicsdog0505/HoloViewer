@@ -280,7 +280,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("function closeMobileControls()", js)
         self.assertIn("function mobileStartSynchronizedPlayback()", js)
         self.assertIn("if(!mobileWatchMedia.matches||!hostPlayer||!sourcePlayer)return;", js)
-        self.assertIn("if(!timelineAligned)setOffset(source-host);", js)
+        self.assertIn("if(!timelineAligned)setOffset(source-host-segmentBaseOffsetSeconds);", js)
         self.assertIn("hostPlayer.playVideo();", js)
         self.assertIn("sourcePlayer.playVideo();", js)
         self.assertIn("function setMobilePrimary(kind)", js)
