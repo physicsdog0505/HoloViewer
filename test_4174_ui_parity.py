@@ -1530,5 +1530,33 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_ptt_midnight_rollover_keeps_previous_tail_without_double_polling(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+
+        self.assertNotIn("if(pttLastGoodDay&&pttLastGoodDay!==today)",js)
+        self.assertIn("pttCarryLoadedFor!==today",js)
+        self.assertIn("const previous=shiftDay(today,-1)",js)
+        self.assertIn("carryRows=carry.pushes.filter",js)
+        self.assertIn("const rows=[...carryRows,...todayRows]",js)
+        self.assertIn("}).slice(-300)",js)
+
+    def test_time_hub_v2_is_anniversary_only_and_preserves_topbar_typography(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+
+        self.assertNotIn('LIVE SCHEDULE',html)
+        self.assertNotIn('id="timeHubStreams"',html)
+        self.assertNotIn('timeHubStreamsForDay',js)
+        self.assertIn("function timeHubAvatar(event)",js)
+        self.assertIn("avatar.classList.add('is-'+event.type)",js)
+        self.assertIn(".time-hub-avatar.is-birthday",css)
+        self.assertIn(".time-hub-avatar.is-anniversary",css)
+        self.assertIn("padding:6px 0",css)
+        self.assertIn("font-size:inherit",css)
+        self.assertIn("letter-spacing:inherit",css)
+
+
+
 if __name__ == "__main__":
     unittest.main()
