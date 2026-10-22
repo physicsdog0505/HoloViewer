@@ -233,16 +233,56 @@ function parseCanonicalCollabRow(row){
  if(!event||event.event_id!==row.event_id||!Array.isArray(event.streams)||event.streams.length<2){
   throw Error('invalid canonical collab projection row');
  }
+ const streams=event.streams.map(stream=>{
+  if(!VIDEO.test(stream?.video_id??''))throw Error('invalid canonical collab stream');
+  const actual_start=validTime(stream.actual_start)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null;
+  const actual_end=validTime(stream.actual_end)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null;
+  const scheduled_start=validTime(stream.scheduled_start)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null;
+  const lifecycle_state=['live','upcoming','ended'].includes(stream.lifecycle_state)?stream.lifecycle_state:'unknown';
+  return {
+   video_id:stream.video_id,
+   title:typeof stream.title==='string'?stream.title:'',
+   channel_id:CHANNEL.test(stream.channel_id??'')?stream.channel_id:'',
+   channel_name:typeof (stream.channel_title??stream.channel_name)==='string'?(stream.channel_title??stream.channel_name):'',
+   lifecycle_state,
+   start_at:actual_start??scheduled_start??null,
+   actual_start,
+   actual_end,
+   avatar_url:typeof stream.avatar_url==='string'?stream.avatar_url:null,
+   sync_offset_ms:null
+  };
+ });
+ const verified=streams.length>1&&streams.every(stream=>
+  stream.lifecycle_state==='ended'&&stream.actual_start&&stream.actual_end&&
+  Date.parse(stream.actual_end)>Date.parse(stream.actual_start)
+ );
+ const master=verified?streams[0]:null;
+ if(verified){
+  for(const stream of streams){
+   stream.sync_offset_ms=Date.parse(stream.actual_start)-Date.parse(master.actual_start);
+  }
+ }
  return {
-  ...event,
   event_id:row.event_id,
   event_key:row.event_key,
   label:row.label,
   confidence:row.confidence,
+  candidate:true,
   review_status:row.review_status,
   source_revision:row.source_revision,
   published_at:row.published_at,
-  candidate:row.review_status!=='approved'
+  event_date:event.event_date??null,
+  event_start_at:event.event_start_at??null,
+  event_end_at:event.event_end_at??null,
+  participant_count:Number(event.participant_count??0),
+  pov_count:streams.length,
+  sync:{
+   available:verified,
+   basis:verified?'youtube_actual_start':null,
+   master_video_id:master?.video_id??null,
+   master_start:master?.actual_start??null
+  },
+  streams
  };
 }
 async function collabProjectionMeta(db){
