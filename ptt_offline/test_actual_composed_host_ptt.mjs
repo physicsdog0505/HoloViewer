@@ -38,6 +38,33 @@ function db({threads=['aid-day','aid-night'],rows=[],gap=false}={}){
 const url=(route)=>new Request('https://public-api.example'+route);
 const row=(id,aid,line,t)=>({push_id:id,aid,source_line:line,kind:'推',author:'viewer',content:'fixture',occurred_at:t,floor:line,source_url:'https://www.ptt.cc',});
 const day='2026-10-16';
+test('recent tail merges previous and current Taipei day without writes',async()=>{
+  const rows=[
+    row('p-old','aid-night',98,'2026-10-15T15:58:00Z'),
+    row('p-last','aid-night',99,'2026-10-15T15:59:00Z'),
+    row('p-mid','aid-day',1,'2026-10-15T16:00:00Z'),
+    row('p-new','aid-day',2,'2026-10-15T16:01:00Z'),
+  ];
+  const DB=db({rows});
+  const original=Date.now;
+  Date.now=()=>Date.parse('2026-10-15T16:05:00Z');
+  try{
+    const response=await host.fetch(url('/v1/ptt/recent?limit=3'),{DB});
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.window.kind,'recent-tail');
+    assert.deepEqual(body.window.taipei_days,['2026-10-15','2026-10-16']);
+    assert.deepEqual(body.pushes.map(r=>r.push_id),['p-last','p-mid','p-new']);
+    assert.equal(body.page.limit,3);
+    assert.equal(body.page.has_more,true);
+    assert.equal(DB.writes,0);
+  }finally{Date.now=original;}
+});
+test('recent tail rejects unbounded limit',async()=>{
+  const DB=db({rows:[]});
+  assert.equal((await host.fetch(url('/v1/ptt/recent?limit=1001'),{DB})).status,400);
+  assert.equal(DB.writes,0);
+});
 test('actual worker host handles health, methods, CORS and empty-day availability',async()=>{
   const DB=db({threads:[]}),env={DB,ALLOWED_ORIGIN:'https://holoviewer.example'};
   assert.equal((await host.fetch(url('/health'),env)).status,200);
