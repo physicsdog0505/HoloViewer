@@ -91,9 +91,11 @@ If the expected set is not authoritative, Collector coverage is incomplete, or
 repair is still pending, the runtime exits fail-closed with
 `NOT_ARCHIVE_READY` and does not invoke Wrangler.
 
-## Production deployment gate
+## Production rollout gate
 
-Only after Owner-local build-only acceptance, enable the two mutation gates explicitly:
+`deploy=false / READY_TO_DEPLOY` is the implementation acceptance gate only. After the Owner performs the one-time reviewed code/config/runtime rollout, routine daily data publication is automatic; it does not require a fresh manual Owner deploy action each day.
+
+For the one-time rollout, enable the required production gates explicitly:
 
 `"repair_enabled": true` (permits bounded Collector repair queue requests)
 
@@ -106,9 +108,10 @@ The runtime then executes only:
 That config contains only an assets directory. It does not bind D1, R2,
 secrets, routes, or Worker source.
 
-After deploy, the runtime performs full-partition HTTP readback of the exact
-content-addressed manifest and every object SHA/byte length. A deploy with
-failed readback is not accepted.
+After rollout, each routine daily run follows:
+`fresh VERIFIED_COMPLETE -> day.json package -> package validation -> Static Assets publication -> full HTTP readback -> publish receipt`.
+
+Any UNKNOWN/CONFLICT/finalization mismatch/package validation failure fails closed before publication. The runtime performs full-partition HTTP readback of the exact content-addressed manifest and every object SHA/byte length. A publication with failed readback is not accepted.
 
 An already verified identical manifest is a cheap no-op and does not redeploy.
 
@@ -123,8 +126,7 @@ python3 -B -m ptt_offline.daily_history_runtime install-launchd \
   --python "$(command -v python3)"
 ```
 
-Then the Owner may activate the generated plist with macOS `launchctl` after
-review. The generated schedule is exactly 07:30 local machine time.
+Then the Owner may activate the generated plist with macOS `launchctl` after the one-time rollout review. The generated schedule is exactly 07:30 local machine time. Once activated, routine daily successful `VERIFIED_COMPLETE` data publication is automatic; Owner approval remains required for future code/config/runtime deployment changes, not for each day's data publish.
 
 ## Safety boundaries
 
