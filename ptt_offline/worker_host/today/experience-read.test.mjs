@@ -251,7 +251,11 @@ function canonicalProjectionDb(){
  return {
   prepare(sql){
    if(sql.includes('FROM public_collab_projection_meta')){
-    return {async first(){return {source_revision:row.source_revision,published_at:row.published_at,source_event_count:1,effective_event_count:1};}};
+    return {bind(key){return {async first(){return key==='live'?{
+     projection_key:'live',source_revision:row.source_revision,published_at:row.published_at,
+     range_start:'2026-10-21T16:00:00Z',range_end:'2026-10-22T16:00:00Z',
+     source_event_count:1,effective_event_count:1
+    }:null;}}};
    }
    if(sql.includes('FROM public_collab_events')&&sql.includes('live_scope=1')){
     return {async all(){return {results:[row]};}};
@@ -293,6 +297,10 @@ test('Public collab live reads canonical projection and preserves canonical even
  assert.equal(body.events[0].review_status,'approved');
  assert.equal(body.events[0].streams.length,5);
  assert.equal(body.events[0].streams.some(x=>x.video_id==='89kUA14-sCc'),true);
+ assert.equal(body.events[0].streams[0].channel_name,'水宮枢');
+ assert.equal(body.events[0].sync.available,true);
+ assert.equal(body.events[0].sync.basis,'youtube_actual_start');
+ assert.equal(body.events[0].streams[0].sync_offset_ms,900000);
 });
 
 test('Public collab history reads canonical projection instead of recomputing shared-topic',async()=>{
@@ -323,4 +331,20 @@ test('Public collab routes fail closed when canonical projection is unavailable'
  const response=await handleExperienceRead(new Request('https://example.test/v1/collab/live'),{DB:db});
  assert.equal(response.status,503);
  assert.deepEqual(await response.json(),{error:'experience_projection_unavailable'});
+});
+
+
+test('Public collab live exposes stale projection as degraded without detector fallback',async()=>{
+ const response=await handleExperienceRead(
+  new Request('https://example.test/v1/collab/live'),
+  {DB:canonicalProjectionDb(),COLLAB_PROJECTION_MAX_AGE_SECONDS:'60'},
+  new Date('2026-10-22T17:02:00Z')
+ );
+ assert.equal(response.status,200);
+ const body=await response.json();
+ assert.equal(body.completeness.projection,'canonical');
+ assert.equal(body.completeness.degraded,true);
+ assert.equal(body.projection.stale,true);
+ assert.equal(body.projection.age_seconds,120);
+ assert.equal(body.events[0].event_id,'holoserver-hide-and-seek:5680e7ec7c29074a');
 });
