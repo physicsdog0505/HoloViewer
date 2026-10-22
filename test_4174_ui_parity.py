@@ -1537,11 +1537,32 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertNotIn("if(pttLastGoodDay&&pttLastGoodDay!==today)",js)
         self.assertIn("pttCarryLoadedFor!==today",js)
         self.assertIn("const previous=shiftDay(today,-1)",js)
-        self.assertIn("/v1/ptt/today?day='+encodeURIComponent(previous)+'&limit=1000",js)
+        self.assertIn("/v1/ptt/history?day='+encodeURIComponent(day)+'&limit='+PTT_HISTORY_PAGE_LIMIT",js)
+        self.assertIn("data.page.next_checkpoint",js)
+        self.assertIn("PTT_HISTORY_PAGE_CAP=100",js)
+        self.assertIn("PTT_CARRY_CACHE_KEY='holoviewer-ptt-carry-v1'",js)
+        self.assertIn("sessionStorage.setItem(PTT_CARRY_CACHE_KEY",js)
+        self.assertIn("carryRows=await loadPttHistoryTail(previous)",js)
+        self.assertNotIn("/v1/ptt/today?day='+encodeURIComponent(previous)+'&limit=1000",js)
         self.assertIn("/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000",js)
         self.assertIn("const rows=[...carryRows,...todayRows]",js)
         self.assertIn("}).slice(-1000)",js)
         self.assertIn("while(list.children.length>1000)",js)
+
+
+
+    def test_ptt_reload_carry_uses_history_tail_not_yesterday_today_endpoint(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+
+        self.assertIn("async function loadPttHistoryTail(day)",js)
+        self.assertIn("PTT_HISTORY_PAGE_LIMIT=200",js)
+        self.assertIn("PTT_HISTORY_PAGE_CAP=100",js)
+        self.assertIn("/v1/ptt/history?day='+encodeURIComponent(day)+'&limit='+PTT_HISTORY_PAGE_LIMIT",js)
+        self.assertIn("data.page.next_checkpoint",js)
+        self.assertIn("tail.length>1000",js)
+        self.assertIn("writePttCarryCache(day,tail)",js)
+        self.assertIn("carryRows=await loadPttHistoryTail(previous)",js)
+        self.assertNotIn("encodeURIComponent(previous)+'&limit=1000",js)
 
 
 
