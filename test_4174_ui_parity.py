@@ -1617,5 +1617,42 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_time_hub_identity_registry_uses_verified_channel_mapping(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        expected=[
+            ("UCjLEmnpCNeisMxy134KPwWw","Kobo Kanaeru"),
+            ("UCYz_5n-uDuChHtLo7My1HnQ","Kureiji Ollie"),
+            ("UCOyYb1c43VlX9rc_lT6NKQw","Ayunda Risu"),
+            ("UCP0BspO_AMEe3aQqqpo89Dg","Moona Hoshinova"),
+            ("UCAoy6rzhSf4ydcYjJw3WoVg","Airani Iofifteen"),
+            ("UCWQtYtq9EOB4-I5P-3fh8lA","音乃瀬奏"),
+            ("UCtyWhCj3AqKh2dXctLkDtng","一条莉々華"),
+            ("UCdXAk5MpyLD8594lm_OvtGQ","儒烏風亭らでん"),
+            ("UC1iA6_NT4mtAcIII6ygrvCw","轟はじめ"),
+            ("UC9LSiN9hXI55svYEBrrK-tw","響咲リオナ"),
+            ("UCGzTVXqMQHa4AgJVJIVvtDQ","綺々羅々ヴィヴィ"),
+            ("UCjk2nKmHzgH5Xy-C5qYRd5A","水宮枢"),
+            ("UCKMWFR6lAstLa7Vbf5dH7ig","輪堂千速"),
+            ("UCuI_opAVX6qbxZY-a-AxFuQ","虎金妃笑虎"),
+        ]
+        for channel_id,name in expected:
+            self.assertIn(channel_id+"|"+name+"|",js)
+        self.assertNotIn("UCjLEmnpCNeisMxy134KPwWw|綺々羅々ヴィヴィ|",js)
+        self.assertNotIn("UCjLEmnpCNeisMxy134KPwWw|Kikirara Vivi|",js)
+
+    def test_time_hub_rwd_avatar_layout_is_independent_from_day_number(self):
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+        self.assertIn(".time-hub-day-number{position:absolute",css)
+        self.assertIn(".time-hub-day-people{position:absolute",css)
+        self.assertIn("width:42px;height:42px",css)
+        self.assertIn("grid-template-rows:repeat(6,72px)",css)
+        self.assertIn(".time-hub-avatar{width:34px;height:34px",css)
+        self.assertIn('content:"B"',css)
+        self.assertIn('content:"★"',css)
+        self.assertIn(".time-hub-special .time-hub-avatar{width:50px;height:50px}",css)
+        self.assertIn(".time-hub-special-copy strong{font-size:15px",css)
+
+
+
 if __name__ == "__main__":
     unittest.main()
