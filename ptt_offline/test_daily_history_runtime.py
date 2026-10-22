@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -26,6 +26,7 @@ from ptt_offline.daily_history_runtime import (
 DAY="2026-10-20"
 AID="1fixture"
 TPE=ZoneInfo("Asia/Taipei")
+EXPECTED_EPOCH=datetime.fromtimestamp(1792450800,tz=timezone.utc)
 
 
 def expected_contract():
@@ -33,7 +34,7 @@ def expected_contract():
         day=DAY,
         entries=[{
             "period":"all_day","part":1,"aid":AID,
-            "source_url":"https://example.invalid/thread",
+            "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792450800.A.111.html",
             "authority_record_id":"fixture:all_day:1",
         }],
         authority={
@@ -104,7 +105,7 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             }],
         }
         logical,raw=_build_taipei_day_source_object(
-            day=DAY,payloads=[second,first],expected_aids={AID})
+            day=DAY,payloads=[second,first],expected_aids={AID},expected_thread_epochs={AID:EXPECTED_EPOCH})
         self.assertEqual(logical,"day.json")
         payload=json.loads(raw)
         self.assertEqual(payload["schema_version"],"holoviewer-ptt-history-day-v1")
@@ -137,7 +138,10 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             },
         ]}
         _,raw=_build_taipei_day_source_object(
-            day=DAY,payloads=[payload],expected_aids={day_aid,night_aid})
+            day=DAY,payloads=[payload],expected_aids={day_aid,night_aid},expected_thread_epochs={
+                day_aid:datetime.fromtimestamp(1792450800,tz=timezone.utc),
+                night_aid:datetime.fromtimestamp(1792501200,tz=timezone.utc),
+            })
         body=json.loads(raw)
         self.assertEqual([row["aid"] for row in body["pushes"]],[day_aid,night_aid])
         self.assertTrue(all(row["day_membership"]=="expected-thread"
@@ -187,7 +191,9 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             },
         ]}
         _,raw=_build_taipei_day_source_object(
-            day=DAY,payloads=[payload],expected_aids={day_aid})
+            day=DAY,payloads=[payload],expected_aids={day_aid},expected_thread_epochs={
+                day_aid:datetime.fromtimestamp(1792450800,tz=timezone.utc),
+            })
         body=json.loads(raw)
         self.assertEqual(
             [row["source_record_key"] for row in body["pushes"]],
@@ -201,6 +207,50 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
         self.assertEqual(excluded[older],"superseded-predecessor")
         self.assertEqual(excluded[adjacent],"outside-authoritative-expected-thread-set")
         self.assertFalse(body["membership"]["silent_drop"])
+
+    def test_zero_push_earliest_expected_thread_still_anchors_predecessor_boundary(self):
+        earliest="1early"
+        later="1later"
+        between="1between"
+        predecessor="1prior"
+        payload={"pushes":[
+            {
+                "aid":predecessor,"source_line":10,"source_record_key":"prior:10",
+                "floor":10,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-19T17:00:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792430000.A.010.html",
+                "content":"legal predecessor",
+            },
+            {
+                "aid":between,"source_line":11,"source_record_key":"between:11",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T00:10:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792454400.A.020.html",
+                "content":"must not become predecessor",
+            },
+            {
+                "aid":later,"source_line":12,"source_record_key":"later:12",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T02:00:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792461600.A.030.html",
+                "content":"later expected",
+            },
+        ]}
+        _,raw=_build_taipei_day_source_object(
+            day=DAY,payloads=[payload],expected_aids={earliest,later},
+            expected_thread_epochs={
+                earliest:datetime.fromtimestamp(1792450800,tz=timezone.utc),
+                later:datetime.fromtimestamp(1792461600,tz=timezone.utc),
+            })
+        body=json.loads(raw)
+        self.assertEqual(body["membership"]["direct_predecessor_aid"],predecessor)
+        self.assertEqual(
+            [row["source_record_key"] for row in body["pushes"]],
+            ["prior:10","later:12"],
+        )
+        excluded={row["aid"]:row["reason"] for row in body["membership"]["excluded_aids"]}
+        self.assertEqual(
+            excluded[between],"outside-authoritative-expected-thread-set")
 
     def test_unexpected_row_without_thread_epoch_fails_closed_not_silent_drop(self):
         payload={"pushes":[
@@ -221,7 +271,7 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(
                 DailyHistoryRuntimeError,"without source thread epoch"):
             _build_taipei_day_source_object(
-                day=DAY,payloads=[payload],expected_aids={AID})
+                day=DAY,payloads=[payload],expected_aids={AID},expected_thread_epochs={AID:EXPECTED_EPOCH})
 
     def test_cross_midnight_predecessor_sort_and_floor_are_preserved(self):
         payload={"pushes":[
@@ -241,7 +291,7 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             },
         ]}
         _,raw=_build_taipei_day_source_object(
-            day=DAY,payloads=[payload],expected_aids={AID})
+            day=DAY,payloads=[payload],expected_aids={AID},expected_thread_epochs={AID:EXPECTED_EPOCH})
         body=json.loads(raw)
         self.assertEqual([row["source_record_key"] for row in body["pushes"]],
                          ["prior:91","expected:2"])
@@ -262,7 +312,7 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(DailyHistoryRuntimeError,"duplicate source_record_key"):
             _build_taipei_day_source_object(
-                day=DAY,payloads=[payload,payload],expected_aids={AID})
+                day=DAY,payloads=[payload,payload],expected_aids={AID},expected_thread_epochs={AID:EXPECTED_EPOCH})
 
     def _config(self,root: Path, *, deploy=False):
         collector=root/"collector.sqlite3"
@@ -384,7 +434,7 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
                 day=DAY,
                 entries=[{
                     "period":"all_day","part":1,"aid":AID,
-                    "source_url":"https://example.invalid/thread",
+                    "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792450800.A.111.html",
                     "authority_record_id":"fixture:all_day:1",
                 }],
                 authority={
