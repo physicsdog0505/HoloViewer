@@ -20,7 +20,7 @@ Proposed snapshot path:
 ~/Documents/HoloViewer-Historical/runtime/HoloViewer-ptt-0730-483aacf
 ```
 
-Build it from the reviewed #163 HEAD, then overlay only the accepted #48 gate modules whose source branch is not present on the #163 branch:
+Build it from the reviewed #163 HEAD. The gate entrypoint and health classifier compatibility seam are now part of the #163 branch. Overlay only the two accepted #48 runtime modules that are still external to this branch:
 
 ```bash
 set -euo pipefail
@@ -41,7 +41,12 @@ do
 done
 ```
 
-Do **not** overlay the older #48 `daily_ptt_finalization.py`; the reviewed #163 HEAD contains the accepted newer finalization/runtime implementation, while the gate consumes only the stable `classify_collector_health` interface from it.
+Do **not** overlay the older #48 `daily_ptt_finalization.py`. The reviewed #163 HEAD contains the accepted newer finalization/runtime implementation.
+
+The 07:30 gate no longer imports `classify_collector_health` from finalization. It imports the additive compatibility seam:
+`ptt_offline.collector_health_contract.classify_collector_health`.
+
+That module contains only the previously reviewed #48 health normalization contract and no completeness/finalization logic.
 
 Snapshot provenance to verify before rollout:
 
