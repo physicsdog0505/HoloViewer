@@ -14,7 +14,7 @@
 <header class="client-topbar">
 <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="開啟導覽">☰</button>
 <a class="mobile-top-brand" href="/">HoloDocchi</a>
-<div id="page-title" class="top-status">今日直播</div>
+<button id="page-title" class="top-status top-date-trigger" type="button" aria-haspopup="dialog" aria-controls="timeHub">今日直播</button>
 </header>
 <div id="mobileNav" class="mobile-nav" hidden> <a data-mobile-route="home" href="/" class="active">今日直播</a>
  <a data-mobile-route="history" href="/history" class="">歷史直播</a>
@@ -22,6 +22,39 @@
  <a data-mobile-route="single" href="/custom-view" class="">自訂觀看</a>
  <a data-mobile-route="multi" href="/collab" class="">多人連動</a>
  <a data-mobile-route="ptt" href="/ptt-today/">PTT 今日專串</a></div>
+<dialog id="timeHub" class="time-hub" aria-labelledby="timeHubTitle">
+ <div class="time-hub-shell">
+  <header class="time-hub-head">
+   <div><p class="time-hub-kicker">HOLODOCCHI TIME</p><h2 id="timeHubTitle">本月行程</h2></div>
+   <div class="time-hub-head-actions">
+    <button id="timeHubToday" type="button">TODAY</button>
+    <button id="timeHubClose" type="button" aria-label="關閉月份行程">×</button>
+   </div>
+  </header>
+  <div class="time-hub-toolbar">
+   <button id="timeHubPrev" type="button" aria-label="上個月">‹</button>
+   <strong id="timeHubMonth"></strong>
+   <button id="timeHubNext" type="button" aria-label="下個月">›</button>
+   <div class="time-hub-legend" aria-label="月份標記說明">
+    <span><i class="birthday"></i>BIRTHDAY</span>
+    <span><i class="anniversary"></i>ANNIVERSARY</span>
+    <span><i class="stream"></i>STREAM</span>
+   </div>
+  </div>
+  <div class="time-hub-body">
+   <section class="time-hub-calendar" aria-label="月份總覽">
+    <div class="time-hub-weekdays" aria-hidden="true"><span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span></div>
+    <div id="timeHubGrid" class="time-hub-grid"></div>
+   </section>
+   <aside class="time-hub-agenda" aria-live="polite">
+    <p id="timeHubSelectedLabel" class="time-hub-selected-label"></p>
+    <div id="timeHubSpecials" class="time-hub-specials"></div>
+    <div class="time-hub-agenda-head"><span>LIVE SCHEDULE</span><span id="timeHubStreamCount"></span></div>
+    <div id="timeHubStreams" class="time-hub-streams"></div>
+   </aside>
+  </div>
+ </div>
+</dialog>
 <div id="connection" hidden>連線確認中</div>
 <main class="client-main">
 <aside id="live-channel-rail" class="live-channel-rail" aria-label="目前直播頻道" hidden><span class="live-channel-label">直播頻道</span><div id="live-channel-list"></div></aside>
