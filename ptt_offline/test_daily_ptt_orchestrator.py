@@ -117,7 +117,7 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         body=run_orchestration(
             gate_command=["gate"],
             downstream_command=["archive"],
-            mode="production",
+            mode="acceptance",
             command_runner=runner,
         )
         self.assertEqual(body["status"],"SUCCEEDED")
@@ -158,6 +158,23 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         self.assertEqual(body["status"],"FAILED")
         self.assertEqual(body["day"],"2026-10-21")
         self.assertEqual(body["failure_code"],"gate-downstream-day-mismatch")
+
+    def test_invalid_gate_day_fails_before_downstream(self):
+        calls=[]
+        def runner(command):
+            calls.append(command)
+            return 0,{"day":"2026-10-32","health_gate_passed":True}
+
+        body=run_orchestration(
+            gate_command=["gate"],
+            downstream_command=["archive"],
+            mode="production",
+            command_runner=runner,
+        )
+        self.assertEqual(calls,[["gate"]])
+        self.assertEqual(body["status"],"FAILED")
+        self.assertFalse(body["downstream_invoked"])
+        self.assertEqual(body["failure_code"],"gate-day-missing")
 
 if __name__=="__main__":
     unittest.main()
