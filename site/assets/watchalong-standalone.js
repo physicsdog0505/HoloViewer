@@ -862,8 +862,6 @@ async function loadTodayPtt(day,windowInfo=null){
   if(!windowInfo){pttFeed.replaceChildren(...pttRows.slice(-300).map(pttRow));pttFollowing=true;requestAnimationFrame(()=>{pttFeed.scrollTop=pttFeed.scrollHeight})}
  }catch(e){pttFeed.replaceChildren();const m=document.createElement('div');m.className='ptt-empty';m.textContent='PTT 暫時無法讀取：'+String(e?.message||e);pttFeed.append(m)}
 }
-function archiveHourKey(ms){const d=new Date(ms);return 'ptt/v1/chunks/'+d.getUTCFullYear()+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCHours()).padStart(2,'0')+'00.json'}
-function archiveHourKeys(startMs,endMs){const out=[];for(let t=Math.floor(startMs/3600000)*3600000;t<endMs;t+=3600000)out.push(archiveHourKey(t));return out}
 async function archiveSha256Hex(buffer){const digest=await crypto.subtle.digest('SHA-256',buffer);return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function archiveIntegrityError(message){
  const error=new Error(message);error.archiveIntegrity=true;return error;
