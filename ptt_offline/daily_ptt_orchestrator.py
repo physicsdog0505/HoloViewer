@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+from datetime import date
 from typing import Any, Callable
 
 
@@ -79,7 +80,11 @@ def run_orchestration(
         }
 
     gate_day=gate.get("day")
-    if not isinstance(gate_day,str) or not gate_day:
+    try:
+        parsed_gate_day=date.fromisoformat(gate_day) if isinstance(gate_day,str) else None
+    except ValueError:
+        parsed_gate_day=None
+    if parsed_gate_day is None or gate_day!=parsed_gate_day.isoformat():
         return {
             "schema_version":SCHEMA_VERSION,
             "status":"FAILED",
@@ -96,9 +101,17 @@ def run_orchestration(
     downstream_rc,downstream=runner(downstream_command)
     downstream_status=downstream.get("status")
     downstream_day=downstream.get("day")
-    if not isinstance(downstream_day,str) or not downstream_day:
+    try:
+        parsed_downstream_day=(
+            date.fromisoformat(downstream_day)
+            if isinstance(downstream_day,str)
+            else None
+        )
+    except ValueError:
+        parsed_downstream_day=None
+    if parsed_downstream_day is None or downstream_day!=parsed_downstream_day.isoformat():
         success=False
-        failure_code="downstream-day-missing"
+        failure_code="downstream-day-invalid"
     elif downstream_day!=gate_day:
         success=False
         failure_code="gate-downstream-day-mismatch"
