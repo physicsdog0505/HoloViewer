@@ -907,6 +907,46 @@ function pttInitControls(){
  },{passive:true});
  $('ptt-show-floor').onchange=()=>pttApplyFloorPreference($('ptt-show-floor').checked);
 }
+
+const PTT_CARRY_CACHE_KEY='holoviewer-ptt-carry-v1';
+const PTT_HISTORY_PAGE_LIMIT=200;
+const PTT_HISTORY_PAGE_CAP=100;
+function readPttCarryCache(day){
+ try{
+  const cached=JSON.parse(sessionStorage.getItem(PTT_CARRY_CACHE_KEY)||'null');
+  return cached?.day===day&&Array.isArray(cached.rows)?cached.rows:[];
+ }catch{return []}
+}
+function writePttCarryCache(day,rows){
+ try{sessionStorage.setItem(PTT_CARRY_CACHE_KEY,JSON.stringify({day,rows:rows.slice(-1000)}))}catch{}
+}
+async function loadPttHistoryTail(day){
+ const cached=readPttCarryCache(day);
+ if(cached.length)return cached.slice(-1000);
+ const tail=[],seenCheckpoints=new Set();
+ let after='',pages=0,lastEnvelope=null;
+ while(pages<PTT_HISTORY_PAGE_CAP){
+  const path='/v1/ptt/history?day='+encodeURIComponent(day)+'&limit='+PTT_HISTORY_PAGE_LIMIT+
+   (after?'&after='+encodeURIComponent(after):'');
+  const data=await api(path);
+  if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes)||
+     !data.page||typeof data.page.has_more!=='boolean')throw new Error('PTT history carry 格式錯誤');
+  lastEnvelope=data;pages+=1;
+  for(const row of data.pushes){
+   if(!row||typeof row.content!=='string')continue;
+   tail.push(row);
+   if(tail.length>1000)tail.shift();
+  }
+  if(!data.page.has_more)break;
+  const next=String(data.page.next_checkpoint||'');
+  if(!next||seenCheckpoints.has(next))throw new Error('PTT history carry continuation 無法前進');
+  seenCheckpoints.add(next);after=next;
+ }
+ if(lastEnvelope?.page?.has_more)throw new Error('PTT history carry 超過安全分頁上限');
+ writePttCarryCache(day,tail);
+ return tail;
+}
+
 async function loadPtt(){
  if(pttLoadInFlight)return;
  const today=taipeiDay();
@@ -926,10 +966,7 @@ async function loadPtt(){
   if(!pttLastGoodCount&&pttCarryLoadedFor!==today){
    pttCarryLoadedFor=today;
    const previous=shiftDay(today,-1);
-   const carry=await api('/v1/ptt/today?day='+encodeURIComponent(previous)+'&limit=1000').catch(()=>null);
-   if(carry?.schema_version==='public-consumer-v1'&&Array.isArray(carry.pushes)){
-    carryRows=carry.pushes.filter(row=>row&&typeof row.content==='string');
-   }
+   carryRows=await loadPttHistoryTail(previous).catch(()=>[]);
   }
   const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
