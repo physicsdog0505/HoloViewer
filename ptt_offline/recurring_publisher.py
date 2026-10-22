@@ -7,6 +7,7 @@ a signed private POST. Writes append-only local operational metrics.
 import argparse
 import json
 import time
+from collections import deque
 from datetime import datetime,timezone,timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -18,6 +19,33 @@ from .publisher_telemetry import update_publisher_telemetry
 from .public_today_contract import ContractError
 
 TAIPEI=ZoneInfo('Asia/Taipei')
+LIVE_INTERVAL_SECONDS=10
+IDLE_INTERVAL_SECONDS=60
+ROLLING_WINDOW_SECONDS=60
+ROLLING_BATCH_CAP=6
+
+def adaptive_live_pressure(result):
+    """Use only Publisher-local evidence to decide whether to stay at 10s."""
+    if not isinstance(result,dict):
+        return False
+    return bool(
+        result.get("fresh_eligible",0)>0 or
+        result.get("backlog_may_remain") or
+        result.get("sent",0)>0
+    )
+
+def prune_rolling(window, now):
+    cutoff=now-ROLLING_WINDOW_SECONDS
+    while window and window[0][0]<=cutoff:
+        window.popleft()
+
+def rolling_totals(window):
+    return {
+        "batches":sum(item[1] for item in window),
+        "rows":sum(item[2] for item in window),
+        "modeled_queries":sum(item[3] for item in window),
+        "modeled_writes":sum(item[4] for item in window),
+    }
 
 def snapshot_interval(now=None):
     """02:00 through 06:59 Taipei: 10 min; otherwise: 1 min."""
@@ -108,6 +136,12 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                         executor=executor,send=True,batch_cap=batch_cap,article_id=article_id)
                     last_status=batch.get("status",last_status)
                     stale_fenced_rows+=batch.get("stale_fenced_rows",0)
+                    pending+=batch.get("eligible",0)
+                    legacy_baseline_candidates+=batch.get("legacy_baseline_candidates",0)
+                    retained_recovery_candidates+=batch.get("retained_recovery_candidates",0)
+                    baseline_skipped_candidates+=batch.get("baseline_skipped_candidates",0)
+                    burst_safe_candidates+=batch.get("burst_safe_candidates",0)
+                    fresh_eligible+=batch.get("fresh_eligible",0)
                     if batch.get("status")=="LOCAL_SOURCE_MUTATION_BLOCKED":
                         mutation_blocked_aids.append(batch.get("aid"))
                         mutation_blocked_count+=batch.get("mutation_count",0)
@@ -194,6 +228,8 @@ def main(argv=None):
     p.add_argument("--metrics",required=True)
     p.add_argument("--interval-seconds",type=int,choices=(60,120),default=None,
                    help="optional fixed interval override; default 1min daytime / 10min 02-07 Asia/Taipei")
+    p.add_argument("--adaptive-live-cadence",action="store_true",
+                   help="owner-reviewed Phase A: 10s under live pressure, 60s idle, max 6 batches/rolling 60s")
     p.add_argument("--iterations",type=int,default=1,
                    help="number of snapshots; 0 means run until externally stopped")
     p.add_argument("--send",action="store_true")
@@ -214,6 +250,10 @@ def main(argv=None):
         p.error('max batches must be 1-16')
     if args.burst_max_batches is not None and not args.max_batches<=args.burst_max_batches<=16:
         p.error('burst max batches must be between max-batches and 16')
+    if args.adaptive_live_cadence and args.max_batches!=1:
+        p.error('adaptive Phase A requires max-batches=1')
+    if args.adaptive_live_cadence and args.interval_seconds is not None:
+        p.error('adaptive cadence cannot be combined with fixed interval override')
     import os
     if args.send and (not args.approve_live_capture_policy or
        os.environ.get("PTT_ALLOW_CAPTURE_TIME_POLICY")!="true"):
@@ -228,12 +268,48 @@ def main(argv=None):
     telemetry=metric.parent/"publisher-telemetry.json"
     with exclusive_lock(Path(args.state_dir)/".single-publisher.lock"):
         iteration=0
+        rolling=deque()
+        previous_backlog=None
         while args.iterations==0 or iteration<args.iterations:
             started=time.monotonic()
             try:
-                result=run_snapshot(source=args.source,state_dir=args.state_dir,send=args.send,
+                now_mono=time.monotonic()
+                prune_rolling(rolling,now_mono)
+                before=rolling_totals(rolling)
+                budget_blocked=bool(args.adaptive_live_cadence and args.send and before["batches"]>=ROLLING_BATCH_CAP)
+                send_this_tick=args.send and not budget_blocked
+                effective_burst=(args.max_batches if args.adaptive_live_cadence else args.burst_max_batches)
+                result=run_snapshot(source=args.source,state_dir=args.state_dir,send=send_this_tick,
                                     secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches,
-                                    burst_max_batches=args.burst_max_batches,max_articles=args.max_articles)
+                                    burst_max_batches=effective_burst,max_articles=args.max_articles)
+                posts=result.get("http_posts",0)
+                sent_rows=result.get("sent",0)
+                modeled_queries=result.get("modeled_d1_queries_ceiling",0)
+                modeled_writes=result.get("modeled_d1_writes_ceiling",0)
+                if send_this_tick and posts:
+                    rolling.append((now_mono,posts,sent_rows,modeled_queries,modeled_writes))
+                prune_rolling(rolling,now_mono)
+                totals=rolling_totals(rolling)
+                eligible=result.get("eligible",0)
+                backlog_after=max(0,eligible-sent_rows) if isinstance(eligible,int) else 0
+                backlog_delta=(None if previous_backlog is None else backlog_after-previous_backlog)
+                previous_backlog=backlog_after
+                retained=result.get("retained_recovery_candidates",0)
+                fresh=result.get("fresh_eligible",0)
+                recovery=max(0,retained-fresh) if isinstance(retained,int) and isinstance(fresh,int) else 0
+                stop_reason=("ROLLING_60S_BATCH_CAP" if budget_blocked else None)
+                result={**result,
+                    "adaptive_live_cadence":bool(args.adaptive_live_cadence),
+                    "live_pressure":adaptive_live_pressure(result),
+                    "recovery_eligible":recovery,
+                    "backlog_size":backlog_after,
+                    "backlog_delta":backlog_delta,
+                    "rolling_60s_batches":totals["batches"],
+                    "rolling_60s_rows":totals["rows"],
+                    "rolling_60s_modeled_queries":totals["modeled_queries"],
+                    "rolling_60s_modeled_writes":totals["modeled_writes"],
+                    "stop_reason":stop_reason,
+                }
             except Exception as exc:
                 failure={"status":"STOP_RECONCILE","error_class":type(exc).__name__,
                          "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -253,6 +329,10 @@ def main(argv=None):
             iteration+=1
             if args.iterations!=0 and iteration>=args.iterations:
                 break
-            time.sleep(max(0,args.interval_seconds-(time.monotonic()-started))
-                       if args.interval_seconds else seconds_until_next_snapshot())
+            if args.adaptive_live_cadence:
+                cadence=(LIVE_INTERVAL_SECONDS if adaptive_live_pressure(result) else IDLE_INTERVAL_SECONDS)
+                time.sleep(max(0,cadence-(time.monotonic()-started)))
+            else:
+                time.sleep(max(0,args.interval_seconds-(time.monotonic()-started))
+                           if args.interval_seconds else seconds_until_next_snapshot())
 if __name__=="__main__":main()
