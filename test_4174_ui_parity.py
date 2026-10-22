@@ -1522,7 +1522,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('aria-controls="timeHub"',html)
         self.assertIn("const TIME_HUB_MEMBERS=",js)
         self.assertIn("function renderTimeHub()",js)
-        self.assertIn("function timeHubStreamsForDay(day)",js)
+        self.assertNotIn("function timeHubStreamsForDay(day)",js)
         self.assertIn("$('timeHub').showModal()",js)
         self.assertIn(".time-hub-grid{",css)
         self.assertIn(".time-hub-agenda{",css)
