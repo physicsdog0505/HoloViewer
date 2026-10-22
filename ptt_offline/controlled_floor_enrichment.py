@@ -14,6 +14,7 @@ from .audit_baseline_gap import _norm_aid
 from .collector_source_preview import open_source
 from .floor_enrichment_plan import _remote_records
 from .live_capture_publisher import inspect_latest_article, OUTPUT_KEYS
+from .d1_publisher import canonical_record
 from .owner_publisher_once import sign_time_proof
 from .owner_http_transport import owner_signed_http_executor
 from .resumable_publisher import new_checkpoint, make_batch
@@ -47,6 +48,14 @@ def validate_batch(*,source,aid,plan_json,remote_json,batch_no,approved_digest):
         if article is None:
             raise ContractError("AID not found in Collector source")
         current=inspect_latest_article(db,article_id=article)
+        raw_keys=("source_line","source_page","kind","author","content","ptt_date","ptt_time","collected_at")
+        raw_by_line={
+            row[0]:dict(zip(raw_keys,row))
+            for row in db.execute("""
+                SELECT source_line,source_page,kind,author,content,ptt_date,ptt_time,collected_at
+                FROM pushes WHERE article_id=? ORDER BY source_line
+            """,(article,)).fetchall()
+        }
     if current.get("source_identity")!=plan.get("source_identity"):
         raise ContractError("source identity changed since floor plan")
     if not current.get("floor_authoritative"):
@@ -59,8 +68,22 @@ def validate_batch(*,source,aid,plan_json,remote_json,batch_no,approved_digest):
         line=expected.get("source_line")
         local=ready.get(line)
         remote_row=remote_by_line.get(line)
-        if local is None or remote_row is None:
-            raise ContractError("approved floor row no longer exists canonically")
+        if remote_row is None:
+            raise ContractError("approved floor row no longer exists remotely")
+        if local is None:
+            raw=raw_by_line.get(line)
+            remote_occurred_at=remote_row.get("occurred_at")
+            if raw is None or not isinstance(remote_occurred_at,str):
+                raise ContractError("approved floor row cannot reconstruct canonical remote identity")
+            local=canonical_record({
+                **raw,
+                "aid":wanted,
+                "source_url":current["url"],
+                "occurred_at":remote_occurred_at,
+                "origin":"collector",
+                "source_record_key":f"{wanted}:{line}",
+                "floor":None,
+            })
         if remote_row.get("floor") is not None:
             if remote_row.get("floor")==expected.get("floor"):
                 raise ContractError("approved floor row is already enriched remotely")
@@ -68,7 +91,7 @@ def validate_batch(*,source,aid,plan_json,remote_json,batch_no,approved_digest):
         for key in ("source_record_key","push_id","occurred_at"):
             if local.get(key)!=expected.get(key):
                 raise ContractError("approved floor row identity changed")
-            if key in remote_row and remote_row.get(key) not in (None,expected.get(key)):
+            if remote_row.get(key) not in (None,expected.get(key)):
                 raise ContractError("remote floor row identity conflict")
         floor=floor_map.get(line)
         if floor!=expected.get("floor"):
