@@ -235,6 +235,90 @@ class DailyStaticAssetsArchiveTests(unittest.TestCase):
                     out_dir=Path(tmp),
                 )
 
+    def test_package_accepts_audited_direct_predecessor_membership(self):
+        day_payload={
+            "schema_version":"holoviewer-ptt-history-day-v1",
+            "precision":"minute",
+            "timezone":"Asia/Taipei",
+            "partition_kind":"taipei-day",
+            "partition_start":"2026-10-19T16:00:00Z",
+            "partition_end":"2026-10-20T16:00:00Z",
+            "coverage_day":DAY,
+            "coverage_status":"COMPLETE",
+            "finalized":True,
+            "membership":{
+                "rule":"taipei-day-expected-plus-direct-predecessor-v1",
+                "expected_aids":["1abcDAY","1abcNIGHT"],
+                "direct_predecessor_aid":"1prior",
+                "first_expected_thread_start":"2026-10-20T00:00:00Z",
+                "cross_midnight_carry_in_pushes":1,
+                "excluded_aids":[],
+                "silent_drop":False,
+            },
+            "pushes":[
+                {
+                    "aid":"1prior","coverage_day":DAY,"source_line":90,
+                    "source_record_key":"prior:90","floor":90,
+                    "floor_quality":"per-thread-ordinal",
+                    "occurred_at":"2026-10-19T17:00:00Z",
+                    "day_membership":"direct-predecessor-cross-midnight",
+                    "content":"carry",
+                },
+                {
+                    "aid":"1abcDAY","coverage_day":DAY,"source_line":101,
+                    "source_record_key":"day:101","floor":1,
+                    "floor_quality":"per-thread-ordinal",
+                    "occurred_at":"2026-10-20T00:30:00Z",
+                    "day_membership":"expected-thread",
+                    "content":"day",
+                },
+            ],
+        }
+        raw=json.dumps(
+            day_payload,ensure_ascii=False,sort_keys=True,separators=(",",":")
+        ).encode("utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            receipt=_receipt()
+            source_objects=[("day.json",raw)]
+            source_hash=compute_source_snapshot_hash(
+                finalization_receipt=receipt,
+                source_revision=SOURCE_REVISION,
+                source_objects=source_objects,
+            )
+            package=build_daily_static_package(
+                finalization_receipt=receipt,
+                source_revision=SOURCE_REVISION,
+                source_hash=source_hash,
+                source_objects=source_objects,
+                out_dir=root,
+            )
+            self.assertEqual(package["archive_aids"],
+                             ["1abcDAY","1prior"])
+            self.assertEqual(package["object_count"],1)
+            self.assertTrue((root/package["objects"][0]["key"]).is_file())
+
+    def test_day_json_rejects_predecessor_without_membership_audit(self):
+        day_payload={
+            "schema_version":"holoviewer-ptt-history-day-v1",
+            "pushes":[{
+                "aid":"1prior","coverage_day":DAY,"source_line":90,
+                "source_record_key":"prior:90","floor":90,
+                "floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-19T17:00:00Z",
+                "day_membership":"direct-predecessor-cross-midnight",
+            }],
+        }
+        raw=json.dumps(
+            day_payload,ensure_ascii=False,sort_keys=True,separators=(",",":")
+        ).encode("utf-8")
+        with self.assertRaisesRegex(DailyArchiveError,"membership audit required"):
+            compute_source_snapshot_hash(
+                finalization_receipt=_receipt(),
+                source_revision=SOURCE_REVISION,
+                source_objects=[("day.json",raw)],
+            )
+
     def test_package_rejects_rows_outside_verified_identity_scope(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(DailyArchiveError,"outside verified expected set"):
