@@ -847,13 +847,14 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
 
     def test_session_url_encodes_and_restores_explicit_stream_ids(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("'#custom-session?'+new URLSearchParams([",js)
+        self.assertIn("'/custom-view#custom-session?'+new URLSearchParams([",js)
         self.assertIn("...viewing.ids.map(id=>['stream',id])",js)
         self.assertIn("params.getAll('stream')",js)
         self.assertIn("const recovered=urls.length?ids:",js)
         self.assertIn("const hashRoute=location.hash.substring(1).split('?')[0];",js)
         self.assertIn("const pathRoute=location.pathname==='/history'?'history':",js)
-        self.assertIn("route(hashRoute||pathRoute||'home')",js)
+        self.assertIn("const initialRoute=hashRoute==='custom-session'?'custom-session':legacyHashRoute||pathRoute||hashRoute||'home';",js)
+        self.assertIn("route(initialRoute)",js)
 
     def test_single_player_ptt_keeps_positive_aspect_ratio_contract(self):
         css=(ROOT/'site/assets/viewer-4174.css').read_text(encoding='utf-8')
