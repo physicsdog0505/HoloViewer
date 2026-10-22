@@ -18,6 +18,7 @@ from ptt_offline.daily_history_runtime import (
     CONFIG_SCHEMA,
     DailyHistoryRuntimeError,
     _build_taipei_day_source_object,
+    _validate_expected_contract_digest,
     load_config,
     make_repair_executor,
     run_closeout,
@@ -407,6 +408,35 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(DailyHistoryRuntimeError,"evidence_digest mismatch"):
                     run_closeout(config=config,day=DAY)
             coverage.assert_not_called()
+
+    def test_expected_contract_accepts_external_authority_evidence_hash(self):
+        contract=build_expected_aid_contract(
+            day=DAY,
+            entries=[{
+                "period":"all_day","part":1,"aid":AID,
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792450800.A.111.html",
+                "authority_record_id":"fixture:external-authority",
+            }],
+            authority={
+                "kind":"ptt-public-index-discovery",
+                "evidence_id":"fixture-external-authority",
+                "observed_at":"2026-10-21T00:00:00Z",
+                "verified":True,
+                "version":"thread-discovery-v1",
+                "issuer":"fixture",
+                "evidence_hash":"f"*64,
+            },
+        )
+        self.assertEqual(contract["authority"]["evidence_hash"],"f"*64)
+        self.assertNotEqual(
+            contract["authority"]["evidence_hash"],contract["evidence_digest"])
+        _validate_expected_contract_digest(contract)
+
+        tampered=json.loads(json.dumps(contract))
+        tampered["authority"]["evidence_hash"]="e"*64
+        with self.assertRaisesRegex(
+                DailyHistoryRuntimeError,"evidence_digest mismatch"):
+            _validate_expected_contract_digest(tampered)
 
     def test_repair_command_is_inert_until_explicitly_enabled(self):
         with tempfile.TemporaryDirectory() as tmp:
