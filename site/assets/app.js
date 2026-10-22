@@ -1408,7 +1408,8 @@ const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/watchalong'?'watchalong':
  location.pathname==='/'?'home':'';
 const legacyHashRoute=['home','history','single','multi','watchalong'].includes(hashRoute)?hashRoute:'';
-route(pathRoute||legacyHashRoute||hashRoute||'home');
+const initialRoute=hashRoute==='custom-session'?'custom-session':legacyHashRoute||pathRoute||hashRoute||'home';
+route(initialRoute);
 
 const homePollTimer=setInterval(()=>{
  if(!document.hidden&&($('home').classList.contains('active')||$('custom-session').classList.contains('active')))loadHome();
