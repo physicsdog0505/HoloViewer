@@ -147,12 +147,18 @@ def _validate_expected_contract_digest(body: dict[str,Any]) -> None:
     authority=material.get("authority")
     if isinstance(authority,dict):
         evidence_hash=authority.get("evidence_hash")
-        # The reviewed v1 builders bind the body while evidence_hash is null,
-        # then mirror the resulting digest into authority.evidence_hash.
+        # Two reviewed v1 authority modes are valid:
+        # 1. builder receives no authority hash, computes the contract digest
+        #    with evidence_hash=null, then mirrors that digest back into the
+        #    serialized authority field;
+        # 2. upstream authority supplies its own SHA-256 evidence hash. In that
+        #    case the external hash is identity-bearing material and must remain
+        #    present while recomputing the contract digest.
         if evidence_hash==digest:
             authority["evidence_hash"]=None
-        elif evidence_hash not in (None,digest):
-            raise DailyHistoryRuntimeError("expected-AID authority evidence_hash mismatch")
+        elif evidence_hash is not None:
+            if not isinstance(evidence_hash,str) or not re.fullmatch(r"[0-9a-f]{64}",evidence_hash):
+                raise DailyHistoryRuntimeError("expected-AID authority evidence_hash invalid")
     if sha256(_canonical_bytes(material)).hexdigest()!=digest:
         raise DailyHistoryRuntimeError("expected-AID evidence_digest mismatch")
 
