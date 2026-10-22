@@ -34,7 +34,7 @@ def _parse_event_time(value: object) -> float | None:
         return None
 
 
-def _latest_refresh_event(path: Path) -> dict[str,Any] | None:
+def _latest_refresh_event(path: Path, *, after_timestamp: float | None=None) -> dict[str,Any] | None:
     try:
         lines=path.read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -45,7 +45,11 @@ def _latest_refresh_event(path: Path) -> dict[str,Any] | None:
         except (ValueError,TypeError):
             continue
         if isinstance(row,dict) and row.get("event")=="refresh_complete":
-            return row
+            if after_timestamp is None:
+                return row
+            event_time=_parse_event_time(row.get("time_utc"))
+            if event_time is not None and event_time>after_timestamp:
+                return row
     return None
 
 
@@ -55,6 +59,7 @@ def read_collector_health(
     now: float | None=None,
     heartbeat_max_age: int=DEFAULT_HEARTBEAT_MAX_AGE,
     refresh_max_age: int=DEFAULT_REFRESH_MAX_AGE,
+    refresh_after_timestamp: float | None=None,
 ) -> dict[str,Any]:
     """Return sanitized health evidence from existing local runtime artifacts.
 
@@ -65,7 +70,10 @@ def read_collector_health(
     root=Path(root)
     current=time.time() if now is None else float(now)
     status=_read_json(root/"collector_live_status.json")
-    refresh=_latest_refresh_event(root/"collector_events.jsonl")
+    refresh=_latest_refresh_event(
+        root/"collector_events.jsonl",
+        after_timestamp=refresh_after_timestamp,
+    )
 
     updated_at=status.get("updated_at")
     heartbeat_age=(current-float(updated_at)
