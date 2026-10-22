@@ -1538,7 +1538,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("const previous=shiftDay(today,-1)",js)
         self.assertIn("carryRows=carry.pushes.filter",js)
         self.assertIn("const rows=[...carryRows,...todayRows]",js)
-        self.assertIn("}).slice(-300)",js)
+        self.assertIn("}).slice(-1000)",js)
 
     def test_time_hub_v2_is_anniversary_only_and_preserves_topbar_typography(self):
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
