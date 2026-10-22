@@ -13,6 +13,7 @@ from ptt_offline.data_lifecycle_evidence import (
     build_expected_aid_contract,
     build_source_coverage,
 )
+from ptt_offline.daily_ptt_finalization import finalize_day
 from ptt_offline.daily_history_runtime import (
     CONFIG_SCHEMA,
     DailyHistoryRuntimeError,
@@ -20,6 +21,7 @@ from ptt_offline.daily_history_runtime import (
     load_config,
     make_repair_executor,
     run_closeout,
+    run_packaging_acceptance,
 )
 
 
@@ -77,6 +79,52 @@ def source_object():
         }],
     }
     return ("chunks/2026/10/20/0100.json",
+            json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode())
+
+
+def finalized_receipt():
+    return finalize_day(
+        day=DAY,
+        expected_contract=expected_contract(),
+        coverage_by_aid={AID:complete_coverage()},
+        repair_executor=None,
+        observed_at="2026-10-21T07:30:00+08:00",
+    )
+
+
+def day_source_object():
+    payload={
+        "schema_version":"holoviewer-ptt-history-day-v1",
+        "precision":"minute",
+        "timezone":"Asia/Taipei",
+        "partition_kind":"taipei-day",
+        "partition_start":"2026-10-19T16:00:00Z",
+        "partition_end":"2026-10-20T16:00:00Z",
+        "coverage_day":DAY,
+        "coverage_status":"COMPLETE",
+        "finalized":True,
+        "membership":{
+            "rule":"taipei-day-expected-plus-direct-predecessor-v1",
+            "expected_aids":[AID],
+            "direct_predecessor_aid":None,
+            "first_expected_thread_start":"2026-10-20T00:20:00Z",
+            "cross_midnight_carry_in_pushes":0,
+            "excluded_aids":[],
+            "silent_drop":False,
+        },
+        "pushes":[{
+            "aid":AID,
+            "coverage_day":DAY,
+            "source_line":2,
+            "source_record_key":f"{DAY}:{AID}:2",
+            "floor":1,
+            "floor_quality":"per-thread-ordinal",
+            "occurred_at":"2026-10-20T01:01:00Z",
+            "day_membership":"expected-thread",
+            "content":"",
+        }],
+    }
+    return ("day.json",
             json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode())
 
 
@@ -388,6 +436,61 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             build.assert_not_called()
             receipt=json.loads((state/"latest-finalization.json").read_text())
             self.assertEqual(receipt["state"],"REPAIR_NEEDED")
+
+    def test_packaging_acceptance_consumes_fresh_receipt_without_recomputing_completeness(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            config_path,state=self._config(root,deploy=False)
+            config=load_config(config_path)
+            finalization_path=root/"fresh-finalization.json"
+            expected_path=root/"fresh-expected.json"
+            finalization=finalized_receipt()
+            finalization_path.write_text(json.dumps(finalization),encoding="utf-8")
+            expected_path.write_text(json.dumps(expected_contract()),encoding="utf-8")
+
+            with patch("ptt_offline.daily_history_runtime.coverage_from_collector") as coverage, \
+                 patch("ptt_offline.daily_history_runtime.finalize_day") as finalize, \
+                 patch("ptt_offline.daily_history_runtime.make_repair_executor") as repair, \
+                 patch("ptt_offline.daily_history_runtime._daily_source_objects",
+                       return_value=[day_source_object()]):
+                result=run_packaging_acceptance(
+                    config=config,
+                    day=DAY,
+                    finalization_path=finalization_path,
+                    expected_contract_path=expected_path,
+                )
+
+            coverage.assert_not_called()
+            finalize.assert_not_called()
+            repair.assert_not_called()
+            self.assertEqual(result["status"],"READY_TO_DEPLOY")
+            self.assertEqual(result["finalization_digest"],finalization["evidence_digest"])
+            self.assertEqual(result["expected_aids"],[AID])
+            self.assertEqual(result["packaged_aids"],[AID])
+            self.assertEqual(result["unexpected_aids"],[])
+            self.assertEqual(result["package_validation"],"PASS")
+            self.assertFalse(result["repair_enabled"])
+            self.assertFalse(result["deploy"])
+            self.assertFalse(result["archive_deployed"])
+            self.assertTrue(Path(result["day_json"]).is_file())
+            self.assertTrue(Path(result["package"]).is_file())
+
+    def test_packaging_acceptance_refuses_mutation_gates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            config_path,_=self._config(root,deploy=True)
+            config=load_config(config_path)
+            finalization_path=root/"fresh-finalization.json"
+            expected_path=root/"fresh-expected.json"
+            finalization_path.write_text(json.dumps(finalized_receipt()),encoding="utf-8")
+            expected_path.write_text(json.dumps(expected_contract()),encoding="utf-8")
+            with self.assertRaisesRegex(
+                    DailyHistoryRuntimeError,"requires deploy=false"):
+                run_packaging_acceptance(
+                    config=config,day=DAY,
+                    finalization_path=finalization_path,
+                    expected_contract_path=expected_path,
+                )
 
     def test_complete_day_builds_package_without_deploy(self):
         with tempfile.TemporaryDirectory() as tmp:
