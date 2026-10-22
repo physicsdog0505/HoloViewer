@@ -47,6 +47,13 @@ def rolling_totals(window):
         "modeled_writes":sum(item[4] for item in window),
     }
 
+def rolling_budget_allows(window, now):
+    prune_rolling(window,now)
+    return rolling_totals(window)["batches"]<ROLLING_BATCH_CAP
+
+def adaptive_interval(result):
+    return LIVE_INTERVAL_SECONDS if adaptive_live_pressure(result) else IDLE_INTERVAL_SECONDS
+
 def snapshot_interval(now=None):
     """02:00 through 06:59 Taipei: 10 min; otherwise: 1 min."""
     local=(now or datetime.now(timezone.utc)).astimezone(TAIPEI)
@@ -276,7 +283,7 @@ def main(argv=None):
                 now_mono=time.monotonic()
                 prune_rolling(rolling,now_mono)
                 before=rolling_totals(rolling)
-                budget_blocked=bool(args.adaptive_live_cadence and args.send and before["batches"]>=ROLLING_BATCH_CAP)
+                budget_blocked=bool(args.adaptive_live_cadence and args.send and not rolling_budget_allows(rolling,now_mono))
                 send_this_tick=args.send and not budget_blocked
                 effective_burst=(args.max_batches if args.adaptive_live_cadence else args.burst_max_batches)
                 result=run_snapshot(source=args.source,state_dir=args.state_dir,send=send_this_tick,
@@ -330,7 +337,7 @@ def main(argv=None):
             if args.iterations!=0 and iteration>=args.iterations:
                 break
             if args.adaptive_live_cadence:
-                cadence=(LIVE_INTERVAL_SECONDS if adaptive_live_pressure(result) else IDLE_INTERVAL_SECONDS)
+                cadence=adaptive_interval(result)
                 time.sleep(max(0,cadence-(time.monotonic()-started)))
             else:
                 time.sleep(max(0,args.interval_seconds-(time.monotonic()-started))
