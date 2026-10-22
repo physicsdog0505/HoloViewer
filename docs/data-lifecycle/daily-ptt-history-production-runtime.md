@@ -144,3 +144,30 @@ The reviewed private-side companion is Hololive-PTT-Viewer PR #422. It supplies
 both the public date-search expected-AID producer and the bounded repair bridge.
 Until that exact private-side HEAD is owner-tested and `repair_enabled=true`,
 gap days still stop safely at `REPAIR_NEEDED`.
+
+## Canonical one-Taipei-day membership
+
+`day.json` is an **event-day partition**, not a raw exporter bucket dump and not an
+`expected_aids` filter.
+
+For a finalized Taipei day, membership is:
+
+1. every included row must occur inside that exact Taipei calendar-day interval;
+2. rows from that day's authoritative expected AIDs belong;
+3. before the first expected thread starts, rows from exactly one **direct
+   predecessor thread** may belong. The direct predecessor is the unexpected
+   candidate with the latest authoritative PTT article-post epoch before the
+   first expected thread's article-post epoch;
+4. this preserves the previous evening thread's legal cross-midnight pushes;
+5. older predecessor candidates are outside scope because the direct predecessor
+   has superseded them; unexpected threads at/after the first expected-thread
+   start are outside the authoritative expected-thread set;
+6. an unexpected AID without enough article-post epoch evidence is not silently
+   dropped: packaging fails closed.
+
+The resulting payload records a sanitized `membership` audit with expected AIDs,
+direct predecessor AID, first expected thread start, cross-midnight carry-in
+count, and every excluded AID/count/reason. `silent_drop=false` is explicit.
+
+All included rows still require unique `source_record_key`, authoritative
+`floor_quality=per-thread-ordinal`, and stable chronological ordering.
