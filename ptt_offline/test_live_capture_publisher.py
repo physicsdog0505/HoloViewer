@@ -381,8 +381,9 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertEqual(result["status"],"ACK")
         self.assertEqual(result["sent"],10)
         self.assertEqual(len(sent),10)
-        self.assertEqual(sent[0]["source_line"],13)
-        self.assertEqual([x["source_line"] for x in sent[1:]],list(range(1,10)))
+        # make_batch canonicalizes transport order by source_line; fresh-first
+        # controls bounded membership, not the serialized row ordering.
+        self.assertEqual([x["source_line"] for x in sent],list(range(1,10))+[13])
         self.assertEqual(result["fresh_eligible"],1)
         self.assertEqual(result["retained_recovery_candidates"],13)
 
