@@ -44,7 +44,7 @@ class CollectorIntegrityExportTests(unittest.TestCase):
                 (2,1,4,1,'→','u','','10/20','14:01','2026-10-20T06:01:10+00:00'),
                 (3,1,6,1,'噓','u','bye','10/20','14:02','2026-10-20T06:02:10+00:00'),
             ])
-            body=export_article_integrity(db,day='2026-10-20',aid='1fixture')
+            body=export_article_integrity(db,day='2026-10-20',aid='1fixture',authoritative_remote_tail=6)
         finally:
             db.close(); tmp.cleanup()
         self.assertEqual(body["source_coverage"]["status"],"COMPLETE")
@@ -69,7 +69,7 @@ class CollectorIntegrityExportTests(unittest.TestCase):
             db.execute("""INSERT INTO pushes VALUES(
                 1,1,6,1,'推','u','visible','10/20','14:02',
                 '2026-10-20T06:02:10+00:00')""")
-            body=export_article_integrity(db,day='2026-10-20',aid='1fixture')
+            body=export_article_integrity(db,day='2026-10-20',aid='1fixture',authoritative_remote_tail=6)
         finally:
             db.close(); tmp.cleanup()
         self.assertEqual(body["source_coverage"]["status"],"REPAIR_NEEDED")
@@ -87,7 +87,7 @@ class CollectorIntegrityExportTests(unittest.TestCase):
         try:
             db.execute("""INSERT INTO article_screens VALUES(
                 1,1,1,1,1,4,'2026-10-20T06:20:00+00:00')""")
-            body=export_article_integrity(db,day='2026-10-20',aid='1fixture')
+            body=export_article_integrity(db,day='2026-10-20',aid='1fixture',authoritative_remote_tail=6)
         finally:
             db.close(); tmp.cleanup()
         self.assertEqual(body["source_coverage"]["status"],"REPAIR_NEEDED")
@@ -96,6 +96,44 @@ class CollectorIntegrityExportTests(unittest.TestCase):
             "collector-screen-coverage-behind-final-source-line",
             body["contract_gaps"],
         )
+
+
+    def test_remote_tail_ahead_forces_bounded_tail_repair(self):
+        tmp,db=self.make_db()
+        try:
+            db.execute("""INSERT INTO article_screens VALUES(
+                1,1,1,1,1,6,'2026-10-20T06:20:00+00:00')""")
+            body=export_article_integrity(
+                db,day='2026-10-20',aid='1fixture',
+                authoritative_remote_tail=10,
+            )
+        finally:
+            db.close(); tmp.cleanup()
+        self.assertEqual(body["source_coverage"]["status"],"REPAIR_NEEDED")
+        self.assertEqual(body["source_coverage"]["local_tail_source_line"],6)
+        self.assertEqual(body["source_coverage"]["authoritative_remote_tail"],10)
+        self.assertFalse(body["source_coverage"]["tail_parity_confirmed"])
+        self.assertEqual(body["source_coverage"]["tail_repair_range"],[7,10])
+        self.assertEqual(body["source_coverage"]["missing_source_lines"],[7,8,9,10])
+        self.assertEqual(body["tail_completeness"]["repair_range"],[7,10])
+        self.assertEqual(
+            body["collector_semantic"]["semantic_check"]["watermark_source_line"],6
+        )
+        self.assertEqual(
+            body["collector_semantic"]["semantic_check"]["final_source_line"],10
+        )
+
+    def test_missing_remote_tail_never_verifies_complete(self):
+        tmp,db=self.make_db()
+        try:
+            db.execute("""INSERT INTO article_screens VALUES(
+                1,1,1,1,1,6,'2026-10-20T06:20:00+00:00')""")
+            body=export_article_integrity(db,day='2026-10-20',aid='1fixture')
+        finally:
+            db.close(); tmp.cleanup()
+        self.assertEqual(body["source_coverage"]["status"],"REPAIR_NEEDED")
+        self.assertFalse(body["source_coverage"]["tail_parity_confirmed"])
+        self.assertIn("authoritative-remote-tail-unavailable",body["contract_gaps"])
 
 
 if __name__=="__main__":
