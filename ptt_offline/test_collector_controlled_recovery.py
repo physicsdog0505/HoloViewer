@@ -44,16 +44,25 @@ class CollectorControlledRecoveryTests(unittest.TestCase):
         self.assertFalse(self.receipt.exists())
 
     def test_dead_launches_once_and_confirms_health(self):
-        states=[
-            {"process_alive":False,"heartbeat_fresh":False,"phase":"stopped"},
-            {"process_alive":True,"heartbeat_fresh":True,
-             "live_context_valid":True,"frontier_progressing":True,
-             "live_aid":"#new","frontier":12,"phase":"collecting"},
-        ]
+        calls=[]
+        def probe(**kwargs):
+            calls.append(kwargs)
+            if len(calls)==1:
+                return {
+                    "process_alive":False,"heartbeat_fresh":False,
+                    "phase":"stopped","pid":22222,"run_id":"old",
+                }
+            return {
+                "process_alive":True,"heartbeat_fresh":True,
+                "live_context_valid":True,"frontier_progressing":True,
+                "live_aid":"#new","frontier":12,"phase":"collecting",
+                "pid":33333,"run_id":"new",
+                "heartbeat_age_seconds":0.1,
+            }
         body=controlled_start_once(
             collector_root=self.root,config_path=self.cfg,
             receipt_path=self.receipt,run_key="2026-10-22",
-            health_probe=lambda:states.pop(0),
+            health_probe=probe,
             sleep=lambda _x:None,
         )
         self.assertEqual(body["status"],"RECOVERED")
@@ -90,6 +99,65 @@ class CollectorControlledRecoveryTests(unittest.TestCase):
         self.cfg.write_text(json.dumps({"enabled":False,"username":"x"}))
         with self.assertRaises(ContractError):
             load_recovery_config(self.cfg)
+
+
+    def test_alive_unhealthy_never_calls_launcher(self):
+        (self.root/"collector_control.py").write_text(
+            "def launch_collector(username, *, test_account=False):\n"
+            "    raise AssertionError('launcher must not be called')\n",
+            encoding="utf-8",
+        )
+        body=controlled_start_once(
+            collector_root=self.root,config_path=self.cfg,
+            receipt_path=self.receipt,run_key="2026-10-22",
+            health_probe=lambda **_kwargs:{
+                "process_alive":True,
+                "heartbeat_fresh":False,
+                "live_context_valid":False,
+                "frontier_progressing":False,
+                "phase":"collecting",
+                "pid":22222,
+                "run_id":"same",
+            },
+        )
+        self.assertEqual(
+            body["status"],"ALIVE_UNHEALTHY_NO_RECOVERY_CHANNEL"
+        )
+        self.assertFalse(body["attempted"])
+        self.assertFalse(self.receipt.exists())
+
+    def test_fresh_old_refresh_does_not_confirm_new_run(self):
+        calls=[]
+        def probe(**kwargs):
+            calls.append(kwargs)
+            if len(calls)==1:
+                return {
+                    "process_alive":False,"heartbeat_fresh":False,
+                    "phase":"stopped","pid":22222,"run_id":"old",
+                }
+            return {
+                "process_alive":True,
+                "heartbeat_fresh":True,
+                "live_context_valid":False,
+                "frontier_progressing":False,
+                "live_aid":None,
+                "frontier":None,
+                "phase":"collecting",
+                "pid":33333,
+                "run_id":"new",
+                "heartbeat_age_seconds":0.1,
+            }
+        body=controlled_start_once(
+            collector_root=self.root,config_path=self.cfg,
+            receipt_path=self.receipt,run_key="2026-10-22",
+            health_probe=probe,
+            sleep=lambda _x:None,
+            confirm_timeout_seconds=1,
+            confirm_interval_seconds=0,
+        )
+        self.assertEqual(body["status"],"STARTED_UNCONFIRMED")
+        self.assertGreaterEqual(len(calls),2)
+        self.assertIn("refresh_after_timestamp",calls[1])
 
 
 if __name__=="__main__":
