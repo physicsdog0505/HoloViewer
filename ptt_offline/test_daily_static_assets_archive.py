@@ -301,6 +301,8 @@ class DailyStaticAssetsArchiveTests(unittest.TestCase):
     def test_day_json_rejects_predecessor_without_membership_audit(self):
         day_payload={
             "schema_version":"holoviewer-ptt-history-day-v1",
+            "partition_start":"2026-10-19T16:00:00Z",
+            "partition_end":"2026-10-20T16:00:00Z",
             "pushes":[{
                 "aid":"1prior","coverage_day":DAY,"source_line":90,
                 "source_record_key":"prior:90","floor":90,
