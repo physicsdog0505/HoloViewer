@@ -80,6 +80,8 @@ class ActivationPreflightTests(unittest.TestCase):
         live_cmd=popen.call_args.args[0]
         self.assertEqual(live_cmd[live_cmd.index("--iterations")+1],"0")
         self.assertIn("--send",live_cmd)
+        self.assertIn("--adaptive-live-cadence",live_cmd)
+        self.assertEqual(live_cmd[live_cmd.index("--max-batches")+1],"1")
         self.assertEqual(result["pid"],12345)
 
 if __name__ == "__main__":
