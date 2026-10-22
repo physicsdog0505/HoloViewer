@@ -1580,7 +1580,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("row?.channel_id",js)
         self.assertIn("function timeHubAvatar(event)",js)
         self.assertIn("wrap.dataset.channelId",js)
-        self.assertIn("UC1DCedRgGHBdm81E1llLhOQ|Usada Pekora",js)
+        self.assertIn("UC1DCedRgGHBdm81E1llLhOQ|兎田ぺこら",js)
         self.assertIn("UCt9H_RpQzhxzlyBxFqrdHqA|Fuwawa Abyssgard",js)
         self.assertIn("UCt9H_RpQzhxzlyBxFqrdHqA|Mococo Abyssgard",js)
         hub=js[js.index('// Time Hub V2 static event registry.'):js.index('function updateClientTopbar(routeName){')]
