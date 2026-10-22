@@ -285,9 +285,9 @@ function parseCanonicalCollabRow(row){
   streams
  };
 }
-async function collabProjectionMeta(db){
- return await db.prepare(`SELECT source_revision,published_at,source_event_count,effective_event_count
- FROM public_collab_projection_meta WHERE singleton=1`).first();
+async function collabProjectionMeta(db,key){
+ return await db.prepare(`SELECT projection_key,source_revision,published_at,range_start,range_end,source_event_count,effective_event_count
+ FROM public_collab_projection_meta WHERE projection_key=?`).bind(key).first();
 }
 function collabProjectionFreshness(meta,now,maxAgeRaw){
  const published=validTime(meta?.published_at);
@@ -300,7 +300,7 @@ function collabProjectionFreshness(meta,now,maxAgeRaw){
 }
 async function canonicalCollabLive(db,{now=new Date(),maxAgeSeconds=null}={}){
  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
- const meta=await collabProjectionMeta(db);
+ const meta=await collabProjectionMeta(db,'live');
  if(!meta)throw Error('canonical collab projection missing');
  const freshness=collabProjectionFreshness(meta,now,maxAgeSeconds);
  const rows=await db.prepare(`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
@@ -317,8 +317,6 @@ async function canonicalCollabLive(db,{now=new Date(),maxAgeSeconds=null}={}){
  };
 }
 async function canonicalCollabHistory(db,day,{limit=50,offset=0}={}){
- const meta=await collabProjectionMeta(db);
- if(!meta)throw Error('canonical collab projection missing');
  const totalRow=await db.prepare(`SELECT COUNT(*) AS n FROM public_collab_events
  WHERE event_date=? AND is_current=1 AND review_status!='rejected'`).bind(day).first();
  const total=Number(totalRow?.n??0);
@@ -328,16 +326,16 @@ async function canonicalCollabHistory(db,day,{limit=50,offset=0}={}){
  ORDER BY start_at DESC,event_id DESC LIMIT ? OFFSET ?`).bind(day,limit,offset).all();
  const events=(rows.results??[]).map(parseCanonicalCollabRow);
  const has_more=offset+events.length<total;
+ const revisions=[...new Set(events.map(event=>event.source_revision).filter(Boolean))];
+ const published=events.map(event=>event.published_at).filter(Boolean).sort().at(-1)??null;
  return {
   schema_version:'public-experience-v1',kind:'collab',scope:'history',day,
   completeness:{limited:false,has_more,projection:'canonical'},
-  projection:{source_revision:meta.source_revision,published_at:meta.published_at},
+  projection:{source_revisions:revisions,published_at:published},
   total,limit,offset,events
  };
 }
 async function canonicalCollabDetail(db,eventId,day=null){
- const meta=await collabProjectionMeta(db);
- if(!meta)throw Error('canonical collab projection missing');
  let query=`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
  FROM public_collab_events WHERE event_id=? AND is_current=1 AND review_status!='rejected'`;
  let row;
