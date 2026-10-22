@@ -70,23 +70,22 @@ function timeHubRecurringEvents(day){
  }
  return events;
 }
-function timeHubStreamDay(row){
- const raw=String(row?.actual_start||row?.scheduled_start||row?.start_at||'');
- const date=new Date(raw);if(!Number.isFinite(date.getTime()))return '';
- const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
- const p=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
- return p.year+'-'+p.month+'-'+p.day;
+function timeHubAvatarRow(event){
+ const key=String(event?.name||'').toLowerCase();
+ return homeCatalogRows.find(row=>{
+  const names=[row?.channel_name,row?.channel_title].map(value=>String(value||'').toLowerCase()).filter(Boolean);
+  return names.some(name=>name===key||name.includes(key)||key.includes(name));
+ })||null;
 }
-function timeHubStreamsForDay(day){
- return homeCatalogRows.filter(row=>timeHubStreamDay(row)===day).slice().sort((a,b)=>{
-  const at=Date.parse(String(a.actual_start||a.scheduled_start||a.start_at||'')),bt=Date.parse(String(b.actual_start||b.scheduled_start||b.start_at||''));
-  return (Number.isFinite(at)?at:Infinity)-(Number.isFinite(bt)?bt:Infinity);
- });
-}
-function timeHubTime(row){
- const raw=String(row?.actual_start||row?.scheduled_start||row?.start_at||'');
- const date=new Date(raw);if(!Number.isFinite(date.getTime()))return 'TIME TBD';
- return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(date);
+function timeHubAvatar(event){
+ const row=timeHubAvatarRow(event);
+ const wrap=node('span',undefined,'time-hub-avatar');
+ if(row){
+  const img=homeAvatarChild(row,event.name);
+  if(img.matches('img')){wrap.append(img);return wrap}
+ }
+ wrap.append(node('span',String(event?.name||'H').trim().slice(0,1).toUpperCase(),'time-hub-avatar-fallback'));
+ return wrap;
 }
 function renderTimeHubAgenda(){
  const day=timeHubSelected;
@@ -96,19 +95,12 @@ function renderTimeHubAgenda(){
  const fixed=timeHubRecurringEvents(day);
  fixed.forEach(event=>{
   const item=node('div',undefined,'time-hub-special '+event.type);
-  item.append(node('span',event.label,'time-hub-special-type'),node('strong',event.name));
-  specials.append(item);
+  item.append(timeHubAvatar(event));
+  const copy=node('div',undefined,'time-hub-special-copy');
+  copy.append(node('span',event.label,'time-hub-special-type'),node('strong',event.name));
+  item.append(copy);specials.append(item);
  });
- if(!fixed.length)specials.append(node('p','這天沒有固定生日或週年。','time-hub-empty'));
- const streams=timeHubStreamsForDay(day),box=$('timeHubStreams');box.replaceChildren();
- $('timeHubStreamCount').textContent=streams.length?streams.length+' STREAMS':'';
- streams.forEach(row=>{
-  const item=node('div',undefined,'time-hub-stream');
-  item.append(node('time',timeHubTime(row)),node('div',String(row.channel_title||row.channel_name||'頻道資訊待補')+'\n'+String(row.title||'')));
-  box.append(item);
- });
- if(!streams.length)box.append(node('p',day===taipeiDay()?'今天目前沒有可顯示的直播時程。':'V1 尚未載入這一天的完整直播時程。','time-hub-empty'));
-}
+ if(!fixed.length)specials.append(node('p','這天沒有生日或出道週年。','time-hub-empty'));
 function renderTimeHub(){
  const [year,month]=timeHubMonth.split('-').map(Number);
  $('timeHubMonth').textContent=timeHubMonthLabel(timeHubMonth);
@@ -119,17 +111,16 @@ function renderTimeHub(){
   const number=slot-start+1;
   if(number<1||number>days){grid.append(node('span',undefined,'time-hub-day is-empty'));continue}
   const day=timeHubMonth+'-'+String(number).padStart(2,'0');
-  const fixed=timeHubRecurringEvents(day),streams=timeHubStreamsForDay(day);
+  const fixed=timeHubRecurringEvents(day);
   const button=node('button',undefined,'time-hub-day');
   button.type='button';button.dataset.day=day;button.classList.toggle('is-today',day===taipeiDay());button.classList.toggle('is-selected',day===timeHubSelected);
   button.append(node('strong',String(number),'time-hub-day-number'));
-  const markers=node('span',undefined,'time-hub-day-markers');
-  fixed.slice(0,2).forEach(event=>markers.append(node('i',undefined,event.type)));
-  if(streams.length)markers.append(node('i',undefined,'stream'));
-  button.append(markers);
-  const names=fixed.slice(0,2).map(event=>event.name.split(' ')[0]);
-  if(names.length)button.append(node('small',names.join(' · ')));
-  if(fixed.length>2)button.append(node('small','+'+(fixed.length-2)+' EVENTS','time-hub-more'));
+  const people=node('span',undefined,'time-hub-day-people');
+  fixed.slice(0,3).forEach(event=>{
+   const avatar=timeHubAvatar(event);avatar.classList.add('is-'+event.type);avatar.title=event.label+' · '+event.name;people.append(avatar);
+  });
+  if(fixed.length)button.append(people);
+  if(fixed.length>3)button.append(node('small','+'+(fixed.length-3),'time-hub-more'));
   button.onclick=()=>{timeHubSelected=day;renderTimeHub()};
   grid.append(button);
  }
@@ -852,7 +843,7 @@ async function loadCollab(){
 }
 $('collab-history-picker').onsubmit=event=>{event.preventDefault();loadCollabHistory($('collabHistoryDate').value)};
 
-let pttLastGoodCount=0,pttLastGoodDay='',pttLoadInFlight=false,pttFollowing=true,pttProgrammatic=false;
+let pttLastGoodCount=0,pttLastGoodDay='',pttCarryLoadedFor='',pttLoadInFlight=false,pttFollowing=true,pttProgrammatic=false;
 function pttAtBottom(){
  const list=$('ptt-list');
  return list.scrollHeight-list.scrollTop-list.clientHeight<48;
@@ -911,9 +902,6 @@ async function loadPtt(){
  if(pttLoadInFlight)return;
  const today=taipeiDay();
  const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty'),latest=$('ptt-newest');
- if(pttLastGoodDay&&pttLastGoodDay!==today){
-  pttLastGoodCount=0;pttLastGoodDay='';list.replaceChildren();list.hidden=true;latest.hidden=true;pttFollowing=true;
- }
  if(!pttLastGoodCount){
   meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
   empty.hidden=false;empty.textContent='讀取今日 PTT 推文中…';
@@ -925,9 +913,23 @@ async function loadPtt(){
  }
  pttLoadInFlight=true;
  try{
-  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+  let carryRows=[];
+  if(!pttLastGoodCount&&pttCarryLoadedFor!==today){
+   pttCarryLoadedFor=today;
+   const previous=shiftDay(today,-1);
+   const carry=await api('/v1/ptt/today?day='+encodeURIComponent(previous)+'&limit=1000').catch(()=>null);
+   if(carry?.schema_version==='public-consumer-v1'&&Array.isArray(carry.pushes)){
+    carryRows=carry.pushes.filter(row=>row&&typeof row.content==='string');
+   }
+  }
+  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
-  const rows=data.pushes.filter(row=>row&&typeof row.content==='string');
+  const todayRows=data.pushes.filter(row=>row&&typeof row.content==='string');
+  const seenRows=new Set();
+  const rows=[...carryRows,...todayRows].filter(row=>{
+   const key=String(row.push_id||row.aid+':'+row.source_line);
+   if(seenRows.has(key))return false;seenRows.add(key);return true;
+  }).slice(-1000);
   const wasEmpty=!pttLastGoodCount;
   const nearBottom=pttFollowing||pttAtBottom();
   const previousScroll=list.scrollTop;
@@ -941,7 +943,7 @@ async function loadPtt(){
     const key=String(row.push_id||row.aid+':'+row.source_line);
     if(!seen.has(key)){list.append(pttRow(row));seen.add(key)}
    }
-   while(list.children.length>300)list.firstElementChild?.remove();
+   while(list.children.length>1000)list.firstElementChild?.remove();
   }
   pttLastGoodCount=list.children.length;pttLastGoodDay=today;
   const freshness=String(data.freshness?.status||'unknown');
