@@ -179,6 +179,7 @@ def start_publisher(repo_root, source, state_root, secrets_path):
          "--max-batches",str(PRODUCTION_PROFILE["max_batches"]),
          "--burst-max-batches",str(PRODUCTION_PROFILE["burst_max_batches"]),
          "--max-articles",str(PRODUCTION_PROFILE["max_articles"]),
+         "--adaptive-live-cadence",
          "--send","--approve-live-capture-policy"]
     with log.open("ab",buffering=0) as handle:
         p=subprocess.Popen(cmd,cwd=repo_root,env=env,stdout=handle,stderr=subprocess.STDOUT,
@@ -225,7 +226,7 @@ def main():
         "worker":WORKER,
         "database":DB_NAME,
         "source":source,
-        "cadence":"07:00-01:59 60s; 02:00-06:59 600s Asia/Taipei",
+        "cadence":"adaptive Phase A: 10s under live pressure; 60s idle; max 6 batches/rolling 60s",
         "limits":dict(PRODUCTION_PROFILE),
         "process":process,
         "public_readback_after_start":public_readback(),
