@@ -38,10 +38,12 @@ class CollectorRuntimeHealthTests(unittest.TestCase):
             "time_utc":when,
         })+"\n",encoding="utf-8")
 
+    @patch("ptt_offline.collector_runtime_health.subprocess.run")
     @patch("os.kill")
-    def test_fresh_repeated_frontier_is_healthy_activity(self, kill):
+    def test_fresh_repeated_frontier_is_healthy_activity(self, kill, run):
         self.write_status()
         self.write_refresh()
+        run.return_value=Mock(stdout="S\n",returncode=0)
         body=read_collector_health(self.root,now=1000.0)
         self.assertTrue(body["process_alive"])
         self.assertTrue(body["heartbeat_fresh"])
@@ -50,10 +52,12 @@ class CollectorRuntimeHealthTests(unittest.TestCase):
         self.assertEqual(body["live_aid"],"#1live")
         self.assertEqual(body["frontier"],178)
 
+    @patch("ptt_offline.collector_runtime_health.subprocess.run")
     @patch("os.kill")
-    def test_stale_refresh_marks_activity_stalled_without_requiring_line_growth(self, kill):
+    def test_stale_refresh_marks_activity_stalled_without_requiring_line_growth(self, kill, run):
         self.write_status()
         self.write_refresh(when="1970-01-01T00:10:00+00:00")
+        run.return_value=Mock(stdout="S\n",returncode=0)
         body=read_collector_health(self.root,now=1000.0)
         self.assertTrue(body["heartbeat_fresh"])
         self.assertFalse(body["frontier_progressing"])
@@ -82,6 +86,17 @@ class CollectorRuntimeHealthTests(unittest.TestCase):
         body=read_collector_health(self.root,now=1000.0)
         self.assertFalse(body["process_alive"])
         self.assertEqual(body["process_state"],"Z")
+
+
+    @patch("ptt_offline.collector_runtime_health.subprocess.run")
+    @patch("os.kill")
+    def test_empty_ps_state_fails_closed(self, kill, run):
+        self.write_status()
+        self.write_refresh()
+        run.return_value=Mock(stdout="",returncode=1)
+        body=read_collector_health(self.root,now=1000.0)
+        self.assertFalse(body["process_alive"])
+        self.assertIsNone(body["process_state"])
 
 
 if __name__=="__main__":
