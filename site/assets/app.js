@@ -852,7 +852,7 @@ async function loadCollab(){
 }
 $('collab-history-picker').onsubmit=event=>{event.preventDefault();loadCollabHistory($('collabHistoryDate').value)};
 
-let pttLastGoodCount=0,pttLastGoodDay='',pttLoadInFlight=false,pttFollowing=true,pttProgrammatic=false;
+let pttLastGoodCount=0,pttLastGoodDay='',pttCarryLoadedFor='',pttLoadInFlight=false,pttFollowing=true,pttProgrammatic=false;
 function pttAtBottom(){
  const list=$('ptt-list');
  return list.scrollHeight-list.scrollTop-list.clientHeight<48;
@@ -911,9 +911,6 @@ async function loadPtt(){
  if(pttLoadInFlight)return;
  const today=taipeiDay();
  const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty'),latest=$('ptt-newest');
- if(pttLastGoodDay&&pttLastGoodDay!==today){
-  pttLastGoodCount=0;pttLastGoodDay='';list.replaceChildren();list.hidden=true;latest.hidden=true;pttFollowing=true;
- }
  if(!pttLastGoodCount){
   meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
   empty.hidden=false;empty.textContent='讀取今日 PTT 推文中…';
@@ -925,9 +922,23 @@ async function loadPtt(){
  }
  pttLoadInFlight=true;
  try{
-  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+  let carryRows=[];
+  if(!pttLastGoodCount&&pttCarryLoadedFor!==today){
+   pttCarryLoadedFor=today;
+   const previous=shiftDay(today,-1);
+   const carry=await api('/v1/ptt/today?day='+encodeURIComponent(previous)+'&limit=1000').catch(()=>null);
+   if(carry?.schema_version==='public-consumer-v1'&&Array.isArray(carry.pushes)){
+    carryRows=carry.pushes.filter(row=>row&&typeof row.content==='string');
+   }
+  }
+  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
-  const rows=data.pushes.filter(row=>row&&typeof row.content==='string');
+  const todayRows=data.pushes.filter(row=>row&&typeof row.content==='string');
+  const seenRows=new Set();
+  const rows=[...carryRows,...todayRows].filter(row=>{
+   const key=String(row.push_id||row.aid+':'+row.source_line);
+   if(seenRows.has(key))return false;seenRows.add(key);return true;
+  }).slice(-1000);
   const wasEmpty=!pttLastGoodCount;
   const nearBottom=pttFollowing||pttAtBottom();
   const previousScroll=list.scrollTop;
@@ -941,7 +952,7 @@ async function loadPtt(){
     const key=String(row.push_id||row.aid+':'+row.source_line);
     if(!seen.has(key)){list.append(pttRow(row));seen.add(key)}
    }
-   while(list.children.length>300)list.firstElementChild?.remove();
+   while(list.children.length>1000)list.firstElementChild?.remove();
   }
   pttLastGoodCount=list.children.length;pttLastGoodDay=today;
   const freshness=String(data.freshness?.status||'unknown');
