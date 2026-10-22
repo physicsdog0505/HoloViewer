@@ -262,8 +262,35 @@ def _row_time(row: dict[str,Any]) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+
+def _expected_thread_epochs(expected_contract: dict[str,Any]) -> dict[str,datetime]:
+    """Resolve authoritative expected-thread article epochs independent of push rows."""
+    rows=expected_contract.get("expected")
+    if not isinstance(rows,list) or not rows:
+        raise DailyHistoryRuntimeError("expected thread authority metadata required")
+    epochs={}
+    for item in rows:
+        if not isinstance(item,dict):
+            raise DailyHistoryRuntimeError("invalid expected thread authority row")
+        aid=str(item.get("aid") or "").lstrip("#")
+        if not aid:
+            raise DailyHistoryRuntimeError("expected thread AID required")
+        source_url=item.get("source_url")
+        if not isinstance(source_url,str):
+            raise DailyHistoryRuntimeError("expected thread source_url authority required")
+        match=re.search(r"/M\.([0-9]{9,11})\.A\.",source_url)
+        if not match:
+            raise DailyHistoryRuntimeError("expected thread article epoch authority unavailable")
+        epoch=datetime.fromtimestamp(int(match.group(1)),tz=timezone.utc)
+        prior=epochs.get(aid)
+        if prior is not None and prior!=epoch:
+            raise DailyHistoryRuntimeError("expected thread epoch authority conflict")
+        epochs[aid]=epoch
+    return epochs
+
 def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
-                                    expected_aids: set[str]) -> tuple[str,bytes]:
+                                    expected_aids: set[str],
+                                    expected_thread_epochs: dict[str,datetime]) -> tuple[str,bytes]:
     """Collapse exporter buckets into the canonical one-Taipei-day event partition.
 
     Membership is not simply "all rows in the exporter window" and is not simply
@@ -318,12 +345,19 @@ def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
                 thread_epochs[aid]=epoch
             candidates.append((aid,occurred,row))
 
-    expected_epochs=[thread_epochs[aid] for aid in normalized_expected if aid in thread_epochs]
+    normalized_authority={
+        str(aid).lstrip("#"):epoch
+        for aid,epoch in expected_thread_epochs.items()
+        if str(aid).lstrip("#") in normalized_expected
+    }
+    if set(normalized_authority)!=normalized_expected:
+        raise DailyHistoryRuntimeError("expected thread epoch authority incomplete")
+    if any(not isinstance(epoch,datetime) or epoch.tzinfo is None
+           for epoch in normalized_authority.values()):
+        raise DailyHistoryRuntimeError("invalid expected thread epoch authority")
+    first_expected_epoch=min(
+        epoch.astimezone(timezone.utc) for epoch in normalized_authority.values())
     unexpected_aids={aid for aid,_,_ in candidates if aid not in normalized_expected}
-    if unexpected_aids and not expected_epochs:
-        raise DailyHistoryRuntimeError(
-            "unexpected AID cannot be classified without expected thread epoch authority")
-    first_expected_epoch=min(expected_epochs) if expected_epochs else None
 
     predecessor_aid=None
     if unexpected_aids:
@@ -403,10 +437,8 @@ def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
             "rule":"taipei-day-expected-plus-direct-predecessor-v1",
             "expected_aids":sorted(normalized_expected),
             "direct_predecessor_aid":predecessor_aid,
-            "first_expected_thread_start":(
-                first_expected_epoch.isoformat(timespec="seconds").replace("+00:00","Z")
-                if first_expected_epoch is not None else None
-            ),
+            "first_expected_thread_start":
+                first_expected_epoch.isoformat(timespec="seconds").replace("+00:00","Z"),
             "cross_midnight_carry_in_pushes":carry_in_count,
             "excluded_aids":[{
                 "aid":aid,
@@ -420,7 +452,8 @@ def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
     return "day.json",_canonical_bytes(payload)
 
 def _daily_source_objects(*, source: Path, day: str, work_dir: Path,
-                          expected_aids: set[str]) -> list[tuple[str,bytes]]:
+                          expected_aids: set[str],
+                          expected_thread_epochs: dict[str,datetime]) -> list[tuple[str,bytes]]:
     archive_root=work_dir/"source-archive"
     with open_source(str(source)) as db:
         receipt=export_archive(db,from_day=day,through_day=day,out_dir=archive_root)
@@ -444,7 +477,8 @@ def _daily_source_objects(*, source: Path, day: str, work_dir: Path,
     if not payloads:
         raise DailyHistoryRuntimeError("no archive objects for finalized day")
     return [_build_taipei_day_source_object(
-        day=day,payloads=payloads,expected_aids=expected_aids)]
+        day=day,payloads=payloads,expected_aids=expected_aids,
+        expected_thread_epochs=expected_thread_epochs)]
 
 _HEADERS=(
     "/ptt/v1/history/*\n"
@@ -628,9 +662,11 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
         }
 
     expected_aids={str(aid).lstrip("#") for aid in finalization["expected_set"]["expected_aids"]}
+    expected_epochs=_expected_thread_epochs(expected)
     with tempfile.TemporaryDirectory(prefix=f"holoviewer-{target_day}-",dir=state_root) as tmp:
         source_objects=_daily_source_objects(
-            source=source,day=target_day,work_dir=Path(tmp),expected_aids=expected_aids)
+            source=source,day=target_day,work_dir=Path(tmp),expected_aids=expected_aids,
+            expected_thread_epochs=expected_epochs)
 
     public,wrangler_config=ensure_static_root(
         state_root=state_root,target=str(config["static_target"]))
