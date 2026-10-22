@@ -121,6 +121,15 @@ def run_scheduler_gate(
         "health_gate_passed":health_ok,
         "downstream_authorized":False,
         "downstream_status":"HOLD_AUTHORITATIVE_TAIL_INTEGRATION",
+        "handoff_status":"BLOCKED_FOR_163_HANDOFF",
+        "handoff_blockers":[
+            "authoritative-remote-tail-provenance-pending",
+            "fresh-verified-complete-finalization-pending",
+        ] if health_ok else [
+            "collector-health-gate-not-passed",
+            "authoritative-remote-tail-provenance-pending",
+            "fresh-verified-complete-finalization-pending",
+        ],
         "archive_ready":False,
         "failure_code":(
             "authoritative-tail-integration-pending"
