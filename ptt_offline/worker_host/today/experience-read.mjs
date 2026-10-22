@@ -289,10 +289,20 @@ async function collabProjectionMeta(db){
  return await db.prepare(`SELECT source_revision,published_at,source_event_count,effective_event_count
  FROM public_collab_projection_meta WHERE singleton=1`).first();
 }
-async function canonicalCollabLive(db,{now=new Date()}={}){
+function collabProjectionFreshness(meta,now,maxAgeRaw){
+ const published=validTime(meta?.published_at);
+ const maxAge=Number(maxAgeRaw);
+ if(!published||!Number.isFinite(maxAge)||maxAge<=0){
+  return {stale:null,age_seconds:published?Math.max(0,Math.floor((now-published)/1000)):null,max_age_seconds:null};
+ }
+ const age=Math.max(0,Math.floor((now-published)/1000));
+ return {stale:age>maxAge,age_seconds:age,max_age_seconds:maxAge};
+}
+async function canonicalCollabLive(db,{now=new Date(),maxAgeSeconds=null}={}){
  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
  const meta=await collabProjectionMeta(db);
  if(!meta)throw Error('canonical collab projection missing');
+ const freshness=collabProjectionFreshness(meta,now,maxAgeSeconds);
  const rows=await db.prepare(`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
  FROM public_collab_events
  WHERE is_current=1 AND live_scope=1 AND review_status!='rejected'
@@ -301,8 +311,8 @@ async function canonicalCollabLive(db,{now=new Date()}={}){
  const events=raw.slice(0,100).map(parseCanonicalCollabRow);
  return {
   schema_version:'public-experience-v1',kind:'collab',scope:'live',day,
-  completeness:{limited:has_more,has_more,projection:'canonical'},
-  projection:{source_revision:meta.source_revision,published_at:meta.published_at},
+  completeness:{limited:has_more,has_more,projection:'canonical',degraded:freshness.stale===true,freshness_known:freshness.stale!==null},
+  projection:{source_revision:meta.source_revision,published_at:meta.published_at,...freshness},
   events
  };
 }
@@ -393,7 +403,7 @@ export async function handleExperienceRead(request,env,now=new Date()){
    return video?json(video,200,30):json({error:'not_found',verified:false},404,0);
   }
   if(url.pathname==='/v1/collab/live'){
-   return json(await canonicalCollabLive(env.DB,{now}));
+   return json(await canonicalCollabLive(env.DB,{now,maxAgeSeconds:env.COLLAB_PROJECTION_MAX_AGE_SECONDS}));
   }
   if(url.pathname==='/v1/collab/history'){
    const day=url.searchParams.get('day')??'';
