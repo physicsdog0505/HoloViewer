@@ -103,19 +103,55 @@ def validate_finalization_receipt(receipt: object) -> dict[str,Any]:
     return receipt
 
 
-def _validate_payload(*,raw: bytes,day: str,expected_aids: set[str]) -> tuple[int,list[str]]:
+def _validate_payload(*,raw: bytes,day: str,
+                      expected_aids: set[str]) -> tuple[int,list[str],set[str]]:
     try:
         payload=json.loads(raw)
     except (UnicodeDecodeError,json.JSONDecodeError) as exc:
         raise DailyArchiveError("canonical object is not valid UTF-8 JSON") from exc
     if not isinstance(payload,dict) or not isinstance(payload.get("pushes"),list):
         raise DailyArchiveError("canonical object requires pushes list")
+
+    membership=payload.get("membership")
+    predecessor_aid=None
+    if payload.get("schema_version")=="holoviewer-ptt-history-day-v1":
+        if not isinstance(membership,dict):
+            raise DailyArchiveError("day.json membership audit required")
+        if membership.get("rule")!="taipei-day-expected-plus-direct-predecessor-v1":
+            raise DailyArchiveError("unsupported day.json membership rule")
+        declared_expected=membership.get("expected_aids")
+        if (not isinstance(declared_expected,list)
+                or {str(aid).strip("#") for aid in declared_expected}!=expected_aids):
+            raise DailyArchiveError("day.json expected-AID membership mismatch")
+        if membership.get("silent_drop") is not False:
+            raise DailyArchiveError("day.json must explicitly forbid silent drop")
+        raw_predecessor=membership.get("direct_predecessor_aid")
+        if raw_predecessor is not None:
+            predecessor_aid=str(raw_predecessor).strip("#")
+            if not predecessor_aid or predecessor_aid in expected_aids:
+                raise DailyArchiveError("invalid direct predecessor AID")
+
     identities=[]
+    archive_aids=set()
     for row in payload["pushes"]:
         if not isinstance(row,dict):
             raise DailyArchiveError("invalid push row")
         aid=str(row.get("aid") or "").strip("#")
-        if aid not in expected_aids:
+        if not aid:
+            raise DailyArchiveError("push AID required")
+        if payload.get("schema_version")=="holoviewer-ptt-history-day-v1":
+            reason=row.get("day_membership")
+            if aid in expected_aids:
+                if reason!="expected-thread":
+                    raise DailyArchiveError("expected AID has invalid day membership")
+            elif aid==predecessor_aid:
+                if reason!="direct-predecessor-cross-midnight":
+                    raise DailyArchiveError("predecessor AID has invalid day membership")
+            else:
+                raise DailyArchiveError("object contains AID outside canonical day membership")
+            if row.get("floor") is None or row.get("floor_quality")!="per-thread-ordinal":
+                raise DailyArchiveError("day.json requires authoritative per-thread floor")
+        elif aid not in expected_aids:
             raise DailyArchiveError("object contains AID outside verified expected set")
         if row.get("coverage_day")!=day:
             raise DailyArchiveError("object contains row outside target Taipei day")
@@ -123,8 +159,8 @@ def _validate_payload(*,raw: bytes,day: str,expected_aids: set[str]) -> tuple[in
         if not isinstance(identity,str) or not identity:
             raise DailyArchiveError("source_record_key required")
         identities.append(identity)
-    return len(payload["pushes"]),identities
-
+        archive_aids.add(aid)
+    return len(payload["pushes"]),identities,archive_aids
 
 def compute_source_snapshot_hash(
     *,
@@ -150,7 +186,7 @@ def compute_source_snapshot_hash(
         if not isinstance(raw,(bytes,bytearray)):
             raise DailyArchiveError("canonical object bytes required")
         body=bytes(raw)
-        pushes,row_ids=_validate_payload(
+        pushes,row_ids,object_aids=_validate_payload(
             raw=body,day=receipt["day"],expected_aids=expected_aids)
         identities.extend(row_ids)
         rows.append({
@@ -158,6 +194,7 @@ def compute_source_snapshot_hash(
             "sha256":_digest_bytes(body),
             "bytes":len(body),
             "pushes":pushes,
+            "archive_aids":sorted(object_aids),
         })
     if len(identities)!=len(set(identities)):
         raise DailyArchiveError("duplicate source_record_key across daily objects")
@@ -202,6 +239,7 @@ def build_daily_static_package(
     expected_aids={aid.strip("#") for aid in receipt["expected_set"]["expected_aids"]}
     seen_keys=set()
     identities=[]
+    archive_aids=set()
     staged=[]
     base=f"ptt/v1/history/{day}/{source_hash[:20]}"
     for logical_key,raw in source_objects:
@@ -212,9 +250,10 @@ def build_daily_static_package(
         if not isinstance(raw,(bytes,bytearray)):
             raise DailyArchiveError("canonical object bytes required")
         body=bytes(raw)
-        pushes,row_ids=_validate_payload(
+        pushes,row_ids,object_aids=_validate_payload(
             raw=body,day=day,expected_aids=expected_aids)
         identities.extend(row_ids)
+        archive_aids.update(object_aids)
         object_key=f"{base}/{logical_key}"
         staged.append({
             "key":object_key,
@@ -222,6 +261,7 @@ def build_daily_static_package(
             "sha256":_digest_bytes(body),
             "bytes":len(body),
             "pushes":pushes,
+            "archive_aids":sorted(object_aids),
             "_body":body,
         })
     if len(identities)!=len(set(identities)):
@@ -239,6 +279,7 @@ def build_daily_static_package(
         "finalization_evidence_digest":receipt["evidence_digest"],
         "expected_aids":sorted(expected_aids),
         "expected_aid_authority":receipt["expected_set"]["authority"],
+        "archive_aids":sorted(archive_aids),
         "total_objects":len(object_rows),
         "total_pushes":sum(item["pushes"] for item in object_rows),
         "objects":object_rows,
@@ -267,6 +308,7 @@ def build_daily_static_package(
         "source_hash":source_hash,
         "finalization_evidence_digest":receipt["evidence_digest"],
         "expected_aids":sorted(expected_aids),
+        "archive_aids":sorted(archive_aids),
         "manifest":{
             "key":manifest_key,
             "digest":manifest_digest,
@@ -389,7 +431,7 @@ def verify_http_readback(
         "from_day":package["taipei_day"],
         "through_day":package["taipei_day"],
         "object_count":package["object_count"],
-        "thread_scope":package["expected_aids"],
+        "thread_scope":package.get("archive_aids",package["expected_aids"]),
         "thread_scope_authoritative":True,
     }
     return build_readback_receipt(
@@ -442,7 +484,7 @@ def build_archive_delivery_evidence(
         "from_day":package["taipei_day"],
         "through_day":package["taipei_day"],
         "object_count":package["object_count"],
-        "thread_scope":package["expected_aids"],
+        "thread_scope":package.get("archive_aids",package["expected_aids"]),
         "thread_scope_authoritative":True,
     }
     verified_count=(
