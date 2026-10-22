@@ -415,7 +415,7 @@ class PublicSmokeTests(unittest.TestCase):
 
     def test_watchalong_static_assets_integrity(self):
         manifest = json.loads((ROOT / "site/data/watchalong/manifest.json").read_text(encoding="utf-8"))
-        expected = {"eFYByyw5AJc": 838, "U2o13h1Oib4": 1438, "8pF4qHcshDc": 1461}
+        expected = {"eFYByyw5AJc": 1568, "U2o13h1Oib4": 1438, "8pF4qHcshDc": 1461}
         self.assertEqual(manifest.get("schema_version"), "holoviewer-watchalong-manifest-v1")
         self.assertEqual(manifest.get("event_count"), 3)
         self.assertEqual({row["event_id"] for row in manifest["events"]}, set(expected))

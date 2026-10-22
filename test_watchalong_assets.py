@@ -68,7 +68,11 @@ class WatchalongAssetTests(unittest.TestCase):
         self.assertEqual(len(event["segments"]), 6)
         self.assertNotIn("Vr0pc63j7jw", event["source_video_ids"])
         self.assertEqual(event["artifacts"]["sync"]["status"], "REPAIRED")
-        self.assertEqual(event["artifacts"]["translation"]["artifact_id"], "62b0a69f53a7e754b424b1ce298566d0f8e733414fe1dbea9bbda9e009f4e8ca")
+        self.assertEqual(event["artifacts"]["transcript"]["transcript_id"], "5b5424cd70f9cc99561e768222fe501b746d7f0572765eba5b958f02583d298d")
+        self.assertEqual(event["artifacts"]["transcript"]["content_hash"], "f67ce6dd021ed9bddd9af2fcadddddab029dbafdb9d3763e4abeb71d8aded456")
+        self.assertEqual(event["artifacts"]["transcript"]["cue_count"], 1568)
+        self.assertEqual(event["artifacts"]["translation"]["artifact_id"], "db98d96002931734b6336c01732b6d981fbee3ed71a5304352c37f7ec4a92168")
+        self.assertEqual(event["artifacts"]["translation"]["quality"], "quality-v2-complete")
 
     def test_integrated_release_uses_existing_static_watchalong_assets(self):
         player = ROOT / "site/assets/watchalong-standalone.js"
