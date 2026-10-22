@@ -117,6 +117,130 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             [f"{DAY}:{AID}:2",f"{DAY}:{AID}:3"])
         self.assertTrue(all(row["coverage_status"]=="COMPLETE" for row in payload["pushes"]))
 
+    def test_daily_membership_includes_expected_day_and_night_threads(self):
+        day_aid="1day"
+        night_aid="1night"
+        payload={"pushes":[
+            {
+                "aid":night_aid,"source_line":20,"source_record_key":"night:20",
+                "floor":2,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T14:30:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792501200.A.222.html",
+                "content":"night",
+            },
+            {
+                "aid":day_aid,"source_line":10,"source_record_key":"day:10",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T00:30:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792450800.A.111.html",
+                "content":"day",
+            },
+        ]}
+        _,raw=_build_taipei_day_source_object(
+            day=DAY,payloads=[payload],expected_aids={day_aid,night_aid})
+        body=json.loads(raw)
+        self.assertEqual([row["aid"] for row in body["pushes"]],[day_aid,night_aid])
+        self.assertTrue(all(row["day_membership"]=="expected-thread"
+                            for row in body["pushes"]))
+        self.assertEqual(body["membership"]["cross_midnight_carry_in_pushes"],0)
+
+    def test_daily_membership_keeps_direct_predecessor_cross_midnight_and_excludes_adjacent(self):
+        carry="1priorNight"
+        older="1older"
+        day_aid="1day"
+        adjacent="1adjacent"
+        payload={"pushes":[
+            {
+                "aid":older,"source_line":1,"source_record_key":"older:1",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-19T16:05:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792400000.A.010.html",
+                "content":"old predecessor",
+            },
+            {
+                "aid":carry,"source_line":50,"source_record_key":"carry:50",
+                "floor":50,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-19T17:30:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792430000.A.020.html",
+                "content":"cross midnight",
+            },
+            {
+                "aid":day_aid,"source_line":2,"source_record_key":"day:2",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T00:30:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792450800.A.111.html",
+                "content":"expected day",
+            },
+            {
+                "aid":adjacent,"source_line":3,"source_record_key":"adjacent:3",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T03:00:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792461600.A.333.html",
+                "content":"unrelated",
+            },
+        ]}
+        _,raw=_build_taipei_day_source_object(
+            day=DAY,payloads=[payload],expected_aids={day_aid})
+        body=json.loads(raw)
+        self.assertEqual(
+            [row["source_record_key"] for row in body["pushes"]],
+            ["carry:50","day:2"],
+        )
+        self.assertEqual(body["pushes"][0]["day_membership"],
+                         "direct-predecessor-cross-midnight")
+        self.assertEqual(body["membership"]["direct_predecessor_aid"],carry)
+        self.assertEqual(body["membership"]["cross_midnight_carry_in_pushes"],1)
+        excluded={row["aid"]:row["reason"] for row in body["membership"]["excluded_aids"]}
+        self.assertEqual(excluded[older],"superseded-predecessor")
+        self.assertEqual(excluded[adjacent],"outside-authoritative-expected-thread-set")
+        self.assertFalse(body["membership"]["silent_drop"])
+
+    def test_unexpected_row_without_thread_epoch_fails_closed_not_silent_drop(self):
+        payload={"pushes":[
+            {
+                "aid":AID,"source_line":2,"source_record_key":"expected:2",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T01:01:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792450800.A.111.html",
+                "content":"expected",
+            },
+            {
+                "aid":"1unknown","source_line":9,"source_record_key":"unknown:9",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T01:02:00Z",
+                "content":"cannot classify",
+            },
+        ]}
+        with self.assertRaisesRegex(
+                DailyHistoryRuntimeError,"without source thread epoch"):
+            _build_taipei_day_source_object(
+                day=DAY,payloads=[payload],expected_aids={AID})
+
+    def test_cross_midnight_predecessor_sort_and_floor_are_preserved(self):
+        payload={"pushes":[
+            {
+                "aid":AID,"source_line":2,"source_record_key":"expected:2",
+                "floor":1,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T00:30:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792450800.A.111.html",
+                "content":"expected",
+            },
+            {
+                "aid":"1prior","source_line":91,"source_record_key":"prior:91",
+                "floor":91,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-19T16:20:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792430000.A.020.html",
+                "content":"carry",
+            },
+        ]}
+        _,raw=_build_taipei_day_source_object(
+            day=DAY,payloads=[payload],expected_aids={AID})
+        body=json.loads(raw)
+        self.assertEqual([row["source_record_key"] for row in body["pushes"]],
+                         ["prior:91","expected:2"])
+        self.assertEqual(body["pushes"][0]["floor"],91)
+        self.assertEqual(body["pushes"][0]["floor_quality"],"per-thread-ordinal")
+
     def test_daily_object_rejects_duplicate_source_identity(self):
         payload={
             "pushes":[{
