@@ -1456,5 +1456,18 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_home_lifecycle_sections_have_minimal_visual_separation(self):
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+
+        self.assertIn("#home-live-section>.section-head",css)
+        self.assertIn("#home-upcoming-section>.section-head",css)
+        self.assertIn("#home-upcoming-section{",css)
+        self.assertIn("background:color-mix(in srgb,var(--accent-soft) 54%,var(--bg));",css)
+        self.assertIn("border:1px solid color-mix(in srgb,var(--accent) 18%,var(--line));",css)
+        self.assertIn("#home-upcoming-section::before{",css)
+        self.assertNotIn("#home-upcoming-section .section-icon",css)
+
+
+
 if __name__ == "__main__":
     unittest.main()
