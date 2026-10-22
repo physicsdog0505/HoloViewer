@@ -57,8 +57,11 @@ const danmakuLayer=document.getElementById('danmakuLayer');
 
 let hostPlayer=null;
 let sourcePlayer=null;
-let timelineAligned=params.has('offset')&&Number.isFinite(Number(params.get('offset')));
-let sourceOffsetSeconds=timelineAligned?Number(params.get('offset')):0;
+let timelineAligned=false;
+let segmentBaseOffsetSeconds=0;
+let userOffsetSeconds=0;
+let hostPlayerReady=false;
+let sourcePlayerReady=false;
 let suppressLinkedCommand=false;
 let syncTimer=null;
 let subtitleTimer=null;
@@ -208,59 +211,69 @@ function saveCheckpoint(){
 }
 // Share-link checkpoint generation is intentionally disabled; browser autoplay/user-gesture
 // restrictions can make a URL-restored time diverge from the actual player clock.
+function setSegmentBaseOffset(value){
+ segmentBaseOffsetSeconds=Math.round((Number(value)||0)*1000)/1000;
+ timelineAligned=true;
+ refreshOffsetUi();
+}
 function seekWatchalongToHost(seconds){
- if(!hostPlayer||!Number.isFinite(seconds))return false;
+ if(!hostPlayerReady||!sourcePlayerReady||!hostPlayer||!sourcePlayer||!Number.isFinite(seconds))return false;
  const hostSeconds=Math.max(0,seconds);
- try{hostPlayer.seekTo(hostSeconds,true);hostPlayer.pauseVideo()}catch{return false}
+ try{hostPlayer.seekTo(hostSeconds,true)}catch{return false}
  if(STATIC_EVENT_MODE&&segments.length){
   const index=segmentIndexForHost(hostSeconds);
   if(index>=0){
    activeSegmentIndex=index;
-   const segment=segments[index],offset=segment.source-segment.host,target=hostSeconds+offset;
-   setOffset(offset,{persist:false});renderSegments();
+   const segment=segments[index],baseOffset=segment.source-segment.host;
+   setSegmentBaseOffset(baseOffset);renderSegments();
+   const target=sourceExpectedTime(hostSeconds);
    try{
     if(segment.sourceVideoId&&segment.sourceVideoId!==activeSourceVideoId){
      activeSourceVideoId=segment.sourceVideoId;sourceVideoId=segment.sourceVideoId;
-     sourcePlayer?.cueVideoById?.({videoId:segment.sourceVideoId,startSeconds:Math.max(0,target)});
-    }else if(sourcePlayer&&target>=0){
-     sourcePlayer.seekTo(Math.max(0,target),true);sourcePlayer.pauseVideo?.();
+     sourcePlayer.cueVideoById({videoId:segment.sourceVideoId,startSeconds:Math.max(0,target)});
+    }else if(Number.isFinite(target)&&target>=0){
+     sourcePlayer.seekTo(Math.max(0,target),true);
     }
    }catch{}
   }
- }else if(sourcePlayer&&timelineAligned){
+ }else if(timelineAligned){
   const target=sourceExpectedTime(hostSeconds);
-  if(Number.isFinite(target)&&target>=0){try{sourcePlayer.seekTo(target,true);sourcePlayer.pauseVideo?.()}catch{}}
+  if(Number.isFinite(target)&&target>=0){try{sourcePlayer.seekTo(target,true)}catch{}}
  }
  syncPttToHost(hostSeconds);
  return true;
 }
+function resumeClockApplied(targetSeconds){
+ const actual=currentHostSeconds();
+ return actual!=null&&Math.abs(actual-targetSeconds)<=2.5;
+}
 function maybeApplyResume(){
- if(resumeApplied||!hostPlayer||!sourcePlayer)return;
+ if(resumeApplied||!hostPlayerReady||!sourcePlayerReady||!hostPlayer||!sourcePlayer)return;
  if(pendingResumeSeconds==null){
   pendingResumeSeconds=readSavedCheckpoint();
   if(pendingResumeSeconds==null){resumeApplied=true;return}
  }
- if(seekWatchalongToHost(pendingResumeSeconds)){
+ const target=pendingResumeSeconds;
+ if(!seekWatchalongToHost(target))return;
+ setTimeout(()=>{
+  if(resumeApplied||!resumeClockApplied(target))return;
   resumeApplied=true;
-  if(resumeStatus)resumeStatus.textContent='繼續上次位置 '+clock(pendingResumeSeconds);
- }
+  if(resumeStatus)resumeStatus.textContent='繼續上次位置 '+clock(target);
+ },120);
 }
 function startCheckpointLoop(){
  if(checkpointTimer)return;
  checkpointTimer=setInterval(()=>{if(!document.hidden)saveCheckpoint()},5000);
 }
 function refreshOffsetUi(){
- offsetValue.textContent=timelineAligned?'Offset '+(sourceOffsetSeconds>=0?'+':'')+sourceOffsetSeconds.toFixed(1)+'s':'尚未對齊';
+ offsetValue.textContent='Offset '+(userOffsetSeconds>=0?'+':'')+userOffsetSeconds.toFixed(1)+'s';
  offsetMinus.disabled=!timelineAligned;
  offsetPlus.disabled=!timelineAligned;
 }
-function setOffset(value,{persist=true}={}){
- sourceOffsetSeconds=Math.round((Number(value)||0)*10)/10;
+function setOffset(value){
+ userOffsetSeconds=Math.round((Number(value)||0)*10)/10;
  timelineAligned=true;
  refreshOffsetUi();
- if(persist){
-  const q=new URLSearchParams(location.search);q.set('offset',String(sourceOffsetSeconds));history.replaceState(null,'',location.pathname+'?'+q.toString());
- }
 }
 refreshOffsetUi();
 
@@ -332,7 +345,7 @@ function mobileStartSynchronizedPlayback(){
   source=sourcePlayer.getCurrentTime();
  }catch{return}
  if(!Number.isFinite(host)||!Number.isFinite(source))return;
- if(!timelineAligned)setOffset(source-host);
+ if(!timelineAligned)setOffset(source-host-segmentBaseOffsetSeconds);
  linkedPlayback.checked=true;
  refreshMobileControls();
  const expected=sourceExpectedTime(host);
@@ -403,12 +416,12 @@ document.querySelectorAll('[data-subtitle-mode]').forEach(button=>button.addEven
 refreshSubtitleModeUi();
 setMobilePrimary('source');
 refreshMobileControls();
-offsetMinus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds-1)};
-offsetPlus.onclick=()=>{if(timelineAligned)setOffset(sourceOffsetSeconds+1)};
+offsetMinus.onclick=()=>{if(timelineAligned)setOffset(userOffsetSeconds-1)};
+offsetPlus.onclick=()=>{if(timelineAligned)setOffset(userOffsetSeconds+1)};
 document.getElementById('captureOffset').onclick=()=>{
  try{
   const host=hostPlayer?.getCurrentTime?.(),source=sourcePlayer?.getCurrentTime?.();
-  if(Number.isFinite(host)&&Number.isFinite(source))setOffset(source-host);
+  if(Number.isFinite(host)&&Number.isFinite(source))setOffset(source-host-segmentBaseOffsetSeconds);
  }catch{}
 };
 pttShowFloor.onchange=()=>pttPanel.classList.toggle('ptt-floor-hidden',!pttShowFloor.checked);
@@ -476,7 +489,7 @@ document.addEventListener('fullscreenchange',()=>{
 
 function sourceExpectedTime(hostSeconds){
  if(!timelineAligned||!Number.isFinite(hostSeconds))return null;
- return hostSeconds+sourceOffsetSeconds;
+ return hostSeconds+segmentBaseOffsetSeconds+userOffsetSeconds;
 }
 function setSourceStandby(active){
  const next=Boolean(active);
@@ -505,12 +518,20 @@ function onHostStateChange(event){
   else if(event.data===YT.PlayerState.PAUSED)sourcePlayer.pauseVideo();
  }catch{}finally{setTimeout(()=>{suppressLinkedCommand=false},0)}
 }
+function youtubePlayerErrorLabel(code){
+ const labels={2:'無效影片參數',5:'播放器 HTML5 錯誤',100:'影片不存在或已設為私人',101:'影片禁止嵌入',150:'影片禁止嵌入'};
+ return labels[Number(code)]||('播放器錯誤 '+String(code??'unknown'));
+}
 function mountPlayers(){
  if(!window.YT?.Player)return;
  if(hostVideoId&&!hostPlayer){
   hostPlayer=new YT.Player('hostPlayer',{
    videoId:hostVideoId,playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
-   events:{onStateChange:onHostStateChange,onReady:()=>{hostStatus.textContent='已就緒';startSyncLoop();startCheckpointLoop();maybeApplyResume()}}
+   events:{
+    onStateChange:onHostStateChange,
+    onReady:()=>{hostPlayerReady=true;hostStatus.textContent='已就緒';startSyncLoop();startCheckpointLoop();maybeApplyResume()},
+    onError:event=>{hostPlayerReady=false;hostStatus.textContent=youtubePlayerErrorLabel(event?.data)}
+   }
   });
  }else if(!hostVideoId){
   hostStatus.textContent='缺少 Hololive 主影片';
@@ -524,7 +545,10 @@ function mountPlayers(){
   }
   sourcePlayer=new YT.Player('sourcePlayer',{
    videoId:sourceVideoId||undefined,playerVars:vars,
-   events:{onReady:()=>{sourceStatus.textContent=PLAYLIST_ID?'Playlist 已就緒':'片源已就緒';startSyncLoop();startSubtitleLoop();maybeApplyResume()}}
+   events:{
+    onReady:()=>{sourcePlayerReady=true;sourceStatus.textContent=PLAYLIST_ID?'Playlist 已就緒':'片源已就緒';startSyncLoop();startSubtitleLoop();maybeApplyResume()},
+    onError:event=>{sourcePlayerReady=false;sourceStatus.textContent=youtubePlayerErrorLabel(event?.data)}
+   }
   });
  }else if(!sourceVideoId&&!PLAYLIST_ID){
   sourceStatus.textContent='缺少 YouTube 片源';
@@ -674,7 +698,7 @@ function jumpToSegmentIndex(index){
    sourcePlayer?.loadVideoById?.({videoId:segment.sourceVideoId,startSeconds:Math.max(0,segment.source)});
   }else sourcePlayer?.seekTo?.(Math.max(0,segment.source),true);
  }catch{}
- setOffset(segment.source-segment.host,{persist:!STATIC_EVENT_MODE});
+ setSegmentBaseOffset(segment.source-segment.host);
  renderSegments();
  if(linkedPlayback.checked){try{hostPlayer?.playVideo?.();sourcePlayer?.playVideo?.()}catch{}}
 }
@@ -734,12 +758,12 @@ function applyStaticSegment(index,{seek=true}={}){
  if(!STATIC_EVENT_MODE||index<0||index>=segments.length)return;
  activeSegmentIndex=index;
  const segment=segments[index];
- const offset=segment.source-segment.host;
- setOffset(offset,{persist:false});
+ const baseOffset=segment.source-segment.host;
+ setSegmentBaseOffset(baseOffset);
  renderSegments();
  if(!sourcePlayer)return;
  const hostNow=(()=>{try{return hostPlayer?.getCurrentTime?.()}catch{return null}})();
- const target=Number.isFinite(hostNow)?hostNow+offset:segment.source;
+ const target=Number.isFinite(hostNow)?sourceExpectedTime(hostNow):segment.source+userOffsetSeconds;
  try{
   if(segment.sourceVideoId&&segment.sourceVideoId!==activeSourceVideoId){
    activeSourceVideoId=segment.sourceVideoId;
@@ -775,7 +799,7 @@ async function loadReadOnlyArtifacts(){
   const initialSegment=segments[activeSegmentIndex]||segments[0];
   sourceVideoId=validVideoId(initialSegment.sourceVideoId)||sourceVideoId;
   activeSourceVideoId=sourceVideoId;
-  setOffset(initialSegment.source-initialSegment.host,{persist:false});
+  setSegmentBaseOffset(initialSegment.source-initialSegment.host);
   renderSegments();
 
   staticArtifactsReady=true;
