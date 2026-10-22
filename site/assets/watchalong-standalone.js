@@ -19,6 +19,9 @@ const workspace=document.getElementById('watchalongWorkspace');
 const linkedPlayback=document.getElementById('linkedPlayback');
 const offsetValue=document.getElementById('offsetValue');
 const hostStatus=document.getElementById('hostStatus');
+const hostMuteToggle=document.getElementById('hostMuteToggle');
+const hostVolume=document.getElementById('hostVolume');
+const hostVolumeValue=document.getElementById('hostVolumeValue');
 const sourceStatus=document.getElementById('sourceStatus');
 const pttPanel=document.getElementById('pttPanel');
 const pttTitle=document.getElementById('pttTitle');
@@ -143,6 +146,38 @@ function watchalongHostAccent(row){
 function applyWatchalongHostAccent(row){
  document.documentElement.style.setProperty('--watchalong-host-accent',watchalongHostAccent(row));
 }
+function refreshHostVolumeUi(){
+ let volume=Number(hostVolume?.value)||0,muted=false;
+ try{
+  const current=hostPlayer?.getVolume?.();
+  if(Number.isFinite(current))volume=Math.max(0,Math.min(100,Math.round(current)));
+  muted=Boolean(hostPlayer?.isMuted?.());
+ }catch{}
+ if(hostVolume)hostVolume.value=String(volume);
+ if(hostVolumeValue)hostVolumeValue.textContent=volume+'%';
+ if(hostMuteToggle){
+  hostMuteToggle.textContent=muted||volume===0?'🔇':'🔊';
+  hostMuteToggle.setAttribute('aria-pressed',String(muted));
+ }
+}
+function setHostVolume(value){
+ const volume=Math.max(0,Math.min(100,Math.round(Number(value)||0)));
+ try{
+  hostPlayer?.setVolume?.(volume);
+  if(volume>0&&hostPlayer?.isMuted?.())hostPlayer.unMute?.();
+ }catch{}
+ if(hostVolume)hostVolume.value=String(volume);
+ if(hostVolumeValue)hostVolumeValue.textContent=volume+'%';
+ refreshHostVolumeUi();
+}
+hostVolume?.addEventListener('input',()=>setHostVolume(hostVolume.value));
+hostMuteToggle?.addEventListener('click',()=>{
+ try{
+  if(hostPlayer?.isMuted?.())hostPlayer.unMute?.();
+  else hostPlayer?.mute?.();
+ }catch{}
+ refreshHostVolumeUi();
+});
 function syncPttFromHostNow(){
  if(!hostPlayer||!hostWindow||!pttRows.length)return false;
  try{
@@ -542,7 +577,7 @@ function mountPlayers(){
    videoId:hostVideoId,playerVars:{playsinline:1,rel:0,enablejsapi:1,origin:location.origin},
    events:{
     onStateChange:onHostStateChange,
-    onReady:()=>{hostPlayerReady=true;hostStatus.textContent='已就緒';startSyncLoop();startCheckpointLoop();maybeApplyResume()},
+    onReady:()=>{hostPlayerReady=true;hostStatus.textContent='已就緒';refreshHostVolumeUi();startSyncLoop();startCheckpointLoop();maybeApplyResume()},
     onError:event=>{hostPlayerReady=false;hostStatus.textContent=youtubePlayerErrorLabel(event?.data)}
    }
   });
