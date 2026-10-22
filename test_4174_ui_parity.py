@@ -1388,5 +1388,13 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_watchalong_translation_danmaku_uses_slower_readable_pacing(self):
+        js=(ROOT/'site/assets/watchalong-standalone.js').read_text(encoding='utf-8')
+
+        self.assertIn("const duration=Math.max(9,Math.min(18,9+text.length*0.09));",js)
+        self.assertNotIn("const duration=Math.max(6,Math.min(12,6+text.length*0.06));",js)
+
+
+
 if __name__ == "__main__":
     unittest.main()
