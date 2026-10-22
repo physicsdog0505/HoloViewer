@@ -1,6 +1,13 @@
 {
   "name": "holoviewer-public",
   "compatibility_date": "2026-10-16",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "holodocchi.com",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "../site",
     "not_found_handling": "single-page-application"
