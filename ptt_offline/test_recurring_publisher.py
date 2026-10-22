@@ -155,6 +155,14 @@ class RecurringPublisherTests(unittest.TestCase):
             self.assertEqual(delivered,[expected_article])
             self.assertTrue(result["backlog_may_remain"])
 
+    def test_read_only_recovery_keeps_live_pressure(self):
+        source="6"*64
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), patch("ptt_offline.recurring_publisher.run_live_once",return_value={"status":"READ_ONLY","eligible":12,"fresh_eligible":0,"retained_recovery_candidates":12}):
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",send=False,batch_cap=10,max_batches=1)
+        self.assertEqual(result["http_posts"],0)
+        self.assertTrue(result["backlog_may_remain"])
+        self.assertEqual(adaptive_interval(result),10)
+
     def test_adaptive_rotation_uses_ten_second_ticks_across_active_aids(self):
         def plan(_,article_id=None):
             return {"status":"READY","source_identity":str(article_id)*64}
