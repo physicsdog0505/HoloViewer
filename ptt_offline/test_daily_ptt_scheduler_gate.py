@@ -63,6 +63,8 @@ class DailyPttSchedulerGateTests(unittest.TestCase):
         self.assertFalse(body["restart_attempted"])
         self.assertEqual(called,[])
         self.assertFalse(body["downstream_authorized"])
+        self.assertEqual(body["handoff_status"],"BLOCKED_FOR_163_HANDOFF")
+        self.assertIn("authoritative-remote-tail-provenance-pending",body["handoff_blockers"])
         self.assertFalse(body["archive_ready"])
         self.assertEqual(body["failure_code"],"authoritative-tail-integration-pending")
 
@@ -86,6 +88,7 @@ class DailyPttSchedulerGateTests(unittest.TestCase):
         self.assertTrue(body["health_gate_passed"])
         self.assertEqual(body["resolved_live_frontier"],210)
         self.assertFalse(body["downstream_authorized"])
+        self.assertEqual(body["handoff_status"],"BLOCKED_FOR_163_HANDOFF")
         receipt=self.state/"collector-health"/"2026-10-21.json"
         self.assertTrue(receipt.is_file())
 
@@ -104,6 +107,8 @@ class DailyPttSchedulerGateTests(unittest.TestCase):
         self.assertEqual(body["restart_result"],"ALIVE_UNHEALTHY_NO_RECOVERY_CHANNEL")
         self.assertFalse(body["health_gate_passed"])
         self.assertFalse(body["archive_ready"])
+        self.assertEqual(body["handoff_status"],"BLOCKED_FOR_163_HANDOFF")
+        self.assertIn("collector-health-gate-not-passed",body["handoff_blockers"])
         self.assertEqual(body["failure_code"],"collector-health-not-restored")
 
     def test_failed_dead_recovery_fails_closed_before_downstream(self):
@@ -118,6 +123,7 @@ class DailyPttSchedulerGateTests(unittest.TestCase):
         self.assertEqual(body["restart_result"],"FAILED")
         self.assertFalse(body["health_gate_passed"])
         self.assertFalse(body["downstream_authorized"])
+        self.assertEqual(body["handoff_status"],"BLOCKED_FOR_163_HANDOFF")
         self.assertFalse(body["archive_ready"])
         self.assertEqual(body["safety"]["restart_attempts"],1)
 
