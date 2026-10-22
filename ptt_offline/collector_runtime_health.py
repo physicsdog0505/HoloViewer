@@ -117,6 +117,7 @@ def read_collector_health(
         "managed":status.get("managed"),
         "pid":pid,
         "run_id":status.get("run_id"),
+        "heartbeat_timestamp":updated_at,
         "heartbeat_age_seconds":heartbeat_age,
         "refresh_age_seconds":refresh_age,
         "evidence":{
