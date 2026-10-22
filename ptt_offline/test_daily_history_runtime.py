@@ -172,6 +172,13 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
                 "content":"expected day",
             },
             {
+                "aid":carry,"source_line":51,"source_record_key":"carry:51",
+                "floor":51,"floor_quality":"per-thread-ordinal",
+                "occurred_at":"2026-10-20T01:30:00Z",
+                "source_url":"https://www.ptt.cc/bbs/C_Chat/M.1792430000.A.020.html",
+                "content":"late but still same direct predecessor",
+            },
+            {
                 "aid":adjacent,"source_line":3,"source_record_key":"adjacent:3",
                 "floor":1,"floor_quality":"per-thread-ordinal",
                 "occurred_at":"2026-10-20T03:00:00Z",
@@ -184,12 +191,12 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
         body=json.loads(raw)
         self.assertEqual(
             [row["source_record_key"] for row in body["pushes"]],
-            ["carry:50","day:2"],
+            ["carry:50","day:2","carry:51"],
         )
         self.assertEqual(body["pushes"][0]["day_membership"],
                          "direct-predecessor-cross-midnight")
         self.assertEqual(body["membership"]["direct_predecessor_aid"],carry)
-        self.assertEqual(body["membership"]["cross_midnight_carry_in_pushes"],1)
+        self.assertEqual(body["membership"]["cross_midnight_carry_in_pushes"],2)
         excluded={row["aid"]:row["reason"] for row in body["membership"]["excluded_aids"]}
         self.assertEqual(excluded[older],"superseded-predecessor")
         self.assertEqual(excluded[adjacent],"outside-authoritative-expected-thread-set")
