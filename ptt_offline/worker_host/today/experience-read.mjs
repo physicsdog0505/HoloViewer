@@ -8,6 +8,7 @@ const ARK=/(?<![a-z])ARK(?![a-z])|ホロARK|ロゼキャンARK|ホロ鯖ARK/i;
 const EXPLICIT=/#?ホロARK|ホロ鯖ARK|ロゼキャンARK/i;
 const STOPWORDS=new Set(['hololive','ホロライブ','live','配信','初見','雑談','vtuber','ホロドリ','holodream','コラボ','collab']);
 const MAX_HISTORY_ROWS=1000;
+const START_LABEL=/(?<month>\d{1,2})\/(?<day>\d{1,2})\s+(?<hour>\d{1,2}):(?<minute>\d{2})/;
 
 function json(body,status=200,age=30){
  return new Response(JSON.stringify(body),{status,headers:{
@@ -40,6 +41,17 @@ function taipeiDayWithSixHourRollover(value){
   timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'
  }).format(shifted);
 }
+function labelEventMonthDay(value){
+ const match=START_LABEL.exec(String(value??''));
+ if(!match?.groups)return null;
+ const month=Number(match.groups.month),day=Number(match.groups.day);
+ const hour=Number(match.groups.hour),minute=Number(match.groups.minute);
+ const d=new Date(Date.UTC(2000,month-1,day,hour,minute));
+ if(d.getUTCFullYear()!==2000||d.getUTCMonth()!==month-1||d.getUTCDate()!==day||
+    d.getUTCHours()!==hour||d.getUTCMinutes()!==minute)return null;
+ d.setUTCHours(d.getUTCHours()-6);
+ return {month:d.getUTCMonth()+1,day:d.getUTCDate()};
+}
 function normalizeStream(row,{state=null}={}){
  const video_id=VIDEO.test(row?.video_id??'')?row.video_id:null;
  if(!video_id)return null;
@@ -59,11 +71,14 @@ function normalizeStream(row,{state=null}={}){
   start_at:validTime(start_at)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null,
   actual_start:validTime(actual_start)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null,
   actual_end:validTime(actual_end)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null,
-  avatar_url:typeof row?.avatar_url==='string'?row.avatar_url:null
+  avatar_url:typeof row?.avatar_url==='string'?row.avatar_url:null,
+  start_label:typeof row?.start_label==='string'?row.start_label:''
  };
 }
 function titleTokens(stream){
- const text=(stream.title+' '+stream.source_label).toLowerCase();
+ // Provenance labels (e.g. "YouTube videos.list verified bootstrap") identify
+ // ingestion, not a shared collab topic. Match only viewer-facing titles.
+ const text=stream.title.toLowerCase();
  const tokens=new Set();
  for(const re of [/[a-z0-9]{4,}/g,/[ァ-ヶー]{4,}/g,/[一-龠]{3,}/g]){
   for(const match of text.matchAll(re)){
@@ -99,16 +114,39 @@ function eventPayload(candidate,allStreams){
 }
 export function detectCollabCandidates(input){
  const rows=input.map(x=>normalizeStream(x)).filter(Boolean);
- const eligible=rows.filter(s=>ARK.test(s.title+' '+s.source_label)&&EXPLICIT.test(s.title+' '+s.source_label)&&['live','ended','upcoming'].includes(s.lifecycle_state)&&s.start_at);
- eligible.sort((a,b)=>Date.parse(a.start_at)-Date.parse(b.start_at)||a.video_id.localeCompare(b.video_id));
- const byDay=new Map();
+ const eligible=rows.filter(s=>ARK.test(s.title+' '+s.source_label)&&EXPLICIT.test(s.title+' '+s.source_label)&&
+   ['live','ended','upcoming'].includes(s.lifecycle_state)&&(s.start_at||labelEventMonthDay(s.start_label)));
+ eligible.sort((a,b)=>{
+  if(Boolean(a.start_at)!==Boolean(b.start_at))return a.start_at?-1:1;
+  if(a.start_at&&b.start_at){
+   const diff=Date.parse(a.start_at)-Date.parse(b.start_at);
+   if(diff)return diff;
+  }
+  return a.video_id.localeCompare(b.video_id);
+ });
+ const byDay=new Map(),unresolved=[];
  for(const s of eligible){
-  const day=taipeiDayWithSixHourRollover(s.start_at);
+  const day=s.start_at?taipeiDayWithSixHourRollover(s.start_at):null;
   if(day)byDay.set(day,[...(byDay.get(day)??[]),s]);
+  else unresolved.push(s);
+ }
+ for(const s of unresolved){
+  const md=labelEventMonthDay(s.start_label);
+  if(!md)continue;
+  const matches=[...byDay.keys()].filter(day=>{
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return false;
+   const [,m,d]=day.split('-').map(Number);
+   return m===md.month&&d===md.day;
+  });
+  if(matches.length===1)byDay.set(matches[0],[...(byDay.get(matches[0])??[]),s]);
+  else{
+   const key=`fallback:${String(md.month).padStart(2,'0')}-${String(md.day).padStart(2,'0')}`;
+   byDay.set(key,[...(byDay.get(key)??[]),s]);
+  }
  }
  const out=[];
  const claimed=new Set();
- for(const [day,cluster] of byDay){
+ for(const [dayKey,cluster] of byDay){
   const byChannel=new Map();
   for(const s of cluster){
    const key=s.channel_id||s.channel_name;
@@ -117,6 +155,7 @@ export function detectCollabCandidates(input){
   if(byChannel.size>1){
    const ids=[...byChannel.values()].map(x=>x.video_id);
    ids.forEach(x=>claimed.add(x));
+   const day=dayKey.startsWith('fallback:')?dayKey.slice('fallback:'.length):dayKey;
    out.push({label:'ホロARK · 多人連動候選',video_ids:ids,confidence:'candidate',event_key:'ark',event_id:'ark:'+day});
   }
  }
@@ -145,8 +184,7 @@ export function detectCollabCandidates(input){
  for(const group of groups){
   const ids=remaining.filter(x=>group.has(x.video_id)).map(x=>x.video_id);
   if(ids.length>1){
-   const day=taipeiDayWithSixHourRollover(remaining.find(x=>x.video_id===ids[0])?.start_at)??'unknown';
-   out.push({label:'多人連動',video_ids:ids,confidence:'shared-topic',event_key:'shared-topic',event_id:'shared-topic:'+day+':'+[...ids].sort()[0]});
+   out.push({label:'多人連動',video_ids:ids,confidence:'shared-topic',event_key:'shared-topic',event_id:'shared-topic:'+[...ids].sort()[0]});
   }
  }
  return out.map(c=>eventPayload(c,rows));
