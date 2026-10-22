@@ -445,11 +445,17 @@ function handleCallKeyUp(event){
 }
 
 function playerHostId(stream){return 'viewer-player-'+String(stream?.videoId||'').replace(/[^A-Za-z0-9_-]/g,'')}
+function playerDisplayLabel(stream){
+ const label=String(stream?.label||'').trim();
+ const videoId=String(stream?.videoId||'').trim();
+ if(!label||label===videoId||/^[A-Za-z0-9_-]{11}$/.test(label))return '';
+ return label;
+}
 function createPlayerCard(index){
  const stream=streams[index];
  const card=node('section',undefined,'player-card');
  card.dataset.index=String(index);
- const label=node('div',stream.label,'player-label');
+ const label=node('div',playerDisplayLabel(stream),'player-label');
  const remove=node('button','×','player-remove');
  remove.type='button';
  remove.title='移除此直播';
@@ -716,7 +722,7 @@ function commitSingleStream(row,id){
  primaryIndex=0;
  audioMaster=0;
  const label=playerCards[0]?.querySelector('.player-label');
- if(label)label.textContent=streams[0].label;
+ if(label)label.textContent=playerDisplayLabel(streams[0]);
  renderControls();
  applyLayout();
  renderLiveRail(catalogRows);
