@@ -250,7 +250,14 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("function jumpToSegmentIndex(index)", js)
         self.assertIn("hostPlayer?.seekTo?.(Math.max(0,segment.host),true)", js)
         self.assertIn("sourcePlayer?.seekTo?.(Math.max(0,segment.source),true)", js)
-        self.assertIn("let timelineAligned=params.has('offset')", js)
+        # Share-time/URL timeline restore is intentionally parked. Watchalong
+        # segment alignment is internal; the user correction always starts at 0.
+        self.assertIn("let timelineAligned=false;", js)
+        self.assertIn("let segmentBaseOffsetSeconds=0;", js)
+        self.assertIn("let userOffsetSeconds=0;", js)
+        self.assertNotIn("params.has('offset')", js)
+        self.assertNotIn("params.get('t')", js)
+        self.assertNotIn("q.set('offset'", js)
         self.assertIn("if(!linkedPlayback.checked||!timelineAligned){setSourceStandby(false);return}", js)
         self.assertIn("if(!linkedPlayback.checked||!timelineAligned||!sourcePlayer||suppressLinkedCommand)return;", js)
         self.assertIn("localStorage.setItem('holoviewer-viewer-ptt-font'", js)
