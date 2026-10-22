@@ -77,8 +77,15 @@ def controlled_start_once(
     if not run_key or not isinstance(run_key,str):
         raise ContractError("recovery run_key required")
 
-    before=(health_probe or (lambda:read_collector_health(root)))()
-    if before.get("process_alive") is True and before.get("heartbeat_fresh") is True:
+    probe=health_probe or (lambda **kwargs:read_collector_health(root,**kwargs))
+    before=probe()
+    healthy_before=(
+        before.get("process_alive") is True
+        and before.get("heartbeat_fresh") is True
+        and before.get("live_context_valid") is True
+        and before.get("frontier_progressing") is True
+    )
+    if healthy_before:
         return {
             "schema_version":SCHEMA_VERSION,
             "run_key":run_key,
@@ -88,6 +95,14 @@ def controlled_start_once(
         }
     if before.get("phase")=="blocked":
         raise ContractError("collector blocked; automatic start forbidden")
+    if before.get("process_alive") is True:
+        return {
+            "schema_version":SCHEMA_VERSION,
+            "run_key":run_key,
+            "status":"ALIVE_UNHEALTHY_NO_RECOVERY_CHANNEL",
+            "attempted":False,
+            "collector_health_after":before,
+        }
 
     if receipt.exists():
         try:
@@ -98,12 +113,19 @@ def controlled_start_once(
             raise ContractError("collector recovery already attempted for run_key")
 
     cfg=load_recovery_config(config_path)
+    attempt_timestamp=time.time()
+    pre_attempt_pid=before.get("pid")
+    pre_attempt_run_id=before.get("run_id")
     attempt={
         "schema_version":SCHEMA_VERSION,
         "run_key":run_key,
         "attempted":True,
         "status":"ATTEMPTING",
-        "attempted_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "attempted_at":datetime.fromtimestamp(
+            attempt_timestamp,timezone.utc
+        ).isoformat(timespec="seconds"),
+        "pre_attempt_pid":pre_attempt_pid,
+        "pre_attempt_run_id":pre_attempt_run_id,
         "test_account":cfg["test_account"],
         # Deliberately omit username from receipt.
         "password_storage":"macOS-keychain-existing-entry",
@@ -125,12 +147,29 @@ def controlled_start_once(
     deadline=time.monotonic()+confirm_timeout_seconds
     after=None
     while time.monotonic()<deadline:
-        after=(health_probe or (lambda:read_collector_health(root)))()
+        try:
+            after=probe(refresh_after_timestamp=attempt_timestamp)
+        except TypeError:
+            after=probe()
+        new_identity=(
+            after.get("pid") is not None
+            and after.get("run_id") is not None
+            and (
+                after.get("pid")!=pre_attempt_pid
+                or after.get("run_id")!=pre_attempt_run_id
+            )
+        )
+        heartbeat_after_attempt=(
+            isinstance(after.get("heartbeat_age_seconds"),(int,float))
+            and after.get("heartbeat_age_seconds")>=0
+        )
         if (
             after.get("process_alive") is True
             and after.get("heartbeat_fresh") is True
             and after.get("live_context_valid") is True
             and after.get("frontier_progressing") is True
+            and new_identity
+            and heartbeat_after_attempt
         ):
             ok={
                 **attempt,
