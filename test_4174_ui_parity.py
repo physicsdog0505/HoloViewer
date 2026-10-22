@@ -1328,5 +1328,28 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_watchalong_animation_layout_has_stable_host_volume_control(self):
+        html=(ROOT / "site/watchalong-viewer/index.html").read_text(encoding="utf-8")
+        css=(ROOT / "site/assets/watchalong-standalone.css").read_text(encoding="utf-8")
+        js=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="hostMuteToggle"',html)
+        self.assertIn('id="hostVolume"',html)
+        self.assertIn('id="hostVolumeValue"',html)
+        self.assertIn('.watchalong-workspace.layout-source .host-volume-control{display:flex}',css)
+        self.assertIn('.host-volume-control input{width:86px',css)
+
+        self.assertIn("const hostVolume=document.getElementById('hostVolume');",js)
+        self.assertIn("function refreshHostVolumeUi()",js)
+        self.assertIn("function setHostVolume(value)",js)
+        self.assertIn("hostPlayer?.setVolume?.(volume);",js)
+        self.assertIn("hostPlayer?.mute?.();",js)
+        self.assertIn("hostPlayer.unMute?.();",js)
+        self.assertIn("hostVolume?.addEventListener('input'",js)
+        self.assertIn("hostMuteToggle?.addEventListener('click'",js)
+        self.assertNotIn("sourcePlayer?.setVolume?.(volume)",js)
+
+
+
 if __name__ == "__main__":
     unittest.main()
