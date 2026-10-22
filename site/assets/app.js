@@ -917,19 +917,19 @@ async function loadPtt(){
   if(!pttLastGoodCount&&pttCarryLoadedFor!==today){
    pttCarryLoadedFor=today;
    const previous=shiftDay(today,-1);
-   const carry=await api('/v1/ptt/today?day='+encodeURIComponent(previous)+'&limit=300').catch(()=>null);
+   const carry=await api('/v1/ptt/today?day='+encodeURIComponent(previous)+'&limit=1000').catch(()=>null);
    if(carry?.schema_version==='public-consumer-v1'&&Array.isArray(carry.pushes)){
     carryRows=carry.pushes.filter(row=>row&&typeof row.content==='string');
    }
   }
-  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+  const data=await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
   const todayRows=data.pushes.filter(row=>row&&typeof row.content==='string');
   const seenRows=new Set();
   const rows=[...carryRows,...todayRows].filter(row=>{
    const key=String(row.push_id||row.aid+':'+row.source_line);
    if(seenRows.has(key))return false;seenRows.add(key);return true;
-  }).slice(-300);
+  }).slice(-1000);
   const wasEmpty=!pttLastGoodCount;
   const nearBottom=pttFollowing||pttAtBottom();
   const previousScroll=list.scrollTop;
@@ -943,7 +943,7 @@ async function loadPtt(){
     const key=String(row.push_id||row.aid+':'+row.source_line);
     if(!seen.has(key)){list.append(pttRow(row));seen.add(key)}
    }
-   while(list.children.length>300)list.firstElementChild?.remove();
+   while(list.children.length>1000)list.firstElementChild?.remove();
   }
   pttLastGoodCount=list.children.length;pttLastGoodDay=today;
   const freshness=String(data.freshness?.status||'unknown');
