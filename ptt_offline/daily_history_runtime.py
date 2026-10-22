@@ -238,18 +238,64 @@ def make_repair_executor(config: dict[str,Any], *, day: str) -> Callable[[dict[s
     return execute
 
 
+def _source_thread_epoch(row: dict[str,Any]) -> datetime | None:
+    """Return authoritative article-post epoch from a canonical PTT source URL."""
+    source_url=row.get("source_url")
+    if not isinstance(source_url,str):
+        return None
+    match=re.search(r"/M\.([0-9]{9,11})\.A\.",source_url)
+    if not match:
+        return None
+    return datetime.fromtimestamp(int(match.group(1)),tz=timezone.utc)
+
+
+def _row_time(row: dict[str,Any]) -> datetime:
+    value=row.get("occurred_at")
+    if not isinstance(value,str):
+        raise DailyHistoryRuntimeError("daily source row occurred_at required")
+    try:
+        parsed=datetime.fromisoformat(value.replace("Z","+00:00"))
+    except ValueError as exc:
+        raise DailyHistoryRuntimeError("daily source row occurred_at invalid") from exc
+    if parsed.tzinfo is None:
+        raise DailyHistoryRuntimeError("daily source row occurred_at must be timezone-aware")
+    return parsed.astimezone(timezone.utc)
+
+
 def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
                                     expected_aids: set[str]) -> tuple[str,bytes]:
-    """Collapse verified hourly exporter payloads into one canonical Taipei-day object.
+    """Collapse exporter buckets into the canonical one-Taipei-day event partition.
 
-    The Collector/exporter remains free to use hourly buckets internally.  Static
-    Assets packaging uses one object per finalized Taipei day so partition size is
-    a publication concern rather than a source-storage concern.
+    Membership is not simply "all rows in the exporter window" and is not simply
+    "rows whose AID is in today's expected set".
+
+    Canonical membership:
+    1. every row must occur inside the exact Taipei calendar-day interval;
+    2. rows from the authoritative expected AIDs for this finalized day belong;
+    3. before the first expected thread starts, rows from exactly one direct
+       predecessor thread may belong.  That predecessor is the candidate with
+       the latest authoritative article-post epoch before the first expected
+       thread's article-post epoch;
+    4. older predecessor candidates are proven superseded by that direct
+       predecessor; unexpected threads at/after the first expected thread start
+       are outside the authoritative day/thread scope;
+    5. if an unexpected row cannot be classified with authoritative article-post
+       epochs, packaging fails closed instead of silently dropping it.
+
+    This preserves legal cross-midnight pushes from the previous evening thread
+    while excluding unrelated/adjacent threads deterministically.
     """
+    normalized_expected={str(aid).lstrip("#") for aid in expected_aids if str(aid).lstrip("#")}
+    if not normalized_expected:
+        raise DailyHistoryRuntimeError("daily source expected AID set required")
+
     day_start=datetime.fromisoformat(day).replace(tzinfo=TPE)
     day_end=day_start+timedelta(days=1)
-    pushes=[]
-    seen=set()
+    start_utc=day_start.astimezone(timezone.utc)
+    end_utc=day_end.astimezone(timezone.utc)
+
+    candidates=[]
+    thread_epochs: dict[str,datetime]={}
     for payload in payloads:
         rows=payload.get("pushes")
         if not isinstance(rows,list):
@@ -259,24 +305,87 @@ def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
                 raise DailyHistoryRuntimeError("invalid source push row")
             row=dict(raw)
             aid=str(row.get("aid") or "").lstrip("#")
-            if aid not in expected_aids:
-                raise DailyHistoryRuntimeError("daily source contains unexpected AID")
-            if row.get("floor") is None or row.get("floor_quality")!="per-thread-ordinal":
-                raise DailyHistoryRuntimeError("VERIFIED_COMPLETE archive requires authoritative per-thread floor")
-            identity=row.get("source_record_key")
-            if not isinstance(identity,str) or not identity:
-                raise DailyHistoryRuntimeError("daily source requires stable source_record_key")
-            if identity in seen:
-                raise DailyHistoryRuntimeError("duplicate source_record_key across daily source")
-            seen.add(identity)
-            row["coverage_day"]=day
-            row["coverage_status"]="COMPLETE"
-            row["finalized"]=True
-            pushes.append(row)
+            if not aid:
+                raise DailyHistoryRuntimeError("daily source row AID required")
+            occurred=_row_time(row)
+            if not start_utc<=occurred<end_utc:
+                raise DailyHistoryRuntimeError("daily exporter row outside Taipei-day partition")
+            epoch=_source_thread_epoch(row)
+            prior=thread_epochs.get(aid)
+            if epoch is not None:
+                if prior is not None and prior!=epoch:
+                    raise DailyHistoryRuntimeError("AID has inconsistent source thread epoch")
+                thread_epochs[aid]=epoch
+            candidates.append((aid,occurred,row))
+
+    expected_epochs=[thread_epochs[aid] for aid in normalized_expected if aid in thread_epochs]
+    unexpected_aids={aid for aid,_,_ in candidates if aid not in normalized_expected}
+    if unexpected_aids and not expected_epochs:
+        raise DailyHistoryRuntimeError(
+            "unexpected AID cannot be classified without expected thread epoch authority")
+    first_expected_epoch=min(expected_epochs) if expected_epochs else None
+
+    predecessor_aid=None
+    if unexpected_aids:
+        missing_epoch=sorted(aid for aid in unexpected_aids if aid not in thread_epochs)
+        if missing_epoch:
+            raise DailyHistoryRuntimeError(
+                "unexpected AID cannot be classified without source thread epoch")
+        predecessor_candidates=[
+            (epoch,aid) for aid,epoch in thread_epochs.items()
+            if aid in unexpected_aids and first_expected_epoch is not None
+            and epoch<first_expected_epoch
+        ]
+        if predecessor_candidates:
+            predecessor_aid=max(predecessor_candidates)[1]
+
+    pushes=[]
+    seen=set()
+    excluded_counts: dict[str,int]={}
+    excluded_reasons: dict[str,str]={}
+    carry_in_count=0
+    for aid,occurred,row in candidates:
+        include=False
+        membership_reason=None
+        if aid in normalized_expected:
+            include=True
+            membership_reason="expected-thread"
+        elif (predecessor_aid is not None and aid==predecessor_aid
+              and first_expected_epoch is not None and occurred<first_expected_epoch):
+            include=True
+            membership_reason="direct-predecessor-cross-midnight"
+            carry_in_count+=1
+        else:
+            epoch=thread_epochs.get(aid)
+            if epoch is None or first_expected_epoch is None:
+                raise DailyHistoryRuntimeError("unexpected AID membership is not provable")
+            if epoch<first_expected_epoch:
+                reason="superseded-predecessor"
+            else:
+                reason="outside-authoritative-expected-thread-set"
+            excluded_counts[aid]=excluded_counts.get(aid,0)+1
+            excluded_reasons[aid]=reason
+            continue
+
+        if row.get("floor") is None or row.get("floor_quality")!="per-thread-ordinal":
+            raise DailyHistoryRuntimeError(
+                "VERIFIED_COMPLETE archive requires authoritative per-thread floor")
+        identity=row.get("source_record_key")
+        if not isinstance(identity,str) or not identity:
+            raise DailyHistoryRuntimeError("daily source requires stable source_record_key")
+        if identity in seen:
+            raise DailyHistoryRuntimeError("duplicate source_record_key across daily source")
+        seen.add(identity)
+        row["coverage_day"]=day
+        row["coverage_status"]="COMPLETE"
+        row["finalized"]=True
+        row["day_membership"]=membership_reason
+        pushes.append(row)
+
     if not pushes:
         raise DailyHistoryRuntimeError("no archive pushes for finalized day")
     pushes.sort(key=lambda row:(
-        str(row.get("occurred_at") or ""),
+        _row_time(row),
         str(row.get("aid") or ""),
         int(row.get("source_line") or 0),
         str(row.get("source_record_key") or ""),
@@ -286,15 +395,30 @@ def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
         "precision":"minute",
         "timezone":"Asia/Taipei",
         "partition_kind":"taipei-day",
-        "partition_start":day_start.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"),
-        "partition_end":day_end.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"),
+        "partition_start":start_utc.isoformat(timespec="seconds").replace("+00:00","Z"),
+        "partition_end":end_utc.isoformat(timespec="seconds").replace("+00:00","Z"),
         "coverage_day":day,
         "coverage_status":"COMPLETE",
         "finalized":True,
+        "membership":{
+            "rule":"taipei-day-expected-plus-direct-predecessor-v1",
+            "expected_aids":sorted(normalized_expected),
+            "direct_predecessor_aid":predecessor_aid,
+            "first_expected_thread_start":(
+                first_expected_epoch.isoformat(timespec="seconds").replace("+00:00","Z")
+                if first_expected_epoch is not None else None
+            ),
+            "cross_midnight_carry_in_pushes":carry_in_count,
+            "excluded_aids":[{
+                "aid":aid,
+                "pushes":excluded_counts[aid],
+                "reason":excluded_reasons[aid],
+            } for aid in sorted(excluded_counts)],
+            "silent_drop":False,
+        },
         "pushes":pushes,
     }
     return "day.json",_canonical_bytes(payload)
-
 
 def _daily_source_objects(*, source: Path, day: str, work_dir: Path,
                           expected_aids: set[str]) -> list[tuple[str,bytes]]:
