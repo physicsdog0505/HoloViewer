@@ -1354,5 +1354,27 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_watchalong_landing_cards_expose_youtube_without_hijacking_primary_action(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+
+        self.assertIn("youtube.dataset.youtubeHref='https://www.youtube.com/watch?v='+videoId",js)
+        self.assertIn("youtube.textContent='YouTube ↗'",js)
+        self.assertIn("event.target.closest('[data-youtube-href]')",js)
+        self.assertIn("window.open(youtube.dataset.youtubeHref,'_blank','noopener,noreferrer')",js)
+        self.assertIn(".watchalong-card-actions{",css)
+        self.assertIn(".watchalong-youtube-link{",css)
+
+    def test_watchalong_compact_cards_clamp_text_before_stacking(self):
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
+
+        self.assertIn("-webkit-line-clamp:3",css)
+        self.assertIn("@media(max-width:1180px){",css)
+        self.assertIn("-webkit-line-clamp:2",css)
+        self.assertIn("@media(max-width:980px){",css)
+        self.assertIn(".watchalong-compact-card{grid-template-columns:1fr}",css)
+
+
+
 if __name__ == "__main__":
     unittest.main()
