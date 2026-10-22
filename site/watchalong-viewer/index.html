@@ -80,6 +80,11 @@
       <section class="host-stack">
         <article class="video-card host-card">
           <div class="video-label"><strong>Hololive</strong><span id="hostStatus">判定中</span></div>
+          <div class="host-volume-control" aria-label="Hololive 音量">
+            <button id="hostMuteToggle" type="button" aria-label="切換 Hololive 靜音" title="切換 Hololive 靜音">🔊</button>
+            <input id="hostVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Hololive 音量">
+            <output id="hostVolumeValue" for="hostVolume">100%</output>
+          </div>
           <button id="mobileSwapHost" class="mobile-swap-button" type="button" aria-label="將 Hololive 切到主畫面">切到主畫面</button>
           <div id="hostPlayer" class="player-host"></div>
         </article>
