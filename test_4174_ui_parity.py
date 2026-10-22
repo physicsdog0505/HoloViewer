@@ -1337,7 +1337,10 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('id="hostVolume"',html)
         self.assertIn('id="hostVolumeValue"',html)
         self.assertIn('.watchalong-workspace.layout-source .host-volume-control{display:flex}',css)
-        self.assertIn('.host-volume-control input{width:86px',css)
+        self.assertIn('.host-volume-label{font-size:10px',css)
+        self.assertIn('.host-volume-control input{flex:1 1 auto',css)
+        self.assertNotIn('position:absolute;right:8px;top:8px',css)
+        self.assertLess(html.index('</article>'),html.index('class="host-volume-control"'))
 
         self.assertIn("const hostVolume=document.getElementById('hostVolume');",js)
         self.assertIn("function refreshHostVolumeUi()",js)
