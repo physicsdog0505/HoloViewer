@@ -28,9 +28,11 @@ CREATE INDEX IF NOT EXISTS public_collab_events_history
   ON public_collab_events(event_date,is_current,start_at DESC);
 
 CREATE TABLE IF NOT EXISTS public_collab_projection_meta (
-  singleton INTEGER PRIMARY KEY CHECK (singleton=1),
+  projection_key TEXT PRIMARY KEY NOT NULL,
   source_revision TEXT NOT NULL,
   published_at TEXT NOT NULL,
+  range_start TEXT NOT NULL,
+  range_end TEXT NOT NULL,
   source_event_count INTEGER NOT NULL,
   effective_event_count INTEGER NOT NULL
 );
