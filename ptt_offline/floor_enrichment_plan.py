@@ -18,6 +18,7 @@ from pathlib import Path
 from .audit_baseline_gap import _norm_aid
 from .collector_source_preview import open_source
 from .live_capture_publisher import inspect_latest_article
+from .d1_publisher import canonical_record
 from .public_today_contract import ContractError
 
 
@@ -58,6 +59,14 @@ def build_plan(*,source,aid,remote_json,batch_cap=10):
         if article is None:
             raise ContractError("AID not found in Collector source")
         current=inspect_latest_article(db,article_id=article)
+        raw_keys=("source_line","source_page","kind","author","content","ptt_date","ptt_time","collected_at")
+        raw_by_line={
+            row[0]:dict(zip(raw_keys,row))
+            for row in db.execute("""
+                SELECT source_line,source_page,kind,author,content,ptt_date,ptt_time,collected_at
+                FROM pushes WHERE article_id=? ORDER BY source_line
+            """,(article,)).fetchall()
+        }
     if not current.get("floor_authoritative"):
         raise ContractError("Collector article-start coverage is insufficient for floor authority")
 
@@ -77,8 +86,28 @@ def build_plan(*,source,aid,remote_json,batch_cap=10):
         seen.add(line)
         local=ready.get(line)
         if local is None:
-            skipped_noncanonical+=1
-            continue
+            # Floor enrichment is allowed for an already-existing remote row
+            # even when that row is no longer live-publish eligible. Rebuild
+            # its canonical identity from Collector raw content plus the
+            # remote persisted occurred_at, then require exact identity parity.
+            raw=raw_by_line.get(line)
+            remote_occurred_at=remote_row.get("occurred_at")
+            if raw is None or not isinstance(remote_occurred_at,str):
+                skipped_noncanonical+=1
+                continue
+            local=canonical_record({
+                **raw,
+                "aid":wanted,
+                "source_url":current["url"],
+                "occurred_at":remote_occurred_at,
+                "origin":"collector",
+                "source_record_key":f"{wanted}:{line}",
+                "floor":None,
+            })
+            if (not isinstance(remote_row.get("push_id"),str)
+                or not isinstance(remote_row.get("source_record_key"),str)):
+                skipped_noncanonical+=1
+                continue
         expected_floor=floor_map.get(line)
         if type(expected_floor) is not int or expected_floor<1:
             raise ContractError("authoritative floor missing for canonical row")
