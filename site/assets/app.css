@@ -365,7 +365,10 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .watchalong-card-avatar{width:30px;height:30px;flex:0 0 30px;border-radius:50%;display:grid;place-items:center;padding:2px;background:color-mix(in srgb,var(--watch-card-accent) 10%,white);border:2px solid var(--watch-card-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--watch-card-accent) 15%,transparent);overflow:hidden}
 .watchalong-card-avatar .channel-avatar-img,.watchalong-card-avatar .channel-avatar-fallback,.watchalong-avatar-fallback{width:100%;height:100%;border-radius:50%;object-fit:cover;display:grid;place-items:center;font-size:10px;font-weight:900;color:var(--watch-card-accent);background:color-mix(in srgb,var(--watch-card-accent) 9%,white)}
 .watchalong-card-host{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.watchalong-static-action{margin-top:auto;color:var(--watch-card-accent);font-size:12px;font-weight:850}
+.watchalong-static-action{color:var(--watch-card-accent);font-size:12px;font-weight:850}
+.watchalong-card-actions{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.watchalong-youtube-link{flex:0 0 auto;color:var(--muted);font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}
+.watchalong-youtube-link:hover,.watchalong-youtube-link:focus-visible{color:var(--text);text-decoration:underline;outline:none}
 .watchalong-featured-section{position:relative;border-color:color-mix(in srgb,#4b97c8 18%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,#4b97c8 4%,white),var(--surface))}
 .watchalong-featured-head .eyebrow{display:inline-flex;margin-bottom:4px;color:#4b97c8}
 .watchalong-featured-card{border-width:1.5px}
@@ -374,13 +377,25 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .watchalong-compact-card{display:grid;grid-template-columns:minmax(150px,38%) 1fr;min-height:150px}
 .watchalong-compact-card .watchalong-static-thumb{height:100%;aspect-ratio:auto;min-height:150px}
 .watchalong-compact-card .watchalong-static-body{padding:12px 14px;gap:7px;justify-content:center}
-.watchalong-compact-card strong{font-size:14px;line-height:1.4}
+.watchalong-compact-card strong{
+ font-size:14px;line-height:1.4;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden
+}
 .watchalong-compact-card .watchalong-card-identity{gap:7px;font-size:11px}
 .watchalong-compact-card .watchalong-card-avatar{width:26px;height:26px;flex-basis:26px}
 .watchalong-compact-card .watchalong-static-action{font-size:11px}
+.watchalong-compact-card .watchalong-youtube-link{font-size:10px}
 .watchalong-featured-card{background:#fff}
-@media(max-width:1180px){.watchalong-compact-card{grid-template-columns:1fr}.watchalong-compact-card .watchalong-static-thumb{aspect-ratio:16/9;min-height:0}}
-
+@media(max-width:1180px){
+ .watchalong-compact-card .watchalong-static-body{padding:10px 11px;gap:6px}
+ .watchalong-compact-card strong{-webkit-line-clamp:2;font-size:13px;line-height:1.35}
+ .watchalong-compact-card .watchalong-static-meta{font-size:10px;gap:5px}
+ .watchalong-compact-card .watchalong-card-identity{font-size:10px}
+ .watchalong-compact-card .watchalong-card-actions{gap:7px}
+}
+@media(max-width:980px){
+ .watchalong-compact-card{grid-template-columns:1fr}
+ .watchalong-compact-card .watchalong-static-thumb{aspect-ratio:16/9;min-height:0}
+}
 @media(max-width:900px){.watchalong-static-grid{grid-template-columns:1fr}}
 
 .manual-shell{padding:20px}.manual-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;align-items:start}
