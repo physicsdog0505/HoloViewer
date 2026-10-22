@@ -1247,5 +1247,53 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);", js)
 
 
+    def test_watchalong_user_offset_resets_and_static_base_is_separate(self):
+        js=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let segmentBaseOffsetSeconds=0;",js)
+        self.assertIn("let userOffsetSeconds=0;",js)
+        self.assertIn("return hostSeconds+segmentBaseOffsetSeconds+userOffsetSeconds;",js)
+        self.assertIn("function setSegmentBaseOffset(value)",js)
+        self.assertIn("setSegmentBaseOffset(initialSegment.source-initialSegment.host);",js)
+        self.assertIn("setOffset(source-host-segmentBaseOffsetSeconds)",js)
+        self.assertNotIn("sourceOffsetSeconds",js)
+        self.assertNotIn("q.set('offset'",js)
+        self.assertNotIn("params.has('offset')",js)
+
+        # Production repro contract: episode 13 starts at host 737.92s,
+        # source starts at 0, and a fresh-page user correction is 0.
+        host=1235.0
+        base=0.0-737.92
+        user=0.0
+        expected=host+base+user
+        self.assertAlmostEqual(expected,497.08,places=2)
+        self.assertGreaterEqual(expected,0)
+
+    def test_watchalong_resume_waits_for_both_players_and_does_not_pause_host(self):
+        js=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let hostPlayerReady=false;",js)
+        self.assertIn("let sourcePlayerReady=false;",js)
+        self.assertIn("if(resumeApplied||!hostPlayerReady||!sourcePlayerReady||!hostPlayer||!sourcePlayer)return;",js)
+        self.assertIn("if(!hostPlayerReady||!sourcePlayerReady||!hostPlayer||!sourcePlayer||!Number.isFinite(seconds))return false;",js)
+        self.assertIn("resumeClockApplied(target)",js)
+        self.assertIn("onError:event=>{hostPlayerReady=false;hostStatus.textContent=youtubePlayerErrorLabel(event?.data)}",js)
+        self.assertIn("onError:event=>{sourcePlayerReady=false;sourceStatus.textContent=youtubePlayerErrorLabel(event?.data)}",js)
+        resume_start=js.index("function seekWatchalongToHost(seconds){")
+        resume_end=js.index("function resumeClockApplied",resume_start)
+        resume=js[resume_start:resume_end]
+        self.assertNotIn("hostPlayer.pauseVideo()",resume)
+
+    def test_watchalong_pre_segment_standby_never_pauses_host(self):
+        js=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        state_start=js.index("function onHostStateChange(event){")
+        state_end=js.index("function youtubePlayerErrorLabel",state_start)
+        state=js[state_start:state_end]
+        self.assertIn("if(Number.isFinite(host)&&sourceExpectedTime(host)<0){setSourceStandby(true);return}",state)
+        self.assertNotIn("hostPlayer.pauseVideo()",state)
+        standby_start=js.index("function setSourceStandby(active){")
+        standby_end=js.index("function onHostStateChange",standby_start)
+        standby=js[standby_start:standby_end]
+        self.assertNotIn("hostPlayer.pauseVideo()",standby)
+
+
 if __name__ == "__main__":
     unittest.main()
