@@ -1,7 +1,11 @@
 import unittest
 from unittest.mock import patch
 from contextlib import nullcontext
-from ptt_offline.recurring_publisher import main,run_snapshot,snapshot_interval,seconds_until_next_snapshot
+from collections import deque
+from ptt_offline.recurring_publisher import (
+    main,run_snapshot,snapshot_interval,seconds_until_next_snapshot,
+    adaptive_interval,rolling_budget_allows,rolling_totals,
+)
 from datetime import datetime
 import tempfile
 from pathlib import Path
@@ -35,6 +39,40 @@ class RecurringPublisherTests(unittest.TestCase):
                         "--interval-seconds","60",
                     ])
         snapshot.assert_called_once()
+
+
+    def test_adaptive_interval_is_10s_under_pressure_and_60s_when_idle(self):
+        self.assertEqual(adaptive_interval({"fresh_eligible":1}),10)
+        self.assertEqual(adaptive_interval({"sent":10}),10)
+        self.assertEqual(adaptive_interval({"backlog_may_remain":True}),10)
+        self.assertEqual(adaptive_interval({"sent":0,"fresh_eligible":0,"backlog_may_remain":False}),60)
+
+    def test_rolling_sixty_second_cap_blocks_seventh_batch_before_send(self):
+        window=deque((float(i*10),1,10,25,22) for i in range(6))
+        self.assertFalse(rolling_budget_allows(window,50.0))
+        totals=rolling_totals(window)
+        self.assertEqual(totals["batches"],6)
+        self.assertEqual(totals["rows"],60)
+        self.assertEqual(totals["modeled_queries"],150)
+        self.assertEqual(totals["modeled_writes"],132)
+        self.assertTrue(rolling_budget_allows(window,60.1))
+
+    def test_send_snapshot_reports_fresh_and_recovery_pressure(self):
+        source="6"*64
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",return_value={
+                 "status":"ACK","sent":10,"eligible":30,"fresh_eligible":8,
+                 "retained_recovery_candidates":30,"burst_safe_candidates":30,
+                 "legacy_baseline_candidates":0,"baseline_skipped_candidates":0,
+             }):
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=10,max_batches=1,burst_max_batches=1)
+        self.assertEqual(result["eligible"],30)
+        self.assertEqual(result["fresh_eligible"],8)
+        self.assertEqual(result["retained_recovery_candidates"],30)
+        self.assertEqual(result["http_posts"],1)
 
     def test_taipei_overnight_snapshot_boundaries(self):
         tpe=ZoneInfo("Asia/Taipei")
