@@ -1434,5 +1434,27 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_viewer_mobile_primary_layout_restores_sidebar_stage_grid(self):
+        css=(ROOT/'site/assets/viewer-standalone.css').read_text(encoding='utf-8')
+
+        self.assertIn(
+            ".viewer-workspace.workspace-focus.layout-primary,.viewer-workspace.workspace-sidebar.layout-primary{grid-template-columns:1fr;grid-template-rows:none}",
+            css,
+        )
+        self.assertIn(
+            ".viewer-workspace.workspace-focus.layout-primary .viewer-stage,.viewer-workspace.workspace-sidebar.layout-primary .viewer-stage{display:grid}",
+            css,
+        )
+        self.assertIn(
+            ".viewer-workspace.workspace-sidebar.layout-primary .viewer-stage .player-card.primary",
+            css,
+        )
+        self.assertIn(
+            ".viewer-workspace.workspace-focus.layout-primary .viewer-ptt,.viewer-workspace.workspace-sidebar.layout-primary .viewer-ptt{grid-column:1;grid-row:auto}",
+            css,
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()
