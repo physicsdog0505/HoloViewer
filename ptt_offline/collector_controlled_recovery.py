@@ -150,3 +150,33 @@ def controlled_start_once(
     }
     _atomic_json(receipt,uncertain)
     return uncertain
+
+
+def main() -> int:
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--collector-root",required=True)
+    parser.add_argument("--config",required=True)
+    parser.add_argument("--receipt",required=True)
+    parser.add_argument("--run-key",required=True)
+    args=parser.parse_args()
+    try:
+        body=controlled_start_once(
+            collector_root=args.collector_root,
+            config_path=args.config,
+            receipt_path=args.receipt,
+            run_key=args.run_key,
+        )
+    except Exception as exc:
+        print(json.dumps({
+            "schema_version":SCHEMA_VERSION,
+            "status":"FAILED",
+            "failure_code":type(exc).__name__,
+        },ensure_ascii=False,sort_keys=True))
+        return 2
+    print(json.dumps(body,ensure_ascii=False,sort_keys=True))
+    return 0 if body.get("status") in ("NOT_NEEDED","RECOVERED") else 3
+
+
+if __name__=="__main__":
+    raise SystemExit(main())
