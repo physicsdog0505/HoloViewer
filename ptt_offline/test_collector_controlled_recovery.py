@@ -57,6 +57,7 @@ class CollectorControlledRecoveryTests(unittest.TestCase):
                 "live_context_valid":True,"frontier_progressing":True,
                 "live_aid":"#new","frontier":12,"phase":"collecting",
                 "pid":33333,"run_id":"new",
+                "heartbeat_timestamp":1001.0,
                 "heartbeat_age_seconds":0.1,
             }
         body=controlled_start_once(
@@ -145,6 +146,7 @@ class CollectorControlledRecoveryTests(unittest.TestCase):
                 "phase":"collecting",
                 "pid":33333,
                 "run_id":"new",
+                "heartbeat_timestamp":1001.0,
                 "heartbeat_age_seconds":0.1,
             }
         body=controlled_start_once(
@@ -158,6 +160,57 @@ class CollectorControlledRecoveryTests(unittest.TestCase):
         self.assertEqual(body["status"],"STARTED_UNCONFIRMED")
         self.assertGreaterEqual(len(calls),2)
         self.assertIn("refresh_after_timestamp",calls[1])
+
+
+    @patch("ptt_offline.collector_controlled_recovery.time.time",return_value=1000.0)
+    def test_old_but_fresh_heartbeat_does_not_confirm_recovery(self, _now):
+        calls=[]
+        def probe(**kwargs):
+            calls.append(kwargs)
+            if len(calls)==1:
+                return {
+                    "process_alive":False,
+                    "heartbeat_fresh":False,
+                    "phase":"stopped",
+                    "pid":22222,
+                    "run_id":"old",
+                }
+            return {
+                "process_alive":True,
+                "heartbeat_fresh":True,
+                "live_context_valid":True,
+                "frontier_progressing":True,
+                "live_aid":"#new",
+                "frontier":12,
+                "phase":"collecting",
+                "pid":33333,
+                "run_id":"new",
+                "heartbeat_timestamp":999.5,
+                "heartbeat_age_seconds":0.5,
+            }
+        body=controlled_start_once(
+            collector_root=self.root,config_path=self.cfg,
+            receipt_path=self.receipt,run_key="2026-10-22",
+            health_probe=probe,
+            sleep=lambda _x:None,
+            confirm_timeout_seconds=1,
+            confirm_interval_seconds=0,
+        )
+        self.assertEqual(body["status"],"STARTED_UNCONFIRMED")
+
+    def test_unknown_dead_phase_is_not_restart_eligible(self):
+        with self.assertRaises(ContractError):
+            controlled_start_once(
+                collector_root=self.root,config_path=self.cfg,
+                receipt_path=self.receipt,run_key="2026-10-22",
+                health_probe=lambda **_kwargs:{
+                    "process_alive":False,
+                    "heartbeat_fresh":False,
+                    "phase":"unknown",
+                    "pid":None,
+                    "run_id":None,
+                },
+            )
 
 
 if __name__=="__main__":
