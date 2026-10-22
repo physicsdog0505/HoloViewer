@@ -93,7 +93,7 @@ class CollectorIntegrityExportTests(unittest.TestCase):
         self.assertEqual(body["source_coverage"]["status"],"REPAIR_NEEDED")
         self.assertEqual(body["source_coverage"]["missing_source_lines"],[5,6])
         self.assertIn(
-            "collector-screen-coverage-behind-final-source-line",
+            "collector-screen-coverage-behind-local-tail",
             body["contract_gaps"],
         )
 
