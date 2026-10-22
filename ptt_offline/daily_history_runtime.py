@@ -43,6 +43,7 @@ from .daily_static_assets_archive import (
     build_daily_static_package,
     compute_source_snapshot_hash,
     prepare_static_assets_delivery,
+    validate_finalization_receipt,
     verify_http_readback,
 )
 from .r2_archive_export import export_archive
@@ -632,6 +633,149 @@ def _reuse_verified_finalization(path: Path, current: dict[str,Any]) -> dict[str
     return current
 
 
+def run_packaging_acceptance(
+    *,
+    config: dict[str,Any],
+    day: str,
+    finalization_path: Path,
+    expected_contract_path: Path,
+) -> dict[str,Any]:
+    """Build one finalized Taipei-day package without re-running #48 completeness.
+
+    This is the Owner-local safe acceptance seam. It consumes already-finalized
+    #48 authority, reads the Collector SQLite only as an immutable archive source,
+    never invokes coverage classification/repair, and refuses deploy=true.
+    """
+    if config.get("deploy") is True:
+        raise DailyHistoryRuntimeError("packaging acceptance requires deploy=false")
+    if config.get("repair_enabled") is True:
+        raise DailyHistoryRuntimeError("packaging acceptance requires repair_enabled=false")
+
+    source: Path=config["_collector_path"]
+    state_root: Path=config["_state_path"]
+    state_root.mkdir(parents=True,exist_ok=True)
+
+    finalization=_load_json(finalization_path.expanduser())
+    try:
+        validate_finalization_receipt(finalization)
+    except Exception as exc:
+        raise DailyHistoryRuntimeError("fresh finalization receipt rejected") from exc
+    if finalization.get("day")!=day:
+        raise DailyHistoryRuntimeError("fresh finalization day mismatch")
+
+    expected=_load_json(expected_contract_path.expanduser())
+    if expected.get("schema_version")!="holoviewer-ptt-expected-aids-v1":
+        raise DailyHistoryRuntimeError("expected-AID contract schema mismatch")
+    if expected.get("day")!=day:
+        raise DailyHistoryRuntimeError("expected-AID contract day mismatch")
+    _validate_expected_contract_digest(expected)
+    if expected.get("status")!="COMPLETE":
+        raise DailyHistoryRuntimeError("expected-AID contract is not COMPLETE")
+
+    expected_rows=expected.get("expected")
+    if not isinstance(expected_rows,list):
+        raise DailyHistoryRuntimeError("expected-AID rows required")
+    expected_aids={
+        str(row.get("aid") or "").lstrip("#")
+        for row in expected_rows if isinstance(row,dict)
+    }
+    expected_aids.discard("")
+    finalized_expected={
+        str(aid).lstrip("#")
+        for aid in finalization["expected_set"]["expected_aids"]
+    }
+    if expected_aids!=finalized_expected:
+        raise DailyHistoryRuntimeError("fresh finalization/expected-AID set mismatch")
+    expected_digest=finalization["expected_set"].get("evidence_digest")
+    if expected_digest!=expected.get("evidence_digest"):
+        raise DailyHistoryRuntimeError("fresh finalization expected-set digest mismatch")
+
+    expected_epochs=_expected_thread_epochs(expected)
+    with tempfile.TemporaryDirectory(
+        prefix=f"holoviewer-packaging-{day}-",dir=state_root
+    ) as tmp:
+        source_objects=_daily_source_objects(
+            source=source,day=day,work_dir=Path(tmp),
+            expected_aids=finalized_expected,
+            expected_thread_epochs=expected_epochs,
+        )
+
+    public,_=ensure_static_root(
+        state_root=state_root,target=str(config["static_target"]))
+    source_revision=f"collector-finalized-{day}-post-authority-v1"
+    source_hash=compute_source_snapshot_hash(
+        finalization_receipt=finalization,
+        source_revision=source_revision,
+        source_objects=source_objects,
+    )
+    package=build_daily_static_package(
+        finalization_receipt=finalization,
+        source_revision=source_revision,
+        source_hash=source_hash,
+        source_objects=source_objects,
+        out_dir=public,
+    )
+    package_path=state_root/"archive"/day/"package.json"
+    _atomic_json(package_path,package)
+
+    if package.get("package_status")!="COMPLETE":
+        raise DailyHistoryRuntimeError("Static Assets package validation incomplete")
+    if package.get("object_count")!=1:
+        raise DailyHistoryRuntimeError("one Taipei day must package exactly one day.json")
+    objects=package.get("objects")
+    if not isinstance(objects,list) or len(objects)!=1:
+        raise DailyHistoryRuntimeError("one day.json package object required")
+    if objects[0].get("logical_key")!="day.json":
+        raise DailyHistoryRuntimeError("canonical daily object must be day.json")
+
+    day_object_path=public/str(objects[0]["key"])
+    if not day_object_path.is_file():
+        raise DailyHistoryRuntimeError("staged day.json missing")
+    day_payload=_load_json(day_object_path)
+    membership=day_payload.get("membership")
+    if not isinstance(membership,dict):
+        raise DailyHistoryRuntimeError("day.json membership audit missing")
+    excluded=membership.get("excluded_aids")
+    if not isinstance(excluded,list):
+        raise DailyHistoryRuntimeError("day.json excluded-AID audit missing")
+    # "unexpected" means unclassified data that survived packaging. A legal
+    # direct predecessor is classified carry-in and is reported separately.
+    classified_allowed=set(finalized_expected)
+    predecessor=membership.get("direct_predecessor_aid")
+    if isinstance(predecessor,str) and predecessor:
+        classified_allowed.add(predecessor.lstrip("#"))
+    packaged_aids={
+        str(row.get("aid") or "").lstrip("#")
+        for row in day_payload.get("pushes",[]) if isinstance(row,dict)
+    }
+    unexpected=sorted(aid for aid in packaged_aids if aid not in classified_allowed)
+    if unexpected:
+        raise DailyHistoryRuntimeError("unclassified unexpected AID survived day.json packaging")
+
+    return {
+        "status":"READY_TO_DEPLOY",
+        "day":day,
+        "finalization_digest":finalization["evidence_digest"],
+        "expected_set_digest":expected["evidence_digest"],
+        "expected_aids":sorted(finalized_expected),
+        "packaged_aids":sorted(packaged_aids),
+        "direct_predecessor_aid":predecessor,
+        "excluded_aids":excluded,
+        "unexpected_aids":unexpected,
+        "source_object_count":len(source_objects),
+        "object_count":package["object_count"],
+        "push_count":package["push_count"],
+        "manifest_digest":package["manifest"]["digest"],
+        "source_hash":package["source_hash"],
+        "package":str(package_path),
+        "day_json":str(day_object_path),
+        "package_validation":"PASS",
+        "repair_enabled":False,
+        "deploy":False,
+        "archive_deployed":False,
+    }
+
+
 def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any]:
     source: Path=config["_collector_path"]
     state_root: Path=config["_state_path"]
@@ -867,6 +1011,12 @@ def main(argv=None):
     run.add_argument("--config",required=True)
     run.add_argument("--day")
 
+    accept=sub.add_parser("accept-package")
+    accept.add_argument("--config",required=True)
+    accept.add_argument("--day",required=True)
+    accept.add_argument("--finalization",required=True)
+    accept.add_argument("--expected-contract",required=True)
+
     install=sub.add_parser("install-launchd")
     install.add_argument("--config",required=True)
     install.add_argument("--repo-root",required=True)
@@ -881,6 +1031,17 @@ def main(argv=None):
         print(json.dumps(result,ensure_ascii=False,sort_keys=True))
         if result["status"]=="NOT_ARCHIVE_READY":
             raise SystemExit(2)
+        return
+    if args.cmd=="accept-package":
+        config=load_config(Path(args.config).expanduser())
+        with _Lock(config["_state_path"]/"daily-history.lock"):
+            result=run_packaging_acceptance(
+                config=config,
+                day=args.day,
+                finalization_path=Path(args.finalization),
+                expected_contract_path=Path(args.expected_contract),
+            )
+        print(json.dumps(result,ensure_ascii=False,sort_keys=True))
         return
     if args.cmd=="install-launchd":
         path=install_launchd(
