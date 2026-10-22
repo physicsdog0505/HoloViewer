@@ -155,6 +155,30 @@ class RecurringPublisherTests(unittest.TestCase):
             self.assertEqual(delivered,[expected_article])
             self.assertTrue(result["backlog_may_remain"])
 
+    def test_adaptive_rotation_uses_ten_second_ticks_across_active_aids(self):
+        def plan(_,article_id=None):
+            return {"status":"READY","source_identity":str(article_id)*64}
+        observed=[]
+        for clock_value in (0,10,20,30):
+            delivered=[]
+            def publish(*args,**kwargs):
+                delivered.append(kwargs["article_id"])
+                return {"status":"ACK","sent":10,"eligible":20,"fresh_eligible":20,
+                        "retained_recovery_candidates":20,"burst_safe_candidates":20}
+            with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+                 patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1,2]), \
+                 patch("ptt_offline.recurring_publisher.inspect_latest_article",side_effect=plan), \
+                 patch("ptt_offline.recurring_publisher.run_live_once",side_effect=publish):
+                result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                    send=True,batch_cap=10,max_batches=1,burst_max_batches=1,
+                    max_articles=2,rotation_interval_seconds=10,
+                    clock=lambda v=clock_value:v)
+            self.assertEqual(result["http_posts"],1)
+            self.assertEqual(result["sent"],10)
+            self.assertEqual(len(delivered),1)
+            observed.append(delivered[0])
+        self.assertEqual(observed,[1,2,1,2])
+
     def test_query_model_matches_three_bounded_reads_per_batch(self):
         source="a"*64
         for sent,expected in [(1,7),(10,25),(25,55)]:
