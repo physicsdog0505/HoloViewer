@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PTT Static Assets offline browser check</title>
+<body data-status="running">running</body>
+<script>
+(async()=>{
+  try {
+    const manifestResponse=await fetch('/ptt/v1/manifests/static-assets-pilot.json',{cache:'no-cache'});
+    if(!manifestResponse.ok) throw new Error('manifest HTTP '+manifestResponse.status);
+    const manifest=await manifestResponse.json();
+    const item=manifest.objects[0];
+    const objectResponse=await fetch('/'+item.key,{cache:'no-cache'});
+    if(!objectResponse.ok) throw new Error('object HTTP '+objectResponse.status);
+    if(!objectResponse.headers.get('content-type')?.startsWith('application/json')) throw new Error('content-type');
+    // Static Assets stores canonical JSON. Cloudflare may negotiate transport
+    // compression, but Fetch exposes the decoded bytes hashed by the manifest.
+    const raw=new Uint8Array(await objectResponse.arrayBuffer());
+    const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',raw));
+    const actualSha=Array.from(hash,byte=>byte.toString(16).padStart(2,'0')).join('');
+    if(actualSha!==item.sha256) throw new Error('object SHA-256 mismatch');
+    const payload=JSON.parse(new TextDecoder().decode(raw));
+    if(!Array.isArray(payload.pushes)||payload.pushes.length!==item.pushes) throw new Error('push count');
+    document.body.dataset.status='pass';
+    document.body.textContent=JSON.stringify({status:'PASS',pushes:payload.pushes.length,sha256:actualSha});
+  } catch(error) {
+    document.body.dataset.status='fail';
+    document.body.textContent=String(error);
+  }
+})();
+</script>
