@@ -24,6 +24,7 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         body=run_orchestration(
             gate_command=["gate"],
             downstream_command=["archive"],
+            mode="production",
             command_runner=runner,
         )
 
@@ -47,6 +48,7 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         body=run_orchestration(
             gate_command=["gate"],
             downstream_command=["archive"],
+            mode="production",
             command_runner=runner,
         )
 
@@ -70,6 +72,7 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         body=run_orchestration(
             gate_command=["gate"],
             downstream_command=["archive"],
+            mode="production",
             command_runner=runner,
         )
 
@@ -95,6 +98,7 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         body=run_orchestration(
             gate_command=["gate"],
             downstream_command=["archive"],
+            mode="production",
             command_runner=runner,
         )
 
@@ -113,11 +117,47 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         body=run_orchestration(
             gate_command=["gate"],
             downstream_command=["archive"],
+            mode="production",
             command_runner=runner,
         )
         self.assertEqual(body["status"],"SUCCEEDED")
         self.assertEqual(body["downstream_status"],"READY_TO_DEPLOY")
 
+
+    def test_production_ready_to_deploy_fails_closed(self):
+        def runner(command):
+            if command==["gate"]:
+                return 0,{"day":"2026-10-21","health_gate_passed":True}
+            return 0,{"day":"2026-10-21","status":"READY_TO_DEPLOY"}
+
+        body=run_orchestration(
+            gate_command=["gate"],
+            downstream_command=["archive"],
+            mode="production",
+            command_runner=runner,
+        )
+        self.assertEqual(body["status"],"FAILED")
+        self.assertEqual(
+            body["failure_code"],"ready-to-deploy-not-valid-in-production")
+
+    def test_gate_and_downstream_day_mismatch_fails_closed(self):
+        def runner(command):
+            if command==["gate"]:
+                return 0,{"day":"2026-10-21","health_gate_passed":True}
+            return 0,{
+                "day":"2026-10-22",
+                "status":"VERIFIED_COMPLETE_PUBLISHED",
+            }
+
+        body=run_orchestration(
+            gate_command=["gate"],
+            downstream_command=["archive"],
+            mode="production",
+            command_runner=runner,
+        )
+        self.assertEqual(body["status"],"FAILED")
+        self.assertEqual(body["day"],"2026-10-21")
+        self.assertEqual(body["failure_code"],"gate-downstream-day-mismatch")
 
 if __name__=="__main__":
     unittest.main()
