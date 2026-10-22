@@ -1598,5 +1598,23 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_public_home_and_sections_use_clean_canonical_paths(self):
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+
+        self.assertIn('data-route="home" href="/"',html)
+        self.assertIn('data-route="history" href="/history"',html)
+        self.assertIn('data-route="watchalong" href="/watchalong"',html)
+        self.assertIn('data-route="single" href="/custom-view"',html)
+        self.assertIn('data-route="multi" href="/collab"',html)
+        self.assertIn("home:'/',history:'/history',single:'/custom-view',multi:'/collab'",js)
+        self.assertIn("watchalong:'/watchalong',ptt:'/ptt-today'",js)
+        self.assertIn("history.replaceState(null,'',sessionUrl)",js)
+        self.assertIn("const legacyHashRoute=['home','history','single','multi','watchalong']",js)
+        self.assertIn("location.pathname==='/'?'home':''",js)
+        self.assertNotIn(":'#'+r;",js)
+
+
+
 if __name__ == "__main__":
     unittest.main()
