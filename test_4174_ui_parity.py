@@ -1297,5 +1297,20 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertNotIn("hostPlayer.pauseVideo()",standby)
 
 
+    def test_watchalong_history_ptt_uses_month_aware_archive_config(self):
+        js=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        config=(ROOT / "site/assets/config.js").read_text(encoding="utf-8")
+        self.assertIn("const PTT_ARCHIVE_MONTHS=config.pttArchiveMonths||{};",js)
+        self.assertIn("function archiveSourceForMonth(month)",js)
+        self.assertIn("function archiveSourcesForWindow(startMs,endMs)",js)
+        self.assertIn("const cacheKey=source.base+source.manifest;",js)
+        self.assertIn("fetch(source.base+'/'+item.key",js)
+        self.assertNotIn("config.pttArchiveBase",js)
+        self.assertNotIn("config.pttArchiveManifest",js)
+        self.assertIn('pttArchiveMonths: Object.freeze({',config)
+        self.assertIn('"2026-10": Object.freeze({',config)
+
+
+
 if __name__ == "__main__":
     unittest.main()
