@@ -315,7 +315,13 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             )
             if not burst_safe:
                 return {**receipt,"status":"BURST_BLOCKED"}
-        selected=missing[:batch_cap]
+        # Near-live rows must not wait behind a recoverable <=2h FIFO backlog.
+        # Preserve source order within each lane, but give the <=3m lane first
+        # claim on the bounded batch. Any remaining slots continue draining
+        # recovery rows, so this changes priority rather than the D1 budget.
+        fresh=[row for row in missing if _fresh_for_burst(row,now=now)]
+        recovery=[row for row in missing if not _fresh_for_burst(row,now=now)]
+        selected=(fresh+recovery)[:batch_cap]
         rows=[]
         floor_map=plan.get("floor_by_source_line",{}) if plan.get("floor_authoritative") else {}
         for source_row in selected:
