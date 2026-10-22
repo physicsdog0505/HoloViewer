@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
+import subprocess
 import time
 from typing import Any
 
@@ -84,6 +85,7 @@ def read_collector_health(
 
     pid=status.get("pid")
     process_alive=False
+    process_state=None
     if type(pid) is int and pid>0:
         try:
             import os
@@ -91,7 +93,15 @@ def read_collector_health(
         except (OSError,ValueError):
             process_alive=False
         else:
-            process_alive=True
+            try:
+                result=subprocess.run(
+                    ["ps","-p",str(pid),"-o","stat="],
+                    capture_output=True,text=True,timeout=2,check=False,
+                )
+                process_state=result.stdout.strip().split()[0] if result.stdout.strip() else None
+            except (OSError,subprocess.SubprocessError):
+                process_state=None
+            process_alive=bool(process_state) and not process_state.startswith("Z")
 
     refresh_at=_parse_event_time(refresh.get("time_utc") if refresh else None)
     refresh_age=(current-refresh_at if refresh_at is not None else None)
@@ -116,6 +126,7 @@ def read_collector_health(
         "phase":status.get("phase"),
         "managed":status.get("managed"),
         "pid":pid,
+        "process_state":process_state,
         "run_id":status.get("run_id"),
         "heartbeat_timestamp":updated_at,
         "heartbeat_age_seconds":heartbeat_age,
