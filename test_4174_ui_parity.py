@@ -1297,13 +1297,19 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertNotIn("hostPlayer.pauseVideo()",standby)
 
 
-    def test_watchalong_history_ptt_uses_month_aware_archive_config(self):
+    def test_watchalong_history_ptt_uses_daily_coverage_with_month_routing(self):
         js=(ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
         config=(ROOT / "site/assets/config.js").read_text(encoding="utf-8")
         self.assertIn("const PTT_ARCHIVE_MONTHS=config.pttArchiveMonths||{};",js)
+        self.assertIn("function archiveCoverageDays(startMs,endMs)",js)
         self.assertIn("function archiveSourceForMonth(month)",js)
-        self.assertIn("function archiveSourcesForWindow(startMs,endMs)",js)
-        self.assertIn("const cacheKey=source.base+source.manifest;",js)
+        self.assertIn("function archiveDayCoverageStatus(manifest,day)",js)
+        self.assertIn("async function resolveArchiveDaySlice(day,rangeStart,rangeEnd)",js)
+        self.assertIn("async function loadPttDayWindowRows(day,startMs,endMs)",js)
+        self.assertIn("async function resolveCoverageDrivenWatchalongPtt(windowInfo)",js)
+        self.assertIn("if(!archive||archive.coverageStatus!=='COMPLETE')",js)
+        self.assertIn("'/v1/ptt/history?day='",js)
+        self.assertIn("const cacheKey=source.month+'|'+source.base+'|'+source.manifest;",js)
         self.assertIn("fetch(source.base+'/'+item.key",js)
         self.assertNotIn("config.pttArchiveBase",js)
         self.assertNotIn("config.pttArchiveManifest",js)
