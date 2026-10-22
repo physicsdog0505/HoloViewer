@@ -969,7 +969,7 @@ function replaceTimelinePovSource(index,resolved){
  stream.videoId=String(resolved.video_id);
  const row=collabRowFor(stream.videoId);
  stream.label=catalogName(row);
- const label=card?.querySelector('.player-label');if(label)label.textContent=stream.label;
+ const label=card?.querySelector('.player-label');if(label)label.textContent=playerDisplayLabel(stream);
  const oldHost=card?.querySelector('.player-host');oldHost?.remove();
  if(card){
   const host=node('div',undefined,'player-host');host.id=playerHostId(stream);card.append(host);
@@ -1314,7 +1314,7 @@ async function loadCatalog(){
    stream.channelId=String(row.channel_id||'');
    stream.avatarUrl=safeAvatar(row.avatar_url);
    const label=playerCards[index]?.querySelector('.player-label');
-   if(label)label.textContent=stream.label;
+   if(label)label.textContent=playerDisplayLabel(stream);
   });
   renderControls();
   renderLiveRail(rows);
