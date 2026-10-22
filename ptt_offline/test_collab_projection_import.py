@@ -1,3 +1,4 @@
+import hashlib
 import json
 import unittest
 
@@ -12,6 +13,9 @@ class CollabProjectionImportTests(unittest.TestCase):
             "event_key":"holoserver-hide-and-seek",
             "label":"#ホロ鯖かくれんぼ",
             "confidence":"explicit-event",
+            "event_date":"2026-10-22",
+            "event_start_at":"2026-10-22T10:00:00+00:00",
+            "event_end_at":"2026-10-22T11:15:00+00:00",
             "streams":[
                 {"video_id":"89kUA14-sCc"},
                 {"video_id":"Uy-KPheZe7U"},
@@ -20,13 +24,15 @@ class CollabProjectionImportTests(unittest.TestCase):
                 {"video_id":"mOeNtn8bn3A"},
             ],
         }
-        return {
+        doc={
             "schema_version":"public-collab-projection-v1",
-            "source_revision":"sha256:"+"a"*64,
+            "projection_key":"live",
+            "source_revision":"",
             "generated_at":"2026-10-22T17:00:00+00:00",
             "source_event_count":1,
             "effective_event_count":1,
             "source":{
+                "detection_version":"collab-event-v1",
                 "range_start":"2026-10-21T16:00:00+00:00",
                 "range_end":"2026-10-22T16:00:00+00:00",
             },
@@ -43,6 +49,16 @@ class CollabProjectionImportTests(unittest.TestCase):
                 "payload":payload,
             }],
         }
+        basis={
+            "projection_key":doc["projection_key"],
+            "range_start":doc["source"]["range_start"],
+            "range_end":doc["source"]["range_end"],
+            "detection_version":doc["source"]["detection_version"],
+            "events":doc["events"],
+        }
+        canonical=json.dumps(basis,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+        doc["source_revision"]="sha256:"+hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return doc
 
     def test_known_event_renders_canonical_upsert(self):
         doc=self.fixture()
@@ -55,6 +71,12 @@ class CollabProjectionImportTests(unittest.TestCase):
         doc=self.fixture()
         doc["events"][0]["review_status"]="rejected"
         with self.assertRaises(ValueError):
+            validate(doc)
+
+    def test_tampered_payload_fails_revision_check(self):
+        doc=self.fixture()
+        doc["events"][0]["payload"]["streams"][0]["video_id"]="AAAAAAAAAAA"
+        with self.assertRaisesRegex(ValueError,"source_revision mismatch"):
             validate(doc)
 
     def test_payload_identity_mismatch_fails_closed(self):
