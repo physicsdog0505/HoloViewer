@@ -235,11 +235,11 @@ function canonicalProjectionDb(){
   participant_count:5,
   pov_count:5,
   streams:[
-   {video_id:'89kUA14-sCc',channel_id:C1,channel_title:'水宮枢',lifecycle_state:'ended',actual_start:'2026-10-22T10:15:00+00:00',actual_end:'2026-10-22T11:15:00+00:00'},
-   {video_id:'Uy-KPheZe7U',channel_id:C2,channel_title:'宙科そぴあ',lifecycle_state:'ended',actual_start:'2026-10-22T10:15:00+00:00',actual_end:'2026-10-22T11:05:00+00:00'},
    {video_id:'bB5HkHSQWkI',channel_id:C3,channel_title:'熱千めら',lifecycle_state:'ended',actual_start:'2026-10-22T10:00:00+00:00',actual_end:'2026-10-22T11:00:00+00:00'},
    {video_id:'ihKbojqvGAk',channel_id:'UC'+'D'.repeat(22),channel_title:'百灯キョーコ',lifecycle_state:'ended',actual_start:'2026-10-22T10:05:00+00:00',actual_end:'2026-10-22T11:00:00+00:00'},
-   {video_id:'mOeNtn8bn3A',channel_id:'UC'+'E'.repeat(22),channel_title:'鈴鳴つづり',lifecycle_state:'ended',actual_start:'2026-10-22T10:10:00+00:00',actual_end:'2026-10-22T11:00:00+00:00'}
+   {video_id:'mOeNtn8bn3A',channel_id:'UC'+'E'.repeat(22),channel_title:'鈴鳴つづり',lifecycle_state:'ended',actual_start:'2026-10-22T10:10:00+00:00',actual_end:'2026-10-22T11:00:00+00:00'},
+   {video_id:'89kUA14-sCc',channel_id:C1,channel_title:'水宮枢',lifecycle_state:'ended',actual_start:'2026-10-22T10:15:00+00:00',actual_end:'2026-10-22T11:15:00+00:00'},
+   {video_id:'Uy-KPheZe7U',channel_id:C2,channel_title:'宙科そぴあ',lifecycle_state:'ended',actual_start:'2026-10-22T10:15:00+00:00',actual_end:'2026-10-22T11:05:00+00:00'}
   ]
  };
  const row={
@@ -297,10 +297,11 @@ test('Public collab live reads canonical projection and preserves canonical even
  assert.equal(body.events[0].review_status,'approved');
  assert.equal(body.events[0].streams.length,5);
  assert.equal(body.events[0].streams.some(x=>x.video_id==='89kUA14-sCc'),true);
- assert.equal(body.events[0].streams[0].channel_name,'水宮枢');
+ assert.equal(body.events[0].streams[0].channel_name,'熱千めら');
  assert.equal(body.events[0].sync.available,true);
  assert.equal(body.events[0].sync.basis,'youtube_actual_start');
- assert.equal(body.events[0].streams[0].sync_offset_ms,900000);
+ assert.equal(body.events[0].streams[0].sync_offset_ms,0);
+ assert.equal(body.events[0].streams.find(x=>x.video_id==='89kUA14-sCc').sync_offset_ms,900000);
 });
 
 test('Public collab history reads canonical projection instead of recomputing shared-topic',async()=>{
