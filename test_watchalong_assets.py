@@ -158,6 +158,20 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertIn("if(rewind){", standby_body)
         self.assertIn("sourcePlayer.seekTo(0,true)", standby_body)
 
+    def test_source_ended_event_latches_gap_without_waiting_for_poll(self):
+        source = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("function onSourceStateChange(event)", source)
+        self.assertIn("if(event?.data!==YT.PlayerState.ENDED)return;", source)
+        self.assertIn("maybeLatchSourceGap(host,YT.PlayerState.ENDED);", source)
+        self.assertIn("onStateChange:onSourceStateChange", source)
+
+        handler_start = source.index("function onSourceStateChange(event)")
+        handler_end = source.index("function youtubePlayerErrorLabel", handler_start)
+        handler = source[handler_start:handler_end]
+        self.assertNotIn("setInterval", handler)
+        self.assertNotIn("playVideo()", handler)
+        self.assertNotIn("seekTo(", handler)
+
     def test_subtitle_and_danmaku_layers_are_independent(self):
         html = (ROOT / "site/watchalong-viewer/index.html").read_text(encoding="utf-8")
         source = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
