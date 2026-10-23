@@ -56,6 +56,7 @@ jobs:
             ptt_offline.test_owner_publisher_once \
             ptt_offline.test_realtime_capture_candidate \
             ptt_offline.test_live_capture_publisher \
+            ptt_offline.test_publisher_recovery \
             ptt_offline.test_recurring_publisher \
             ptt_offline.test_publisher_telemetry \
             ptt_offline.test_data_lifecycle_evidence \
@@ -69,4 +70,4 @@ jobs:
       - name: Indexed PTT 1000-row capacity receipt (synthetic, offline only)
         run: python3 -B -m ptt_offline.capacity_probe
       - name: Cloudflare Worker pure offline regressions
-        run: node --experimental-default-type=module --test ptt_offline/test_d1_worker_freshness.mjs ptt_offline/test_api_shell_ptt_extension.mjs ptt_offline/test_d1_owner_writer.mjs ptt_offline/test_d1_owner_dispatch.mjs ptt_offline/test_ptt_owner_hmac.mjs ptt_offline/test_api_owner_shell_extension.mjs ptt_offline/test_owner_ptt_migration_preflight.mjs ptt_offline/test_full_ptt_api_composition.mjs ptt_offline/test_actual_composed_host_ptt.mjs ptt_offline/test_worker_host.mjs ptt_offline/test_worker_host_build.mjs ptt_offline/worker_host/today/experience-read.test.mjs
+        run: node --experimental-default-type=module --test ptt_offline/test_d1_owner_reconcile.mjs ptt_offline/test_d1_worker_freshness.mjs ptt_offline/test_api_shell_ptt_extension.mjs ptt_offline/test_d1_owner_writer.mjs ptt_offline/test_d1_owner_dispatch.mjs ptt_offline/test_ptt_owner_hmac.mjs ptt_offline/test_api_owner_shell_extension.mjs ptt_offline/test_owner_ptt_migration_preflight.mjs ptt_offline/test_full_ptt_api_composition.mjs ptt_offline/test_actual_composed_host_ptt.mjs ptt_offline/test_worker_host.mjs ptt_offline/test_worker_host_build.mjs ptt_offline/worker_host/today/experience-read.test.mjs
