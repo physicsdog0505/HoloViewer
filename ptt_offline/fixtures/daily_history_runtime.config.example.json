@@ -23,5 +23,6 @@
     "wrangler"
   ],
   "expected_timeout_seconds": 60,
-  "readback_timeout_seconds": 20
+  "readback_timeout_seconds": 20,
+  "lifecycle_v2_cutover_day": "2026-10-23"
 }
