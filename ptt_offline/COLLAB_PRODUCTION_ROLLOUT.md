@@ -2,9 +2,11 @@
 
 Status: REVIEWED SOURCE COMPOSITION / PRODUCTION MUTATION HOLD
 
-Exact candidate:
+Release candidate:
 - PR #197
-- HEAD: `e8bbbcb47a617c8bf521260a5febd1f7c575ed54`
+- execution must pin the exact HEAD explicitly approved by #45
+- do not reuse an earlier review receipt after the PR HEAD moves
+- verify with `git rev-parse HEAD` immediately before any Owner-local mutation
 
 Production baseline / rollback:
 - Worker: `holoviewer-public-api`
@@ -18,8 +20,10 @@ This packet does not authorize Production mutation.
 
 ## Gate A — exact source pin
 
-The Owner worktree must resolve exactly to the reviewed PR #197 HEAD.
-Any branch movement or dirty worktree is STOP.
+The Owner worktree must resolve exactly to the PR #197 HEAD named in the latest
+#45 Production mutation approval. Any mismatch, later branch movement, or dirty
+worktree is STOP. Source-composition review receipts for older HEADs are not
+deployment authorization for a newer HEAD.
 
 ## Gate B — active config preservation
 
