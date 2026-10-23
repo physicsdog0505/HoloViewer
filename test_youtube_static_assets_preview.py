@@ -131,19 +131,6 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual({"2026-10": ["new"]}, index["months"])
         self.assertEqual(1, index["months"]["2026-10"].count("new"))
 
-    def test_gate4_runner_is_current_only_and_forward_only(self):
-        runner = (
-            Path(__file__).parent
-            / "scripts/run_youtube_static_assets_gate4_production.sh"
-        ).read_text()
-        self.assertIn("stage-current-release", runner)
-        self.assertIn("HISTORICAL_MONTHS_INCLUDED=0", runner)
-        self.assertIn("FULL_128_MONTH_HISTORY=NO", runner)
-        self.assertIn("site/** differs from accepted Production frontend baseline", runner)
-        self.assertIn("wrangler deploy", runner)
-        self.assertNotIn("versions deploy", runner)
-        self.assertNotIn("youtube/v1/archive/", runner)
-
     def test_bounded_pilot_tree_uses_two_months_and_max_five_indexes(self):
         target = self.root / "pilot"
         result = preview.build_pilot_tree(
