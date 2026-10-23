@@ -85,6 +85,26 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(saved["status"],"REMOTE_UNCERTAIN")
             self.assertEqual(saved["last_recovery_error"],"ADMISSION_BUDGET_BLOCKED")
 
+    def test_legacy_uncertain_without_pending_envelope_is_quarantined(self):
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"state.json"
+            p.write_text(json.dumps({
+                "status":"REMOTE_UNCERTAIN",
+                "source_identity":"s"*64,
+                "accepted":{"1abc:9":"old"},
+                "pending_batch_id":"ptt48:legacy"
+            }),encoding="utf-8")
+            result=recover_pending_state(
+                p,
+                reconcile_executor=lambda _:self.fail("legacy state must not reconcile"),
+                publish_executor=lambda _:self.fail("legacy state must not replay"),
+                clock=lambda:100,
+            )
+            self.assertEqual(result["status"],"RECOVERY_QUARANTINED")
+            saved=json.loads(p.read_text())
+            self.assertEqual(saved["status"],"STOP_MANUAL")
+            self.assertEqual(saved["recovery_reason"],"LEGACY_OR_INVALID_PENDING_ENVELOPE")
+
     def test_partial_commit_quarantines_source(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"state.json"; b=self.state(p)
