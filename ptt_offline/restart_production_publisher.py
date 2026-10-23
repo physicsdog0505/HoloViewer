@@ -84,8 +84,10 @@ def process_command(pid: int) -> str:
 
 def assert_expected_process(pid: int):
     command=process_command(pid)
+    if "ptt_offline.publisher_service" in command:
+        raise SystemExit("Publisher is launchd-managed; use publisher_supervisor for service operations")
     if "ptt_offline.recurring_publisher" not in command:
-        raise SystemExit("PID does not look like the production recurring Publisher")
+        raise SystemExit("PID does not look like a recognized production Publisher")
     return command
 
 
