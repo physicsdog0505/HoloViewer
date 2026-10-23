@@ -378,10 +378,49 @@ class DailyHistoryRuntimeTests(unittest.TestCase):
             "expected_contract_path":str(expected),
             "static_target":"holoviewer-ptt-static-assets-pilot",
             "base_url":"https://example.invalid",
+            "lifecycle_v2_cutover_day":DAY,
             "deploy":deploy,
             "wrangler_command":["npx","wrangler"],
         }),encoding="utf-8")
         return config,state
+
+
+
+    def test_pre_cutover_day_is_immutable_and_skips_all_runtime_work(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path,_=self._config(Path(tmp),deploy=False)
+            body=json.loads(config_path.read_text(encoding="utf-8"))
+            body["lifecycle_v2_cutover_day"]="2026-10-23"
+            config_path.write_text(json.dumps(body),encoding="utf-8")
+            config=load_config(config_path)
+
+            with patch("ptt_offline.daily_history_runtime.load_expected_contract") as expected, \
+                 patch("ptt_offline.daily_history_runtime.coverage_from_collector") as coverage, \
+                 patch("ptt_offline.daily_history_runtime._daily_source_objects") as build, \
+                 patch("ptt_offline.daily_history_runtime._deploy_static_assets") as deploy:
+                result=run_closeout(config=config,day="2026-10-22")
+
+            self.assertEqual(result["status"],"PRE_CUTOVER_IMMUTABLE")
+            self.assertEqual(result["day"],"2026-10-22")
+            self.assertEqual(result["cutover_day"],"2026-10-23")
+            self.assertFalse(result["archive_deployed"])
+            expected.assert_not_called()
+            coverage.assert_not_called()
+            build.assert_not_called()
+            deploy.assert_not_called()
+
+    def test_cutover_day_is_allowed_to_enter_pure_v2_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path,_=self._config(Path(tmp),deploy=False)
+            body=json.loads(config_path.read_text(encoding="utf-8"))
+            body["lifecycle_v2_cutover_day"]="2026-10-23"
+            config_path.write_text(json.dumps(body),encoding="utf-8")
+            config=load_config(config_path)
+
+            with patch("ptt_offline.daily_history_runtime.load_expected_contract",
+                       side_effect=DailyHistoryRuntimeError("cutover-entered")):
+                with self.assertRaisesRegex(DailyHistoryRuntimeError,"cutover-entered"):
+                    run_closeout(config=config,day="2026-10-23")
 
     def test_load_config_rejects_missing_collector(self):
         with tempfile.TemporaryDirectory() as tmp:
