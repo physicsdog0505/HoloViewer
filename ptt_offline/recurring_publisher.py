@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from .collector_source_preview import open_source
 from .live_capture_publisher import active_article_ids,inspect_latest_article,run_live_once,state_for_source
-from .owner_http_transport import owner_signed_http_executor
+from .owner_http_transport import owner_signed_http_executor, owner_signed_reconcile_executor
 from .publisher_cli import exclusive_lock
 from .publisher_telemetry import update_publisher_telemetry
 from .public_today_contract import ContractError
@@ -71,7 +71,7 @@ def seconds_until_next_snapshot(now=None):
         target=local.replace(hour=next_minute//60,minute=next_minute%60,second=0,microsecond=0)
     return max(0,(target-local).total_seconds())
 
-def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=1,burst_max_batches=None,max_articles=4,rotation_interval_seconds=None):
+def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,reconcile_executor=None,clock=time.time,batch_cap=5,max_batches=1,burst_max_batches=None,max_articles=4,rotation_interval_seconds=None):
     if type(max_batches) is not int or not 1<=max_batches<=16:
         raise ContractError('invalid bounded batches per snapshot')
     if burst_max_batches is None:
@@ -121,7 +121,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                 state=state_for_source(state_dir,plan["source_identity"])
                 if not send:
                     result=run_live_once(db,state_path=state,secret=secret,
-                       executor=executor,send=False,batch_cap=batch_cap,article_id=article_id)
+                       executor=executor,reconcile_executor=reconcile_executor,send=False,batch_cap=batch_cap,article_id=article_id)
                     pending+=result.get("eligible",0)
                     # A budget-blocked adaptive tick probes without sending. Its
                     # recoverable backlog still requires 10s polling, even if
@@ -149,7 +149,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                 count=0
                 for _ in range(per_article_cap):
                     batch=run_live_once(db,state_path=state,secret=secret,
-                        executor=executor,send=True,batch_cap=batch_cap,article_id=article_id)
+                        executor=executor,reconcile_executor=reconcile_executor,send=True,batch_cap=batch_cap,article_id=article_id)
                     last_status=batch.get("status",last_status)
                     stale_fenced_rows+=batch.get("stale_fenced_rows",0)
                     pending+=batch.get("eligible",0)
@@ -195,7 +195,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     initial_burst_safe==initial_eligible):
                     while total_posts<burst_max_batches:
                         burst=run_live_once(db,state_path=state,secret=secret,
-                            executor=executor,send=True,batch_cap=batch_cap,
+                            executor=executor,reconcile_executor=reconcile_executor,send=True,batch_cap=batch_cap,
                             article_id=article_id,fresh_only=True)
                         stale_fenced_rows+=burst.get("stale_fenced_rows",0)
                         if burst.get("status")=="BURST_BLOCKED":
@@ -255,6 +255,7 @@ def main(argv=None):
     p.add_argument("--max-articles",type=int,default=4)
     p.add_argument("--approve-live-capture-policy",action="store_true")
     p.add_argument("--endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish")
+    p.add_argument("--reconcile-endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/reconcile")
     args=p.parse_args(argv)
     if not 0<=args.iterations<=1440:
         p.error("iterations must be 0 (continuous) or 1-1440")
@@ -279,6 +280,10 @@ def main(argv=None):
              secret=os.environ.get("PTT_PUBLISH_HMAC_SECRET",""),allow_write=True,
              max_rows=args.batch_cap,max_bytes=131072 if args.batch_cap>5 else 65536)
               if args.send else None)
+    reconcile_executor=(owner_signed_reconcile_executor(endpoint=args.reconcile_endpoint,
+             secret=os.environ.get("PTT_PUBLISH_HMAC_SECRET",""),allow_write=True,
+             max_rows=args.batch_cap,max_bytes=131072)
+              if args.send else None)
     metric=Path(args.metrics)
     metric.parent.mkdir(parents=True,exist_ok=True)
     telemetry=metric.parent/"publisher-telemetry.json"
@@ -296,7 +301,7 @@ def main(argv=None):
                 send_this_tick=args.send and not budget_blocked
                 effective_burst=(args.max_batches if args.adaptive_live_cadence else args.burst_max_batches)
                 result=run_snapshot(source=args.source,state_dir=args.state_dir,send=send_this_tick,
-                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches,
+                                    secret=proof_secret,executor=executor,reconcile_executor=reconcile_executor,batch_cap=args.batch_cap,max_batches=args.max_batches,
                                     burst_max_batches=effective_burst,max_articles=args.max_articles,
                                     rotation_interval_seconds=(LIVE_INTERVAL_SECONDS if args.adaptive_live_cadence else None))
                 posts=result.get("http_posts",0)
