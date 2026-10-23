@@ -152,7 +152,7 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         source_play = sync_body.index("sourcePlayer.playVideo()", gap_guard)
         self.assertLess(gap_guard, source_play)
 
-        standby_start = source.index("function setSourceStandby(active,{rewind=true}={})")
+        standby_start = source.index("function setSourceStandby(active){")
         standby_end = source.index("function onHostStateChange", standby_start)
         standby_body = source[standby_start:standby_end]
         self.assertIn("if(rewind){", standby_body)
