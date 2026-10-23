@@ -147,6 +147,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("return await loadYoutubeHistoryDay(day,offset,50)", js)
         self.assertIn("return api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+offset)", js)
         self.assertIn("data.source==='legacy-api'&&data.static_error", js)
+        self.assertIn("staticError?.code==='HISTORY_STATIC_UNAVAILABLE'", js)
+        self.assertIn("throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開')", js)
         self.assertNotIn("/objects/", js[js.index("const YOUTUBE_HISTORY_MANIFEST_PATH"):js.index("function historyChrome(){")])
 
     def test_custom_builder_matches_accepted_4174_controls(self):
