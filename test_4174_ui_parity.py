@@ -105,7 +105,8 @@ class ParityContract(unittest.TestCase):
         start=js.index('async function loadHistory(){')
         end=js.index('function collabEventState(event){',start)
         history=js[start:end]
-        self.assertIn("api('/v1/catalog/today').catch(()=>null)",history)
+        self.assertIn("requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null)",history)
+        self.assertIn("homeCatalogPromise=api('/v1/catalog/today')",js)
         self.assertIn("historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel)",history)
         # Display fallback is metadata-only; lifecycle still comes from /v1/history.
         self.assertNotIn("scheduled_start",history.split("historyDisplayRow",1)[0].split("lifecycle_state",1)[-1])
