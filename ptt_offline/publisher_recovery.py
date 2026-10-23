@@ -11,6 +11,7 @@ from pathlib import Path
 from .owner_http_transport import RemoteOutcomeUnknown, ReconcileUnavailable
 from .publisher_cli import atomic_receipt
 from .resumable_publisher import apply_ack, new_checkpoint
+from .d1_transport_contract import execute_once
 from .public_today_contract import ContractError
 
 BACKOFF_SECONDS=(30,60,120,300)
@@ -110,11 +111,14 @@ def recover_pending_state(state_path,*,reconcile_executor,publish_executor,clock
 
     if outcome=="NONE_PRESENT":
         try:
-            ack=publish_executor(batch)
+            ack=execute_once(batch=batch,executor=publish_executor,
+                max_rows=len(batch["rows"]),
+                max_queries=min(150,2+5*len(batch["rows"])),
+                max_written=min(80,2+2*len(batch["rows"])))
             aids=sorted({row["aid"] for row in batch["rows"]})
             checkpoint=new_checkpoint(source_identity=batch["source_identity"],day=batch["day"],aids=aids)
             apply_ack(checkpoint=checkpoint,batch=batch,ack=ack)
-        except RemoteOutcomeUnknown as exc:
+        except (RemoteOutcomeUnknown,ContractError) as exc:
             atomic_receipt(path,_wait_state(current,attempt,now,type(exc).__name__))
             return {"status":"RECOVERY_WAIT","aid":current.get("pending_aid"),
                     "retry_after_seconds":_delay(attempt),"sent":0,
