@@ -1674,5 +1674,29 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_watchalong_subtitle_and_danmaku_default_on_but_preserve_user_choice(self):
+        html=(ROOT/'site/watchalong-viewer/index.html').read_text(encoding='utf-8')
+        js=(ROOT/'site/assets/watchalong-standalone.js').read_text(encoding='utf-8')
+        self.assertIn("let subtitleEnabled=true;",js)
+        self.assertIn("let danmakuEnabled=true;",js)
+        self.assertIn("localStorage.getItem('holoviewer-watchalong-subtitle-standard')",js)
+        self.assertIn("localStorage.getItem('holoviewer-watchalong-subtitle-danmaku')",js)
+        self.assertIn('data-subtitle-mode="standard" class="active" aria-pressed="true"',html)
+        self.assertIn('data-subtitle-mode="danmaku" class="active" aria-pressed="true"',html)
+
+    def test_watchalong_intermediate_width_keeps_toolbar_legible_before_mobile_stack(self):
+        css=(ROOT/'site/assets/watchalong-standalone.css').read_text(encoding='utf-8')
+        self.assertIn("white-space:nowrap;flex:0 0 auto",css)
+        self.assertIn("@media(max-width:1180px){",css)
+        self.assertIn(".segment-controls,.resume-status{display:none}",css)
+        self.assertIn("@media(max-width:900px){",css)
+        self.assertIn(".sync-controls{display:none}",css)
+        self.assertIn("@media(max-width:820px){",css)
+        self.assertIn(".control-toggle span:last-child{display:none}",css)
+        self.assertIn("@media(max-width:760px){",css)
+        self.assertNotIn("@media(max-width:980px){\n .sync-controls,.subtitle-mode-controls{display:none}",css)
+
+
+
 if __name__ == "__main__":
     unittest.main()
