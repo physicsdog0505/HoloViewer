@@ -214,8 +214,8 @@ def deploy_data_watchalong(target: str, expected_main: str) -> None:
         }
         for old in production_manifest.get("events", []):
             old_id = old.get("event_id")
-            if old_id not in final_events or final_events[old_id].get("sha256") != old.get("sha256"):
-                raise ReleaseGateError(f"post-deploy existing event changed: {old_id}")
+            if old_id not in final_events or final_events[old_id] != old:
+                raise ReleaseGateError(f"post-deploy existing manifest entry changed: {old_id}")
 
         receipt = {
             "SOURCE_MAIN_SHA": expected_main,
