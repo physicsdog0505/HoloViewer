@@ -167,8 +167,6 @@ def _atomic_plist(path,body):
 
 def apply_cutover(*,repo_root,runtime_root,expected_head,python_executable,plist_path=DEFAULT_PLIST):
     proof=preflight(repo_root=repo_root,runtime_root=runtime_root,expected_head=expected_head)
-    candidate_service=validate_candidate_service(
-        repo_root=repo_root,python_executable=python_executable)
     state_root=Path(proof["state_root"])
     state_dir=state_root/"state"
     pidfile=state_root/"publisher.pid"
@@ -187,6 +185,8 @@ def apply_cutover(*,repo_root,runtime_root,expected_head,python_executable,plist
             "secrets_rotated":False,
             "d1_schema_changed":False,
         }
+    candidate_service=validate_candidate_service(
+        repo_root=repo_root,python_executable=python_executable)
     if old_pid is not None:
         os.kill(old_pid,signal.SIGTERM)
         _wait_dead(old_pid)
