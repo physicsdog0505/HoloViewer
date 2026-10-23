@@ -238,10 +238,13 @@ def main(argv=None):
     proof=preflight(repo_root=args.repo_root,runtime_root=args.runtime_root,
                     expected_head=args.expected_head)
     if not args.apply:
+        candidate_service=validate_candidate_service(
+            repo_root=args.repo_root,python_executable=args.python)
         plist=render_plist(repo_root=args.repo_root,runtime_root=args.runtime_root,
                            python_executable=args.python,
                            log_path=Path(proof["state_root"])/"publisher-service.log")
-        print(json.dumps({"status":"PLAN_ONLY","preflight":proof,"plist":plist,
+        print(json.dumps({"status":"PLAN_ONLY","preflight":proof,
+                          "candidate_service":candidate_service,"plist":plist,
                           "mutation":False},ensure_ascii=False,indent=2))
         return
     result=apply_cutover(repo_root=args.repo_root,runtime_root=args.runtime_root,
