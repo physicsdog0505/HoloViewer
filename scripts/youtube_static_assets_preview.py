@@ -1,0 +1,305 @@
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import shutil
+from urllib.parse import quote
+from urllib.request import Request, urlopen
+
+
+class PreviewError(RuntimeError):
+    pass
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _json_object(data: bytes, *, label: str) -> dict:
+    try:
+        value = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PreviewError(f"invalid JSON for {label}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise PreviewError(f"expected JSON object for {label}")
+    return value
+
+
+def _load_manifest(v1_root: str | Path) -> tuple[Path, bytes, dict]:
+    root = Path(v1_root).expanduser().resolve()
+    path = root / "manifest.json"
+    if not path.is_file():
+        raise PreviewError(f"manifest missing: {path}")
+    raw = path.read_bytes()
+    manifest = _json_object(raw, label="manifest")
+    if manifest.get("schema_version") != 1:
+        raise PreviewError("unsupported manifest schema_version")
+    if not isinstance(manifest.get("current_month"), str):
+        raise PreviewError("manifest current_month missing")
+    if not isinstance(manifest.get("months"), list):
+        raise PreviewError("manifest months must be list")
+    if not isinstance(manifest.get("channel_indexes"), list):
+        raise PreviewError("manifest channel_indexes must be list")
+    return root, raw, manifest
+
+
+def _relative_logical(path: str) -> Path:
+    prefix = "youtube/v1/"
+    if not isinstance(path, str) or not path.startswith(prefix):
+        raise PreviewError(f"unexpected logical path: {path!r}")
+    rel = Path(path[len(prefix):])
+    if rel.is_absolute() or ".." in rel.parts or not rel.parts:
+        raise PreviewError(f"unsafe logical path: {path}")
+    return rel
+
+
+def _verify_declared(data: bytes, item: dict, *, label: str) -> None:
+    expected_bytes = item.get("bytes")
+    expected_sha = item.get("sha256")
+    if not isinstance(expected_bytes, int) or expected_bytes < 0:
+        raise PreviewError(f"{label}: invalid bytes")
+    if not isinstance(expected_sha, str) or len(expected_sha) != 64:
+        raise PreviewError(f"{label}: invalid sha256")
+    if len(data) != expected_bytes:
+        raise PreviewError(f"{label}: byte length mismatch")
+    if _sha256(data) != expected_sha:
+        raise PreviewError(f"{label}: sha256 mismatch")
+
+
+def verify_local_tree(v1_root: str | Path) -> dict:
+    root, manifest_raw, manifest = _load_manifest(v1_root)
+    month_count = 0
+    video_count = 0
+    for item in manifest["months"]:
+        if not isinstance(item, dict):
+            raise PreviewError("malformed month manifest entry")
+        rel = _relative_logical(item.get("path"))
+        path = root / rel
+        if not path.is_file():
+            raise PreviewError(f"month missing: {item.get('path')}")
+        raw = path.read_bytes()
+        _verify_declared(raw, item, label=f"month {item.get('path')}")
+        payload = _json_object(raw, label=f"month {item.get('path')}")
+        if payload.get("schema_version") != 1:
+            raise PreviewError(f"month schema mismatch: {item.get('path')}")
+        videos = payload.get("videos")
+        if not isinstance(videos, list):
+            raise PreviewError(f"month videos invalid: {item.get('path')}")
+        expected_count = item.get("count")
+        if not isinstance(expected_count, int) or expected_count != len(videos):
+            raise PreviewError(f"month count mismatch: {item.get('path')}")
+        month_count += 1
+        video_count += len(videos)
+
+    declared_indexes: set[str] = set()
+    for item in manifest["channel_indexes"]:
+        if not isinstance(item, dict):
+            raise PreviewError("malformed channel index manifest entry")
+        rel = _relative_logical(item.get("path"))
+        declared_indexes.add(rel.as_posix())
+        path = root / rel
+        if not path.is_file():
+            raise PreviewError(f"channel index missing: {item.get('path')}")
+        raw = path.read_bytes()
+        _verify_declared(raw, item, label=f"index {item.get('path')}")
+        payload = _json_object(raw, label=f"index {item.get('path')}")
+        if payload.get("schema_version") != 1:
+            raise PreviewError(f"index schema mismatch: {item.get('path')}")
+        if payload.get("channel_id") != item.get("channel_id"):
+            raise PreviewError(f"channel_id mismatch: {item.get('path')}")
+        months = payload.get("months")
+        if not isinstance(months, dict) or any(
+            not isinstance(ids, list) for ids in months.values()
+        ):
+            raise PreviewError(f"index months invalid: {item.get('path')}")
+        actual_count = sum(len(ids) for ids in months.values())
+        if actual_count != item.get("video_count"):
+            raise PreviewError(f"index video_count mismatch: {item.get('path')}")
+
+    actual_indexes = {
+        path.relative_to(root).as_posix()
+        for path in (root / "index/channels").glob("*.json")
+    } if (root / "index/channels").exists() else set()
+    if actual_indexes != declared_indexes:
+        raise PreviewError("channel index inventory mismatch")
+
+    return {
+        "manifest_sha256": _sha256(manifest_raw),
+        "months": month_count,
+        "channel_indexes": len(manifest["channel_indexes"]),
+        "videos": video_count,
+        "local_readback": "PASS",
+    }
+
+
+def stage_site(
+    source_site: str | Path,
+    source_v1: str | Path,
+    target_site: str | Path,
+) -> dict:
+    source_site_path = Path(source_site).expanduser().resolve()
+    source_v1_path = Path(source_v1).expanduser().resolve()
+    target = Path(target_site).expanduser().resolve()
+
+    verify = verify_local_tree(source_v1_path)
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(source_site_path, target)
+
+    youtube = target / "youtube"
+    if youtube.exists():
+        shutil.rmtree(youtube)
+    (target / "youtube").mkdir(parents=True)
+    shutil.copytree(source_v1_path, target / "youtube/v1")
+
+    staged = verify_local_tree(target / "youtube/v1")
+    if staged != verify:
+        raise PreviewError("staged tree differs from accepted local tree")
+    return staged
+
+
+def write_preview_config(
+    source_config: str | Path,
+    output_config: str | Path,
+    staged_site: str | Path,
+) -> dict:
+    source = Path(source_config).expanduser().resolve()
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    if payload.get("name") != "holoviewer-public":
+        raise PreviewError("unexpected Worker name")
+    assets = payload.get("assets")
+    if not isinstance(assets, dict):
+        raise PreviewError("authoritative config has no assets block")
+
+    staged = Path(staged_site).expanduser().resolve()
+    out = dict(payload)
+    out["assets"] = dict(assets)
+    out["assets"]["directory"] = str(staged)
+    # Do not mutate routes/workers_dev/preview settings. versions upload creates
+    # an inert Worker version only; triggers remain untouched unless separately
+    # deployed with a trigger/deployment command.
+    target = Path(output_config).expanduser().resolve()
+    target.write_text(
+        json.dumps(out, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return out
+
+
+def _http_get(url: str, *, opener=urlopen) -> bytes:
+    request = Request(
+        url,
+        headers={
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "User-Agent": "HoloViewer-Issue448-Preview/1",
+        },
+    )
+    with opener(request, timeout=30) as response:
+        return response.read()
+
+
+def _remote_url(base_url: str, logical_path: str, nonce: str) -> str:
+    rel = "/".join(quote(part, safe="") for part in logical_path.split("/"))
+    return f"{base_url.rstrip('/')}/{rel}?issue448={quote(nonce, safe='')}"
+
+
+def verify_http_tree(
+    base_url: str,
+    v1_root: str | Path,
+    *,
+    nonce: str = "readback",
+    opener=urlopen,
+) -> dict:
+    _, local_manifest_raw, manifest = _load_manifest(v1_root)
+    manifest_url = _remote_url(base_url, "youtube/v1/manifest.json", nonce)
+    remote_manifest_raw = _http_get(manifest_url, opener=opener)
+    if remote_manifest_raw != local_manifest_raw:
+        raise PreviewError("remote manifest bytes differ from accepted local manifest")
+    remote_manifest = _json_object(remote_manifest_raw, label="remote manifest")
+    if remote_manifest != manifest:
+        raise PreviewError("remote manifest semantic mismatch")
+
+    for item in manifest["months"]:
+        logical = item["path"]
+        raw = _http_get(_remote_url(base_url, logical, nonce), opener=opener)
+        _verify_declared(raw, item, label=f"remote month {logical}")
+        payload = _json_object(raw, label=f"remote month {logical}")
+        if payload.get("schema_version") != 1:
+            raise PreviewError(f"remote month schema mismatch: {logical}")
+        videos = payload.get("videos")
+        if not isinstance(videos, list) or len(videos) != item.get("count"):
+            raise PreviewError(f"remote month count mismatch: {logical}")
+
+    for item in manifest["channel_indexes"]:
+        logical = item["path"]
+        raw = _http_get(_remote_url(base_url, logical, nonce), opener=opener)
+        _verify_declared(raw, item, label=f"remote index {logical}")
+        payload = _json_object(raw, label=f"remote index {logical}")
+        if payload.get("schema_version") != 1:
+            raise PreviewError(f"remote index schema mismatch: {logical}")
+        if payload.get("channel_id") != item.get("channel_id"):
+            raise PreviewError(f"remote index channel_id mismatch: {logical}")
+        months = payload.get("months")
+        if not isinstance(months, dict) or any(
+            not isinstance(ids, list) for ids in months.values()
+        ):
+            raise PreviewError(f"remote index months invalid: {logical}")
+        if sum(len(ids) for ids in months.values()) != item.get("video_count"):
+            raise PreviewError(f"remote index video_count mismatch: {logical}")
+
+    return {
+        "manifest_http_readback": "PASS",
+        "month_objects_http_readback": "PASS",
+        "channel_index_http_readback": "PASS",
+        "manifest_sha256": _sha256(remote_manifest_raw),
+        "months": len(manifest["months"]),
+        "channel_indexes": len(manifest["channel_indexes"]),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Issue #448 Static Assets Version URL pilot helper"
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    check = sub.add_parser("check-local")
+    check.add_argument("--v1", required=True)
+
+    stage = sub.add_parser("stage")
+    stage.add_argument("--source-site", required=True)
+    stage.add_argument("--source-v1", required=True)
+    stage.add_argument("--target-site", required=True)
+
+    config = sub.add_parser("write-config")
+    config.add_argument("--source-config", required=True)
+    config.add_argument("--output-config", required=True)
+    config.add_argument("--staged-site", required=True)
+
+    http = sub.add_parser("verify-http")
+    http.add_argument("--base-url", required=True)
+    http.add_argument("--v1", required=True)
+    http.add_argument("--nonce", default="readback")
+
+    args = parser.parse_args(argv)
+    if args.command == "check-local":
+        result = verify_local_tree(args.v1)
+    elif args.command == "stage":
+        result = stage_site(args.source_site, args.source_v1, args.target_site)
+    elif args.command == "write-config":
+        result = write_preview_config(
+            args.source_config, args.output_config, args.staged_site
+        )
+    else:
+        result = verify_http_tree(
+            args.base_url, args.v1, nonce=args.nonce
+        )
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
