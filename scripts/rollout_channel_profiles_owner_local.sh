@@ -272,31 +272,49 @@ EOF
 fi
 
 echo "=== WORKER CANDIDATE UPLOAD ==="
+UPLOAD_OUTPUT="/tmp/hv155-version-upload.ndjson"
+UPLOAD_CONSOLE="/tmp/hv155-version-upload.txt"
+rm -f "$UPLOAD_OUTPUT" "$UPLOAD_CONSOLE"
+
+WRANGLER_OUTPUT_FILE_PATH="$UPLOAD_OUTPUT" \
 npx wrangler versions upload ptt_offline/worker_host/index.mjs \
   --name "$WORKER" --config "$BACKEND_CONFIG" --keep-vars \
-  --message "PR155 canonical profile authority $HEAD" --json \
-  | tee /tmp/hv155-version-upload.json
+  --message "PR155 canonical profile authority $HEAD" \
+  2>&1 | tee "$UPLOAD_CONSOLE"
 
 NEW_VERSION_ID="$(
-python3 - /tmp/hv155-version-upload.json <<'PY'
+python3 - "$UPLOAD_OUTPUT" "$WORKER" <<'PY'
 import json,re,sys
-obj=json.load(open(sys.argv[1],encoding="utf-8"))
+path,worker=sys.argv[1:]
 uu=re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",re.I)
 found=[]
-def walk(x):
-    if isinstance(x,dict):
-        for k,v in x.items():
-            if isinstance(v,str) and uu.fullmatch(v) and ("version" in k.lower() or k.lower()=="id"):
-                found.append(v)
-            walk(v)
-    elif isinstance(x,list):
-        for v in x: walk(v)
-walk(obj)
-u=list(dict.fromkeys(found))
-print(u[-1] if u else "")
+try:
+    lines=open(path,encoding="utf-8").read().splitlines()
+except OSError as exc:
+    raise SystemExit(f"ABORT: Wrangler output receipt missing: {exc}")
+for lineno,line in enumerate(lines,1):
+    if not line.strip():
+        continue
+    try:
+        obj=json.loads(line)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"ABORT: malformed Wrangler output receipt line {lineno}: {exc}")
+    if obj.get("type")!="version-upload":
+        continue
+    if obj.get("worker_name") not in (None,worker):
+        continue
+    vid=obj.get("version_id")
+    if not isinstance(vid,str) or not uu.fullmatch(vid):
+        raise SystemExit("ABORT: version-upload receipt missing canonical version_id")
+    found.append(vid.lower())
+unique=list(dict.fromkeys(found))
+if len(unique)!=1:
+    raise SystemExit(f"ABORT: expected exactly one uploaded candidate version, found {len(unique)}")
+print(unique[0])
 PY
 )"
 [[ -n "$NEW_VERSION_ID" ]] || { echo "ABORT: cannot resolve uploaded candidate version" >&2; exit 1; }
+echo "UPLOADED_CANDIDATE_VERSION=$NEW_VERSION_ID"
 
 npx wrangler versions view "$NEW_VERSION_ID" --name "$WORKER" --config "$BACKEND_CONFIG" --json \
   > /tmp/hv155-new-version.json
@@ -340,7 +358,8 @@ DAY="2026-10-15"
 curl -fsS "$API/health" >/tmp/hv155-health.json || { rollback; exit 1; }
 curl -fsS "$API/v1/channels/$ROBOCO/profile" >/tmp/hv155-profile-readback.json || { rollback; exit 1; }
 curl -fsS "$API/v1/catalog/today?limit=200&offset=0" >/tmp/hv155-today.json || { rollback; exit 1; }
-curl -fsS "$API/v1/history?day=$DAY&limit=100&offset=0" >/tmp/hv155-history.json || { rollback; exit 1; }
+curl -fsS "$API/v1/ptt/recent?limit=1000" >/tmp/hv155-ptt-recent.json || { rollback; exit 1; }
+curl -fsS "$API/v1/history?day=$DAY&limit=50&offset=0" >/tmp/hv155-history.json || { rollback; exit 1; }
 curl -fsS "$API/v1/videos/$VIDEO/metadata" >/tmp/hv155-metadata.json || { rollback; exit 1; }
 curl -fsS "$API/v1/collab/live" >/tmp/hv155-collab-live.json || { rollback; exit 1; }
 curl -fsS "$API/v1/collab/history?day=$DAY&limit=100&offset=0" >/tmp/hv155-collab-history.json || { rollback; exit 1; }

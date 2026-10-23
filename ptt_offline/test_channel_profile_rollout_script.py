@@ -1,10 +1,28 @@
-import re, unittest
+import json, re, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 SCRIPT=Path(__file__).resolve().parents[1]/"scripts"/"rollout_channel_profiles_owner_local.sh"
 SOURCE=SCRIPT.read_text(encoding="utf-8")
 
 class ChannelProfileRolloutScriptTests(unittest.TestCase):
+    def _run_upload_receipt_parser(self, records):
+        match=re.search(
+            r'python3 - "\$UPLOAD_OUTPUT" "\$WORKER" <<\'PY\'\n(.*?)\nPY\n\)"',
+            SOURCE,
+            re.S,
+        )
+        self.assertIsNotNone(match)
+        with tempfile.NamedTemporaryFile("w",encoding="utf-8",delete=False) as fh:
+            for record in records:
+                fh.write(json.dumps(record)+"\n")
+            path=fh.name
+        return subprocess.run(
+            [sys.executable,"-",path,"holoviewer-public-api"],
+            input=match.group(1),
+            text=True,
+            capture_output=True,
+        )
+
     def test_shell_script_has_exact_head_and_owner_local_guards(self):
         self.assertIn('--expected-head',SOURCE)
         self.assertIn('[[ "$HEAD" == "$EXPECTED_HEAD" ]]',SOURCE)
@@ -34,9 +52,65 @@ class ChannelProfileRolloutScriptTests(unittest.TestCase):
         self.assertNotIn('p=d["plan"]\\nassert',SOURCE)
         self.assertIn('p=d["plan"]\nassert p["updates"]==0, p',SOURCE)
 
+
+    def test_post_activation_smoke_uses_valid_history_limit_and_recent_tail(self):
+        self.assertIn('/v1/history?day=$DAY&limit=50&offset=0', SOURCE)
+        self.assertNotIn('/v1/history?day=$DAY&limit=100&offset=0', SOURCE)
+        self.assertIn('/v1/ptt/recent?limit=1000', SOURCE)
+
     def test_semantic_readback_failure_rolls_back(self):
         self.assertIn("if ! python3 - /tmp/hv155-profile-readback.json <<'PY'",SOURCE)
         self.assertIn("PY\nthen\n  rollback\n  exit 1\nfi",SOURCE)
+
+    def test_wrangler_4152_upload_uses_machine_readable_output_receipt(self):
+        self.assertIn('WRANGLER_OUTPUT_FILE_PATH="$UPLOAD_OUTPUT"',SOURCE)
+        self.assertIn('UPLOAD_OUTPUT="/tmp/hv155-version-upload.ndjson"',SOURCE)
+        self.assertNotIn('--message "PR155 canonical profile authority $HEAD" --json',SOURCE)
+        self.assertIn('--name "$WORKER" --config "$BACKEND_CONFIG" --keep-vars',SOURCE)
+        self.assertIn('obj.get("type")!="version-upload"',SOURCE)
+        self.assertIn('obj.get("worker_name") not in (None,worker)',SOURCE)
+        self.assertIn('expected exactly one uploaded candidate version',SOURCE)
+        self.assertIn('version-upload receipt missing canonical version_id',SOURCE)
+        self.assertIn('wrangler versions view "$NEW_VERSION_ID"',SOURCE)
+        upload=SOURCE.index('WRANGLER_OUTPUT_FILE_PATH="$UPLOAD_OUTPUT"')
+        verify=SOURCE.index('wrangler versions view "$NEW_VERSION_ID"')
+        activate=SOURCE.index('=== MUTATION 3: ACTIVATE CANDIDATE 100% ===')
+        self.assertLess(upload,verify)
+        self.assertLess(verify,activate)
+
+    def test_wrangler_output_receipt_parser_accepts_exact_single_candidate(self):
+        candidate="12345678-1234-4abc-8def-1234567890ab"
+        result=self._run_upload_receipt_parser([
+            {"type":"wrangler-session","version":1},
+            {"type":"version-upload","worker_name":"holoviewer-public-api","version_id":candidate},
+        ])
+        self.assertEqual(0,result.returncode,result.stderr)
+        self.assertEqual(candidate,result.stdout.strip())
+
+    def test_wrangler_output_receipt_parser_rejects_zero_candidates(self):
+        result=self._run_upload_receipt_parser([
+            {"type":"wrangler-session","version":1},
+        ])
+        self.assertNotEqual(0,result.returncode)
+        self.assertIn("expected exactly one uploaded candidate version",result.stderr)
+
+    def test_wrangler_output_receipt_parser_rejects_multiple_candidates(self):
+        result=self._run_upload_receipt_parser([
+            {"type":"version-upload","worker_name":"holoviewer-public-api","version_id":"12345678-1234-4abc-8def-1234567890ab"},
+            {"type":"version-upload","worker_name":"holoviewer-public-api","version_id":"87654321-4321-4abc-8def-ba0987654321"},
+        ])
+        self.assertNotEqual(0,result.returncode)
+        self.assertIn("expected exactly one uploaded candidate version",result.stderr)
+
+    def test_wrangler_output_receipt_parser_ignores_baseline_uuid_in_unrelated_event(self):
+        baseline="df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96"
+        candidate="12345678-1234-4abc-8def-1234567890ab"
+        result=self._run_upload_receipt_parser([
+            {"type":"deploy","version_id":baseline},
+            {"type":"version-upload","worker_name":"holoviewer-public-api","version_id":candidate},
+        ])
+        self.assertEqual(0,result.returncode,result.stderr)
+        self.assertEqual(candidate,result.stdout.strip())
 
     def test_population_and_readback_contract_is_present(self):
         for marker in (
