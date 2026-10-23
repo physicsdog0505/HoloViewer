@@ -1,79 +1,54 @@
-name: Deploy HoloViewer Cloudflare production
+name: HoloViewer production release evidence only
+
 on:
   workflow_dispatch:
     inputs:
-      confirm:
-        description: "Type DEPLOY to update holoviewer-public production Worker"
-        required: true
-        type: string
       release_sha:
-        description: "Full 40-character reviewed main commit SHA (must equal checked-out commit)"
+        description: "Full 40-character reviewed main commit SHA to validate (evidence only; no deploy)"
         required: true
         type: string
-      baseline_confirmed:
-        description: "Type BASELINE-CHECKED after reviewing current Cloudflare Worker configuration and rollback"
-        required: true
-        type: string
+
 permissions:
   contents: read
-concurrency:
-  group: holoviewer-production-deploy
-  cancel-in-progress: false
+
 jobs:
-  deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY' && inputs.baseline_confirmed == 'BASELINE-CHECKED'
+  evidence:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    environment: cloudflare-production
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Pin exactly reviewed production revision
+
+      - name: Pin exactly reviewed main revision
         env:
           REQUESTED_SHA: ${{ inputs.release_sha }}
         run: |
           test "${#REQUESTED_SHA}" -eq 40
           test "$REQUESTED_SHA" = "$(git rev-parse HEAD)"
           test "${{ github.ref }}" = 'refs/heads/main'
-      - name: Verify production asset inputs
+
+      - name: Validate public static inputs
         run: |
           test -s site/index.html
           test -s site/assets/app.js
-          test -s site/assets/app.css
           test -s site/assets/config.js
           test -s site/viewer/index.html
-          test -s site/assets/shared-shell.css
-          test -s site/assets/viewer-standalone.css
-          test -s site/assets/viewer-standalone.js
-          test -s site/ptt-today/index.html
-          test -s site/assets/ptt-today.css
-          test -s site/assets/ptt-today.js
+          test -s site/watchalong-viewer/index.html
+          test -s site/data/watchalong/manifest.json
           grep -F 'https://holoviewer-public-api.singlebagel.workers.dev' site/assets/config.js
           ! grep -R -E 'http://(localhost|127\.0\.0\.1)' site || exit 1
-      - name: Validate public client JavaScript and request policy
+
+      - name: Validate release safety contracts
         run: |
           node --check site/assets/app.js
           node --check site/assets/config.js
           node --check site/assets/viewer-standalone.js
-          node --check site/assets/ptt-today.js
-          ! grep -E 'setTimeout|location.reload|eval\(|innerHTML|document.write\(' site/assets/app.js
-          test "$(grep -o 'setInterval(' site/assets/app.js | wc -l | tr -d ' ')" = "2"
-          python -B -m unittest -v test_public_smoke test_4174_ui_parity
-      - name: Validate Wrangler static assets config (no script, D1, KV or routes)
+          node --check site/assets/watchalong-standalone.js
+          python -B -m unittest -v             test_public_smoke             test_4174_ui_parity             test_frontend_release_gate
+
+      - name: Confirm evidence-only policy
         run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          cfg=json.loads(Path('cloudflare/wrangler.json').read_text())
-          assert set(cfg)=={'name','compatibility_date','assets'}, cfg.keys()
-          assert cfg['name']=='holoviewer-public'
-          assert cfg['assets']=={'directory':'../site','not_found_handling':'single-page-application'}
-          assert 'main' not in cfg
-          PY
-      - name: Deploy static assets to existing production Worker
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare
-          command: deploy
+          echo "PRODUCTION_MUTATION=NO"
+          echo "OWNER_LOCAL_DEPLOY_REQUIRED=YES"
+          echo "GITHUB_ACTIONS_DEPLOY_DISABLED=YES"
