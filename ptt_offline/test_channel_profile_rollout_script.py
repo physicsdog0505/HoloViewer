@@ -10,6 +10,8 @@ class ChannelProfileRolloutScriptTests(unittest.TestCase):
         self.assertIn('[[ "$HEAD" == "$EXPECTED_HEAD" ]]',SOURCE)
         self.assertIn('[[ -z "$(git status --porcelain)" ]]',SOURCE)
         self.assertIn('ABORT: frontend/assets config cannot be used as backend config',SOURCE)
+        self.assertIn('materialize_channel_profile_backend_config.py',SOURCE)
+        self.assertIn('BACKEND_CONFIG="/tmp/hv155-backend-wrangler.json"',SOURCE)
         self.assertIn('ACCEPTED_BASELINE="df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96"',SOURCE)
 
     def test_mutations_are_explicitly_gated(self):
@@ -21,6 +23,7 @@ class ChannelProfileRolloutScriptTests(unittest.TestCase):
 
     def test_deploy_uses_complete_backend_config_and_dynamic_rollback(self):
         self.assertIn('--config "$BACKEND_CONFIG"',SOURCE)
+        self.assertIn('--config "$BACKEND_CONFIG_SOURCE"',SOURCE)
         self.assertNotIn('--config "$D1_CONFIG" --keep-vars',SOURCE)
         self.assertIn('OLD_VERSION_ID="$(',SOURCE)
         self.assertIn('wrangler versions view "$OLD_VERSION_ID"',SOURCE)

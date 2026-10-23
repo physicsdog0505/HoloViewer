@@ -30,6 +30,7 @@ jobs:
         run: |
           python3 -B -m unittest -v ptt_offline.test_export_canonical_channel_profiles \
             ptt_offline.test_channel_profile_rollout_script \
+            ptt_offline.test_materialize_channel_profile_backend_config \
             ptt_offline.test_public_today_contract \
             ptt_offline.test_consumer_boundary \
             ptt_offline.test_consumer_paging \
