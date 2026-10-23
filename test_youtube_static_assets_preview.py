@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -145,6 +146,14 @@ class PreviewTests(unittest.TestCase):
             "single-page-application",
             result["assets"]["not_found_handling"],
         )
+
+    def test_preview_alias_contract_matches_cloudflare_rules(self):
+        stamp = "20261023T131321Z"
+        alias_stamp = stamp.lower()
+        alias = f"issue448-{alias_stamp}"
+        self.assertRegex(alias, r"^[a-z][a-z0-9-]*$")
+        self.assertLessEqual(len(alias + "-holoviewer-public"), 63)
+        self.assertNotRegex(alias, r"[A-Z]")
 
     def test_http_readback_verifies_all_declared_objects(self):
         objects = {}
