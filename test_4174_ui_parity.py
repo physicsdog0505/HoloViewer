@@ -134,6 +134,21 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('id="history-prev"', html)
         self.assertNotIn('id="history-next"', html)
 
+    def test_history_prefers_youtube_static_manifest_month_read_path(self):
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+
+        self.assertIn("const YOUTUBE_HISTORY_MANIFEST_PATH='/youtube/v1/manifest.json'", js)
+        self.assertIn("config.youtubeStaticBase", js)
+        self.assertIn("fetchYoutubeStaticJson(YOUTUBE_HISTORY_MANIFEST_PATH,{manifest:true})", js)
+        self.assertIn("youtubeHistoryMonthEntry(manifest,month)", js)
+        self.assertIn("const payload=await fetchYoutubeStaticJson(entry.path)", js)
+        self.assertIn("payload?.schema_version!==1||!Array.isArray(payload.videos)", js)
+        self.assertIn("youtubeHistoryTaipeiDay(row)===day", js)
+        self.assertIn("return await loadYoutubeHistoryDay(day,offset,50)", js)
+        self.assertIn("return api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+offset)", js)
+        self.assertIn("data.source==='legacy-api'&&data.static_error", js)
+        self.assertNotIn("/objects/", js[js.index("const YOUTUBE_HISTORY_MANIFEST_PATH"):js.index("function historyChrome(){")])
+
     def test_custom_builder_matches_accepted_4174_controls(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
