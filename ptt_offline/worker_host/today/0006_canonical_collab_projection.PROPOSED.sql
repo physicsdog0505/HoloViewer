@@ -27,6 +27,10 @@ CREATE INDEX IF NOT EXISTS public_collab_events_live
 CREATE INDEX IF NOT EXISTS public_collab_events_history
   ON public_collab_events(event_date,is_current,start_at DESC);
 
+CREATE INDEX IF NOT EXISTS public_collab_events_retire_range
+  ON public_collab_events(live_scope,start_at,event_id)
+  WHERE is_current=1;
+
 CREATE TABLE IF NOT EXISTS public_collab_projection_meta (
   projection_key TEXT PRIMARY KEY NOT NULL,
   source_revision TEXT NOT NULL,
