@@ -358,7 +358,8 @@ DAY="2026-10-15"
 curl -fsS "$API/health" >/tmp/hv155-health.json || { rollback; exit 1; }
 curl -fsS "$API/v1/channels/$ROBOCO/profile" >/tmp/hv155-profile-readback.json || { rollback; exit 1; }
 curl -fsS "$API/v1/catalog/today?limit=200&offset=0" >/tmp/hv155-today.json || { rollback; exit 1; }
-curl -fsS "$API/v1/history?day=$DAY&limit=100&offset=0" >/tmp/hv155-history.json || { rollback; exit 1; }
+curl -fsS "$API/v1/ptt/recent?limit=1000" >/tmp/hv155-ptt-recent.json || { rollback; exit 1; }
+curl -fsS "$API/v1/history?day=$DAY&limit=50&offset=0" >/tmp/hv155-history.json || { rollback; exit 1; }
 curl -fsS "$API/v1/videos/$VIDEO/metadata" >/tmp/hv155-metadata.json || { rollback; exit 1; }
 curl -fsS "$API/v1/collab/live" >/tmp/hv155-collab-live.json || { rollback; exit 1; }
 curl -fsS "$API/v1/collab/history?day=$DAY&limit=100&offset=0" >/tmp/hv155-collab-history.json || { rollback; exit 1; }
