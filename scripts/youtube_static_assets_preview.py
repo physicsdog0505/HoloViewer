@@ -268,6 +268,149 @@ def build_pilot_tree(
     }
 
 
+
+def build_current_release_tree(
+    source_v1: str | Path,
+    target_v1: str | Path,
+    *,
+    expected_current_month: str | None = None,
+) -> dict:
+    source_root, source_manifest_raw, manifest = _load_manifest(source_v1)
+    target_root = Path(target_v1).expanduser().resolve()
+    if target_root.exists():
+        shutil.rmtree(target_root)
+    target_root.mkdir(parents=True)
+
+    current_month = manifest["current_month"]
+    if expected_current_month and current_month != expected_current_month:
+        raise PreviewError(
+            f"current month mismatch: expected {expected_current_month}, got {current_month}"
+        )
+
+    expected_month_path = f"youtube/v1/current/{current_month}.json"
+    current_item = next(
+        (
+            item
+            for item in manifest["months"]
+            if isinstance(item, dict) and item.get("path") == expected_month_path
+        ),
+        None,
+    )
+    if current_item is None:
+        raise PreviewError(f"current month object missing from manifest: {expected_month_path}")
+
+    current_rel = _relative_logical(current_item["path"])
+    current_raw = (source_root / current_rel).read_bytes()
+    _verify_declared(current_raw, current_item, label="current release month")
+    current_payload = _json_object(current_raw, label="current release month")
+    current_videos = current_payload.get("videos")
+    if not isinstance(current_videos, list):
+        raise PreviewError("current release month videos invalid")
+
+    current_dest = target_root / current_rel
+    current_dest.parent.mkdir(parents=True, exist_ok=True)
+    current_dest.write_bytes(current_raw)
+
+    release_indexes = []
+    indexed_video_ids: set[str] = set()
+    for item in sorted(
+        manifest["channel_indexes"],
+        key=lambda entry: entry.get("channel_id", "") if isinstance(entry, dict) else "",
+    ):
+        if not isinstance(item, dict):
+            continue
+        rel = _relative_logical(item["path"])
+        payload = _json_object(
+            (source_root / rel).read_bytes(),
+            label=f"release source index {item['path']}",
+        )
+        ids = (payload.get("months") or {}).get(current_month)
+        if not isinstance(ids, list) or not ids:
+            continue
+        if any(not isinstance(video_id, str) or not video_id for video_id in ids):
+            raise PreviewError(f"invalid video IDs in current index: {item['path']}")
+        channel_id = item.get("channel_id")
+        if payload.get("channel_id") != channel_id:
+            raise PreviewError(f"source index channel_id mismatch: {item['path']}")
+        filtered_payload = {
+            "schema_version": 1,
+            "channel_id": channel_id,
+            "months": {current_month: ids},
+        }
+        raw = json.dumps(
+            filtered_payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+        out_rel = Path("index/channels") / f"{channel_id}.json"
+        out_path = target_root / out_rel
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(raw)
+        indexed_video_ids.update(ids)
+        release_indexes.append({
+            "channel_id": channel_id,
+            "path": f"youtube/v1/{out_rel.as_posix()}",
+            "bytes": len(raw),
+            "sha256": _sha256(raw),
+            "video_count": len(ids),
+        })
+
+    month_video_ids = {
+        video.get("video_id")
+        for video in current_videos
+        if isinstance(video, dict) and isinstance(video.get("video_id"), str)
+    }
+    missing_from_indexes = month_video_ids - indexed_video_ids
+    if missing_from_indexes:
+        raise PreviewError(
+            f"current release indexes do not cover {len(missing_from_indexes)} month video IDs"
+        )
+    if not release_indexes:
+        raise PreviewError("current release found no channel indexes")
+
+    release_manifest = {
+        "schema_version": 1,
+        "current_month": current_month,
+        "months": [dict(current_item)],
+        "channel_indexes": release_indexes,
+        "channel_index": "youtube/v1/index/channels/<channel_id>.json",
+    }
+    manifest_raw = json.dumps(
+        release_manifest,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    (target_root / "manifest.json").write_bytes(manifest_raw)
+
+    verified = verify_local_tree(target_root)
+    total_bytes = sum(
+        path.stat().st_size
+        for path in target_root.rglob("*")
+        if path.is_file()
+    )
+    object_paths = [
+        "youtube/v1/manifest.json",
+        expected_month_path,
+        *[item["path"] for item in release_indexes],
+    ]
+    return {
+        **verified,
+        "release_scope": "CURRENT_ONLY",
+        "current_month": current_month,
+        "month_paths": [expected_month_path],
+        "month_count": 1,
+        "channel_index_count": len(release_indexes),
+        "object_count": len(object_paths),
+        "total_bytes": total_bytes,
+        "historical_months_included": 0,
+        "full_128_month_history": False,
+        "source_manifest_sha256": _sha256(source_manifest_raw),
+        "release_manifest_sha256": _sha256(manifest_raw),
+        "object_paths": object_paths,
+    }
+
 def stage_site(
     source_site: str | Path,
     source_v1: str | Path,
@@ -507,6 +650,12 @@ def main(argv: list[str] | None = None) -> int:
     pilot.add_argument("--target-site", required=True)
     pilot.add_argument("--max-channel-indexes", type=int, default=5)
 
+    release = sub.add_parser("stage-current-release")
+    release.add_argument("--source-site", required=True)
+    release.add_argument("--source-v1", required=True)
+    release.add_argument("--target-site", required=True)
+    release.add_argument("--expected-current-month")
+
     config = sub.add_parser("write-config")
     config.add_argument("--source-config", required=True)
     config.add_argument("--output-config", required=True)
@@ -538,6 +687,21 @@ def main(argv: list[str] | None = None) -> int:
             args.source_v1,
             target_site / "youtube/v1",
             max_channel_indexes=args.max_channel_indexes,
+        )
+    elif args.command == "stage-current-release":
+        target_site = Path(args.target_site).expanduser().resolve()
+        source_site = Path(args.source_site).expanduser().resolve()
+        if target_site.exists():
+            shutil.rmtree(target_site)
+        shutil.copytree(source_site, target_site)
+        youtube = target_site / "youtube"
+        if youtube.exists():
+            shutil.rmtree(youtube)
+        (target_site / "youtube").mkdir(parents=True)
+        result = build_current_release_tree(
+            args.source_v1,
+            target_site / "youtube/v1",
+            expected_current_month=args.expected_current_month,
         )
     elif args.command == "write-config":
         result = write_preview_config(
