@@ -3,8 +3,8 @@ import test from "node:test";
 import { assertDisposableIdentity, makeBatchPacket, packetReceipt, executeDisposableBatch } from "./collab_disposable_batch.mjs";
 
 const identity = {kind:"disposable-cloudflare-d1",database_id:"test-disposable-not-prod",binding:"DB",name:"hv197-collab-disposable-ci"};
-const event = {event_id:"holoserver-hide-and-seek:5680e7ec7c29074a",event_key:"k",label:"x",confidence:"high",event_date:"2026-10-22",start_at:"2026-10-22T08:00:00Z",end_at:"2026-10-22T10:00:00Z",review_status:"candidate",live_scope:false,payload:{event_id:"holoserver-hide-and-seek:5680e7ec7c29074a"}};
-const fixture = {projection_key:"live",source_revision:"sha256:8d0e11e2c08764f643c7751e08ea55e558b71f65eca71a25d89159022ca6fdeb",events:[event],source_event_count:1,effective_event_count:1,generated_at:"2026-10-23T06:00:00Z",source:{range_start:"2026-10-22T00:00:00Z",range_end:"2026-10-23T00:00:00Z"}};
+const event = {event_id:"holoserver-hide-and-seek:5680e7ec7c29074a",event_key:"k",label:"x",confidence:"high",event_date:"2026-10-22",start_at:"2026-10-22T08:00:00Z",end_at:"2026-10-22T10:00:00Z",review_status:"candidate",live_scope:false,payload:{event_id:"holoserver-hide-and-seek:5680e7ec7c29074a",event_key:"k",label:"x",confidence:"high",event_date:"2026-10-22",event_start_at:"2026-10-22T08:00:00Z",event_end_at:"2026-10-22T10:00:00Z",streams:[{video_id:"12345678901"},{video_id:"12345678902"}]}};
+const fixture = {schema_version:"public-collab-projection-v1",projection_key:"live",source_revision:"sha256:8d0e11e2c08764f643c7751e08ea55e558b71f65eca71a25d89159022ca6fdeb",events:[event],source_event_count:1,effective_event_count:1,generated_at:"2026-10-23T06:00:00Z",source:{range_start:"2026-10-22T00:00:00Z",range_end:"2026-10-23T00:00:00Z"}};
 
 test("production binding identity fails closed", () => {
   assert.throws(() => assertDisposableIdentity({...identity,database_id:"64e1a0ee-1455-4377-9640-3922e8f4d061"}),/STOP/);
@@ -26,7 +26,7 @@ test("reviewable three-statement canonical packet and distinct digest",async () 
 test("batch is invoked once with ordered prepared statements",async () => {
   let batches=0, prepared=[];
   const db={
-    prepare(sql) { return {bind(...args) {prepared.push({sql,args});return {sql,args};}}; },
+    prepare(sql) { return {all:async()=>({results:[{database_id:identity.database_id,name:identity.name}]}), bind(...args) {prepared.push({sql,args});return {sql,args};}}; },
     async batch(xs) {batches++;return xs;}
   };
   const output=await executeDisposableBatch(db,makeBatchPacket(fixture),identity);
@@ -38,4 +38,15 @@ test("empty-live packet clears membership and preserves meta",() => {
   const doc={...fixture,events:[],source_event_count:0,effective_event_count:0};
   const packet=makeBatchPacket(doc,{mode:"empty-next-live"});
   assert.equal(packet.length,2);
+});
+
+test("actual D1 sentinel mismatch prevents all writes", async () => {
+ let batches=0;
+ const db={prepare(sql){return {all:async()=>({results:[{database_id:"WRONG",name:identity.name}]}),
+ bind(...args){return {sql,args}}}},batch:async()=>{batches++;}};
+ await assert.rejects(executeDisposableBatch(db,makeBatchPacket(fixture),identity),/sentinel mismatch/);
+ assert.equal(batches,0);
+});
+test("payload mismatch is rejected before preparing a batch", () => {
+ assert.throws(()=>makeBatchPacket({...fixture,events:[{...event,payload:{...event.payload,event_key:"tampered"}}]}),/STOP/);
 });
