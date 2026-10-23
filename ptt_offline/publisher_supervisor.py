@@ -93,8 +93,6 @@ def preflight(*,repo_root,runtime_root,expected_head):
     if expected_head and head!=expected_head:
         raise ContractError("supervisor candidate HEAD mismatch")
     ambiguous=_ambiguous_states(state_dir)
-    if ambiguous:
-        raise ContractError("ambiguous Publisher state exists; reconcile before supervisor cutover")
     pid=None
     command=None
     if pidfile.is_file():
@@ -111,6 +109,8 @@ def preflight(*,repo_root,runtime_root,expected_head):
     holders=_lock_holders(state_dir/".single-publisher.lock")
     if holders and (pid is None or holders!=[pid]):
         raise ContractError("writer lock ownership does not match current Publisher")
+    if pid is not None and ambiguous:
+        raise ContractError("live manual Publisher has unresolved state; wait for a clean checkpoint before cutover")
     return {
         "repo_root":str(repo_root),
         "runtime_root":str(runtime_root),
@@ -119,7 +119,8 @@ def preflight(*,repo_root,runtime_root,expected_head):
         "manual_pid":pid,
         "manual_command":command,
         "lock_holders":holders,
-        "ambiguous_count":0,
+        "ambiguous_count":len(ambiguous),
+        "ambiguous_states":ambiguous,
     }
 
 def _atomic_plist(path,body):
