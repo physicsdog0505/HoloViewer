@@ -8,22 +8,23 @@ button,input,select,output{font:inherit}
  min-height:58px;display:flex;align-items:center;gap:10px;padding:4px 12px;
  background:rgba(247,245,242,.97);border-bottom:1px solid var(--line);color:var(--text)
 }
-.layout-segment{display:inline-flex;align-items:center;padding:2px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.62)}
+.layout-segment{display:inline-flex;align-items:center;padding:2px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.62);flex:0 0 auto}
 .layout-segment button,.sync-controls button,.segment-controls button,.subtitle-mode-controls button,.watchalong-actions button,.watchalong-link{
- min-height:32px;padding:0 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center
+ min-height:32px;padding:0 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;
+ white-space:nowrap;flex:0 0 auto
 }
 .layout-segment button{border:0;background:transparent}
 .layout-segment button.active{background:#242321;color:#fff}
 .subtitle-mode-controls{display:inline-flex;align-items:center;padding:2px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.62);gap:2px}
 .subtitle-mode-controls button{border:0;background:transparent;min-height:28px;padding:0 8px}
 .subtitle-mode-controls button.active{background:#242321;color:#fff}
-.control-toggle{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--muted)}
+.control-toggle{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap;flex:0 0 auto}
 .control-toggle input{accent-color:#242321}
-.sync-controls,.segment-controls{display:flex;align-items:center;gap:6px;font-size:12px}
+.sync-controls,.segment-controls{display:flex;align-items:center;gap:6px;font-size:12px;flex:0 0 auto}
 .sync-controls button:disabled,.segment-controls button:disabled{opacity:.42;cursor:not-allowed}
 #offsetValue{min-width:78px;text-align:center;color:var(--muted);font-weight:700}
 #segmentStatus{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-weight:700}
-.watchalong-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.watchalong-actions{display:flex;align-items:center;gap:6px;margin-left:auto;min-width:0;flex:0 0 auto}
 .resume-status{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px;font-weight:700}
 #copyCheckpoint{white-space:nowrap}
 
@@ -127,12 +128,20 @@ body.immersive .immersive-toolbar-trigger{
  display:block;position:fixed;left:0;right:0;top:0;height:14px;z-index:79;background:transparent
 }
 
-@media(max-width:1120px){
- .segment-controls{display:none}
+@media(max-width:1180px){
+ .watchalong-topbar{gap:6px;padding-left:8px;padding-right:8px}
+ .segment-controls,.resume-status{display:none}
+ .layout-segment button,.sync-controls button,.subtitle-mode-controls button,.watchalong-actions button,.watchalong-link{padding-left:8px;padding-right:8px}
+ #offsetValue{min-width:64px}
 }
-@media(max-width:980px){
- .sync-controls,.subtitle-mode-controls{display:none}
- .watchalong-workspace.layout-source{grid-template-columns:minmax(240px,.38fr) minmax(0,1fr)}
+@media(max-width:900px){
+ .sync-controls{display:none}
+ .watchalong-workspace.layout-source{grid-template-columns:minmax(230px,.36fr) minmax(0,1fr)}
+}
+@media(max-width:820px){
+ .watchalong-topbar{gap:5px;padding-left:6px;padding-right:6px}
+ .control-toggle span:last-child{display:none}
+ .layout-segment button,.subtitle-mode-controls button,.watchalong-actions button,.watchalong-link{padding-left:7px;padding-right:7px}
 }
 @media(max-width:760px){
  body{overflow:auto}
