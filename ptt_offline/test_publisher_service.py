@@ -27,7 +27,7 @@ class PublisherServiceTests(unittest.TestCase):
             self.assertEqual(argv[argv.index("--burst-max-batches")+1],"1")
             self.assertEqual(argv[argv.index("--batch-cap")+1],"10")
             self.assertEqual(argv[argv.index("--iterations")+1],"0")
-            self.assertEqual(argv[argv.index("--state-dir")+1],str(state/"state"))
+            self.assertEqual(argv[argv.index("--state-dir")+1],str((state/"state").resolve()))
 
     def test_missing_or_invalid_secret_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
