@@ -18,7 +18,7 @@ class SupervisorTests(unittest.TestCase):
                                log_path=runtime/"publisher.log")
             self.assertEqual(plist["Label"],LABEL)
             self.assertEqual(plist["ProgramArguments"][:4],
-                ["/usr/bin/python3","-B","-m","ptt_offline.publisher_service"])
+                [str(Path("/usr/bin/python3").resolve()),"-B","-m","ptt_offline.publisher_service"])
             self.assertEqual(plist["ProgramArguments"][-2:],["--root",str(runtime.resolve())])
             self.assertTrue(plist["RunAtLoad"])
             self.assertEqual(plist["KeepAlive"],{"SuccessfulExit":False})
