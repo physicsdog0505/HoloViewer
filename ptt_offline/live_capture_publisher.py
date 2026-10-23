@@ -357,7 +357,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,reconcile_executor=N
         try:
             ack=execute_once(batch=batch,executor=executor,max_rows=batch_cap,
                 max_queries=min(150,2+5*batch_cap),max_written=min(80,2+2*batch_cap))
-        except RemoteOutcomeUnknown:
+        except (RemoteOutcomeUnknown,ContractError):
             return {**receipt,"status":"REMOTE_UNCERTAIN","aid":plan["aid"],
                     "sent":0,"batch_id":batch["batch_id"]}
         apply_ack(checkpoint=checkpoint,batch=batch,ack=ack)
