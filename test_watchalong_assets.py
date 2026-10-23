@@ -1,4 +1,4 @@
-"""Offline integrity checks for the three approved static Watchalong events."""
+"""Offline integrity checks for the approved static Watchalong events."""
 from __future__ import annotations
 
 import hashlib
@@ -9,7 +9,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "site/data/watchalong"
-MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc")
+MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc", "t8q3XEmK0aM")
 
 
 class WatchalongAssetTests(unittest.TestCase):
@@ -17,9 +17,9 @@ class WatchalongAssetTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.manifest = json.loads((DATA / "manifest.json").read_text(encoding="utf-8"))
 
-    def test_manifest_exports_exactly_three_intended_sessions(self):
+    def test_manifest_exports_exactly_four_intended_sessions(self):
         self.assertEqual(self.manifest["schema_version"], "holoviewer-watchalong-manifest-v1")
-        self.assertEqual(self.manifest["event_count"], 3)
+        self.assertEqual(self.manifest["event_count"], 4)
         self.assertEqual(tuple(row["event_id"] for row in self.manifest["events"]), MASTERS)
         self.assertEqual({path.stem for path in (DATA / "events").glob("*.json")}, set(MASTERS))
 
@@ -73,6 +73,34 @@ class WatchalongAssetTests(unittest.TestCase):
         self.assertEqual(event["artifacts"]["transcript"]["cue_count"], 1568)
         self.assertEqual(event["artifacts"]["translation"]["artifact_id"], "db98d96002931734b6336c01732b6d981fbee3ed71a5304352c37f7ec4a92168")
         self.assertEqual(event["artifacts"]["translation"]["quality"], "quality-v2-complete")
+
+    def test_october_22_owner_completed_artifact_identity_is_exact(self):
+        event = json.loads((DATA / "events/t8q3XEmK0aM.json").read_text(encoding="utf-8"))
+        self.assertEqual(event["session_day"], "2026-10-22")
+        self.assertEqual(event["playlist_start_index"], 19)
+        self.assertEqual(event["source_video_ids"], [
+            "O4V1jClR7PY", "ybW0na9NNms", "aFmPLs4JkbQ",
+            "sD2ql0Nfptg", "v_9mDEhKv1g", "1PRbROChRAw",
+        ])
+        self.assertEqual(
+            [row["host_start_ms"] for row in event["segments"]],
+            [727000, 2195000, 3683000, 5170000, 6691000, 8233000],
+        )
+        self.assertNotIn(8610000, [row["host_start_ms"] for row in event["segments"]])
+        self.assertEqual(event["artifacts"]["transcript"], {
+            "transcript_id": "178aae1474d868fb3800c451eb75ce29de0b26dd8d7f32bf66a62c99f59b108a",
+            "content_hash": "c71004b6d0d4b888b841f97862d5e0856035c7c09fe039ac4c0844109c72f06d",
+            "cue_count": 1367,
+            "source": "TranscriptCorpus/youtube/t8q3XEmK0aM/178aae1474d868fb3800c451eb75ce29de0b26dd8d7f32bf66a62c99f59b108a",
+        })
+        self.assertEqual(
+            event["artifacts"]["translation"]["artifact_id"],
+            "a9376309a49b753a1d57326b818d9ec13e12ab3caaf57aaf3d63b4005676b2c6",
+        )
+        self.assertEqual(event["artifacts"]["translation"]["translated_cues"], 1367)
+        self.assertEqual(event["completeness"], {
+            "sync": "PRESENT", "transcript": "COMPLETE", "translation": "COMPLETE",
+        })
 
     def test_integrated_release_uses_existing_static_watchalong_assets(self):
         player = ROOT / "site/assets/watchalong-standalone.js"

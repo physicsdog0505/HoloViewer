@@ -72,6 +72,23 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "breakpoint_status": "PRESENT",
         "breakpoint_note": "Six high-confidence starts from the selected 8501 public-caption transcript.",
     },
+    {
+        "master": "t8q3XEmK0aM",
+        "day": "2026-10-22",
+        "title": "#4【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
+        "playlist_start": 19,
+        "sources": ("O4V1jClR7PY", "ybW0na9NNms", "aFmPLs4JkbQ", "sD2ql0Nfptg", "v_9mDEhKv1g", "1PRbROChRAw"),
+        "starts_ms": (727000, 2195000, 3683000, 5170000, 6691000, 8233000),
+        "transcript_id": "178aae1474d868fb3800c451eb75ce29de0b26dd8d7f32bf66a62c99f59b108a",
+        "transcript_hash": "c71004b6d0d4b888b841f97862d5e0856035c7c09fe039ac4c0844109c72f06d",
+        "cue_count": 1367,
+        "translation_kind": "corpus-artifact",
+        "translation_id": "a9376309a49b753a1d57326b818d9ec13e12ab3caaf57aaf3d63b4005676b2c6",
+        "translation_rel": "data/watchalong/transcripts/youtube/t8q3XEmK0aM/translations/a9376309a49b753a1d57326b818d9ec13e12ab3caaf57aaf3d63b4005676b2c6.json",
+        "translation_quality": "quality-v2-complete",
+        "breakpoint_status": "PRESENT",
+        "breakpoint_note": "Six high-confidence starts from the selected 8501 public-caption transcript; the reference URL t=8610 is not a synchronization cue.",
+    },
 )
 
 
