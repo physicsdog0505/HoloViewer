@@ -75,8 +75,9 @@ async function artifact(){
   events
  };
 }
-function fakeDb(expectedRevision,expectedLive=1){
+function fakeDb(expectedRevision,expectedLive=1,{alreadyCurrent=false}={}){
  const batched=[];
+ let applied=alreadyCurrent;
  return {
   batched,
   prepare(sql){
@@ -86,7 +87,9 @@ function fakeDb(expectedRevision,expectedLive=1){
      return {
       async first(){
        if(sql.includes('public_collab_projection_meta'))
-        return {source_revision:expectedRevision,effective_event_count:1};
+        return applied
+          ? {source_revision:expectedRevision,effective_event_count:1}
+          : null;
        throw Error('unexpected bound first');
       }
      };
@@ -101,6 +104,7 @@ function fakeDb(expectedRevision,expectedLive=1){
   },
   async batch(statements){
    batched.push(...statements);
+   applied=true;
    return statements.map(()=>({success:true,meta:{changes:1}}));
   }
  };
@@ -130,6 +134,15 @@ test('complete live projection applies one bounded D1 batch and verifies readbac
  assert.match(DB.batched[0].sql,/SET live_scope=0/);
  assert.match(DB.batched[1].sql,/holoserver-hide-and-seek/);
  assert.match(DB.batched[2].sql,/public_collab_projection_meta/);
+});
+
+test('unchanged source revision performs no D1 write batch',async()=>{
+ const doc=await artifact();
+ const DB=fakeDb(doc.source_revision,1,{alreadyCurrent:true});
+ const receipt=await applyLiveProjection(DB,doc);
+ assert.equal(receipt.status,'unchanged');
+ assert.equal(receipt.d1_batch_statements,0);
+ assert.equal(DB.batched.length,0);
 });
 
 test('private endpoint requires explicit enablement and a valid signature',async()=>{
