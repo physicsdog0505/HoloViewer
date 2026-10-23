@@ -1,5 +1,3 @@
-import {readToday} from './store.mjs';
-
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
 const DAY=/^\d{4}-\d{2}-\d{2}$/;
@@ -228,31 +226,122 @@ async function historyVideoMetadata(db,videoId){
  };
 }
 
-async function collabLive(db,{now=new Date(),profileTableEnabled=false}={}){
- const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
- const today=await readToday(db,{day,limit:200,offset:0,now,profileTableEnabled});
+function parseCanonicalCollabRow(row){
+ if(!row)return null;
+ let event;
+ try{event=JSON.parse(row.payload_json);}catch{throw Error('invalid canonical collab payload');}
+ if(!event||event.event_id!==row.event_id||!Array.isArray(event.streams)||event.streams.length<2){
+  throw Error('invalid canonical collab projection row');
+ }
+ const streams=event.streams.map(stream=>{
+  if(!VIDEO.test(stream?.video_id??''))throw Error('invalid canonical collab stream');
+  const actual_start=validTime(stream.actual_start)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null;
+  const actual_end=validTime(stream.actual_end)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null;
+  const scheduled_start=validTime(stream.scheduled_start)?.toISOString().replace(/\.\d{3}Z$/,'Z')??null;
+  const lifecycle_state=['live','upcoming','ended'].includes(stream.lifecycle_state)?stream.lifecycle_state:'unknown';
+  return {
+   video_id:stream.video_id,
+   title:typeof stream.title==='string'?stream.title:'',
+   channel_id:CHANNEL.test(stream.channel_id??'')?stream.channel_id:'',
+   channel_name:typeof (stream.channel_title??stream.channel_name)==='string'?(stream.channel_title??stream.channel_name):'',
+   lifecycle_state,
+   start_at:actual_start??scheduled_start??null,
+   actual_start,
+   actual_end,
+   avatar_url:typeof stream.avatar_url==='string'?stream.avatar_url:null,
+   sync_offset_ms:null
+  };
+ });
+ const verified=streams.length>1&&streams.every(stream=>
+  stream.lifecycle_state==='ended'&&stream.actual_start&&stream.actual_end&&
+  Date.parse(stream.actual_end)>Date.parse(stream.actual_start)
+ );
+ const master=verified?streams[0]:null;
+ if(verified){
+  for(const stream of streams){
+   stream.sync_offset_ms=Date.parse(stream.actual_start)-Date.parse(master.actual_start);
+  }
+ }
  return {
-  schema_version:'public-experience-v1',
-  kind:'collab',
-  scope:'live',
-  day,
-  completeness:today.completeness,
-  events:detectCollabCandidates(today.streams)
+  event_id:row.event_id,
+  event_key:row.event_key,
+  label:row.label,
+  confidence:row.confidence,
+  candidate:true,
+  review_status:row.review_status,
+  source_revision:row.source_revision,
+  published_at:row.published_at,
+  event_date:event.event_date??null,
+  event_start_at:event.event_start_at??null,
+  event_end_at:event.event_end_at??null,
+  participant_count:Number(event.participant_count??0),
+  pov_count:streams.length,
+  sync:{
+   available:verified,
+   basis:verified?'youtube_actual_start':null,
+   master_video_id:master?.video_id??null,
+   master_start:master?.actual_start??null
+  },
+  streams
  };
 }
-async function collabHistory(db,day,{limit=50,offset=0}={}){
- const source=await historyRows(db,day);
- const events=detectCollabCandidates(source.streams);
+async function collabProjectionMeta(db,key){
+ return await db.prepare(`SELECT projection_key,source_revision,published_at,range_start,range_end,source_event_count,effective_event_count
+ FROM public_collab_projection_meta WHERE projection_key=?`).bind(key).first();
+}
+function collabProjectionFreshness(meta,now,maxAgeRaw){
+ const published=validTime(meta?.published_at);
+ const maxAge=Number(maxAgeRaw);
+ if(!published||!Number.isFinite(maxAge)||maxAge<=0){
+  return {stale:null,age_seconds:published?Math.max(0,Math.floor((now-published)/1000)):null,max_age_seconds:null};
+ }
+ const age=Math.max(0,Math.floor((now-published)/1000));
+ return {stale:age>maxAge,age_seconds:age,max_age_seconds:maxAge};
+}
+async function canonicalCollabLive(db,{now=new Date(),maxAgeSeconds=null}={}){
+ const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+ const meta=await collabProjectionMeta(db,'live');
+ if(!meta)throw Error('canonical collab projection missing');
+ const freshness=collabProjectionFreshness(meta,now,maxAgeSeconds);
+ const rows=await db.prepare(`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
+ FROM public_collab_events
+ WHERE is_current=1 AND live_scope=1 AND review_status!='rejected'
+ ORDER BY start_at DESC,event_id DESC LIMIT 101`).all();
+ const raw=rows.results??[],has_more=raw.length>100;
+ const events=raw.slice(0,100).map(parseCanonicalCollabRow);
  return {
-  schema_version:'public-experience-v1',
-  kind:'collab',
-  scope:'history',
-  day,
-  completeness:{limited:source.limited,has_more:offset+limit<events.length},
-  total:events.length,
-  limit,offset,
-  events:events.slice(offset,offset+limit)
+  schema_version:'public-experience-v1',kind:'collab',scope:'live',day,
+  completeness:{limited:has_more,has_more,projection:'canonical',degraded:freshness.stale!==false,freshness_known:freshness.stale!==null},
+  projection:{source_revision:meta.source_revision,published_at:meta.published_at,...freshness},
+  events
  };
+}
+async function canonicalCollabHistory(db,day,{limit=50,offset=0}={}){
+ const totalRow=await db.prepare(`SELECT COUNT(*) AS n FROM public_collab_events
+ WHERE event_date=? AND is_current=1 AND review_status!='rejected'`).bind(day).first();
+ const total=Number(totalRow?.n??0);
+ const rows=await db.prepare(`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
+ FROM public_collab_events
+ WHERE event_date=? AND is_current=1 AND review_status!='rejected'
+ ORDER BY start_at DESC,event_id DESC LIMIT ? OFFSET ?`).bind(day,limit,offset).all();
+ const events=(rows.results??[]).map(parseCanonicalCollabRow);
+ const has_more=offset+events.length<total;
+ const revisions=[...new Set(events.map(event=>event.source_revision).filter(Boolean))];
+ const published=events.map(event=>event.published_at).filter(Boolean).sort().at(-1)??null;
+ return {
+  schema_version:'public-experience-v1',kind:'collab',scope:'history',day,
+  completeness:{limited:false,has_more,projection:'canonical'},
+  projection:{source_revisions:revisions,published_at:published},
+  total,limit,offset,events
+ };
+}
+async function canonicalCollabDetail(db,eventId,day=null){
+ let query=`SELECT event_id,event_key,label,confidence,review_status,payload_json,source_revision,published_at
+ FROM public_collab_events WHERE event_id=? AND is_current=1 AND review_status!='rejected'`;
+ let row;
+ if(day!=null)row=await db.prepare(query+' AND event_date=?').bind(eventId,day).first();
+ else row=await db.prepare(query).bind(eventId).first();
+ return parseCanonicalCollabRow(row);
 }
 function publicWatchEvent(row,streams){
  return {
@@ -312,26 +401,21 @@ export async function handleExperienceRead(request,env,now=new Date()){
    return video?json(video,200,30):json({error:'not_found',verified:false},404,0);
   }
   if(url.pathname==='/v1/collab/live'){
-   return json(await collabLive(env.DB,{now,profileTableEnabled:env.TODAY_PROFILES_ENABLED==='true'}));
+   return json(await canonicalCollabLive(env.DB,{now,maxAgeSeconds:env.COLLAB_PROJECTION_MAX_AGE_SECONDS}));
   }
   if(url.pathname==='/v1/collab/history'){
    const day=url.searchParams.get('day')??'';
    const limit=intParam(url.searchParams.get('limit'),{min:1,max:100,def:50});
    const offset=intParam(url.searchParams.get('offset'),{min:0,max:1000,def:0});
    if(!validDay(day)||limit==null||offset==null)return json({error:'invalid_collab_query'},400,0);
-   return json(await collabHistory(env.DB,day,{limit,offset}));
+   return json(await canonicalCollabHistory(env.DB,day,{limit,offset}));
   }
   if(url.pathname.startsWith('/v1/collab/events/')){
    const eventId=decodeURIComponent(url.pathname.slice('/v1/collab/events/'.length));
    if(!EVENT_ID.test(eventId))return json({error:'invalid_event_id'},400,0);
    const day=url.searchParams.get('day');
-   let events;
-   if(day!=null){
-    if(!validDay(day))return json({error:'invalid_day'},400,0);
-    const source=await historyRows(env.DB,day);
-    events=detectCollabCandidates(source.streams);
-   }else events=(await collabLive(env.DB,{now,profileTableEnabled:env.TODAY_PROFILES_ENABLED==='true'})).events;
-   const event=events.find(x=>x.event_id===eventId);
+   if(day!=null&&!validDay(day))return json({error:'invalid_day'},400,0);
+   const event=await canonicalCollabDetail(env.DB,eventId,day);
    return event?json({schema_version:'public-experience-v1',event}):json({error:'not_found'},404,0);
   }
   if(url.pathname==='/v1/watchalong/recent'){
