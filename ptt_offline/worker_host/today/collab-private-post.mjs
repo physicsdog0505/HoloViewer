@@ -121,6 +121,22 @@ export async function validateLiveProjection(doc){
 function q(value){
  return value===null?'NULL':"'" + String(value).replaceAll("'","''") + "'";
 }
+async function readLiveMembership(DB){
+ const result=await DB.prepare(
+  'SELECT event_id,source_revision FROM public_collab_events WHERE is_current=1 AND live_scope=1 ORDER BY event_id'
+ ).all();
+ const rows=Array.isArray(result?.results)?result.results:[];
+ return rows.map(row=>({event_id:String(row?.event_id??''),source_revision:String(row?.source_revision??'')}));
+}
+function verifyLiveMembership(rows,events,revision){
+ const expected=events.filter(row=>row.live_scope).map(row=>row.event_id).sort();
+ const actual=rows.map(row=>row.event_id).sort();
+ if(actual.length!==expected.length||actual.some((eventId,index)=>eventId!==expected[index]))
+  throw Error('live membership readback mismatch; do not retry');
+ if(rows.some(row=>row.source_revision!==revision))
+  throw Error('live source revision readback mismatch; do not retry');
+ return expected.length;
+}
 function upsertSql(row,revision,published){
  const payload=canonical(row.payload);
  return `INSERT INTO public_collab_events(
@@ -145,12 +161,16 @@ export async function applyLiveProjection(DB,doc){
   'SELECT source_revision,effective_event_count FROM public_collab_projection_meta WHERE projection_key=?'
  ).bind('live').first();
  if(previous?.source_revision===doc.source_revision){
+  if(Number(previous.effective_event_count)!==doc.effective_event_count)
+   throw Error('projection meta readback mismatch; do not retry');
+  const liveRows=await readLiveMembership(DB);
+  const liveEventCount=verifyLiveMembership(liveRows,valid.events,doc.source_revision);
   return {
    status:'unchanged',
    projection_key:'live',
    source_revision:doc.source_revision,
    effective_event_count:doc.effective_event_count,
-   live_event_count:valid.events.filter(row=>row.live_scope).length,
+   live_event_count:liveEventCount,
    d1_batch_statements:0
   };
  }
@@ -177,12 +197,8 @@ source_event_count=excluded.source_event_count,effective_event_count=excluded.ef
  if(!meta||meta.source_revision!==doc.source_revision||
     Number(meta.effective_event_count)!==doc.effective_event_count)
   throw Error('projection meta readback mismatch; do not retry');
- const expectedLive=valid.events.filter(row=>row.live_scope).length;
- const live=await DB.prepare(
-  'SELECT COUNT(*) AS n FROM public_collab_events WHERE is_current=1 AND live_scope=1'
- ).first();
- if(Number(live?.n)!==expectedLive)
-  throw Error('live membership readback mismatch; do not retry');
+ const liveRows=await readLiveMembership(DB);
+ const expectedLive=verifyLiveMembership(liveRows,valid.events,doc.source_revision);
  return {
   status:'verified',
   projection_key:'live',
@@ -196,7 +212,8 @@ export async function handleCollabPrivatePost(request,env,{now=Date.now()}={}){
  if(new URL(request.url).pathname!=='/internal/collab/live')
   return reply({error:'not_found'},404);
  if(request.method!=='POST')return reply({error:'method_not_allowed'},405);
- if(env?.COLLAB_PUBLISH_ENABLED!=='true'||!env?.COLLAB_PUBLISH_HMAC_SECRET||!env?.DB)
+ const secret=env?.COLLAB_PUBLISH_HMAC_SECRET;
+ if(env?.COLLAB_PUBLISH_ENABLED!=='true'||typeof secret!=='string'||secret.length<32||!env?.DB)
   return reply({error:'publisher_disabled'},503);
  const timestamp=request.headers.get('x-collab-timestamp')??'';
  const mac=request.headers.get('x-collab-signature')??'';
@@ -204,7 +221,7 @@ export async function handleCollabPrivatePost(request,env,{now=Date.now()}={}){
   return reply({error:'invalid_timestamp'},401);
  const raw=await request.text();
  if(enc.encode(raw).length>MAX_BODY_BYTES)return reply({error:'payload_too_large'},413);
- const expected=await collabSignature(env.COLLAB_PUBLISH_HMAC_SECRET,timestamp,raw);
+ const expected=await collabSignature(secret,timestamp,raw);
  if(!equal(mac,expected))return reply({error:'bad_signature'},401);
  let data;
  try{data=JSON.parse(raw)}catch{return reply({error:'invalid_json'},400)}

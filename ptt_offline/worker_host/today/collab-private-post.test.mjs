@@ -75,36 +75,34 @@ async function artifact(){
   events
  };
 }
-function fakeDb(expectedRevision,expectedLive=1,{alreadyCurrent=false}={}){
+function fakeDb(expectedRevision,expectedLive=1,{alreadyCurrent=false,currentRows=null,postApplyRows=null}={}){
  const batched=[];
  let applied=alreadyCurrent;
+ const expectedRows=()=>Array.from({length:expectedLive},(_,index)=>({
+  event_id:index===0?'holoserver-hide-and-seek:fixture':'event-'+index,
+  source_revision:expectedRevision
+ }));
  return {
   batched,
   prepare(sql){
-   const statement={
+   return {
     sql,
     bind(...args){
-     return {
-      async first(){
-       if(sql.includes('public_collab_projection_meta'))
-        return applied
-          ? {source_revision:expectedRevision,effective_event_count:1}
-          : null;
-       throw Error('unexpected bound first');
-      }
-     };
+     return {async first(){
+      if(sql.includes('public_collab_projection_meta'))
+       return applied?{source_revision:expectedRevision,effective_event_count:1}:null;
+      throw Error('unexpected bound first');
+     }};
     },
-    async first(){
-     if(sql.includes('COUNT(*) AS n FROM public_collab_events'))
-      return {n:expectedLive};
-     throw Error('unexpected first');
+    async all(){
+     if(sql.includes('SELECT event_id,source_revision FROM public_collab_events'))
+      return {results:applied?(postApplyRows??currentRows??expectedRows()):(currentRows??[])};
+     throw Error('unexpected all');
     }
    };
-   return statement;
   },
   async batch(statements){
-   batched.push(...statements);
-   applied=true;
+   batched.push(...statements); applied=true;
    return statements.map(()=>({success:true,meta:{changes:1}}));
   }
  };
@@ -145,6 +143,27 @@ test('unchanged source revision performs no D1 write batch',async()=>{
  assert.equal(DB.batched.length,0);
 });
 
+test('same revision with membership drift never returns unchanged',async()=>{
+ const doc=await artifact();
+ const DB=fakeDb(doc.source_revision,1,{alreadyCurrent:true,currentRows:[{event_id:'wrong-event',source_revision:doc.source_revision}]});
+ await assert.rejects(applyLiveProjection(DB,doc),/live membership readback mismatch/);
+ assert.equal(DB.batched.length,0);
+});
+
+test('same revision with source revision drift never returns unchanged',async()=>{
+ const doc=await artifact();
+ const DB=fakeDb(doc.source_revision,1,{alreadyCurrent:true,currentRows:[{event_id:'holoserver-hide-and-seek:fixture',source_revision:'sha256:'+'0'.repeat(64)}]});
+ await assert.rejects(applyLiveProjection(DB,doc),/live source revision readback mismatch/);
+ assert.equal(DB.batched.length,0);
+});
+
+test('new revision apply rejects wrong post-apply membership',async()=>{
+ const doc=await artifact();
+ const DB=fakeDb(doc.source_revision,1,{postApplyRows:[{event_id:'wrong-event',source_revision:doc.source_revision}]});
+ await assert.rejects(applyLiveProjection(DB,doc),/live membership readback mismatch/);
+ assert.equal(DB.batched.length,3);
+});
+
 test('private endpoint requires explicit enablement and a valid signature',async()=>{
  const doc=await artifact();
  const disabled=await handleCollabPrivatePost(
@@ -161,6 +180,19 @@ test('private endpoint requires explicit enablement and a valid signature',async
   {now:NOW}
  );
  assert.equal(denied.status,401);
+});
+
+test('private endpoint rejects short HMAC secret',async()=>{
+ const doc=await artifact();
+ const secret='short-secret';
+ const DB=fakeDb(doc.source_revision);
+ const response=await handleCollabPrivatePost(
+  await signedRequest(doc,{secret}),
+  {DB,COLLAB_PUBLISH_ENABLED:'true',COLLAB_PUBLISH_HMAC_SECRET:secret},
+  {now:NOW}
+ );
+ assert.equal(response.status,503);
+ assert.equal(DB.batched.length,0);
 });
 
 test('private endpoint accepts exact signed canonical v2 live projection',async()=>{
