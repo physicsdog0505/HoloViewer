@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import os
 
 from ptt_offline.publisher_service import build_runtime
 
@@ -39,6 +40,15 @@ class PublisherServiceTests(unittest.TestCase):
             }))
             with self.assertRaises(Exception):
                 build_runtime(root)
+
+    def test_pidfile_claim_and_release_is_owner_scoped(self):
+        from ptt_offline.publisher_service import _claim_pidfile,_release_pidfile
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"publisher.pid"
+            _claim_pidfile(p)
+            self.assertEqual(int(p.read_text().strip()),os.getpid())
+            _release_pidfile(p)
+            self.assertFalse(p.exists())
 
 if __name__=="__main__":
     unittest.main()
