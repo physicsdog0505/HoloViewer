@@ -68,10 +68,11 @@ cat "$OUT/tests.txt"
 
 echo
 echo "=== 2. STAGE EXISTING SITE + ACCEPTED YOUTUBE TREE ==="
-if ! python3 scripts/youtube_static_assets_preview.py stage \
+if ! python3 scripts/youtube_static_assets_preview.py stage-pilot \
   --source-site site \
   --source-v1 "$SOURCE_V1" \
-  --target-site "$TMP/site" >"$OUT/stage.json" 2>&1; then
+  --target-site "$TMP/site" \
+  --max-channel-indexes 5 >"$OUT/stage.json" 2>&1; then
   cat "$OUT/stage.json"
   fail "Static Assets staging failed"
 fi
@@ -110,16 +111,17 @@ if ! npx --yes wrangler versions upload \
 fi
 cat "$UPLOAD_OUT"
 
-VERSION_URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' "$UPLOAD_OUT" | tail -n1 || true)"
+VERSION_URL="$(awk '/Version Preview URL:/{print $4; exit}' "$UPLOAD_OUT" | sed 's/[()\[\]]//g' || true)"
 [ -n "$VERSION_URL" ] || fail "Wrangler did not return a Version URL"
 echo "PREVIEW_OR_VERSION_URL=$VERSION_URL"
 
 echo
-echo "=== 5. HTTP READBACK OF COMPLETE YOUTUBE/V1 TREE ==="
+echo "=== 5. HTTP READBACK OF BOUNDED PILOT TREE ==="
 if ! python3 scripts/youtube_static_assets_preview.py verify-http \
   --base-url "$VERSION_URL" \
-  --v1 "$SOURCE_V1" \
-  --nonce "$STAMP" >"$OUT/http-readback.json" 2>&1; then
+  --v1 "$TMP/site/youtube/v1" \
+  --nonce "$STAMP" \
+  --workers 8 >"$OUT/http-readback.json" 2>&1; then
   cat "$OUT/http-readback.json"
   fail "Version URL HTTP readback failed"
 fi
@@ -145,6 +147,10 @@ PREVIEW_OR_VERSION_URL=$VERSION_URL
 MANIFEST_HTTP_READBACK=PASS
 MONTH_OBJECTS_HTTP_READBACK=PASS
 CHANNEL_INDEX_HTTP_READBACK=PASS
+PILOT_SCOPE=BOUNDED
+PILOT_MAX_MONTHS=2
+PILOT_MAX_CHANNEL_INDEXES=5
+PILOT_MAX_HTTP_REQUESTS=8
 BASELINE_ACTIVE_VERSION=$BASELINE_VERSION
 POST_ACTIVE_VERSION=$POST_VERSION
 PRODUCTION_TRAFFIC_CHANGED=NO

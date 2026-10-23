@@ -106,6 +106,23 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(1, result["channel_indexes"])
         self.assertEqual(2, result["videos"])
 
+    def test_bounded_pilot_tree_uses_two_months_and_max_five_indexes(self):
+        target = self.root / "pilot"
+        result = preview.build_pilot_tree(
+            self.v1,
+            target,
+            max_channel_indexes=5,
+        )
+        manifest = json.loads((target / "manifest.json").read_text())
+        self.assertTrue(result["pilot"])
+        self.assertLessEqual(len(manifest["months"]), 2)
+        self.assertLessEqual(len(manifest["channel_indexes"]), 5)
+        self.assertLessEqual(result["http_request_budget"], 8)
+        self.assertEqual(
+            "PASS",
+            preview.verify_local_tree(target)["local_readback"],
+        )
+
     def test_stage_site_preserves_existing_site_and_adds_youtube_tree(self):
         target = self.root / "staged"
         result = preview.stage_site(self.site, self.v1, target)
@@ -161,6 +178,10 @@ class PreviewTests(unittest.TestCase):
         self.assertIn('fail "Version URL HTTP readback failed"', runner)
         self.assertIn('fail "Cloudflare version upload failed"', runner)
         self.assertIn('fail "offline regression failed"', runner)
+        self.assertIn("stage-pilot", runner)
+        self.assertIn("--max-channel-indexes 5", runner)
+        self.assertIn('--v1 "$TMP/site/youtube/v1"', runner)
+        self.assertIn("PILOT_MAX_HTTP_REQUESTS=8", runner)
 
     def test_http_readback_verifies_all_declared_objects(self):
         objects = {}
