@@ -44,7 +44,7 @@ export function createExistingApiRouter({legacyHistory=defaultLegacyHistory,lega
   if(u.pathname==='/v1/catalog/today')response=await handleTodayRead(request,env);
   else if(/^\/v1\/videos\/[A-Za-z0-9_-]{1,64}\/metadata$/.test(u.pathname))response=await handleVideoMetadataRead(request,env,{ctx});
   else if(u.pathname.startsWith('/v1/history/videos/')||u.pathname.startsWith('/v1/collab/')||u.pathname.startsWith('/v1/watchalong/'))response=await handleExperienceRead(request,env);
-  else if((u.pathname==='/v1/ptt/today'||u.pathname==='/v1/ptt/history')&&pttHandler)response=await pttHandler(request,env);
+  else if((u.pathname==='/v1/ptt/today'||u.pathname==='/v1/ptt/history'||u.pathname==='/v1/ptt/recent')&&pttHandler)response=await pttHandler(request,env);
   else if(u.pathname==='/v1/history'&&legacyHistory)response=await legacyHistory(request,env);
   else if(u.pathname.startsWith('/v1/catalog/videos/')&&legacyVideo)response=await legacyVideo(request,env);
   else response=json({error:'not_found'},404);
