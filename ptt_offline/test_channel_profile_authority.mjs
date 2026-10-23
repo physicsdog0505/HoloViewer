@@ -71,6 +71,23 @@ test('canonical profile round-trips through one shared projection',async()=>{
  db.close();
 });
 
+test('canonical row color overrides runtime migration fallback and stays endpoint-identical',async()=>{
+ const db=sqliteD1();
+ await upsertChannelProfiles(db,[profile()]);
+ const runtime={schema_version:1,fallback:'neutral',channels:[{
+  channel_id:CHANNEL,display_mode:'solid',color_hex:'#ABCDEF',verification_status:'verified'
+ }]};
+ const env={DB:db,TODAY_SUPPORT_COLORS_JSON:JSON.stringify(runtime)};
+ const direct=await readChannelProfile(db,CHANNEL,{env});
+ const res=await handleChannelProfileRead(new Request('https://api.example/v1/channels/'+CHANNEL+'/profile'),env);
+ const body=await res.json();
+ assert.equal(direct.member_accent,'#123456');
+ assert.equal(direct.support_mode,'solid');
+ assert.equal(direct.support_color_source,'verified');
+ assert.deepEqual(body.profile,direct);
+ db.close();
+});
+
 test('legacy catalog avatar survives when optional channel_name column is absent',async()=>{
  const db=sqliteD1();
  db.raw.exec('DROP TABLE public_catalog');
