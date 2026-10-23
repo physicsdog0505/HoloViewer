@@ -56,6 +56,8 @@ const topbar=document.querySelector('.watchalong-topbar');
 const sourceStandby=document.getElementById('sourceStandby');
 const subtitleOverlay=document.getElementById('subtitleOverlay');
 const subtitleTranslation=document.getElementById('subtitleTranslation');
+const sourceSubtitleOverlay=document.getElementById('sourceSubtitleOverlay');
+const sourceSubtitleTranslation=document.getElementById('sourceSubtitleTranslation');
 const danmakuLayer=document.getElementById('danmakuLayer');
 
 let hostPlayer=null;
@@ -345,6 +347,7 @@ function refreshSubtitleModeUi(){
  });
  if(mobileSubtitleMode)mobileSubtitleMode.textContent='字幕：'+subtitleModeLabel();
  if(!subtitleEnabled)subtitleOverlay.hidden=true;
+ if(!subtitleEnabled||danmakuEnabled)sourceSubtitleOverlay.hidden=true;
  if(!danmakuEnabled)clearDanmaku();
 }
 function persistSubtitleMode(){
@@ -702,10 +705,14 @@ function spawnDanmaku(row){
 function renderSubtitleCue(row){
  const cueId=row?String(row.id||row.index||row.start):'';
  if(subtitleEnabled){
-  subtitleTranslation.textContent=row?.translation||'';
-  subtitleOverlay.hidden=!row?.translation;
+  const text=row?.translation||'';
+  subtitleTranslation.textContent=text;
+  subtitleOverlay.hidden=!text;
+  sourceSubtitleTranslation.textContent=text;
+  sourceSubtitleOverlay.hidden=danmakuEnabled||!text;
  }else{
   subtitleOverlay.hidden=true;
+  sourceSubtitleOverlay.hidden=true;
  }
  if(danmakuEnabled){
   if(!row){
