@@ -77,6 +77,8 @@ def validate(doc: dict) -> list[dict]:
         seen.add(event_id)
         if row.get("review_status") not in STATUS:
             raise ValueError("rejected/invalid event must not be published")
+        if projection_key != "live" and bool(row.get("live_scope")):
+            raise ValueError("history projection cannot claim live_scope")
         payload = row.get("payload")
         if not isinstance(payload, dict) or payload.get("event_id") != event_id:
             raise ValueError("payload identity mismatch")
@@ -145,12 +147,27 @@ def render_sql(doc: dict) -> str:
     published = doc.get("generated_at")
     _parse_time(published)
 
-    statements = [
-        "BEGIN TRANSACTION;",
-        f"UPDATE public_collab_events SET is_current=0 WHERE start_at>={q(start)} AND start_at<{q(end)};",
-    ]
+    statements = ["BEGIN TRANSACTION;"]
+    if projection_key == "live":
+        # The live projection is a complete replacement of current live membership,
+        # independent of the artifact's source date range. Do not retire canonical
+        # history rows when they simply leave live scope.
+        statements.append(
+            "UPDATE public_collab_events SET live_scope=0 WHERE live_scope=1;"
+        )
+    else:
+        # Historical publication owns only non-live rows in its bounded range.
+        statements.append(
+            "UPDATE public_collab_events SET is_current=0 "
+            f"WHERE is_current=1 AND live_scope=0 AND start_at>={q(start)} AND start_at<{q(end)};"
+        )
     for row in rows:
         payload_json = json.dumps(row["payload"], ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        live_update = (
+            "live_scope=excluded.live_scope,"
+            if projection_key == "live"
+            else "live_scope=CASE WHEN public_collab_events.live_scope=1 THEN 1 ELSE 0 END,"
+        )
         statements.append(
             "INSERT INTO public_collab_events("
             "event_id,event_key,label,confidence,event_date,start_at,end_at,review_status,"
@@ -166,7 +183,8 @@ def render_sql(doc: dict) -> str:
             "event_key=excluded.event_key,label=excluded.label,confidence=excluded.confidence,"
             "event_date=excluded.event_date,start_at=excluded.start_at,end_at=excluded.end_at,"
             "review_status=excluded.review_status,payload_json=excluded.payload_json,"
-            "live_scope=excluded.live_scope,is_current=1,source_revision=excluded.source_revision,"
+            + live_update +
+            "is_current=1,source_revision=excluded.source_revision,"
             "published_at=excluded.published_at;"
         )
     statements.append(
