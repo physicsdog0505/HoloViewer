@@ -597,6 +597,13 @@ function onHostStateChange(event){
   else if(event.data===YT.PlayerState.PAUSED)sourcePlayer.pauseVideo();
  }catch{}finally{setTimeout(()=>{suppressLinkedCommand=false},0)}
 }
+function onSourceStateChange(event){
+ if(event?.data!==YT.PlayerState.ENDED)return;
+ let host=null;
+ try{host=hostPlayer?.getCurrentTime?.()}catch{}
+ if(!Number.isFinite(host))return;
+ maybeLatchSourceGap(host,YT.PlayerState.ENDED);
+}
 function youtubePlayerErrorLabel(code){
  const labels={2:'無效影片參數',5:'播放器 HTML5 錯誤',100:'影片不存在或已設為私人',101:'影片禁止嵌入',150:'影片禁止嵌入'};
  return labels[Number(code)]||('播放器錯誤 '+String(code??'unknown'));
@@ -626,6 +633,7 @@ function mountPlayers(){
    videoId:sourceVideoId||undefined,playerVars:vars,
    events:{
     onReady:()=>{sourcePlayerReady=true;sourceStatus.textContent=PLAYLIST_ID?'Playlist 已就緒':'片源已就緒';startSyncLoop();startSubtitleLoop();maybeApplyResume()},
+    onStateChange:onSourceStateChange,
     onError:event=>{sourcePlayerReady=false;sourceStatus.textContent=youtubePlayerErrorLabel(event?.data)}
    }
   });
