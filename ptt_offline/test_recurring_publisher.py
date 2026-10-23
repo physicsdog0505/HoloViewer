@@ -77,6 +77,22 @@ class RecurringPublisherTests(unittest.TestCase):
             self.assertEqual(last["stop_reason"],"DAILY_BUDGET_STATE_INVALID")
             self.assertTrue(last["daily_budget_blocked"])
 
+    def test_daily_budget_block_keeps_backlog_pressure(self):
+        source="8"*64
+        with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
+             patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1]), \
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
+             patch("ptt_offline.recurring_publisher.run_live_once",return_value={
+                 "status":"DAILY_BUDGET_BLOCKED","sent":0,"eligible":5,
+                 "fresh_eligible":0,"retained_recovery_candidates":5,
+             }):
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=10,max_batches=1,
+                                write_allowed=False)
+        self.assertEqual(result["status"],"DAILY_BUDGET_BLOCKED")
+        self.assertTrue(result["backlog_may_remain"])
+        self.assertEqual(result["eligible"],5)
+
     def test_adaptive_interval_is_10s_under_pressure_and_60s_when_idle(self):
         self.assertEqual(adaptive_interval({"fresh_eligible":1}),10)
         self.assertEqual(adaptive_interval({"sent":10}),10)
