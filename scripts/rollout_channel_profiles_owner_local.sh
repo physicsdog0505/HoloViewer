@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-EXPECTED_HEAD="320689b2bf47bac776a25ddd533c5a8933aa7680"
+EXPECTED_HEAD=""
 WORKER="holoviewer-public-api"
 DB="holoviewer-public-v1"
 ACCEPTED_BASELINE="df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96"
@@ -19,6 +19,7 @@ usage() {
   cat <<'EOF'
 Usage:
   scripts/rollout_channel_profiles_owner_local.sh [--apply] [--deploy] \
+    --expected-head <reviewed-40-char-sha> \
     --backend-config /absolute/path/to/complete-backend-wrangler.json \
     [--support-colors /absolute/path/to/holoviewer-channel-support-colors.json]
 
@@ -32,6 +33,7 @@ while (($#)); do
   case "$1" in
     --apply) APPLY=1; shift ;;
     --deploy) DEPLOY=1; shift ;;
+    --expected-head) EXPECTED_HEAD="${2:?missing expected head}"; shift 2 ;;
     --backend-config) BACKEND_CONFIG="${2:?missing backend config}"; shift 2 ;;
     --support-colors) SUPPORT_COLORS="${2:?missing support colors}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -40,6 +42,7 @@ while (($#)); do
 done
 
 (( DEPLOY == 0 || APPLY == 1 )) || { echo "ABORT: --deploy requires --apply" >&2; exit 2; }
+[[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "ABORT: --expected-head <40-char reviewed SHA> is required" >&2; exit 2; }
 [[ -n "$BACKEND_CONFIG" ]] || { echo "ABORT: --backend-config is required" >&2; exit 2; }
 
 BACKEND_CONFIG="$(cd "$(dirname "$BACKEND_CONFIG")" && pwd)/$(basename "$BACKEND_CONFIG")"
