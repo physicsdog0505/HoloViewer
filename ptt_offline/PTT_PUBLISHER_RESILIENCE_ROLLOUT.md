@@ -37,10 +37,13 @@ Never import Publisher code from the legacy runtime checkout by accident.
 
 Required before Owner cutover:
 - PR #211 exact HEAD recorded;
-- PTT workflow PASS at that exact HEAD;
-- Owner-local focused regression PASS;
-- Public smoke repository allowlist failure, if unchanged and unrelated, is not
-  a PTT runtime deployment gate.
+- source review completed for that exact HEAD;
+- Owner-local focused regression PASS.
+
+GitHub Actions / CI are passive evidence only. They are never required for
+cutover, never block deployment, and never deploy or rollback Production.
+Any workflow result may be recorded for audit, but Owner-local source/runtime
+evidence is the deployment gate.
 
 ## Gate B — live preflight
 
