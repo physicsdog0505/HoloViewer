@@ -104,6 +104,16 @@ def load_config(path: Path) -> dict[str,Any]:
     base_url=body.get("base_url")
     if not isinstance(base_url,str) or not base_url.startswith("https://"):
         raise DailyHistoryRuntimeError("https base_url required")
+    cutover=body.get("lifecycle_v2_cutover_day",LIFECYCLE_V2_CUTOVER_DAY)
+    if not isinstance(cutover,str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}",cutover):
+        raise DailyHistoryRuntimeError("lifecycle_v2_cutover_day must be canonical YYYY-MM-DD")
+    try:
+        if datetime.fromisoformat(cutover).date().isoformat()!=cutover:
+            raise ValueError
+    except ValueError as exc:
+        raise DailyHistoryRuntimeError(
+            "lifecycle_v2_cutover_day must be canonical YYYY-MM-DD") from exc
+    body["lifecycle_v2_cutover_day"]=cutover
     body["_collector_path"]=collector.resolve()
     body["_state_path"]=state.resolve()
     return body
@@ -992,11 +1002,12 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
     state_root: Path=config["_state_path"]
     state_root.mkdir(parents=True,exist_ok=True)
     target_day=day or previous_taipei_day()
-    if target_day < LIFECYCLE_V2_CUTOVER_DAY:
+    cutover_day=str(config.get("lifecycle_v2_cutover_day") or LIFECYCLE_V2_CUTOVER_DAY)
+    if target_day < cutover_day:
         return {
             "status":"PRE_CUTOVER_IMMUTABLE",
             "day":target_day,
-            "cutover_day":LIFECYCLE_V2_CUTOVER_DAY,
+            "cutover_day":cutover_day,
             "archive_deployed":False,
             "reason":"historical-v1-production-archive-immutable",
         }
