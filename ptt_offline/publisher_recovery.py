@@ -76,7 +76,15 @@ def recover_pending_state(state_path,*,reconcile_executor,publish_executor,clock
     current=json.loads(path.read_text(encoding="utf-8"))
     if current.get("status")=="STOP_MANUAL":
         return {"status":"RECOVERY_QUARANTINED","aid":current.get("pending_aid"),"sent":0}
-    batch,updates=_validate_pending(current)
+    try:
+        batch,updates=_validate_pending(current)
+    except ContractError:
+        stopped=dict(current)
+        stopped["status"]="STOP_MANUAL"
+        stopped["recovery_reason"]="LEGACY_OR_INVALID_PENDING_ENVELOPE"
+        atomic_receipt(path,stopped)
+        return {"status":"RECOVERY_QUARANTINED","aid":current.get("pending_aid"),
+                "sent":0,"recovery_reason":"LEGACY_OR_INVALID_PENDING_ENVELOPE"}
     now=float(clock())
     due=current.get("next_reconcile_at")
     if isinstance(due,(int,float)) and now<due:
