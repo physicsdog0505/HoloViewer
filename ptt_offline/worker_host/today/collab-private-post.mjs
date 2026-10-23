@@ -141,6 +141,19 @@ export async function applyLiveProjection(DB,doc){
  if(!DB||typeof DB.prepare!=='function'||typeof DB.batch!=='function')
   throw Error('existing D1 binding required');
  const valid=await validateLiveProjection(doc);
+ const previous=await DB.prepare(
+  'SELECT source_revision,effective_event_count FROM public_collab_projection_meta WHERE projection_key=?'
+ ).bind('live').first();
+ if(previous?.source_revision===doc.source_revision){
+  return {
+   status:'unchanged',
+   projection_key:'live',
+   source_revision:doc.source_revision,
+   effective_event_count:doc.effective_event_count,
+   live_event_count:valid.events.filter(row=>row.live_scope).length,
+   d1_batch_statements:0
+  };
+ }
  const statements=[
   DB.prepare('UPDATE public_collab_events SET live_scope=0 WHERE is_current=1 AND live_scope=1')
  ];
