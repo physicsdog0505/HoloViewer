@@ -126,15 +126,21 @@ test('bounded importer uses at most four write batches for 85 profiles',async()=
 
 test('partial 25-of-85 state resumes with exactly 60 writes',async()=>{
  const db=d1();
- const raw=artifact(), digest=sha(raw);
- const body=JSON.parse(raw);
- const first25=JSON.stringify({...body,profile_count:85,profiles:body.profiles});
- // Seed only the first 25 rows using the canonical writer path via direct SQL fixture.
+ const body=JSON.parse(artifact());
+ body.profiles[0]=profile(0,{
+  support_mode:'dual_color',
+  member_accent:'#112233',
+  member_accent_dual:['#112233','#445566'],
+  support_color_source:'test-dual'
+ });
+ const raw=JSON.stringify(body), digest=sha(raw);
+ // Seed only the first 25 rows, including a dual-color row, as already-committed Production state.
  for(const p of body.profiles.slice(0,25)){
   db.raw.prepare(`INSERT INTO public_channel_profiles
    (channel_id,channel_name,display_name,avatar_url,channel_group,member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at)
    VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(
-    p.channel_id,p.channel_name,p.display_name,p.avatar_url,p.group,p.member_accent,null,
+    p.channel_id,p.channel_name,p.display_name,p.avatar_url,p.group,p.member_accent,
+    p.member_accent_dual?JSON.stringify(p.member_accent_dual):null,
     p.support_mode,p.support_color_source,p.profile_revision,p.updated_at
    );
  }
