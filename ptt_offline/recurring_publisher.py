@@ -16,6 +16,7 @@ from .live_capture_publisher import active_article_ids,inspect_latest_article,ru
 from .owner_http_transport import owner_signed_http_executor, owner_signed_reconcile_executor
 from .publisher_cli import exclusive_lock
 from .publisher_telemetry import update_publisher_telemetry
+from .publisher_admission import allows_batch as durable_allows_batch, record as durable_record, snapshot as durable_snapshot
 from .public_today_contract import ContractError
 
 TAIPEI=ZoneInfo('Asia/Taipei')
@@ -310,6 +311,7 @@ def main(argv=None):
     with exclusive_lock(Path(args.state_dir)/".single-publisher.lock"):
         iteration=0
         rolling=deque()
+        admission_path=metric.parent/"publisher-admission.json"
         previous_backlog=None
         while args.iterations==0 or iteration<args.iterations:
             started=time.monotonic()
@@ -317,7 +319,11 @@ def main(argv=None):
                 now_mono=time.monotonic()
                 prune_rolling(rolling,now_mono)
                 before=rolling_totals(rolling)
-                budget_blocked=bool(args.adaptive_live_cadence and args.send and not rolling_budget_allows(rolling,now_mono))
+                durable_now=time.time()
+                durable_before=durable_snapshot(admission_path,now=durable_now)
+                budget_blocked=bool(args.adaptive_live_cadence and args.send and
+                    (not rolling_budget_allows(rolling,now_mono) or
+                     not durable_allows_batch(admission_path,now=durable_now)))
                 send_this_tick=args.send and not budget_blocked
                 effective_burst=(args.max_batches if args.adaptive_live_cadence else args.burst_max_batches)
                 result=run_snapshot(source=args.source,state_dir=args.state_dir,send=send_this_tick,
@@ -330,8 +336,11 @@ def main(argv=None):
                 modeled_writes=result.get("modeled_d1_writes_ceiling",0)
                 if send_this_tick and posts:
                     rolling.append((now_mono,posts,sent_rows,modeled_queries,modeled_writes))
+                    durable_record(admission_path,batches=posts,rows=sent_rows,
+                        modeled_queries=modeled_queries,modeled_writes=modeled_writes,
+                        now=time.time())
                 prune_rolling(rolling,now_mono)
-                totals=rolling_totals(rolling)
+                totals=durable_snapshot(admission_path,now=time.time())
                 eligible=result.get("eligible",0)
                 backlog_after=max(0,eligible-sent_rows) if isinstance(eligible,int) else 0
                 backlog_delta=(None if previous_backlog is None else backlog_after-previous_backlog)
@@ -350,6 +359,7 @@ def main(argv=None):
                     "rolling_60s_rows":totals["rows"],
                     "rolling_60s_modeled_queries":totals["modeled_queries"],
                     "rolling_60s_modeled_writes":totals["modeled_writes"],
+                    "durable_admission":True,
                     "stop_reason":stop_reason,
                 }
             except Exception as exc:
