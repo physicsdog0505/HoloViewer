@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import patch
 from contextlib import nullcontext
@@ -40,6 +41,41 @@ class RecurringPublisherTests(unittest.TestCase):
                     ])
         snapshot.assert_called_once()
 
+
+    def test_invalid_daily_budget_keeps_process_alive_and_blocks_remote_write(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            state=root/"state"; state.mkdir()
+            metrics=root/"metrics.jsonl"
+            result={
+                "status":"ADMISSION_BUDGET_BLOCKED","sent":0,"eligible":5,
+                "http_posts":0,"backlog_may_remain":True,
+                "retained_recovery_candidates":5,"fresh_eligible":0,
+                "observed_at":"2026-10-23T15:00:00+00:00",
+                "publisher_mode":"OWNER_APPROVED_SEND",
+                "budget_batches":0,"budget_rows":0,
+                "budget_modeled_queries":0,"budget_modeled_writes":0,
+            }
+            with patch.dict("os.environ",{
+                    "PTT_ALLOW_CAPTURE_TIME_POLICY":"true",
+                    "PTT_PUBLISH_HMAC_SECRET":"p"*40,
+                    "PTT_TIME_AUTHORITY_SECRET":"t"*40,
+                 },clear=False), patch("ptt_offline.recurring_publisher.exclusive_lock",return_value=nullcontext()), patch("ptt_offline.recurring_publisher.owner_signed_http_executor",return_value=lambda x:x), patch("ptt_offline.recurring_publisher.owner_signed_reconcile_executor",return_value=lambda x:x), patch("ptt_offline.recurring_publisher.daily_allows",side_effect=ContractError("bad ledger")), patch("ptt_offline.recurring_publisher.daily_snapshot",side_effect=ContractError("bad ledger")), patch("ptt_offline.recurring_publisher.run_snapshot",return_value=result) as snapshot:
+                main([
+                    "--source","unused.sqlite3",
+                    "--state-dir",str(state),
+                    "--metrics",str(metrics),
+                    "--iterations","1",
+                    "--adaptive-live-cadence",
+                    "--send","--approve-live-capture-policy",
+                    "--batch-cap","10","--max-batches","1","--burst-max-batches","1",
+                ])
+            kwargs=snapshot.call_args.kwargs
+            self.assertFalse(kwargs["write_allowed"])
+            self.assertIsNone(kwargs["reconcile_executor"])
+            last=json.loads(metrics.read_text().splitlines()[-1])
+            self.assertEqual(last["stop_reason"],"DAILY_BUDGET_STATE_INVALID")
+            self.assertTrue(last["daily_budget_blocked"])
 
     def test_adaptive_interval_is_10s_under_pressure_and_60s_when_idle(self):
         self.assertEqual(adaptive_interval({"fresh_eligible":1}),10)
