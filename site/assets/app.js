@@ -257,12 +257,14 @@ function route(r){
  document.body.classList.toggle('watchalong-wide',r==='watchalong');
  $('ptt-focus').textContent=r==='ptt-focus'?'退出專注':'⛶ 專注模式';
  $('ptt-floor-toggle').hidden=r!=='ptt-focus';
- $('live-channel-rail').hidden=!['home','custom-session'].includes(r)||!$('live-channel-list').childElementCount;
+ $('live-channel-rail').hidden=!$('live-channel-list').childElementCount;
+ window.hvEnsureLiveRail?.();
  if(r==='home')loadHome();
  if(r==='history')loadHistory();
  if(r==='ptt'||r==='ptt-focus')loadPtt();
  if(r==='single')loadCustomLibrary();
  if(r==='multi')loadCollab();
+ if(r==='watchalong')window.hvLoadWatchalongLanding?.();
 }
 async function api(path){if(!config.apiBase||!/^https:\/\//.test(config.apiBase))throw Error('尚未設定正式 Worker API');const base=config.apiBase.replace(/\/$/,'');const response=await fetch(base+path,{mode:'cors',credentials:'omit',headers:{Accept:'application/json'}});if(!response.ok)throw Error('API HTTP '+response.status);return response.json()}
 function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_id||''))return;const card=node('div',undefined,'card');card.append(node('strong',String(item.title||item.video_id)));card.append(node('p',String(item.channel_name||item.lifecycle_state||''),'sub'));const btn=node('button','單人觀看');btn.onclick=()=>openStandaloneViewer([item.video_id],{pttMode:'video'});card.append(btn);card.append(' ');const multi=node('button','加入多人','secondary');multi.onclick=()=>{if(!state.multi.includes(item.video_id))state.multi.push(item.video_id);renderMulti();openStandaloneViewer(state.multi.slice(),{pttMode:'video'})};card.append(multi);container.append(card)}
@@ -565,7 +567,7 @@ function homeRail(items){const box=$('live-channel-list');box.replaceChildren();
  applyHomeSupportStyle(link,item);
  const avatarNode=homeAvatarChild(item,name);if(!avatarNode.matches('img'))avatarNode.className='';avatar.append(avatarNode);avatar.append(node('i'));link.append(avatar);link.append(node('strong',name));
  link.onclick=event=>{event.preventDefault();if($('custom-session').classList.contains('active')){selectWatchRailVideo(id,name);return}const card=$('stream-'+id);card?.scrollIntoView({block:'center',behavior:'smooth'})};box.append(link)});
- $('live-channel-rail').hidden=!box.children.length||(!$('home').classList.contains('active')&&!$('custom-session').classList.contains('active'));
+ $('live-channel-rail').hidden=!box.children.length;
  applyHomeFilter();refreshWatchRail();
 }
 
@@ -672,6 +674,7 @@ function renderHomeHighlights(rows,filter=homeFilter()){
 const HOME_CATALOG_CACHE_KEY='holoviewer-home-catalog-v1';
 let homeLoadInFlight=false;
 let homeCatalogRows=[];
+let homeCatalogPromise=null;
 function readHomeCatalogCache(){
  try{
   const cached=JSON.parse(sessionStorage.getItem(HOME_CATALOG_CACHE_KEY)||'null');
@@ -682,6 +685,34 @@ function readHomeCatalogCache(){
 function writeHomeCatalogCache(rows){
  try{sessionStorage.setItem(HOME_CATALOG_CACHE_KEY,JSON.stringify({day:taipeiDay(),savedAt:Date.now(),rows}))}catch{}
 }
+function acceptHomeCatalogRows(rows){
+ if(!Array.isArray(rows))throw Error('資料格式錯誤');
+ homeCatalogRows=rows;
+ customCatalogCache=rows;
+ writeHomeCatalogCache(rows);
+ return rows;
+}
+function requestHomeCatalogRows(){
+ if(homeCatalogPromise)return homeCatalogPromise;
+ homeCatalogPromise=api('/v1/catalog/today')
+  .then(data=>acceptHomeCatalogRows(data.streams||data.items))
+  .finally(()=>{homeCatalogPromise=null});
+ return homeCatalogPromise;
+}
+async function ensureLiveRail(){
+ const cached=homeCatalogRows.length?homeCatalogRows:readHomeCatalogCache();
+ if(cached.length){
+  homeCatalogRows=cached;
+  customCatalogCache=cached;
+  homeRail(homeBuckets(cached).live);
+ }
+ if(!config.apiBase)return;
+ try{
+  const rows=await requestHomeCatalogRows();
+  homeRail(homeBuckets(rows).live);
+ }catch{}
+}
+window.hvEnsureLiveRail=ensureLiveRail;
 function renderHomeRows(rows){
  homeCatalogRows=rows;
  customCatalogCache=rows;
@@ -765,10 +796,7 @@ async function loadHome(){
  homeLoadInFlight=true;
  if(!cachedRows.length)$('home-empty').textContent='';
  try{
-  const data=await api('/v1/catalog/today');
-  const rows=data.streams||data.items;
-  if(!Array.isArray(rows))throw Error('資料格式錯誤');
-  writeHomeCatalogCache(rows);
+  const rows=await requestHomeCatalogRows();
   renderHomeRows(rows);
   $('connection').textContent='API 已連線';
   loadHomeCollab();
@@ -805,7 +833,7 @@ async function loadHistory(){
   const collabPromise=api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null);
   const catalogPromise=homeCatalogRows.length
    ?Promise.resolve({streams:homeCatalogRows})
-   :api('/v1/catalog/today').catch(()=>null);
+   :requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null);
   const [data,collabData,catalogData]=await Promise.all([historyPromise,collabPromise,catalogPromise]);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
   const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
@@ -1851,7 +1879,8 @@ async function loadWatchalongLanding(){
   if(watchalongTodayEmpty){watchalongTodayEmpty.hidden=false;watchalongTodayEmpty.textContent='今日同時視聽暫時無法載入。'}
  }
 }
-loadWatchalongLanding();
+window.hvLoadWatchalongLanding=loadWatchalongLanding;
+if(initialRoute==='watchalong')loadWatchalongLanding();
 
 const youtubePanel=document.getElementById('youtubePanel');
 const externalPanel=document.getElementById('externalPanel');
