@@ -136,9 +136,16 @@ The current pinned support-color export is consumed centrally during transition
 so endpoint-specific color parsers can be removed without losing existing
 reviewed color behavior.
 
-Avatar/name/group/profile revisions must ultimately be persisted by the canonical
-profile producer. Missing values remain null rather than being inferred from
-titles.
+The reviewed 85-channel population artifact also merges that same pinned
+support-color authority by stable `channel_id`. Known reviewed accent/dual-color
+values are therefore persisted directly in `public_channel_profiles`; only
+channels without reviewed color evidence remain neutral/null. The runtime color
+projection remains migration compatibility only, and a populated canonical row
+takes precedence.
+
+Avatar/name/group/profile revisions and reviewed support-color fields are
+persisted by the canonical profile producer. Missing values remain null rather
+than being inferred from titles.
 
 ## Frontend transition
 
