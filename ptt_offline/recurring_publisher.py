@@ -433,9 +433,16 @@ def main(argv=None):
                         "modeled_query_cap":args.daily_modeled_query_cap,
                     }
                     daily_state_error="DAILY_BUDGET_STATE_INVALID"
-                stop_reason=(admission_state_error or daily_state_error or
-                             "ROLLING_60S_BATCH_CAP" if rolling_blocked else
-                             daily_reason if budget_blocked else None)
+                if admission_state_error:
+                    stop_reason=admission_state_error
+                elif daily_state_error:
+                    stop_reason=daily_state_error
+                elif rolling_blocked:
+                    stop_reason="ROLLING_60S_BATCH_CAP"
+                elif budget_blocked:
+                    stop_reason=daily_reason
+                else:
+                    stop_reason=None
                 result={**result,
                     "adaptive_live_cadence":bool(args.adaptive_live_cadence),
                     "live_pressure":adaptive_live_pressure(result),
