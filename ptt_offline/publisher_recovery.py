@@ -120,7 +120,8 @@ def recover_pending_state(state_path,*,reconcile_executor,publish_executor,clock
                     "retry_after_seconds":_delay(attempt),"sent":0,
                     "reconcile_reads":1}
         atomic_receipt(path,_clean_success_state(current,batch,updates,remote_commit=False))
-        return {"status":"RECOVERED_REPLAY","aid":current.get("pending_aid"),
+        return {"status":"ACK","recovery_status":"RECOVERED_REPLAY",
+                "aid":current.get("pending_aid"),
                 "sent":len(batch["rows"]),"batch_id":batch["batch_id"],
                 "http_posts":1,"reconcile_reads":1}
 
