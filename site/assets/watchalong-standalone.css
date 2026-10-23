@@ -78,6 +78,12 @@ button,input,select,output{font:inherit}
  text-shadow:0 1px 2px #000,0 0 5px rgba(0,0,0,.85);overflow-wrap:anywhere
 }
 .subtitle-line.translation{font-size:clamp(20px,1.55vw,28px)}
+.source-subtitle-overlay{
+ position:absolute;left:5%;right:5%;bottom:7%;z-index:6;display:flex;align-items:center;justify-content:center;
+ padding:2px 8px;pointer-events:none;text-align:center
+}
+.source-subtitle-overlay[hidden]{display:none}
+.source-subtitle-overlay .subtitle-line{color:var(--watchalong-host-accent,#4b97c8)}
 .danmaku-layer{position:absolute;left:0;right:0;top:0;height:48%;z-index:6;overflow:hidden;pointer-events:none}
 .danmaku-item{
  position:absolute;right:-10%;top:var(--danmaku-top,8%);max-width:88%;padding:3px 7px;border-radius:0;
