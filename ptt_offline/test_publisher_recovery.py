@@ -51,7 +51,8 @@ class RecoveryTests(unittest.TestCase):
             def publish(got):
                 seen.append(got)
                 return {"status":"ACK","batch_id":b["batch_id"],"digest":b["digest"],
-                        "rows_acked":1}
+                        "logical_rows_acked":1,"d1_rows_written":0,
+                        "d1_query_count":7,"http_requests":1}
             result=recover_pending_state(p,
                 reconcile_executor=lambda _:{"status":"RECONCILE","outcome":"NONE_PRESENT",
                     "batch_id":b["batch_id"],"digest":b["digest"],"rows_checked":1,"present":0,"mismatched":0},
