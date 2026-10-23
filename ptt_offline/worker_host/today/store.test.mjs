@@ -219,7 +219,7 @@ test('prior-day ended Home grace lasts until 11:59:59 Taipei and ends at noon',a
  d.close();
 });
 
-test('new verified profile avatar is opt-in and legacy API remains readable before migration',async()=>{
+test('legacy verified profile migration source is resolved centrally for all reads',async()=>{
  const d=db();
  await writeEvidence(d,fixture());
  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
@@ -232,7 +232,7 @@ test('new verified profile avatar is opt-in and legacy API remains readable befo
  const fresh=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z'),profileTableEnabled:true});
  assert.equal(fresh.streams[0].avatar_url,'https://yt3.ggpht.com/approved');
  const unchanged=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:00:00Z')});
- assert.equal(unchanged.streams[0].avatar_url,null);
+ assert.equal(unchanged.streams[0].avatar_url,'https://yt3.ggpht.com/approved');
  d.close();
 });
 
@@ -274,7 +274,7 @@ test('4174 Home envelope degrades malformed optional fields per-row instead of f
   start_at:result.streams[0].start_at,
   avatar_url:result.streams[0].avatar_url,
   source_label:result.streams[0].source_label
- },{video_id:V,title:'',channel_id:C,channel_name:'',group:'other',start_at:null,avatar_url:null,source_label:''});
+ },{video_id:V,title:'',channel_id:C,channel_name:'Fixture channel',group:'hololive',start_at:null,avatar_url:null,source_label:''});
  d.close();
 });
 
