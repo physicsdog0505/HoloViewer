@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from .recurring_publisher import main as recurring_main
@@ -51,16 +52,57 @@ def build_runtime(root):
     ]
     return env,argv
 
+def _pid_alive(pid):
+    try:
+        os.kill(pid,0)
+        return True
+    except ProcessLookupError:
+        return False
+
+def _claim_pidfile(path):
+    path=Path(path)
+    if path.exists():
+        try:
+            old=int(path.read_text(encoding="utf-8").strip())
+        except ValueError:
+            old=None
+        if old is not None and old!=os.getpid() and _pid_alive(old):
+            raise ContractError("another Publisher pidfile owner is alive")
+    fd,tmp=tempfile.mkstemp(prefix=path.name+".",dir=str(path.parent))
+    try:
+        with os.fdopen(fd,"w",encoding="utf-8") as handle:
+            handle.write(str(os.getpid())+"\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp,path)
+        os.chmod(path,0o600)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+def _release_pidfile(path):
+    path=Path(path)
+    try:
+        current=int(path.read_text(encoding="utf-8").strip())
+    except (OSError,ValueError):
+        return
+    if current==os.getpid():
+        path.unlink(missing_ok=True)
+
 def main(argv=None):
     p=argparse.ArgumentParser()
     p.add_argument("--root",required=True)
     args=p.parse_args(argv)
     env,child_argv=build_runtime(args.root)
+    state=Path(args.root).expanduser().resolve()/".ptt-publisher-state"
+    pidfile=state/"publisher.pid"
+    _claim_pidfile(pidfile)
     old={k:os.environ.get(k) for k in env}
     try:
         os.environ.update(env)
         return recurring_main(child_argv)
     finally:
+        _release_pidfile(pidfile)
         for key,value in old.items():
             if value is None:
                 os.environ.pop(key,None)
