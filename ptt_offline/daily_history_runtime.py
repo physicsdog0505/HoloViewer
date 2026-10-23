@@ -474,12 +474,200 @@ def _build_taipei_day_source_object(*, day: str, payloads: list[dict[str,Any]],
     }
     return "day.json",_canonical_bytes(payload)
 
+
+def _build_thread_lifecycle_source_object(
+    *,
+    day: str,
+    payloads: list[dict[str,Any]],
+    expected_aids: set[str],
+    expected_thread_epochs: dict[str,datetime],
+) -> tuple[str,bytes]:
+    """Build one archive object owned by the target day's expected threads.
+
+    The target day owns its authoritative expected day/night threads through the
+    first next-day successor-thread handoff, capped at 07:30 Asia/Taipei. This
+    permits a target night thread to contribute its post-midnight tail while
+    preventing the same rows from being carried into the adjacent day's archive.
+    """
+    normalized_expected={
+        str(aid).lstrip("#") for aid in expected_aids if str(aid).lstrip("#")
+    }
+    if not normalized_expected:
+        raise DailyHistoryRuntimeError("daily source expected AID set required")
+
+    day_start=datetime.fromisoformat(day).replace(tzinfo=TPE)
+    next_midnight=day_start+timedelta(days=1)
+    closeout_limit=next_midnight+timedelta(hours=7,minutes=30)
+    start_utc=day_start.astimezone(timezone.utc)
+    next_midnight_utc=next_midnight.astimezone(timezone.utc)
+    closeout_limit_utc=closeout_limit.astimezone(timezone.utc)
+
+    normalized_authority={
+        str(aid).lstrip("#"):epoch
+        for aid,epoch in expected_thread_epochs.items()
+        if str(aid).lstrip("#") in normalized_expected
+    }
+    if set(normalized_authority)!=normalized_expected:
+        raise DailyHistoryRuntimeError("expected thread epoch authority incomplete")
+    if any(not isinstance(epoch,datetime) or epoch.tzinfo is None
+           for epoch in normalized_authority.values()):
+        raise DailyHistoryRuntimeError("invalid expected thread epoch authority")
+
+    first_expected_epoch=min(
+        epoch.astimezone(timezone.utc) for epoch in normalized_authority.values())
+
+    candidates=[]
+    thread_epochs: dict[str,datetime]={}
+    for payload in payloads:
+        rows=payload.get("pushes")
+        if not isinstance(rows,list):
+            raise DailyHistoryRuntimeError("daily source object pushes missing")
+        for raw in rows:
+            if not isinstance(raw,dict):
+                raise DailyHistoryRuntimeError("invalid source push row")
+            row=dict(raw)
+            aid=str(row.get("aid") or "").lstrip("#")
+            if not aid:
+                raise DailyHistoryRuntimeError("daily source row AID required")
+            occurred=_row_time(row)
+            epoch=_source_thread_epoch(row)
+            prior=thread_epochs.get(aid)
+            if epoch is not None:
+                if prior is not None and prior!=epoch:
+                    raise DailyHistoryRuntimeError("AID has inconsistent source thread epoch")
+                thread_epochs[aid]=epoch
+            candidates.append((aid,occurred,row))
+
+    # Any unexpected thread born after the target midnight and before the
+    # 07:30 closeout cap is the authoritative next-owner handoff.
+    successor_candidates=[]
+    for aid,epoch in thread_epochs.items():
+        if aid in normalized_expected:
+            continue
+        epoch_utc=epoch.astimezone(timezone.utc)
+        if next_midnight_utc<=epoch_utc<closeout_limit_utc:
+            successor_candidates.append((epoch_utc,aid))
+        elif first_expected_epoch<=epoch_utc<next_midnight_utc:
+            # A non-authoritative thread born inside the target lifecycle makes
+            # ownership ambiguous; fail closed instead of silently excluding it.
+            raise DailyHistoryRuntimeError(
+                "unexpected thread inside authoritative target lifecycle")
+
+    successor_aid=None
+    handoff_boundary=closeout_limit_utc
+    handoff_source="closeout-limit"
+    if successor_candidates:
+        handoff_boundary,successor_aid=min(successor_candidates)
+        handoff_source="successor-thread"
+
+    pushes=[]
+    seen=set()
+    excluded_counts: dict[str,int]={}
+    excluded_reasons: dict[str,str]={}
+    post_midnight_tail=0
+
+    def exclude(aid: str, reason: str) -> None:
+        excluded_counts[aid]=excluded_counts.get(aid,0)+1
+        excluded_reasons[aid]=reason
+
+    for aid,occurred,row in candidates:
+        if occurred<start_utc:
+            exclude(aid,"before-target-lifecycle")
+            continue
+        if occurred>=closeout_limit_utc:
+            exclude(aid,"after-closeout-limit")
+            continue
+
+        if aid not in normalized_expected:
+            epoch=thread_epochs.get(aid)
+            if epoch is None:
+                raise DailyHistoryRuntimeError(
+                    "unexpected AID cannot be classified without source thread epoch")
+            epoch_utc=epoch.astimezone(timezone.utc)
+            if epoch_utc<first_expected_epoch:
+                exclude(aid,"previous-lifecycle-thread")
+            elif epoch_utc>=next_midnight_utc:
+                exclude(aid,"successor-thread")
+            else:
+                raise DailyHistoryRuntimeError(
+                    "unexpected AID membership is not provable")
+            continue
+
+        if occurred>=handoff_boundary:
+            exclude(aid,"after-authoritative-handoff")
+            continue
+
+        if row.get("floor") is None or row.get("floor_quality")!="per-thread-ordinal":
+            raise DailyHistoryRuntimeError(
+                "VERIFIED_COMPLETE archive requires authoritative per-thread floor")
+        identity=row.get("source_record_key")
+        if not isinstance(identity,str) or not identity:
+            raise DailyHistoryRuntimeError("daily source requires stable source_record_key")
+        if identity in seen:
+            raise DailyHistoryRuntimeError("duplicate source_record_key across daily source")
+        seen.add(identity)
+
+        row["coverage_day"]=day
+        row["coverage_status"]="COMPLETE"
+        row["finalized"]=True
+        row["day_membership"]="expected-thread-lifecycle"
+        pushes.append(row)
+        if occurred>=next_midnight_utc:
+            post_midnight_tail+=1
+
+    if not pushes:
+        raise DailyHistoryRuntimeError("no archive pushes for finalized day")
+
+    pushes.sort(key=lambda row:(
+        _row_time(row),
+        str(row.get("aid") or ""),
+        int(row.get("source_line") or 0),
+        str(row.get("source_record_key") or ""),
+    ))
+
+    payload={
+        "schema_version":"holoviewer-ptt-history-day-v2",
+        "precision":"minute",
+        "timezone":"Asia/Taipei",
+        "partition_kind":"expected-thread-lifecycle",
+        "partition_start":start_utc.isoformat(timespec="seconds").replace("+00:00","Z"),
+        "partition_end":
+            handoff_boundary.isoformat(timespec="seconds").replace("+00:00","Z"),
+        "coverage_day":day,
+        "coverage_status":"COMPLETE",
+        "finalized":True,
+        "membership":{
+            "rule":"expected-thread-lifecycle-v2",
+            "expected_aids":sorted(normalized_expected),
+            "first_expected_thread_start":
+                first_expected_epoch.isoformat(timespec="seconds").replace("+00:00","Z"),
+            "closeout_limit":
+                closeout_limit_utc.isoformat(timespec="seconds").replace("+00:00","Z"),
+            "handoff_boundary":
+                handoff_boundary.isoformat(timespec="seconds").replace("+00:00","Z"),
+            "handoff_source":handoff_source,
+            "successor_aid":successor_aid,
+            "post_midnight_tail_pushes":post_midnight_tail,
+            "excluded_aids":[{
+                "aid":aid,
+                "pushes":excluded_counts[aid],
+                "reason":excluded_reasons[aid],
+            } for aid in sorted(excluded_counts)],
+            "silent_drop":False,
+        },
+        "pushes":pushes,
+    }
+    return "day.json",_canonical_bytes(payload)
+
+
 def _daily_source_objects(*, source: Path, day: str, work_dir: Path,
                           expected_aids: set[str],
                           expected_thread_epochs: dict[str,datetime]) -> list[tuple[str,bytes]]:
     archive_root=work_dir/"source-archive"
     with open_source(str(source)) as db:
-        receipt=export_archive(db,from_day=day,through_day=day,out_dir=archive_root)
+        next_day=(datetime.fromisoformat(day)+timedelta(days=1)).date().isoformat()
+        receipt=export_archive(
+            db,from_day=day,through_day=next_day,out_dir=archive_root)
     payloads=[]
     for item in receipt.get("objects",[]):
         key=item.get("key")
@@ -499,7 +687,7 @@ def _daily_source_objects(*, source: Path, day: str, work_dir: Path,
         payloads.append(payload)
     if not payloads:
         raise DailyHistoryRuntimeError("no archive objects for finalized day")
-    return [_build_taipei_day_source_object(
+    return [_build_thread_lifecycle_source_object(
         day=day,payloads=payloads,expected_aids=expected_aids,
         expected_thread_epochs=expected_thread_epochs)]
 
