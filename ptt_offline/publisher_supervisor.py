@@ -35,6 +35,15 @@ def _pid_alive(pid):
 def _command(pid):
     return _run(["ps","-p",str(pid),"-o","command="]).stdout.strip()
 
+def _publisher_kind(command):
+    if not isinstance(command,str):
+        return None
+    if "ptt_offline.publisher_service" in command:
+        return "launchd_service"
+    if "ptt_offline.recurring_publisher" in command:
+        return "manual_recurring"
+    return None
+
 def _wait_dead(pid,timeout=20.0):
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
@@ -104,10 +113,14 @@ def preflight(*,repo_root,runtime_root,expected_head):
             raise ContractError("invalid Publisher pidfile") from exc
         if _pid_alive(pid):
             command=_command(pid)
-            if "ptt_offline.recurring_publisher" not in command:
-                raise ContractError("pidfile process is not recurring Publisher")
+            runtime_kind=_publisher_kind(command)
+            if runtime_kind is None:
+                raise ContractError("pidfile process is not a recognized Publisher runtime")
         else:
             pid=None
+            runtime_kind=None
+    else:
+        runtime_kind=None
     holders=_lock_holders(state_dir/".single-publisher.lock")
     if holders and (pid is None or holders!=[pid]):
         raise ContractError("writer lock ownership does not match current Publisher")
@@ -120,6 +133,7 @@ def preflight(*,repo_root,runtime_root,expected_head):
         "head":head,
         "manual_pid":pid,
         "manual_command":command,
+        "runtime_kind":runtime_kind,
         "lock_holders":holders,
         "ambiguous_count":len(ambiguous),
         "ambiguous_states":ambiguous,
@@ -142,6 +156,20 @@ def apply_cutover(*,repo_root,runtime_root,expected_head,python_executable,plist
     state_dir=state_root/"state"
     pidfile=state_root/"publisher.pid"
     old_pid=proof["manual_pid"]
+    if old_pid is not None and proof.get("runtime_kind")=="launchd_service":
+        return {
+            "status":"ALREADY_SUPERVISED",
+            "label":LABEL,
+            "old_manual_pid":None,
+            "new_writer_pid":old_pid,
+            "plist":str(Path(plist_path).resolve()),
+            "log":str(state_root/"publisher-service.log"),
+            "head":proof["head"],
+            "worker_deploy":False,
+            "collector_restart":False,
+            "secrets_rotated":False,
+            "d1_schema_changed":False,
+        }
     if old_pid is not None:
         os.kill(old_pid,signal.SIGTERM)
         _wait_dead(old_pid)
