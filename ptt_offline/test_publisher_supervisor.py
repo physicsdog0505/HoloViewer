@@ -136,6 +136,7 @@ class SupervisorTests(unittest.TestCase):
                  patch("ptt_offline.publisher_supervisor._pid_alive",return_value=True), \
                  patch("ptt_offline.publisher_supervisor._command",return_value="python -m ptt_offline.publisher_service --root /tmp/runtime"), \
                  patch("ptt_offline.publisher_supervisor._lock_holders",return_value=[123]), \
+                 patch("ptt_offline.publisher_supervisor.validate_candidate_service") as validate, \
                  patch("ptt_offline.publisher_supervisor.os.kill") as kill:
                 run.return_value.stdout="abc\n"
                 result=apply_cutover(repo_root=repo,runtime_root=runtime,
@@ -143,6 +144,7 @@ class SupervisorTests(unittest.TestCase):
                     plist_path=plist)
             self.assertEqual(result["status"],"ALREADY_SUPERVISED")
             self.assertEqual(result["new_writer_pid"],123)
+            validate.assert_not_called()
             kill.assert_not_called()
             self.assertFalse(plist.exists())
 
