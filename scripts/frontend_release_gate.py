@@ -68,8 +68,8 @@ def validate_watchalong_addition(
         )
     for event_id, old in prod.items():
         new = cand[event_id]
-        if old.get("sha256") != new.get("sha256"):
-            raise ReleaseGateError(f"existing event hash changed: {event_id}")
+        if old != new:
+            raise ReleaseGateError(f"existing manifest entry changed: {event_id}")
     if candidate.get("event_count") != len(cand):
         raise ReleaseGateError("candidate event_count does not match events")
     if production.get("event_count") != len(prod):
