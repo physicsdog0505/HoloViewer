@@ -313,7 +313,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,reconcile_executor=N
                  "source_identity":plan["source_identity"],"sent":0}
         if not send:return receipt
         if not write_allowed:
-            return {**receipt,"status":"DAILY_BUDGET_BLOCKED","budget_blocked":True}
+            return {**receipt,"status":"ADMISSION_BUDGET_BLOCKED","budget_blocked":True}
         if not isinstance(secret,str) or len(secret)<32 or not callable(executor):
             raise ContractError("separate trusted source proof and transport required")
         if not missing:return {**receipt,"status":"NO_NEW_ROWS"}
