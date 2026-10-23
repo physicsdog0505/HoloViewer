@@ -1,21 +1,151 @@
 # HoloViewer Cloudflare production deployment
 
-This deploys static assets to the **existing** Worker `holoviewer-public`.
-It does not deploy `holoviewer-public-api`, alter D1, or touch PTT Workers.
+Production frontend deployment is **Owner-local only**.
 
-## Initial setup (once)
-1. In GitHub `physicsdog0505/HoloViewer` → Settings → Secrets and variables → Actions, add secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Never paste tokens into chat, issues, logs, or source files. Create a Cloudflare API token restricted to this account's Workers Scripts Edit/deployment permissions. Review the token's actual permissions in Cloudflare.
-2. Create protected GitHub Environment `cloudflare-production` under Settings → Environments. Enable required reviewers where available and limit deployment to main. GitHub settings, not YAML alone, must enforce this; verify actual protection before any deploy.
-3. The static site is checked into `site/`. This is a **partial** UI release and may have broken features; partial rollout is accepted by the owner, but security, public-domain data and licensing boundaries are mandatory.
-4. **Before first deploy** capture screenshots/export of current `holoviewer-public` Worker settings, compatibility date, routes, bindings, assets and deployment version; confirm intended static-assets Wrangler config will not silently remove needed settings. Retain rollback deployment/version evidence. If baseline cannot be obtained or differs, STOP; do not dispatch.
-5. Merge after security review and matching-head CI. For manual release use GitHub Actions on main: `confirm=DEPLOY`, `release_sha=<full reviewed main commit SHA>`, `baseline_confirmed=BASELINE-CHECKED`. Incomplete inputs or mismatched SHA fail closed. This is not a claim that the YAML can independently inspect Cloudflare's Worker configuration.
-6. Open https://holoviewer-public.singlebagel.workers.dev/ and check sidebar, navigation, API request URLs, individual and multi-player behavior. Check Worker deployment logs and browser network errors.
+This document governs the existing static-assets Worker `holoviewer-public`.
+It does not deploy `holoviewer-public-api`, alter D1, or touch PTT Collector/Publisher state.
 
-## Important boundaries
-- GitHub Actions on public standard hosted runners is ordinarily free; Cloudflare usage is separate.
-- Existing Cloudflare Worker names: website `holoviewer-public` and API `holoviewer-public-api`. API D1 binding is `DB` → `holoviewer-public-v1`.
-- No automatic production deploy on push, no implicit D1 writes or migration. Store no private SQLite dumps, third-party copyrighted video/transcript/chat bulk mirrors, internal-only member information, or credentials in public repo or static files. Only publish source-compliant, explicitly approved metadata; provide attribution / notices and respect content takedown requests.
-- Public Worker API must remain read-only on unauthenticated routes; review CORS, abuse/rate limits, query bounds, error redaction and source/licensing policy separately before exposing new endpoints.
-- Protection verification is a human gate; the Cloudflare API token must be scoped minimally and rotated if ever exposed.
-- Current static 4174 shell is **not complete functional parity**; do not present deploy success as full product acceptance.
-- Roll back via Cloudflare worker deployment history / prior known-good site commit, not by blindly running a new head.
+## Authoritative rule
+
+Production must never be ahead of repository truth.
+
+- Never deploy an unmerged PR head.
+- Deploy only an exact, reviewed, already-merged `origin/main` SHA.
+- GitHub Actions / CI may provide passive evidence only. They must not mutate Production.
+- The Owner runs Wrangler locally from the exact merged checkout.
+- Capture the active version before every deploy and retain an immutable rollback target.
+
+## Standard Owner-local entrypoint
+
+For a new additive Watchalong event:
+
+```sh
+./scripts/deploy_frontend_owner_local.sh \
+  data-watchalong \
+  <event-id> \
+  <exact-merged-origin-main-sha>
+```
+
+The tool is intentionally fail-closed. It:
+
+1. fetches `origin/main` and requires both local HEAD and `origin/main` to equal the requested SHA;
+2. rejects a dirty checkout;
+3. runs the Watchalong exporter in `--check` mode and regression tests;
+4. computes candidate hashes locally;
+5. identifies the target event introduction commit and enforces the data-only `site/` allowlist;
+6. reads the current Production manifest;
+7. requires every existing Production Watchalong event/hash to remain unchanged;
+8. requires the target to be absent from Production and present in the candidate;
+9. captures the active `holoviewer-public` version and Production manifest hash;
+10. deploys with Owner-local Wrangler;
+11. performs bounded read-only retries against both:
+    - `https://holodocchi.com`
+    - `https://holoviewer-public.singlebagel.workers.dev`
+12. never automatically redeploys or rolls back after a transient mismatch;
+13. writes before/after receipts and prints the exact rollback command.
+
+The default canonical/private Watchalong source root is:
+
+```text
+/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer
+```
+
+Override it when needed with:
+
+```sh
+HOLOVIEWER_SOURCE_ROOT=/path/to/source \
+  ./scripts/deploy_frontend_owner_local.sh data-watchalong <event-id> <main-sha>
+```
+
+## Release classes
+
+### Full frontend release
+
+For UI/code/general static-site changes, require:
+
+- exact merged main SHA;
+- reviewed site diff;
+- applicable regression tests;
+- captured active Production version;
+- Owner-local Wrangler deploy;
+- post-deploy smoke;
+- immutable rollback version.
+
+Do not use the Watchalong data-only mode to smuggle unrelated frontend changes.
+
+### Data-only frontend release
+
+For browser-facing derived datasets, require additive preservation against current Production truth.
+
+For the current Watchalong v1 new-event mode:
+
+```text
+EXISTING_EVENT_CHANGED=NO
+OLD_EVENT_COUNT_PRESERVED=YES
+NEW_EVENT_COUNT=1
+```
+
+Allowed `site/` delta is exactly:
+
+```text
+site/data/watchalong/manifest.json
+site/data/watchalong/events/<new-id>.json
+```
+
+Any other `site/` change fails closed.
+
+Updating an existing event is a different release class and must explicitly declare which existing IDs are allowed to change. Do not use the new-event path for refreshes.
+
+## Edge/cache handling
+
+A newly activated Worker version may briefly coexist with older cached static bytes at an edge.
+
+Therefore:
+
+- read both custom-domain and workers.dev origins;
+- use bounded read-only retry;
+- do not issue a second deploy because the first read is stale;
+- do not automatically rollback on a transient mismatch;
+- investigate or manually rollback only after persistent inconsistency is proven.
+
+## GitHub Actions policy
+
+`.github/workflows/deploy-cloudflare-production.yml` is retained only as **passive release evidence**.
+
+It must not contain:
+
+- Cloudflare API-token usage;
+- `cloudflare/wrangler-action`;
+- `wrangler deploy`;
+- `wrangler rollback`;
+- any Production mutation step.
+
+A green workflow is not deployment authorization and is not evidence that Production changed.
+
+## Wrangler local state
+
+`.wrangler/` is local generated state and is ignored by Git. It must not be committed or treated as a release artifact.
+
+## Rollback
+
+Rollback is a deliberate Owner-local action against the captured baseline version:
+
+```sh
+npx --yes wrangler rollback <baseline-version> \
+  --config cloudflare/wrangler.json \
+  --name holoviewer-public
+```
+
+Never "rollback" by blindly redeploying an older Git checkout.
+
+## Boundaries
+
+The frontend release path must not mutate:
+
+- `holoviewer-public-api`;
+- D1;
+- Collector;
+- Publisher;
+- PTT databases;
+- translation/provider policy;
+- Watchalong timing behavior.
