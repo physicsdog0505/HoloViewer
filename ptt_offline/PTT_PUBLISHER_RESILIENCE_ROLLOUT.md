@@ -97,6 +97,22 @@ The helper:
 The service runs `ptt_offline.publisher_service` from the exact candidate
 checkout and reuses existing Production state and secrets.
 
+## Runtime identity compatibility
+
+Before cutover, verify operational helpers recognize both runtime identities:
+
+- legacy/manual: `ptt_offline.recurring_publisher`;
+- supervised: `ptt_offline.publisher_service`.
+
+After cutover:
+- `publisher_supervisor` must recognize the launchd-managed process and a
+  repeated `--apply` must be an idempotent no-op;
+- `restart_production_publisher` must refuse to SIGTERM a launchd-managed
+  Publisher and direct operators back to the supervisor;
+- Admin/PR147 health evidence remains telemetry/checkpoint based and must not
+  infer Publisher health from the legacy process name;
+- Collector health remains independently sourced from Collector status and PID.
+
 ## Post-cutover acceptance
 
 Required:
