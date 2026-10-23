@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import subprocess
+import textwrap
 import unittest
 
 
@@ -101,6 +103,60 @@ class WatchalongAssetTests(unittest.TestCase):
         self.assertEqual(event["completeness"], {
             "sync": "PRESENT", "transcript": "COMPLETE", "translation": "COMPLETE",
         })
+
+
+    def test_inter_segment_gap_helper_latches_until_next_host_start(self):
+        script = r"""
+const fs=require('node:fs');
+const vm=require('node:vm');
+const assert=require('node:assert/strict');
+const source=fs.readFileSync('site/assets/watchalong-static-core.js','utf8');
+vm.runInThisContext(source);
+const core=globalThis.HoloViewerWatchalongStatic;
+const segments=[
+ {host_start_ms:1000},
+ {host_start_ms:5000},
+ {host_start_ms:9000},
+];
+assert.equal(core.interSegmentGapUntil(segments,0,3.0,true),5);
+assert.equal(core.interSegmentGapUntil(segments,0,4.999,true),5);
+assert.equal(core.interSegmentGapUntil(segments,0,5.0,true),null);
+assert.equal(core.interSegmentGapUntil(segments,0,3.0,false),null);
+assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
+"""
+        result = subprocess.run(
+            ["node", "-e", textwrap.dedent(script)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode:
+            self.fail(result.stdout + result.stderr)
+
+    def test_watchalong_runtime_holds_source_during_inter_segment_gap(self):
+        source = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        self.assertIn("let sourceGapUntilHostSeconds=null;", source)
+        self.assertIn("function maybeLatchSourceGap(hostSeconds,sourceState)", source)
+        self.assertIn("sourceState===YT.PlayerState.ENDED", source)
+        self.assertIn("setSourceStandby(true,{rewind:false});", source)
+        self.assertIn("if(sourceGapActive(host)){setSourceStandby(true,{rewind:false});return}", source)
+        self.assertIn("if(maybeLatchSourceGap(host,sourceState))return;", source)
+        self.assertIn("function clearSourceGap()", source)
+        self.assertIn("clearSourceGap();\n setSourceStandby(false);\n activeSegmentIndex=index;", source)
+
+        sync_start = source.index("function startSyncLoop(){")
+        sync_end = source.index("function subtitleCueAt", sync_start)
+        sync_body = source[sync_start:sync_end]
+        gap_guard = sync_body.index("if(sourceGapActive(host)){setSourceStandby(true,{rewind:false});return}")
+        source_play = sync_body.index("sourcePlayer.playVideo()", gap_guard)
+        self.assertLess(gap_guard, source_play)
+
+        standby_start = source.index("function setSourceStandby(active,{rewind=true}={})")
+        standby_end = source.index("function onHostStateChange", standby_start)
+        standby_body = source[standby_start:standby_end]
+        self.assertIn("if(rewind){", standby_body)
+        self.assertIn("sourcePlayer.seekTo(0,true)", standby_body)
 
     def test_integrated_release_uses_existing_static_watchalong_assets(self):
         player = ROOT / "site/assets/watchalong-standalone.js"
