@@ -342,15 +342,21 @@ class RecurringPublisherTests(unittest.TestCase):
         self.assertEqual(result["mutation_blocked_aids"],["#mutated"])
         self.assertEqual(result["mutation_blocked_count"],1)
 
-    def test_remote_uncertain_remains_global_fail_closed(self):
-        source="8"*64
+    def test_recovering_aid_does_not_stop_other_aid(self):
+        def plan(_,article_id=None):
+            return {"status":"READY","source_identity":str(article_id)*64}
+        responses=[
+            {"status":"RECOVERY_WAIT","aid":"blocked","sent":0,"retry_after_seconds":30},
+            {"status":"ACK","aid":"healthy","sent":10},
+        ]
         with patch("ptt_offline.recurring_publisher.open_source",return_value=nullcontext(object())), \
              patch("ptt_offline.recurring_publisher.active_article_ids",return_value=[1,2]), \
-             patch("ptt_offline.recurring_publisher.inspect_latest_article",return_value={"status":"READY","source_identity":source}), \
-             patch("ptt_offline.recurring_publisher.run_live_once",
-                   side_effect=ContractError("remote ACK unresolved; inspect D1 before any replay")) as publisher:
-            with self.assertRaisesRegex(ContractError,"remote ACK unresolved"):
-                run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
-                             send=True,batch_cap=10,max_batches=1,clock=lambda:0)
-        self.assertEqual(publisher.call_count,1)
+             patch("ptt_offline.recurring_publisher.inspect_latest_article",side_effect=plan), \
+             patch("ptt_offline.recurring_publisher.run_live_once",side_effect=responses) as publisher:
+            result=run_snapshot(source="unused",state_dir="/tmp/ptt48-test",
+                                send=True,batch_cap=10,max_batches=1,clock=lambda:0)
+        self.assertEqual([call.kwargs["article_id"] for call in publisher.call_args_list],[1,2])
+        self.assertEqual(result["sent"],10)
+        self.assertEqual(result["http_posts"],1)
+        self.assertTrue(result["backlog_may_remain"])
 if __name__=="__main__":unittest.main()
