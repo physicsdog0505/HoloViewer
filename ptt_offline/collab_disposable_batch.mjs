@@ -33,7 +33,7 @@ export async function digest(value) {
 
 export function makeBatchPacket(artifact, { mode = "initial", injectedFailure = false } = {}) {
   if (!artifact || artifact.schema_version !== "public-collab-projection-v1" || artifact.projection_key !== "live" ||
-      artifact.source_revision !== REVISION || !Array.isArray(artifact.events)) fail("artifact mismatch");
+      !Array.isArray(artifact.events)) fail("artifact mismatch");
   const rows = artifact.events;
   if (!artifact.source || !artifact.source.range_start || !artifact.source.range_end ||
       !artifact.generated_at || !Number.isSafeInteger(artifact.source_event_count) ||
@@ -50,8 +50,10 @@ export function makeBatchPacket(artifact, { mode = "initial", injectedFailure = 
         !Array.isArray(p.streams) || p.streams.length < 2 ||
         new Set(p.streams.map(x => x.video_id)).size !== p.streams.length) fail("invalid event payload");
   }
-  if (mode === "initial" && (rows.length !== 1 || rows[0].event_id !== TARGET ||
-      rows[0].live_scope !== false)) fail("unexpected canonical event");
+  if (mode === "initial" && (artifact.source_revision !== REVISION || rows.length !== 1 ||
+      rows[0].event_id !== TARGET || rows[0].live_scope !== false)) fail("unexpected canonical event");
+  if (mode === "empty-next-live" && !/^sha256:[0-9a-f]{64}$/.test(artifact.source_revision))
+    fail("invalid next-live revision");
   if (mode === "empty-next-live" && rows.length !== 0) fail("next-live must be empty");
   if (!["initial", "empty-next-live"].includes(mode)) fail("invalid mode");
 
