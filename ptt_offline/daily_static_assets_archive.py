@@ -168,7 +168,27 @@ def _validate_payload(*,raw: bytes,day: str,
             raise DailyArchiveError("day.json lifecycle partition end outside closeout window")
         if membership.get("handoff_boundary")!=raw_end:
             raise DailyArchiveError("day.json handoff boundary mismatch")
-        if membership.get("handoff_source") not in {"closeout-limit","successor-thread"}:
+
+        expected_closeout=closeout_limit.isoformat(timespec="seconds").replace("+00:00","Z")
+        if membership.get("closeout_limit")!=expected_closeout:
+            raise DailyArchiveError("day.json closeout limit mismatch")
+
+        handoff_source=membership.get("handoff_source")
+        successor_raw=membership.get("successor_aid")
+        if handoff_source=="closeout-limit":
+            if lifecycle_end!=closeout_limit:
+                raise DailyArchiveError("closeout-limit handoff must equal closeout cap")
+            if successor_raw is not None:
+                raise DailyArchiveError("closeout-limit handoff cannot declare successor")
+        elif handoff_source=="successor-thread":
+            successor_aid=str(successor_raw or "").strip("#")
+            if not successor_aid:
+                raise DailyArchiveError("successor-thread handoff requires successor AID")
+            if successor_aid in expected_aids:
+                raise DailyArchiveError("successor-thread AID must be outside expected set")
+            if not day_end<=lifecycle_end<closeout_limit:
+                raise DailyArchiveError("successor-thread handoff outside valid window")
+        else:
             raise DailyArchiveError("day.json handoff source invalid")
     elif schema is not None:
         raise DailyArchiveError("unsupported day.json schema version")
