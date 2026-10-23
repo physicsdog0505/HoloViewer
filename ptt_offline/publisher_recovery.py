@@ -60,7 +60,7 @@ def _wait_state(current,attempt,now,reason):
     updated["last_recovery_error"]=reason
     return updated
 
-def recover_pending_state(state_path,*,reconcile_executor,publish_executor,clock=time.time):
+def recover_pending_state(state_path,*,reconcile_executor,publish_executor,clock=time.time,allow_replay=True):
     """Reconcile one durable pending batch.
 
     Outcomes:
@@ -106,10 +106,19 @@ def recover_pending_state(state_path,*,reconcile_executor,publish_executor,clock
     outcome=receipt.get("outcome")
     if outcome=="ALL_PRESENT":
         atomic_receipt(path,_clean_success_state(current,batch,updates,remote_commit=True))
+        rows=len(batch["rows"])
         return {"status":"RECOVERED_REMOTE_COMMIT","aid":current.get("pending_aid"),
-                "sent":0,"batch_id":batch["batch_id"],"reconcile_reads":1}
+                "sent":0,"batch_id":batch["batch_id"],"reconcile_reads":1,
+                "budget_batches":1,"budget_rows":rows,
+                "budget_modeled_writes":2+2*rows,
+                "budget_modeled_queries":5+2*rows}
 
     if outcome=="NONE_PRESENT":
+        if not allow_replay:
+            atomic_receipt(path,_wait_state(current,attempt,now,"DAILY_BUDGET_BLOCKED"))
+            return {"status":"RECOVERY_WAIT","aid":current.get("pending_aid"),
+                    "retry_after_seconds":_delay(attempt),"sent":0,
+                    "reconcile_reads":1,"budget_blocked":True}
         try:
             ack=execute_once(batch=batch,executor=publish_executor,
                 max_rows=len(batch["rows"]),
@@ -124,10 +133,14 @@ def recover_pending_state(state_path,*,reconcile_executor,publish_executor,clock
                     "retry_after_seconds":_delay(attempt),"sent":0,
                     "reconcile_reads":1}
         atomic_receipt(path,_clean_success_state(current,batch,updates,remote_commit=False))
+        rows=len(batch["rows"])
         return {"status":"ACK","recovery_status":"RECOVERED_REPLAY",
                 "aid":current.get("pending_aid"),
-                "sent":len(batch["rows"]),"batch_id":batch["batch_id"],
-                "http_posts":1,"reconcile_reads":1}
+                "sent":rows,"batch_id":batch["batch_id"],
+                "http_posts":1,"reconcile_reads":1,
+                "budget_batches":1,"budget_rows":rows,
+                "budget_modeled_writes":2+2*rows,
+                "budget_modeled_queries":5+2*rows}
 
     stopped=dict(current)
     stopped["status"]="STOP_MANUAL"
