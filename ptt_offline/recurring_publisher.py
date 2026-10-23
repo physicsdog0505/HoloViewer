@@ -113,6 +113,10 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,reconci
             burst_batches=0
             mutation_blocked_aids=[]
             mutation_blocked_count=0
+            recovery_aids=[]
+            recovery_quarantined_aids=[]
+            recovery_retry_after_seconds=0
+            reconcile_reads=0
             stale_fenced_rows=0
             for article_index,article_id in enumerate(article_ids):
                 plan=inspect_latest_article(db,article_id=article_id)
@@ -152,6 +156,9 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,reconci
                         executor=executor,reconcile_executor=reconcile_executor,send=True,batch_cap=batch_cap,article_id=article_id)
                     last_status=batch.get("status",last_status)
                     stale_fenced_rows+=batch.get("stale_fenced_rows",0)
+                    batch_reconcile_reads=batch.get("reconcile_reads",0)
+                    reconcile_reads+=batch_reconcile_reads
+                    modeled_queries+=2*batch_reconcile_reads
                     pending+=batch.get("eligible",0)
                     legacy_baseline_candidates+=batch.get("legacy_baseline_candidates",0)
                     retained_recovery_candidates+=batch.get("retained_recovery_candidates",0)
@@ -163,6 +170,15 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,reconci
                         mutation_blocked_count+=batch.get("mutation_count",0)
                         count=0
                         break
+                    if batch.get("status") in ("RECOVERY_WAIT","RECOVERY_BLOCKED","RECOVERED_REMOTE_COMMIT"):
+                        recovery_aids.append(batch.get("aid"))
+                        recovery_retry_after_seconds=max(recovery_retry_after_seconds,
+                            int(batch.get("retry_after_seconds",0) or 0))
+                        backlog=True
+                    if batch.get("status")=="RECOVERY_QUARANTINED":
+                        recovery_aids.append(batch.get("aid"))
+                        recovery_quarantined_aids.append(batch.get("aid"))
+                        backlog=True
                     if batch.get("status")=="BASELINED":
                         # Local first-seen baseline is a successful zero-write
                         # activation outcome, not a remote failure.
@@ -231,6 +247,10 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,reconci
                     "mutation_blocked_articles":len(mutation_blocked_aids),
                     "mutation_blocked_aids":mutation_blocked_aids,
                     "mutation_blocked_count":mutation_blocked_count,
+                    "recovery_aids":[x for x in dict.fromkeys(recovery_aids) if x],
+                    "recovery_quarantined_aids":[x for x in dict.fromkeys(recovery_quarantined_aids) if x],
+                    "recovery_retry_after_seconds":recovery_retry_after_seconds,
+                    "reconcile_reads":reconcile_reads,
                     "stale_fenced_rows":stale_fenced_rows}
     return {**result,"elapsed_ms":round((clock()-started)*1000),
         "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
