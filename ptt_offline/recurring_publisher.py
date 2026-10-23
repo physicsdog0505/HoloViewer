@@ -192,7 +192,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,reconci
                         recovery_aids.append(batch.get("aid"))
                         recovery_quarantined_aids.append(batch.get("aid"))
                         backlog=True
-                    if batch.get("status")=="DAILY_BUDGET_BLOCKED":
+                    if batch.get("status")=="ADMISSION_BUDGET_BLOCKED":
                         backlog=True
                         count=0
                         break
