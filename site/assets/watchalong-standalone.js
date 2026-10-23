@@ -566,7 +566,8 @@ function maybeLatchSourceGap(hostSeconds,sourceState){
 function clearSourceGap(){
  sourceGapUntilHostSeconds=null;
 }
-function setSourceStandby(active,{rewind=true}={}){
+function setSourceStandby(active){
+ const {rewind=true}=arguments[1]||{};
  const next=Boolean(active);
  if(sourceStandbyActive===next)return;
  sourceStandbyActive=next;
