@@ -116,9 +116,12 @@ def _validate_payload(*,raw: bytes,day: str,
 
     membership=payload.get("membership")
     predecessor_aid=None
+    lifecycle_end=None
     day_start=datetime.fromisoformat(day).replace(tzinfo=ZoneInfo("Asia/Taipei")).astimezone(timezone.utc)
     day_end=day_start+timedelta(days=1)
-    if payload.get("schema_version")=="holoviewer-ptt-history-day-v1":
+    closeout_limit=day_end+timedelta(hours=7,minutes=30)
+    schema=payload.get("schema_version")
+    if schema=="holoviewer-ptt-history-day-v1":
         expected_start=day_start.isoformat(timespec="seconds").replace("+00:00","Z")
         expected_end=day_end.isoformat(timespec="seconds").replace("+00:00","Z")
         if payload.get("partition_start")!=expected_start or payload.get("partition_end")!=expected_end:
@@ -138,6 +141,37 @@ def _validate_payload(*,raw: bytes,day: str,
             predecessor_aid=str(raw_predecessor).strip("#")
             if not predecessor_aid or predecessor_aid in expected_aids:
                 raise DailyArchiveError("invalid direct predecessor AID")
+    elif schema=="holoviewer-ptt-history-day-v2":
+        expected_start=day_start.isoformat(timespec="seconds").replace("+00:00","Z")
+        if payload.get("partition_kind")!="expected-thread-lifecycle":
+            raise DailyArchiveError("unsupported day.json partition kind")
+        if payload.get("partition_start")!=expected_start:
+            raise DailyArchiveError("day.json lifecycle partition start mismatch")
+        if not isinstance(membership,dict):
+            raise DailyArchiveError("day.json membership audit required")
+        if membership.get("rule")!="expected-thread-lifecycle-v2":
+            raise DailyArchiveError("unsupported day.json lifecycle membership rule")
+        declared_expected=membership.get("expected_aids")
+        if (not isinstance(declared_expected,list)
+                or {str(aid).strip("#") for aid in declared_expected}!=expected_aids):
+            raise DailyArchiveError("day.json expected-AID membership mismatch")
+        if membership.get("silent_drop") is not False:
+            raise DailyArchiveError("day.json must explicitly forbid silent drop")
+        raw_end=payload.get("partition_end")
+        if not isinstance(raw_end,str):
+            raise DailyArchiveError("day.json lifecycle partition end required")
+        try:
+            lifecycle_end=datetime.fromisoformat(raw_end.replace("Z","+00:00")).astimezone(timezone.utc)
+        except ValueError as exc:
+            raise DailyArchiveError("day.json lifecycle partition end invalid") from exc
+        if not day_end<=lifecycle_end<=closeout_limit:
+            raise DailyArchiveError("day.json lifecycle partition end outside closeout window")
+        if membership.get("handoff_boundary")!=raw_end:
+            raise DailyArchiveError("day.json handoff boundary mismatch")
+        if membership.get("handoff_source") not in {"closeout-limit","successor-thread"}:
+            raise DailyArchiveError("day.json handoff source invalid")
+    elif schema is not None:
+        raise DailyArchiveError("unsupported day.json schema version")
 
     identities=[]
     archive_aids=set()
@@ -147,7 +181,7 @@ def _validate_payload(*,raw: bytes,day: str,
         aid=str(row.get("aid") or "").strip("#")
         if not aid:
             raise DailyArchiveError("push AID required")
-        if payload.get("schema_version")=="holoviewer-ptt-history-day-v1":
+        if schema=="holoviewer-ptt-history-day-v1":
             reason=row.get("day_membership")
             if aid in expected_aids:
                 if reason!="expected-thread":
@@ -157,6 +191,13 @@ def _validate_payload(*,raw: bytes,day: str,
                     raise DailyArchiveError("predecessor AID has invalid day membership")
             else:
                 raise DailyArchiveError("object contains AID outside canonical day membership")
+            if row.get("floor") is None or row.get("floor_quality")!="per-thread-ordinal":
+                raise DailyArchiveError("day.json requires authoritative per-thread floor")
+        elif schema=="holoviewer-ptt-history-day-v2":
+            if aid not in expected_aids:
+                raise DailyArchiveError("lifecycle object contains non-expected AID")
+            if row.get("day_membership")!="expected-thread-lifecycle":
+                raise DailyArchiveError("expected AID has invalid lifecycle membership")
             if row.get("floor") is None or row.get("floor_quality")!="per-thread-ordinal":
                 raise DailyArchiveError("day.json requires authoritative per-thread floor")
         elif aid not in expected_aids:
@@ -173,7 +214,10 @@ def _validate_payload(*,raw: bytes,day: str,
         if occurred_at.tzinfo is None:
             raise DailyArchiveError("push occurred_at must be timezone-aware")
         occurred_utc=occurred_at.astimezone(timezone.utc)
-        if not day_start<=occurred_utc<day_end:
+        if schema=="holoviewer-ptt-history-day-v2":
+            if lifecycle_end is None or not day_start<=occurred_utc<lifecycle_end:
+                raise DailyArchiveError("push occurred_at outside lifecycle partition bounds")
+        elif not day_start<=occurred_utc<day_end:
             raise DailyArchiveError("push occurred_at outside Taipei partition bounds")
         identity=row.get("source_record_key")
         if not isinstance(identity,str) or not identity:
