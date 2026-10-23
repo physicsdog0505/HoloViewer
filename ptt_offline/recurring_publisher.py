@@ -320,7 +320,8 @@ def main(argv=None):
                 prune_rolling(rolling,now_mono)
                 before=rolling_totals(rolling)
                 durable_now=time.time()
-                durable_before=durable_snapshot(admission_path,now=durable_now)
+                durable_before=(durable_snapshot(admission_path,now=durable_now)
+                    if args.adaptive_live_cadence else None)
                 budget_blocked=bool(args.adaptive_live_cadence and args.send and
                     (not rolling_budget_allows(rolling,now_mono) or
                      not durable_allows_batch(admission_path,now=durable_now)))
@@ -336,11 +337,13 @@ def main(argv=None):
                 modeled_writes=result.get("modeled_d1_writes_ceiling",0)
                 if send_this_tick and posts:
                     rolling.append((now_mono,posts,sent_rows,modeled_queries,modeled_writes))
-                    durable_record(admission_path,batches=posts,rows=sent_rows,
-                        modeled_queries=modeled_queries,modeled_writes=modeled_writes,
-                        now=time.time())
+                    if args.adaptive_live_cadence:
+                        durable_record(admission_path,batches=posts,rows=sent_rows,
+                            modeled_queries=modeled_queries,modeled_writes=modeled_writes,
+                            now=time.time())
                 prune_rolling(rolling,now_mono)
-                totals=durable_snapshot(admission_path,now=time.time())
+                totals=(durable_snapshot(admission_path,now=time.time())
+                        if args.adaptive_live_cadence else rolling_totals(rolling))
                 eligible=result.get("eligible",0)
                 backlog_after=max(0,eligible-sent_rows) if isinstance(eligible,int) else 0
                 backlog_delta=(None if previous_backlog is None else backlog_after-previous_backlog)
@@ -359,7 +362,7 @@ def main(argv=None):
                     "rolling_60s_rows":totals["rows"],
                     "rolling_60s_modeled_queries":totals["modeled_queries"],
                     "rolling_60s_modeled_writes":totals["modeled_writes"],
-                    "durable_admission":True,
+                    "durable_admission":bool(args.adaptive_live_cadence),
                     "stop_reason":stop_reason,
                 }
             except Exception as exc:
