@@ -9,7 +9,23 @@ from ptt_offline.collab_projection_import import render_sql, validate
 
 class CollabProjectionImportTests(unittest.TestCase):
     def rehash(self,doc):
-        return self.rehash(doc)
+        basis={
+            "projection_key":doc["projection_key"],
+            "range_start":doc["source"]["range_start"],
+            "range_end":doc["source"]["range_end"],
+            "detection_version":doc["source"]["detection_version"],
+            "events":doc["events"],
+        }
+        canonical=json.dumps(
+            basis,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",",":"),
+        )
+        doc["source_revision"]="sha256:"+hashlib.sha256(
+            canonical.encode("utf-8")
+        ).hexdigest()
+        return doc
 
     def fixture(self):
         event_id="holoserver-hide-and-seek:5680e7ec7c29074a"
