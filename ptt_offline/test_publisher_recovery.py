@@ -38,6 +38,10 @@ class RecoveryTests(unittest.TestCase):
                     "batch_id":b["batch_id"],"digest":b["digest"],"rows_checked":1,"present":1,"mismatched":0},
                 publish_executor=lambda _:called.append(1),clock=lambda:100)
             self.assertEqual(result["status"],"RECOVERED_REMOTE_COMMIT")
+            self.assertEqual(result["budget_batches"],1)
+            self.assertEqual(result["budget_rows"],1)
+            self.assertEqual(result["budget_modeled_writes"],4)
+            self.assertEqual(result["budget_modeled_queries"],7)
             self.assertEqual(called,[])
             saved=json.loads(p.read_text())
             self.assertEqual(saved["status"],"ACKED")
@@ -59,8 +63,27 @@ class RecoveryTests(unittest.TestCase):
                 publish_executor=publish,clock=lambda:100)
             self.assertEqual(result["status"],"ACK")
             self.assertEqual(result["recovery_status"],"RECOVERED_REPLAY")
+            self.assertEqual(result["budget_batches"],1)
+            self.assertEqual(result["budget_modeled_writes"],4)
+            self.assertEqual(result["budget_modeled_queries"],7)
             self.assertEqual(seen,[b])
             self.assertEqual(json.loads(p.read_text())["status"],"ACKED")
+
+    def test_none_present_reconcile_can_wait_without_replay_when_budget_blocked(self):
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"state.json"; b=self.state(p)
+            called=[]
+            result=recover_pending_state(p,
+                reconcile_executor=lambda _:{"status":"RECONCILE","outcome":"NONE_PRESENT",
+                    "batch_id":b["batch_id"],"digest":b["digest"],"rows_checked":1,"present":0,"mismatched":0},
+                publish_executor=lambda _:called.append(1),clock=lambda:100,allow_replay=False)
+            self.assertEqual(result["status"],"RECOVERY_WAIT")
+            self.assertTrue(result["budget_blocked"])
+            self.assertEqual(result["reconcile_reads"],1)
+            self.assertEqual(called,[])
+            saved=json.loads(p.read_text())
+            self.assertEqual(saved["status"],"REMOTE_UNCERTAIN")
+            self.assertEqual(saved["last_recovery_error"],"DAILY_BUDGET_BLOCKED")
 
     def test_partial_commit_quarantines_source(self):
         with tempfile.TemporaryDirectory() as td:
