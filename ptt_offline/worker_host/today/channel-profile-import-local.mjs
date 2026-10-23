@@ -89,7 +89,7 @@ async function validateAgainstExisting(db,rows){
   if(incomingTime<currentTime){older++;continue}
   updates++;
  }
- return {inserts,updates,noops,older};
+ return {plan:{inserts,updates,noops,older},existing};
 }
 async function runImport(env,raw,{apply=false,approvedSha=null}={}){
  if(!env?.DB?.prepare||!env?.DB?.batch)throw Error('DB binding required');
@@ -97,14 +97,14 @@ async function runImport(env,raw,{apply=false,approvedSha=null}={}){
  if(!/^[0-9a-f]{64}$/.test(approvedSha??''))throw Error('approved artifact sha required');
  if(digest!==approvedSha)throw Error('artifact sha mismatch');
  const {body,rows}=parseArtifact(raw);
- const plan=await validateAgainstExisting(env.DB,rows);
+ const {plan,existing}=await validateAgainstExisting(env.DB,rows);
  if(!apply)return {
   status:'VALIDATED',production_mutation:false,artifact_sha256:digest,
   roster_version:body.roster_version,profile_count:rows.length,batch_size:BATCH_SIZE,plan
  };
  let written=0;
  for(let i=0;i<rows.length;i+=BATCH_SIZE){
-  const result=await upsertChannelProfiles(env.DB,rows.slice(i,i+BATCH_SIZE));
+  const result=await upsertChannelProfiles(env.DB,rows.slice(i,i+BATCH_SIZE),{existingById:existing});
   written+=result.profiles_written;
  }
  return {
