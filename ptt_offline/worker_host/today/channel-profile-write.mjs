@@ -38,6 +38,12 @@ export function validateChannelProfileWrite(row){
  if(!normalized)throw Error('invalid profile');
  return normalized;
 }
+function decodeExistingDual(value){
+ if(value==null)return null;
+ if(Array.isArray(value))return value;
+ if(typeof value==='string')return JSON.parse(value);
+ throw Error('stored dual accent invalid');
+}
 function profileContentKey(p){
  return JSON.stringify([
   p.channel_id,p.channel_name,p.display_name,p.avatar_url,p.group,p.member_accent,
@@ -55,7 +61,7 @@ export async function upsertChannelProfiles(db,rows,{existingById=null}={}){
    ? existingById.get(p.channel_id)
    : await db.prepare('SELECT channel_id,channel_name,display_name,avatar_url,channel_group AS "group",member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at FROM public_channel_profiles WHERE channel_id=? LIMIT 1').bind(p.channel_id).first();
   if(existing){
-   const current=validateChannelProfileWrite({...existing,member_accent_dual:existing.member_accent_dual?JSON.parse(existing.member_accent_dual):null});
+   const current=validateChannelProfileWrite({...existing,member_accent_dual:decodeExistingDual(existing.member_accent_dual)});
    if(current.updated_at===p.updated_at){
     if(profileContentKey(current)===profileContentKey(p))continue;
     throw Error('same-timestamp profile conflict');
