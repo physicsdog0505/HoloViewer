@@ -75,7 +75,7 @@ async function artifact(){
   events
  };
 }
-function fakeDb(expectedRevision,expectedLive=1,{alreadyCurrent=false,currentRows=null,postApplyRows=null}={}){
+function fakeDb(expectedRevision,expectedLive=1,{alreadyCurrent=false,currentRows=null,postApplyRows=null,malformedReadback=false}={}){
  const batched=[];
  let applied=alreadyCurrent;
  const expectedRows=()=>Array.from({length:expectedLive},(_,index)=>({
@@ -95,8 +95,10 @@ function fakeDb(expectedRevision,expectedLive=1,{alreadyCurrent=false,currentRow
      }};
     },
     async all(){
-     if(sql.includes('SELECT event_id,source_revision FROM public_collab_events'))
+     if(sql.includes('SELECT event_id,source_revision FROM public_collab_events')){
+      if(malformedReadback)return {results:null};
       return {results:applied?(postApplyRows??currentRows??expectedRows()):(currentRows??[])};
+     }
      throw Error('unexpected all');
     }
    };
@@ -162,6 +164,28 @@ test('new revision apply rejects wrong post-apply membership',async()=>{
  const DB=fakeDb(doc.source_revision,1,{postApplyRows:[{event_id:'wrong-event',source_revision:doc.source_revision}]});
  await assert.rejects(applyLiveProjection(DB,doc),/live membership readback mismatch/);
  assert.equal(DB.batched.length,3);
+});
+
+test('malformed membership readback fails closed even when expected live set is empty',async()=>{
+ const doc=await artifact();
+ doc.events[0].live_scope=false;
+ const basis={
+  projection_key:'live',
+  range_start:doc.source.range_start,
+  range_end:doc.source.range_end,
+  detection_version:doc.source.detection_version,
+  events:doc.events
+ };
+ doc.source_revision='sha256:'+await digest(canonical(basis));
+ const DB=fakeDb(doc.source_revision,0,{
+  alreadyCurrent:true,
+  malformedReadback:true
+ });
+ await assert.rejects(
+  applyLiveProjection(DB,doc),
+  /live membership readback unavailable/
+ );
+ assert.equal(DB.batched.length,0);
 });
 
 test('private endpoint requires explicit enablement and a valid signature',async()=>{

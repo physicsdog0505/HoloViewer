@@ -125,7 +125,9 @@ async function readLiveMembership(DB){
  const result=await DB.prepare(
   'SELECT event_id,source_revision FROM public_collab_events WHERE is_current=1 AND live_scope=1 ORDER BY event_id'
  ).all();
- const rows=Array.isArray(result?.results)?result.results:[];
+ if(!Array.isArray(result?.results))
+  throw Error('live membership readback unavailable; do not retry');
+ const rows=result.results;
  return rows.map(row=>({event_id:String(row?.event_id??''),source_revision:String(row?.source_revision??'')}));
 }
 function verifyLiveMembership(rows,events,revision){
