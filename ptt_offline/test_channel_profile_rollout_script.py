@@ -52,6 +52,12 @@ class ChannelProfileRolloutScriptTests(unittest.TestCase):
         self.assertNotIn('p=d["plan"]\\nassert',SOURCE)
         self.assertIn('p=d["plan"]\nassert p["updates"]==0, p',SOURCE)
 
+
+    def test_post_activation_smoke_uses_valid_history_limit_and_recent_tail(self):
+        self.assertIn('/v1/history?day=$DAY&limit=50&offset=0', SOURCE)
+        self.assertNotIn('/v1/history?day=$DAY&limit=100&offset=0', SOURCE)
+        self.assertIn('/v1/ptt/recent?limit=1000', SOURCE)
+
     def test_semantic_readback_failure_rolls_back(self):
         self.assertIn("if ! python3 - /tmp/hv155-profile-readback.json <<'PY'",SOURCE)
         self.assertIn("PY\nthen\n  rollback\n  exit 1\nfi",SOURCE)
