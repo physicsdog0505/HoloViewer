@@ -136,6 +136,138 @@ def verify_local_tree(v1_root: str | Path) -> dict:
     }
 
 
+def build_pilot_tree(
+    source_v1: str | Path,
+    target_v1: str | Path,
+    *,
+    max_channel_indexes: int = 5,
+) -> dict:
+    source_root, _, manifest = _load_manifest(source_v1)
+    target_root = Path(target_v1).expanduser().resolve()
+    if target_root.exists():
+        shutil.rmtree(target_root)
+    target_root.mkdir(parents=True)
+
+    current_month = manifest["current_month"]
+    current_item = next(
+        (
+            item
+            for item in manifest["months"]
+            if isinstance(item, dict)
+            and item.get("path") == f"youtube/v1/current/{current_month}.json"
+        ),
+        None,
+    )
+    archive_items = sorted(
+        [
+            item
+            for item in manifest["months"]
+            if isinstance(item, dict)
+            and isinstance(item.get("path"), str)
+            and "/archive/" in item["path"]
+        ],
+        key=lambda item: item["path"],
+    )
+    selected_months = []
+    if archive_items:
+        selected_months.append(archive_items[-1])
+    if current_item is not None:
+        selected_months.append(current_item)
+    if not selected_months:
+        raise PreviewError("pilot selection found no month objects")
+
+    selected_month_names = {
+        Path(item["path"]).stem
+        for item in selected_months
+    }
+    pilot_month_entries = []
+    for item in selected_months:
+        rel = _relative_logical(item["path"])
+        raw = (source_root / rel).read_bytes()
+        _verify_declared(raw, item, label=f"pilot month {item['path']}")
+        dest = target_root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(raw)
+        pilot_month_entries.append(dict(item))
+
+    pilot_index_entries = []
+    index_candidates = []
+    for item in sorted(
+        manifest["channel_indexes"],
+        key=lambda entry: entry.get("channel_id", "") if isinstance(entry, dict) else "",
+    ):
+        if not isinstance(item, dict):
+            continue
+        rel = _relative_logical(item["path"])
+        payload = _json_object(
+            (source_root / rel).read_bytes(),
+            label=f"pilot source index {item['path']}",
+        )
+        filtered = {
+            month: ids
+            for month, ids in (payload.get("months") or {}).items()
+            if month in selected_month_names and isinstance(ids, list) and ids
+        }
+        if not filtered:
+            continue
+        index_candidates.append((item, filtered))
+        if len(index_candidates) >= max_channel_indexes:
+            break
+
+    if not index_candidates:
+        raise PreviewError("pilot selection found no channel indexes")
+
+    for item, filtered in index_candidates:
+        channel_id = item["channel_id"]
+        pilot_payload = {
+            "schema_version": 1,
+            "channel_id": channel_id,
+            "months": filtered,
+        }
+        raw = json.dumps(
+            pilot_payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+        rel = Path("index/channels") / f"{channel_id}.json"
+        dest = target_root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(raw)
+        pilot_index_entries.append({
+            "channel_id": channel_id,
+            "path": f"youtube/v1/{rel.as_posix()}",
+            "bytes": len(raw),
+            "sha256": _sha256(raw),
+            "video_count": sum(len(ids) for ids in filtered.values()),
+        })
+
+    pilot_manifest = {
+        "schema_version": 1,
+        "current_month": current_month,
+        "months": pilot_month_entries,
+        "channel_indexes": pilot_index_entries,
+        "channel_index": "youtube/v1/index/channels/<channel_id>.json",
+    }
+    (target_root / "manifest.json").write_text(
+        json.dumps(
+            pilot_manifest,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    verified = verify_local_tree(target_root)
+    return {
+        **verified,
+        "pilot": True,
+        "selected_months": sorted(selected_month_names),
+        "selected_channel_indexes": len(pilot_index_entries),
+        "http_request_budget": 1 + len(pilot_month_entries) + len(pilot_index_entries),
+    }
+
+
 def stage_site(
     source_site: str | Path,
     source_v1: str | Path,
@@ -369,6 +501,12 @@ def main(argv: list[str] | None = None) -> int:
     stage.add_argument("--source-v1", required=True)
     stage.add_argument("--target-site", required=True)
 
+    pilot = sub.add_parser("stage-pilot")
+    pilot.add_argument("--source-site", required=True)
+    pilot.add_argument("--source-v1", required=True)
+    pilot.add_argument("--target-site", required=True)
+    pilot.add_argument("--max-channel-indexes", type=int, default=5)
+
     config = sub.add_parser("write-config")
     config.add_argument("--source-config", required=True)
     config.add_argument("--output-config", required=True)
@@ -386,6 +524,21 @@ def main(argv: list[str] | None = None) -> int:
         result = verify_local_tree(args.v1)
     elif args.command == "stage":
         result = stage_site(args.source_site, args.source_v1, args.target_site)
+    elif args.command == "stage-pilot":
+        target_site = Path(args.target_site).expanduser().resolve()
+        source_site = Path(args.source_site).expanduser().resolve()
+        if target_site.exists():
+            shutil.rmtree(target_site)
+        shutil.copytree(source_site, target_site)
+        youtube = target_site / "youtube"
+        if youtube.exists():
+            shutil.rmtree(youtube)
+        (target_site / "youtube").mkdir(parents=True)
+        result = build_pilot_tree(
+            args.source_v1,
+            target_site / "youtube/v1",
+            max_channel_indexes=args.max_channel_indexes,
+        )
     elif args.command == "write-config":
         result = write_preview_config(
             args.source_config, args.output_config, args.staged_site
