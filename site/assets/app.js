@@ -862,6 +862,9 @@ function youtubeHistoryMonthState(manifest,month){
  if(raw&&typeof raw==='object')return String(raw.state||raw.status||'');
  return '';
 }
+function youtubeHistoryUnavailable(message){
+ const error=new Error(message);error.code='HISTORY_STATIC_UNAVAILABLE';return error;
+}
 function youtubeHistoryMonthEntry(manifest,month){
  return (manifest?.months||[]).find(item=>{
   if(!item||typeof item.path!=='string')return false;
@@ -875,9 +878,9 @@ async function loadYoutubeHistoryMonth(day){
  if(youtubeHistoryMonthCache.has(month))return youtubeHistoryMonthCache.get(month);
  const manifest=await loadYoutubeHistoryManifest();
  const monthState=youtubeHistoryMonthState(manifest,month).toLowerCase();
- if(monthState&&monthState!=='published'&&monthState!=='available')throw new Error('YouTube 歷史月份尚未公開');
+ if(monthState&&monthState!=='published'&&monthState!=='available')throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開');
  const entry=youtubeHistoryMonthEntry(manifest,month);
- if(!entry)throw new Error('YouTube 歷史月份尚未公開');
+ if(!entry)throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開');
  const payload=await fetchYoutubeStaticJson(entry.path);
  if(payload?.schema_version!==1||!Array.isArray(payload.videos))throw new Error('YouTube 歷史月份格式錯誤');
  if(payload.month&&payload.month!==month)throw new Error('YouTube 歷史月份識別不一致');
@@ -929,6 +932,7 @@ async function loadHistoryData(day,offset=0){
  try{
   return await loadYoutubeHistoryDay(day,offset,50);
  }catch(staticError){
+  if(staticError?.code==='HISTORY_STATIC_UNAVAILABLE')throw staticError;
   const legacy=await loadLegacyHistoryDay(day,offset);
   return {...legacy,source:'legacy-api',static_error:String(staticError?.message||staticError)};
  }
