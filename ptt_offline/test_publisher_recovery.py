@@ -83,7 +83,7 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(called,[])
             saved=json.loads(p.read_text())
             self.assertEqual(saved["status"],"REMOTE_UNCERTAIN")
-            self.assertEqual(saved["last_recovery_error"],"DAILY_BUDGET_BLOCKED")
+            self.assertEqual(saved["last_recovery_error"],"ADMISSION_BUDGET_BLOCKED")
 
     def test_partial_commit_quarantines_source(self):
         with tempfile.TemporaryDirectory() as td:
