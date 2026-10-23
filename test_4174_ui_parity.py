@@ -1043,9 +1043,25 @@ process.stdout.write(JSON.stringify({
 
     def test_live_channel_rail_survives_asynchronous_home_refresh_in_viewer(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("(!$('home').classList.contains('active')&&!$('custom-session').classList.contains('active'))",js)
+        self.assertIn("$('live-channel-rail').hidden=!box.children.length;",js)
+        self.assertIn("$('live-channel-rail').hidden=!$('live-channel-list').childElementCount;",js)
+        self.assertNotIn("!['home','custom-session'].includes(r)",js)
+        self.assertNotIn("(!$('home').classList.contains('active')&&!$('custom-session').classList.contains('active'))",js)
+        self.assertIn("window.hvEnsureLiveRail?.();",js)
         self.assertIn("applyHomeFilter();refreshWatchRail();",js)
         self.assertIn("selectWatchRailVideo(id,name)",js)
+
+    def test_public_shell_dedupes_catalog_and_defers_watchalong_startup(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("let homeCatalogPromise=null;",js)
+        self.assertIn("function requestHomeCatalogRows(){",js)
+        self.assertIn("if(homeCatalogPromise)return homeCatalogPromise;",js)
+        self.assertIn("homeCatalogPromise=api('/v1/catalog/today')",js)
+        self.assertIn(":requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null);",js)
+        self.assertIn("window.hvLoadWatchalongLanding=loadWatchalongLanding;",js)
+        self.assertIn("if(initialRoute==='watchalong')loadWatchalongLanding();",js)
+        self.assertIn("if(r==='watchalong')window.hvLoadWatchalongLanding?.();",js)
+        self.assertNotIn("\nloadWatchalongLanding();\n\nconst youtubePanel=",js)
 
     def test_youtube_embed_origin_matches_current_host(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
