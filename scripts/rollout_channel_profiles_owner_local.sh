@@ -11,7 +11,8 @@ IMPORT_CONFIG="ptt_offline/channel-profile-import-local.wrangler.json"
 MIGRATION="ptt_offline/worker_host/today/0005_channel_profiles.sql"
 ARTIFACT="/tmp/hv155-canonical-channel-profiles-85.json"
 SUPPORT_COLORS="${HOME}/Downloads/Hololive-PTT-Viewer/holoviewer-channel-support-colors.json"
-BACKEND_CONFIG=""
+BACKEND_CONFIG_SOURCE=""
+BACKEND_CONFIG="/tmp/hv155-backend-wrangler.json"
 APPLY=0
 DEPLOY=0
 
@@ -34,7 +35,7 @@ while (($#)); do
     --apply) APPLY=1; shift ;;
     --deploy) DEPLOY=1; shift ;;
     --expected-head) EXPECTED_HEAD="${2:?missing expected head}"; shift 2 ;;
-    --backend-config) BACKEND_CONFIG="${2:?missing backend config}"; shift 2 ;;
+    --backend-config) BACKEND_CONFIG_SOURCE="${2:?missing backend config}"; shift 2 ;;
     --support-colors) SUPPORT_COLORS="${2:?missing support colors}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -43,9 +44,9 @@ done
 
 (( DEPLOY == 0 || APPLY == 1 )) || { echo "ABORT: --deploy requires --apply" >&2; exit 2; }
 [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "ABORT: --expected-head <40-char reviewed SHA> is required" >&2; exit 2; }
-[[ -n "$BACKEND_CONFIG" ]] || { echo "ABORT: --backend-config is required" >&2; exit 2; }
+[[ -n "$BACKEND_CONFIG_SOURCE" ]] || { echo "ABORT: --backend-config is required" >&2; exit 2; }
 
-BACKEND_CONFIG="$(cd "$(dirname "$BACKEND_CONFIG")" && pwd)/$(basename "$BACKEND_CONFIG")"
+BACKEND_CONFIG_SOURCE="$(cd "$(dirname "$BACKEND_CONFIG_SOURCE")" && pwd)/$(basename "$BACKEND_CONFIG_SOURCE")"
 SUPPORT_COLORS="$(cd "$(dirname "$SUPPORT_COLORS")" && pwd)/$(basename "$SUPPORT_COLORS")"
 
 REPO="$(git rev-parse --show-toplevel)"
@@ -53,8 +54,15 @@ cd "$REPO"
 HEAD="$(git rev-parse HEAD)"
 [[ "$HEAD" == "$EXPECTED_HEAD" ]] || { echo "ABORT: HEAD=$HEAD expected=$EXPECTED_HEAD" >&2; exit 1; }
 [[ -z "$(git status --porcelain)" ]] || { echo "ABORT: worktree is not clean" >&2; exit 1; }
-[[ -f "$BACKEND_CONFIG" ]] || { echo "ABORT: backend config missing" >&2; exit 1; }
+[[ -f "$BACKEND_CONFIG_SOURCE" ]] || { echo "ABORT: backend config source missing" >&2; exit 1; }
 [[ -f "$SUPPORT_COLORS" ]] || { echo "ABORT: support-color artifact missing" >&2; exit 1; }
+
+echo "=== MATERIALIZE SAFE BACKEND CONFIG ==="
+python3 -B ptt_offline/materialize_channel_profile_backend_config.py \
+  --config "$BACKEND_CONFIG_SOURCE" \
+  --support-colors-json "$SUPPORT_COLORS" \
+  --output "$BACKEND_CONFIG" \
+  | tee /tmp/hv155-backend-config-receipt.json
 
 python3 - "$BACKEND_CONFIG" <<'PY'
 import json,sys
