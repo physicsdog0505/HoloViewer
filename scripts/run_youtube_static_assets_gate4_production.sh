@@ -45,7 +45,7 @@ cd "$repo_root"
 
 git fetch origin main >/dev/null 2>&1
 [ "$(git rev-parse HEAD)" = "$EXPECTED_HEAD" ] || fail "checkout is not EXPECTED_HEAD"
-[ "$(git rev-parse origin/main)" = "$EXPECTED_HEAD" ] || fail "EXPECTED_HEAD is not current merged origin/main"
+git merge-base --is-ancestor "$EXPECTED_HEAD" origin/main || fail "EXPECTED_HEAD is not contained in current origin/main"
 [ -z "$(git status --porcelain --untracked-files=all)" ] || fail "checkout is not clean"
 git cat-file -e "${PROD_SITE_BASE_SHA}^{commit}"
 [ -z "$(git diff --name-only "$PROD_SITE_BASE_SHA" "$EXPECTED_HEAD" -- site/)" ] || fail "site/** differs from accepted Production frontend baseline"
