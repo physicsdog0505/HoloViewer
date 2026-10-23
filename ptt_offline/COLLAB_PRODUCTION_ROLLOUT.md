@@ -29,6 +29,35 @@ deployment authorization for a newer HEAD.
 
 Do not invent a Wrangler config.
 
+Owner read-only capture commands:
+
+```sh
+set -euo pipefail
+
+WORKER="holoviewer-public-api"
+BASELINE_VERSION="df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96"
+DB_ID="64e1a0ee-1455-4377-9640-3922e8f4d061"
+OUT="/tmp/hv197-readonly"
+rm -rf "$OUT"
+mkdir -p "$OUT"
+
+npx wrangler --version | tee "$OUT/wrangler-version.txt"
+npx wrangler whoami --json > "$OUT/whoami.json"
+npx wrangler deployments status --name "$WORKER" --json > "$OUT/deployments-status.json"
+npx wrangler deployments list --name "$WORKER" --json > "$OUT/deployments-list.json"
+npx wrangler versions view "$BASELINE_VERSION" --name "$WORKER" --json > "$OUT/baseline-version.json"
+npx wrangler d1 info "$DB_ID" --json > "$OUT/d1-info-before.json"
+
+echo "READ_ONLY_CAPTURE=$OUT"
+echo "PRODUCTION_MUTATION=NO"
+```
+
+These commands inspect Worker/D1 metadata only. They do not upload a version,
+change traffic, mutate D1, or alter triggers.
+
+The capture must prove the active deployment still includes #62 at 100% before
+any mutation. If it does not, STOP and return to #45.
+
 Use the current Owner-confirmed full API Worker config or reconstruct it from the
 active Cloudflare Worker settings before mutation.
 
@@ -171,6 +200,17 @@ No GitHub Actions deployment.
 
 Immutable Worker rollback target:
 `df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96`
+
+Owner-local immutable rollback command:
+
+```sh
+npx wrangler rollback df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96 \
+  --name holoviewer-public-api \
+  --message "rollback PR197 canonical-collab release to known-good #62"
+```
+
+This command is **not** part of preflight and must not be run unless rollback is
+actually required/authorized.
 
 Rollback the Worker only; additive Collab tables may remain unused.
 Do not drop tables during incident rollback.
