@@ -178,7 +178,7 @@ def _fresh_for_burst(row, *, now=None, max_age_seconds=180):
     return age is not None and 0<=age<=max_age_seconds
 
 def run_live_once(db,*,state_path,secret=None,executor=None,reconcile_executor=None,send=False,batch_cap=5,article_id=None,
-                  fresh_only=False,now=None):
+                  fresh_only=False,now=None,write_allowed=True):
     if type(batch_cap) is not int or not 1<=batch_cap<=25:
         raise ContractError('invalid bounded live batch cap')
     path=Path(state_path)
@@ -196,7 +196,8 @@ def run_live_once(db,*,state_path,secret=None,executor=None,reconcile_executor=N
                 if not callable(reconcile_executor) or not callable(executor):
                     return {"status":"RECOVERY_BLOCKED","aid":plan["aid"],"sent":0}
                 return recover_pending_state(path,reconcile_executor=reconcile_executor,
-                                             publish_executor=executor)
+                                             publish_executor=executor,
+                                             allow_replay=bool(write_allowed))
             if current.get("source_identity")!=plan["source_identity"]:
                 raise ContractError("live source identity changed; separate state needed")
         accepted=dict(current.get("accepted",{}))
@@ -273,7 +274,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,reconcile_executor=N
             else:
                 keep.append(row)
         stale_fenced_rows=0
-        if send and current:
+        if send and write_allowed and current:
             for row in stale:
                 accepted[row["source_record_key"]]=content_digest(row)
             stale_fenced_rows=len(stale)
@@ -311,6 +312,8 @@ def run_live_once(db,*,state_path,secret=None,executor=None,reconcile_executor=N
                  "pending":len(plan["pending_source_lines"]),
                  "source_identity":plan["source_identity"],"sent":0}
         if not send:return receipt
+        if not write_allowed:
+            return {**receipt,"status":"DAILY_BUDGET_BLOCKED","budget_blocked":True}
         if not isinstance(secret,str) or len(secret)<32 or not callable(executor):
             raise ContractError("separate trusted source proof and transport required")
         if not missing:return {**receipt,"status":"NO_NEW_ROWS"}
