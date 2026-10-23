@@ -49,6 +49,7 @@ from .daily_static_assets_archive import (
 from .r2_archive_export import export_archive
 
 CONFIG_SCHEMA="holoviewer-ptt-daily-history-runtime-config-v1"
+LIFECYCLE_V2_CUTOVER_DAY="2026-10-23"
 TPE=ZoneInfo("Asia/Taipei")
 SAFE_TARGET=re.compile(r"^[A-Za-z0-9._-]{1,80}$")
 UUID_RE=re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",re.I)
@@ -991,6 +992,14 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
     state_root: Path=config["_state_path"]
     state_root.mkdir(parents=True,exist_ok=True)
     target_day=day or previous_taipei_day()
+    if target_day < LIFECYCLE_V2_CUTOVER_DAY:
+        return {
+            "status":"PRE_CUTOVER_IMMUTABLE",
+            "day":target_day,
+            "cutover_day":LIFECYCLE_V2_CUTOVER_DAY,
+            "archive_deployed":False,
+            "reason":"historical-v1-production-archive-immutable",
+        }
     expected=load_expected_contract(config,day=target_day)
     coverage=coverage_from_collector(source=source,day=target_day,expected_contract=expected)
     repair_executor=make_repair_executor(config,day=target_day)
@@ -1239,7 +1248,7 @@ def main(argv=None):
         with _Lock(config["_state_path"]/"daily-history.lock"):
             result=run_closeout(config=config,day=args.day)
         print(json.dumps(result,ensure_ascii=False,sort_keys=True))
-        if result["status"]=="NOT_ARCHIVE_READY":
+        if result["status"] in {"NOT_ARCHIVE_READY","PRE_CUTOVER_IMMUTABLE"}:
             raise SystemExit(2)
         return
     if args.cmd=="accept-package":
