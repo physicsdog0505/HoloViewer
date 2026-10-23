@@ -344,7 +344,7 @@ curl -fsSI -H 'Origin: https://holodocchi.com' "$API/health" \
   | grep -i '^access-control-allow-origin: https://holodocchi.com' >/dev/null \
   || { rollback; exit 1; }
 
-python3 - /tmp/hv155-profile-readback.json <<'PY'
+if ! python3 - /tmp/hv155-profile-readback.json <<'PY'
 import json,sys
 p=json.load(open(sys.argv[1])).get("profile",{})
 assert p.get("channel_id")=="UCDqI2jOz0weumE8s7paEk6g"
@@ -353,6 +353,10 @@ assert p.get("support_mode") in {"neutral","solid","dual_color"}
 assert p.get("profile_revision")
 print("DIRECT_PROFILE_READBACK=PASS")
 PY
+then
+  rollback
+  exit 1
+fi
 
 cat <<EOF
 CANONICAL_PROFILE_TABLE=PASS

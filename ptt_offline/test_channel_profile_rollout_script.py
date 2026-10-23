@@ -30,6 +30,14 @@ class ChannelProfileRolloutScriptTests(unittest.TestCase):
         self.assertIn('CANDIDATE_BINDING_CONTRACT=PASS',SOURCE)
         self.assertIn('ROLLBACK_TO=$OLD_VERSION_ID',SOURCE)
 
+    def test_reentry_python_gates_do_not_contain_literal_backslash_n(self):
+        self.assertNotIn('p=d["plan"]\\nassert',SOURCE)
+        self.assertIn('p=d["plan"]\nassert p["updates"]==0, p',SOURCE)
+
+    def test_semantic_readback_failure_rolls_back(self):
+        self.assertIn("if ! python3 - /tmp/hv155-profile-readback.json <<'PY'",SOURCE)
+        self.assertIn("PY\nthen\n  rollback\n  exit 1\nfi",SOURCE)
+
     def test_population_and_readback_contract_is_present(self):
         for marker in (
             'PROFILE_ROWS=85',
