@@ -91,6 +91,22 @@ If the expected set is not authoritative, Collector coverage is incomplete, or
 repair is still pending, the runtime exits fail-closed with
 `NOT_ARCHIVE_READY` and does not invoke Wrangler.
 
+## Forward-only lifecycle v2 cutover
+
+Normal 07:30 runtime is fail-closed before the explicit lifecycle-v2 cutover day.
+
+Production setting:
+
+`"lifecycle_v2_cutover_day": "2026-10-23"`
+
+Behavior:
+
+- target days before 2026-10-23 return `PRE_CUTOVER_IMMUTABLE` before expected-AID discovery, Collector coverage, repair, packaging, or deploy;
+- target day 2026-10-23 and later use pure `expected-thread-lifecycle-v2`;
+- already-published historical v1 days remain immutable;
+- normal runtime never recursively repacks pre-cutover history;
+- a future separately authorized historical repair path is outside normal 07:30 operation.
+
 ## Production rollout gate
 
 `deploy=false / READY_TO_DEPLOY` is the implementation acceptance gate only. After the Owner performs the one-time reviewed code/config/runtime rollout, routine daily data publication is automatic; it does not require a fresh manual Owner deploy action each day.
