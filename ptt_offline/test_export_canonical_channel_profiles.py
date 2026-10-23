@@ -33,5 +33,59 @@ class CanonicalProfileExportTests(unittest.TestCase):
             p.write_text(json.dumps(cfg),encoding="utf-8")
             with self.assertRaises(SystemExit): mod.load_config(p)
 
+    def support_export(self):
+        channels=[{"channel_id":"UC"+format(i,"022d"),"display_mode":"neutral"} for i in range(66)]
+        for i in range(56):
+            channels[i].update({
+              "display_mode":"solid",
+              "color_hex":"#112233",
+              "verification_status":"verified",
+            })
+        channels[56].update({
+          "display_mode":"dual_color",
+          "color_hexes":["#112233","#445566"],
+          "verification_status":"community",
+          "color_semantics":"2025_6th_fes_penlight",
+        })
+        return {"schema_version":1,"fallback":"neutral","channels":channels}
+
+    def test_support_color_projection_matches_runtime_contract(self):
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"colors.json"
+            p.write_text(json.dumps(self.support_export(),ensure_ascii=False),encoding="utf-8")
+            colors,receipt=mod.load_support_colors(p)
+            self.assertEqual(receipt["rows"],66)
+            self.assertEqual(receipt["colored"],57)
+            self.assertEqual(receipt["neutral"],9)
+            self.assertEqual(receipt["dual"],1)
+            self.assertRegex(receipt["sha256"],r"^[0-9a-f]{64}$")
+            self.assertEqual(colors["UC"+format(0,"022d")],{
+              "member_accent":"#112233",
+              "member_accent_dual":None,
+              "support_mode":"solid",
+              "support_color_source":"verified",
+            })
+            self.assertEqual(colors["UC"+format(56,"022d")],{
+              "member_accent":"#112233",
+              "member_accent_dual":["#112233","#445566"],
+              "support_mode":"dual_color",
+              "support_color_source":"2025_6th_fes_penlight",
+            })
+            self.assertEqual(colors["UC"+format(65,"022d")]["support_mode"],"neutral")
+
+    def test_support_color_export_fails_closed_on_unreviewed_evidence(self):
+        body=self.support_export()
+        body["channels"][0]={
+          "channel_id":"UC"+format(0,"022d"),
+          "display_mode":"solid",
+          "color_hex":"#112233",
+          "verification_status":"unknown",
+        }
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"colors.json"
+            p.write_text(json.dumps(body),encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                mod.load_support_colors(p)
+
 if __name__=="__main__":
     unittest.main()
