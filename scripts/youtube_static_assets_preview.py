@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 from pathlib import Path
 import shutil
+import time
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -188,7 +190,13 @@ def write_preview_config(
     return out
 
 
-def _http_get(url: str, *, opener=urlopen) -> bytes:
+def _http_get(
+    url: str,
+    *,
+    opener=urlopen,
+    timeout: int = 10,
+    attempts: int = 2,
+) -> bytes:
     request = Request(
         url,
         headers={
@@ -197,13 +205,54 @@ def _http_get(url: str, *, opener=urlopen) -> bytes:
             "User-Agent": "HoloViewer-Issue448-Preview/1",
         },
     )
-    with opener(request, timeout=30) as response:
-        return response.read()
+    last_error: Exception | None = None
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            with opener(request, timeout=timeout) as response:
+                return response.read()
+        except Exception as exc:
+            last_error = exc
+            if attempt < attempts:
+                time.sleep(0.25 * attempt)
+    raise PreviewError(
+        f"HTTP GET failed after {attempts} attempt(s): {url}: {last_error}"
+    )
 
 
 def _remote_url(base_url: str, logical_path: str, nonce: str) -> str:
     rel = "/".join(quote(part, safe="") for part in logical_path.split("/"))
     return f"{base_url.rstrip('/')}/{rel}?issue448={quote(nonce, safe='')}"
+
+
+def _load_baseline_manifest(path: str | Path | None) -> dict | None:
+    if not path:
+        return None
+    candidate = Path(path).expanduser().resolve()
+    if not candidate.is_file():
+        raise PreviewError(f"baseline manifest missing: {candidate}")
+    payload = _json_object(candidate.read_bytes(), label="baseline manifest")
+    if payload.get("schema_version") != 1:
+        raise PreviewError("baseline manifest schema mismatch")
+    return payload
+
+
+def _changed_entries(current: list[dict], baseline: list[dict] | None) -> list[dict]:
+    if baseline is None:
+        return list(current)
+    previous = {
+        item.get("path"): item
+        for item in baseline
+        if isinstance(item, dict) and isinstance(item.get("path"), str)
+    }
+    changed = []
+    for item in current:
+        old = previous.get(item.get("path"))
+        if old is None or any(
+            old.get(key) != item.get(key)
+            for key in ("sha256", "bytes", "count", "channel_id", "video_count")
+        ):
+            changed.append(item)
+    return changed
 
 
 def verify_http_tree(
@@ -212,8 +261,13 @@ def verify_http_tree(
     *,
     nonce: str = "readback",
     opener=urlopen,
+    baseline_manifest: str | Path | None = None,
+    workers: int = 12,
+    progress: bool = True,
 ) -> dict:
     _, local_manifest_raw, manifest = _load_manifest(v1_root)
+    baseline = _load_baseline_manifest(baseline_manifest)
+
     manifest_url = _remote_url(base_url, "youtube/v1/manifest.json", nonce)
     remote_manifest_raw = _http_get(manifest_url, opener=opener)
     if remote_manifest_raw != local_manifest_raw:
@@ -222,43 +276,84 @@ def verify_http_tree(
     if remote_manifest != manifest:
         raise PreviewError("remote manifest semantic mismatch")
 
-    for item in manifest["months"]:
-        logical = item["path"]
-        raw = _http_get(_remote_url(base_url, logical, nonce), opener=opener)
-        _verify_declared(raw, item, label=f"remote month {logical}")
-        payload = _json_object(raw, label=f"remote month {logical}")
-        if payload.get("schema_version") != 1:
-            raise PreviewError(f"remote month schema mismatch: {logical}")
-        videos = payload.get("videos")
-        if not isinstance(videos, list) or len(videos) != item.get("count"):
-            raise PreviewError(f"remote month count mismatch: {logical}")
+    months = _changed_entries(
+        manifest["months"],
+        baseline.get("months") if baseline is not None else None,
+    )
+    indexes = _changed_entries(
+        manifest["channel_indexes"],
+        baseline.get("channel_indexes") if baseline is not None else None,
+    )
+    mode = "DELTA" if baseline is not None else "FULL"
 
-    for item in manifest["channel_indexes"]:
+    def verify_one(kind: str, item: dict) -> tuple[str, str]:
         logical = item["path"]
         raw = _http_get(_remote_url(base_url, logical, nonce), opener=opener)
-        _verify_declared(raw, item, label=f"remote index {logical}")
-        payload = _json_object(raw, label=f"remote index {logical}")
+        _verify_declared(raw, item, label=f"remote {kind} {logical}")
+        payload = _json_object(raw, label=f"remote {kind} {logical}")
         if payload.get("schema_version") != 1:
-            raise PreviewError(f"remote index schema mismatch: {logical}")
-        if payload.get("channel_id") != item.get("channel_id"):
-            raise PreviewError(f"remote index channel_id mismatch: {logical}")
-        months = payload.get("months")
-        if not isinstance(months, dict) or any(
-            not isinstance(ids, list) for ids in months.values()
-        ):
-            raise PreviewError(f"remote index months invalid: {logical}")
-        if sum(len(ids) for ids in months.values()) != item.get("video_count"):
-            raise PreviewError(f"remote index video_count mismatch: {logical}")
+            raise PreviewError(f"remote {kind} schema mismatch: {logical}")
+        if kind == "month":
+            videos = payload.get("videos")
+            if not isinstance(videos, list) or len(videos) != item.get("count"):
+                raise PreviewError(f"remote month count mismatch: {logical}")
+        else:
+            if payload.get("channel_id") != item.get("channel_id"):
+                raise PreviewError(f"remote index channel_id mismatch: {logical}")
+            month_map = payload.get("months")
+            if not isinstance(month_map, dict) or any(
+                not isinstance(ids, list) for ids in month_map.values()
+            ):
+                raise PreviewError(f"remote index months invalid: {logical}")
+            if sum(len(ids) for ids in month_map.values()) != item.get("video_count"):
+                raise PreviewError(f"remote index video_count mismatch: {logical}")
+        return kind, logical
+
+    tasks = [("month", item) for item in months] + [
+        ("index", item) for item in indexes
+    ]
+    total = len(tasks)
+    worker_count = max(1, min(workers, total or 1))
+    if progress:
+        print(
+            f"READBACK_MODE={mode} MANIFEST=1 "
+            f"MONTHS={len(months)}/{len(manifest['months'])} "
+            f"INDEXES={len(indexes)}/{len(manifest['channel_indexes'])} "
+            f"WORKERS={worker_count}",
+            flush=True,
+        )
+
+    completed = 0
+    if tasks:
+        with ThreadPoolExecutor(max_workers=worker_count) as pool:
+            futures = {
+                pool.submit(verify_one, kind, item): (kind, item["path"])
+                for kind, item in tasks
+            }
+            for future in as_completed(futures):
+                kind, logical = futures[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    raise PreviewError(
+                        f"{kind} readback failed: {logical}: {exc}"
+                    ) from exc
+                completed += 1
+                if progress and (completed == total or completed % 10 == 0):
+                    print(f"READBACK_PROGRESS={completed}/{total}", flush=True)
 
     return {
         "manifest_http_readback": "PASS",
         "month_objects_http_readback": "PASS",
         "channel_index_http_readback": "PASS",
         "manifest_sha256": _sha256(remote_manifest_raw),
-        "months": len(manifest["months"]),
-        "channel_indexes": len(manifest["channel_indexes"]),
+        "readback_mode": mode,
+        "declared_months": len(manifest["months"]),
+        "declared_channel_indexes": len(manifest["channel_indexes"]),
+        "checked_months": len(months),
+        "checked_channel_indexes": len(indexes),
+        "http_requests": 1 + total,
     }
-
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
@@ -283,6 +378,8 @@ def main(argv: list[str] | None = None) -> int:
     http.add_argument("--base-url", required=True)
     http.add_argument("--v1", required=True)
     http.add_argument("--nonce", default="readback")
+    http.add_argument("--baseline-manifest")
+    http.add_argument("--workers", type=int, default=12)
 
     args = parser.parse_args(argv)
     if args.command == "check-local":
@@ -295,7 +392,11 @@ def main(argv: list[str] | None = None) -> int:
         )
     else:
         result = verify_http_tree(
-            args.base_url, args.v1, nonce=args.nonce
+            args.base_url,
+            args.v1,
+            nonce=args.nonce,
+            baseline_manifest=args.baseline_manifest,
+            workers=args.workers,
         )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0
