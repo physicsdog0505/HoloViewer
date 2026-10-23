@@ -63,6 +63,25 @@ class SupervisorTests(unittest.TestCase):
                 with self.assertRaises(ContractError):
                     preflight(repo_root=repo,runtime_root=runtime,expected_head="abc")
 
+    def test_preflight_recognizes_launchd_service_runtime(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            repo=root/"repo"; runtime=root/"runtime"
+            repo.mkdir(); runtime.mkdir()
+            state=runtime/".ptt-publisher-state"
+            (state/"state").mkdir(parents=True)
+            (runtime/"hololive_ptt.sqlite3").write_bytes(b"x")
+            (state/".publisher-secrets.json").write_text("{}")
+            (state/"publisher.pid").write_text("123\n")
+            with patch("ptt_offline.publisher_supervisor._run") as run, \
+                 patch("ptt_offline.publisher_supervisor._pid_alive",return_value=True), \
+                 patch("ptt_offline.publisher_supervisor._command",return_value="python -m ptt_offline.publisher_service --root /tmp/runtime"), \
+                 patch("ptt_offline.publisher_supervisor._lock_holders",return_value=[123]):
+                run.return_value.stdout="abc\n"
+                proof=preflight(repo_root=repo,runtime_root=runtime,expected_head="abc")
+            self.assertEqual(proof["runtime_kind"],"launchd_service")
+            self.assertEqual(proof["manual_pid"],123)
+
     def test_preflight_accepts_clean_stopped_runtime(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
