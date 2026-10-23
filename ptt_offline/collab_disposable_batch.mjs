@@ -32,9 +32,24 @@ export async function digest(value) {
 }
 
 export function makeBatchPacket(artifact, { mode = "initial", injectedFailure = false } = {}) {
-  if (!artifact || artifact.projection_key !== "live" ||
+  if (!artifact || artifact.schema_version !== "public-collab-projection-v1" || artifact.projection_key !== "live" ||
       artifact.source_revision !== REVISION || !Array.isArray(artifact.events)) fail("artifact mismatch");
   const rows = artifact.events;
+  if (!artifact.source || !artifact.source.range_start || !artifact.source.range_end ||
+      !artifact.generated_at || !Number.isSafeInteger(artifact.source_event_count) ||
+      !Number.isSafeInteger(artifact.effective_event_count) ||
+      artifact.effective_event_count !== rows.length ||
+      artifact.source_event_count < rows.length) fail("invalid projection metadata");
+  if (rows.length === 1) {
+    const row = rows[0], p = row.payload;
+    if (!p || p.event_id !== row.event_id || p.event_key !== row.event_key ||
+        p.label !== row.label || p.confidence !== row.confidence ||
+        p.event_date !== row.event_date || p.event_start_at !== row.start_at ||
+        p.event_end_at !== row.end_at ||
+        !["candidate","approved","needs_review"].includes(row.review_status) ||
+        !Array.isArray(p.streams) || p.streams.length < 2 ||
+        new Set(p.streams.map(x => x.video_id)).size !== p.streams.length) fail("invalid event payload");
+  }
   if (mode === "initial" && (rows.length !== 1 || rows[0].event_id !== TARGET ||
       rows[0].live_scope !== false)) fail("unexpected canonical event");
   if (mode === "empty-next-live" && rows.length !== 0) fail("next-live must be empty");
@@ -79,8 +94,13 @@ export async function packetReceipt(packet, identity) {
 export async function executeDisposableBatch(db, packet, identity) {
   assertDisposableIdentity(identity);
   if (!db || typeof db.batch !== "function" || typeof db.prepare !== "function") fail("D1 API unavailable");
-  // Caller must independently prove binding identity with authenticated Wrangler
-  // account/config and a sentinel. This metadata check alone is insufficient.
+  // Check sentinel using ACTUAL D1 binding; never create it here.
+  const sentinel = await db.prepare(
+    "SELECT database_id, name FROM hv197_disposable_identity LIMIT 2"
+  ).all();
+  if (!sentinel || !Array.isArray(sentinel.results) || sentinel.results.length !== 1 ||
+      sentinel.results[0].database_id !== identity.database_id ||
+      sentinel.results[0].name !== identity.name) fail("bound D1 sentinel mismatch");
   const statements = packet.map(s => db.prepare(s.sql).bind(...s.bindings));
   return db.batch(statements);
 }
