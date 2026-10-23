@@ -134,6 +134,23 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('id="history-prev"', html)
         self.assertNotIn('id="history-next"', html)
 
+    def test_history_prefers_youtube_static_manifest_month_read_path(self):
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+
+        self.assertIn("const YOUTUBE_HISTORY_MANIFEST_PATH='/youtube/v1/manifest.json'", js)
+        self.assertIn("config.youtubeStaticBase", js)
+        self.assertIn("fetchYoutubeStaticJson(YOUTUBE_HISTORY_MANIFEST_PATH,{manifest:true})", js)
+        self.assertIn("youtubeHistoryMonthEntry(manifest,month)", js)
+        self.assertIn("const payload=await fetchYoutubeStaticJson(entry.path)", js)
+        self.assertIn("payload?.schema_version!==1||!Array.isArray(payload.videos)", js)
+        self.assertIn("youtubeHistoryTaipeiDay(row)===day", js)
+        self.assertIn("return await loadYoutubeHistoryDay(day,offset,50)", js)
+        self.assertIn("return api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+offset)", js)
+        self.assertIn("data.source==='legacy-api'&&data.static_error", js)
+        self.assertIn("staticError?.code==='HISTORY_STATIC_UNAVAILABLE'", js)
+        self.assertIn("throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開')", js)
+        self.assertNotIn("/objects/", js[js.index("const YOUTUBE_HISTORY_MANIFEST_PATH"):js.index("function historyChrome(){")])
+
     def test_custom_builder_matches_accepted_4174_controls(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
@@ -1058,7 +1075,7 @@ process.stdout.write(JSON.stringify({
         self.assertIn("function requestHomeCatalogRows(){",js)
         self.assertIn("if(homeCatalogPromise)return homeCatalogPromise;",js)
         self.assertIn("homeCatalogPromise=api('/v1/catalog/today')",js)
-        self.assertIn(":requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null);",js)
+        self.assertIn("requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null)",js)
         self.assertIn("window.hvLoadWatchalongLanding=loadWatchalongLanding;",js)
         self.assertIn("if(initialRoute==='watchalong')loadWatchalongLanding();",js)
         self.assertIn("if(r==='watchalong')window.hvLoadWatchalongLanding?.();",js)

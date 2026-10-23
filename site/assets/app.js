@@ -818,6 +818,126 @@ function shiftDay(day,delta){const date=new Date(day+'T00:00:00Z');date.setUTCDa
 function historyBounds(){const today=taipeiDay();return {earliest:shiftDay(today,-30),latest:shiftDay(today,-1)}}
 function historyDateValid(day){const b=historyBounds();return /^\\d{4}-\\d{2}-\\d{2}$/.test(day)&&day>=b.earliest&&day<=b.latest}
 function historyLink(label,day,page=1){const link=node('a',label,'subtle-action');link.href='/history?date='+encodeURIComponent(day)+(page>1?'&page='+page:'');link.onclick=e=>{e.preventDefault();$('historyDate').value=day;state.offset=(page-1)*50;loadHistory()};return link}
+const YOUTUBE_HISTORY_MANIFEST_PATH='/youtube/v1/manifest.json';
+const YOUTUBE_HISTORY_MANIFEST_TTL_MS=60000;
+const youtubeHistoryMonthCache=new Map();
+let youtubeHistoryManifestCache=null;
+let youtubeHistoryManifestSavedAt=0;
+let youtubeHistoryManifestPromise=null;
+function youtubeStaticBase(){
+ return String(config.youtubeStaticBase||'').replace(/\/$/,'');
+}
+function youtubeStaticUrl(path){
+ const base=youtubeStaticBase();
+ if(!base)throw new Error('YouTube 歷史 Static Assets 尚未設定');
+ const logical=String(path||'').replace(/^\/+/, '');
+ if(!logical.startsWith('youtube/v1/'))throw new Error('YouTube 歷史 path 不合法');
+ return base+'/'+logical;
+}
+async function fetchYoutubeStaticJson(path,{manifest=false}={}){
+ const response=await fetch(youtubeStaticUrl(path),{
+  mode:'cors',credentials:'omit',headers:{Accept:'application/json'},
+  cache:manifest?'no-cache':'default'
+ });
+ if(!response.ok)throw new Error('YouTube Static HTTP '+response.status);
+ return response.json();
+}
+async function loadYoutubeHistoryManifest(){
+ const now=Date.now();
+ if(youtubeHistoryManifestCache&&now-youtubeHistoryManifestSavedAt<YOUTUBE_HISTORY_MANIFEST_TTL_MS)return youtubeHistoryManifestCache;
+ if(youtubeHistoryManifestPromise)return youtubeHistoryManifestPromise;
+ youtubeHistoryManifestPromise=fetchYoutubeStaticJson(YOUTUBE_HISTORY_MANIFEST_PATH,{manifest:true})
+  .then(data=>{
+   if(data?.schema_version!==1||!Array.isArray(data.months))throw new Error('YouTube 歷史 manifest 格式錯誤');
+   youtubeHistoryManifestCache=data;
+   youtubeHistoryManifestSavedAt=Date.now();
+   return data;
+  })
+  .finally(()=>{youtubeHistoryManifestPromise=null});
+ return youtubeHistoryManifestPromise;
+}
+function youtubeHistoryMonthState(manifest,month){
+ const raw=manifest?.availability?.month_state?.[month];
+ if(typeof raw==='string')return raw;
+ if(raw&&typeof raw==='object')return String(raw.state||raw.status||'');
+ return '';
+}
+function youtubeHistoryUnavailable(message){
+ const error=new Error(message);error.code='HISTORY_STATIC_UNAVAILABLE';return error;
+}
+function youtubeHistoryMonthEntry(manifest,month){
+ return (manifest?.months||[]).find(item=>{
+  if(!item||typeof item.path!=='string')return false;
+  const itemMonth=String(item.month||'');
+  return itemMonth===month||item.path.endsWith('/'+month+'.json');
+ })||null;
+}
+async function loadYoutubeHistoryMonth(day){
+ const month=String(day||'').slice(0,7);
+ if(!/^\d{4}-\d{2}$/.test(month))throw new Error('YouTube 歷史月份不合法');
+ if(youtubeHistoryMonthCache.has(month))return youtubeHistoryMonthCache.get(month);
+ const manifest=await loadYoutubeHistoryManifest();
+ const monthState=youtubeHistoryMonthState(manifest,month).toLowerCase();
+ if(monthState&&monthState!=='published'&&monthState!=='available')throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開');
+ const entry=youtubeHistoryMonthEntry(manifest,month);
+ if(!entry)throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開');
+ const payload=await fetchYoutubeStaticJson(entry.path);
+ if(payload?.schema_version!==1||!Array.isArray(payload.videos))throw new Error('YouTube 歷史月份格式錯誤');
+ if(payload.month&&payload.month!==month)throw new Error('YouTube 歷史月份識別不一致');
+ youtubeHistoryMonthCache.set(month,payload);
+ return payload;
+}
+function youtubeHistoryVideoStart(row){
+ return String(row?.actual_start||row?.scheduled_start||row?.start_at||row?.published_at||'');
+}
+function youtubeHistoryTaipeiDay(row){
+ const raw=youtubeHistoryVideoStart(row);
+ const ms=Date.parse(raw);
+ if(!Number.isFinite(ms))return '';
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ms));
+ const p=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return p.year+'-'+p.month+'-'+p.day;
+}
+function normalizeYoutubeHistoryVideo(row){
+ if(!row||typeof row!=='object')return null;
+ const videoId=String(row.video_id||'');
+ if(!/^[A-Za-z0-9_-]{11}$/.test(videoId))return null;
+ return {
+  ...row,
+  video_id:videoId,
+  channel_id:String(row.channel_id||''),
+  channel_name:row.channel_name||row.channel_title||'',
+  channel_title:row.channel_title||row.channel_name||'',
+  title:String(row.title||videoId),
+  actual_start:row.actual_start||row.start_at||'',
+  scheduled_start:row.scheduled_start||'',
+  actual_end:row.actual_end||row.end_at||'',
+  lifecycle_state:'ended'
+ };
+}
+async function loadYoutubeHistoryDay(day,offset=0,limit=50){
+ const payload=await loadYoutubeHistoryMonth(day);
+ const rows=payload.videos
+  .filter(row=>youtubeHistoryTaipeiDay(row)===day)
+  .map(normalizeYoutubeHistoryVideo)
+  .filter(Boolean)
+  .sort((a,b)=>Date.parse(String(b.actual_start||b.scheduled_start||0))-Date.parse(String(a.actual_start||a.scheduled_start||0))||String(b.video_id).localeCompare(String(a.video_id)));
+ const page=rows.slice(offset,offset+limit);
+ return {items:page,total:rows.length,has_more:offset+page.length<rows.length,source:'youtube-static'};
+}
+async function loadLegacyHistoryDay(day,offset=0){
+ return api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+offset);
+}
+async function loadHistoryData(day,offset=0){
+ try{
+  return await loadYoutubeHistoryDay(day,offset,50);
+ }catch(staticError){
+  if(staticError?.code==='HISTORY_STATIC_UNAVAILABLE')throw staticError;
+  const legacy=await loadLegacyHistoryDay(day,offset);
+  return {...legacy,source:'legacy-api',static_error:String(staticError?.message||staticError)};
+ }
+}
+
 function historyChrome(){const b=historyBounds();const input=$('historyDate');input.min=b.earliest;input.max=b.latest;if(!historyDateValid(input.value)){input.value=b.latest;state.offset=0}
  const selected=input.value;const shortcuts=$('history-shortcuts');shortcuts.replaceChildren();
  [['昨天',b.latest],['前天',shiftDay(b.latest,-1)],['7 天前',shiftDay(b.latest,-6)],['← 前一天',shiftDay(selected,-1)],['後一天 →',shiftDay(selected,1)]].forEach(([label,day])=>{if(historyDateValid(day))shortcuts.append(historyLink(label,day))});
@@ -827,13 +947,15 @@ function historyChrome(){const b=historyBounds();const input=$('historyDate');in
 async function loadHistory(){
  historyChrome();const day=$('historyDate').value;const error=$('history-error');error.hidden=true;error.textContent='';
  const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;
- if(!config.apiBase){error.textContent='History 正式 API 尚未接通。';error.hidden=false;return}
+ if(!config.youtubeStaticBase&&!config.apiBase){error.textContent='History 資料來源尚未設定。';error.hidden=false;return}
  try{
-  const historyPromise=api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+state.offset);
-  const collabPromise=api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null);
-  const catalogPromise=homeCatalogRows.length
-   ?Promise.resolve({streams:homeCatalogRows})
-   :requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null);
+  const historyPromise=loadHistoryData(day,state.offset);
+  const collabPromise=config.apiBase?api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null):Promise.resolve(null);
+  const catalogPromise=config.apiBase
+   ?(homeCatalogRows.length
+     ?Promise.resolve({streams:homeCatalogRows})
+     :requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null))
+   :Promise.resolve(null);
   const [data,collabData,catalogData]=await Promise.all([historyPromise,collabPromise,catalogPromise]);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
   const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
@@ -844,7 +966,10 @@ async function loadHistory(){
   endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));
   const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
   const total=Number(data.total||0);if(!endedItems.length)$('history-empty').hidden=false;
-  if(!collabData&&endedItems.length){error.textContent='歷史直播已載入；多人連動資料暫時無法讀取。';error.hidden=false}
+  const notices=[];
+  if(data.source==='legacy-api'&&data.static_error)notices.push('YouTube 歷史 Static Assets 暫時不可用，已使用既有 History API。');
+  if(!collabData&&endedItems.length&&config.apiBase)notices.push('多人連動資料暫時無法讀取。');
+  if(notices.length){error.textContent=notices.join(' ');error.hidden=false}
   const page=Math.floor(state.offset/50)+1;if(page>1)pagination.append(historyLink('上一頁',day,page-1));
   if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
  }catch(e){error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false}
