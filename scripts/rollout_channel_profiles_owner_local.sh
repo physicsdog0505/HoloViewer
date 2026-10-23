@@ -194,7 +194,10 @@ d=json.load(open(sys.argv[1]))
 assert d["status"]=="VALIDATED"
 assert d["production_mutation"] is False
 assert d["profile_count"]==85
-p=d["plan"]\nassert p["updates"]==0, p\nassert p["older"]==0, p\nassert p["inserts"]+p["noops"]==85, p
+p=d["plan"]
+assert p["updates"]==0, p
+assert p["older"]==0, p
+assert p["inserts"]+p["noops"]==85, p
 print("POPULATION_DRY_RUN=PASS")
 PY
 
@@ -211,7 +214,11 @@ import json,sys
 d=json.load(open(sys.argv[1]))
 assert d["status"]=="APPLIED"
 assert d["profile_count"]==85
-p=d["plan"]\nassert p["updates"]==0, p\nassert p["older"]==0, p\nassert p["inserts"]+p["noops"]==85, p\nassert d["profiles_written"]==p["inserts"], d
+p=d["plan"]
+assert p["updates"]==0, p
+assert p["older"]==0, p
+assert p["inserts"]+p["noops"]==85, p
+assert d["profiles_written"]==p["inserts"], d
 print("PROFILE_POPULATION=PASS")
 PY
 
@@ -344,7 +351,7 @@ curl -fsSI -H 'Origin: https://holodocchi.com' "$API/health" \
   | grep -i '^access-control-allow-origin: https://holodocchi.com' >/dev/null \
   || { rollback; exit 1; }
 
-python3 - /tmp/hv155-profile-readback.json <<'PY'
+if ! python3 - /tmp/hv155-profile-readback.json <<'PY'
 import json,sys
 p=json.load(open(sys.argv[1])).get("profile",{})
 assert p.get("channel_id")=="UCDqI2jOz0weumE8s7paEk6g"
@@ -353,6 +360,10 @@ assert p.get("support_mode") in {"neutral","solid","dual_color"}
 assert p.get("profile_revision")
 print("DIRECT_PROFILE_READBACK=PASS")
 PY
+then
+  rollback
+  exit 1
+fi
 
 cat <<EOF
 CANONICAL_PROFILE_TABLE=PASS
