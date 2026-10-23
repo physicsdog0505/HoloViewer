@@ -32,6 +32,7 @@ jobs:
             ptt_offline.test_public_today_contract \
             ptt_offline.test_collab_projection_import \
             ptt_offline.test_collab_projection_query_plan \
+            ptt_offline.test_collab_release_preflight \
             ptt_offline.test_consumer_boundary \
             ptt_offline.test_consumer_paging \
             ptt_offline.test_public_consumer_envelope \
