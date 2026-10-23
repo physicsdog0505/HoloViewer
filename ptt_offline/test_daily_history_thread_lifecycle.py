@@ -130,5 +130,83 @@ class ThreadLifecycleArchiveTests(unittest.TestCase):
         self.assertEqual(excluded[prior_night],"previous-lifecycle-thread")
 
 
+    def test_validator_rejects_closeout_limit_with_early_partition_end(self):
+        day="2026-10-22"
+        aid="1night"
+        payload={"pushes":[
+            row(aid=aid,key="night-0609",occurred="2026-10-23T06:09:00",
+                thread_start="2026-10-22T18:00:00",floor=3),
+        ]}
+        _,raw=_build_thread_lifecycle_source_object(
+            day=day,payloads=[payload],expected_aids={aid},
+            expected_thread_epochs={aid:local("2026-10-22T18:00:00")})
+        body=json.loads(raw)
+        early=local("2026-10-23T06:30:00").astimezone(timezone.utc) \
+            .isoformat(timespec="seconds").replace("+00:00","Z")
+        body["partition_end"]=early
+        body["membership"]["handoff_boundary"]=early
+        with self.assertRaisesRegex(Exception,"closeout-limit handoff must equal closeout cap"):
+            _validate_payload(
+                raw=json.dumps(body,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode(),
+                day=day,expected_aids={aid})
+
+    def test_validator_rejects_successor_thread_without_successor_aid(self):
+        day="2026-10-22"
+        aid="1night"
+        successor="1next"
+        payload={"pushes":[
+            row(aid=aid,key="night-0615",occurred="2026-10-23T06:15:00",
+                thread_start="2026-10-22T18:00:00",floor=10),
+            row(aid=successor,key="next-0630",occurred="2026-10-23T06:31:00",
+                thread_start="2026-10-23T06:30:00",floor=1),
+        ]}
+        _,raw=_build_thread_lifecycle_source_object(
+            day=day,payloads=[payload],expected_aids={aid},
+            expected_thread_epochs={aid:local("2026-10-22T18:00:00")})
+        body=json.loads(raw)
+        body["membership"]["successor_aid"]=None
+        with self.assertRaisesRegex(Exception,"successor-thread handoff requires successor AID"):
+            _validate_payload(
+                raw=json.dumps(body,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode(),
+                day=day,expected_aids={aid})
+
+    def test_validator_rejects_successor_aid_inside_expected_set(self):
+        day="2026-10-22"
+        aid="1night"
+        successor="1next"
+        payload={"pushes":[
+            row(aid=aid,key="night-0615",occurred="2026-10-23T06:15:00",
+                thread_start="2026-10-22T18:00:00",floor=10),
+            row(aid=successor,key="next-0630",occurred="2026-10-23T06:31:00",
+                thread_start="2026-10-23T06:30:00",floor=1),
+        ]}
+        _,raw=_build_thread_lifecycle_source_object(
+            day=day,payloads=[payload],expected_aids={aid},
+            expected_thread_epochs={aid:local("2026-10-22T18:00:00")})
+        body=json.loads(raw)
+        body["membership"]["successor_aid"]=aid
+        with self.assertRaisesRegex(Exception,"successor-thread AID must be outside expected set"):
+            _validate_payload(
+                raw=json.dumps(body,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode(),
+                day=day,expected_aids={aid})
+
+    def test_validator_rejects_serialized_closeout_limit_mismatch(self):
+        day="2026-10-22"
+        aid="1night"
+        payload={"pushes":[
+            row(aid=aid,key="night-0609",occurred="2026-10-23T06:09:00",
+                thread_start="2026-10-22T18:00:00",floor=3),
+        ]}
+        _,raw=_build_thread_lifecycle_source_object(
+            day=day,payloads=[payload],expected_aids={aid},
+            expected_thread_epochs={aid:local("2026-10-22T18:00:00")})
+        body=json.loads(raw)
+        body["membership"]["closeout_limit"]="2026-10-23T00:00:00Z"
+        with self.assertRaisesRegex(Exception,"day.json closeout limit mismatch"):
+            _validate_payload(
+                raw=json.dumps(body,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode(),
+                day=day,expected_aids={aid})
+
+
 if __name__=="__main__":
     unittest.main()
