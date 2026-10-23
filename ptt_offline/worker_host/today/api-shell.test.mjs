@@ -184,10 +184,9 @@ test('History read enriches trusted avatar, group and audited dual support color
  const cid='UC'+'H'.repeat(22);
  const row={
   video_id:'histcard001',taipei_day:'2026-10-17',title:'History',channel_id:cid,channel_name:'Member',
-  avatar_url:'',scheduled_start:'2026-10-17T10:00:00Z',
+  avatar_url:'https://yt3.ggpht.com/history-avatar',scheduled_start:'2026-10-17T10:00:00Z',
   actual_start:'2026-10-17T10:01:00Z',actual_end:'2026-10-17T11:00:00Z',
   source_revision:'youtube-videos-list:liveStreamingDetails',
-  trusted_channel_avatar:'https://yt3.ggpht.com/history-avatar',
   channel_group:'hololive'
  };
  const DB={prepare(sql){return {bind(){return {

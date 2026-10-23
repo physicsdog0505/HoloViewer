@@ -2,7 +2,7 @@
  * Issue #47, single canonical D1 store. No Cloudflare bindings, network or Cron side effects.
  * Inject a D1-compatible db. A write is an atomic batch of evidence and projection.
  */
-import {supportColorFor} from './support-colors.mjs';
+import {readChannelProfiles,applyChannelProfile} from './channel-profile.mjs';
 const idPattern=/^[A-Za-z0-9_-]{11}$/;
 const channelPattern=/^UC[A-Za-z0-9_-]{22}$/;
 const groups=new Set(['hololive','holostars','mekpark','other']);
@@ -44,7 +44,7 @@ export function evidenceChecksum(r) {
   for (let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
   return (h>>>0).toString(16).padStart(8,'0');
 }
-export async function writeEvidence(db, evidence) {
+export async function writeEvidence(db, evidence, {projectHistory=true}={}) {
   const r=validateEvidence(evidence), hash=evidenceChecksum(r);
   const oldEvidence=await db.prepare('SELECT checksum FROM public_today_evidence WHERE video_id=? AND observed_at=? AND source_label=?')
     .bind(r.video_id,r.observed_at,r.source_label).first();
@@ -79,7 +79,7 @@ export async function writeEvidence(db, evidence) {
         AND public_today_canonical.publisher_channel_id=excluded.publisher_channel_id`;
     mutations.push(db.prepare(sql).bind(r.video_id,r.channel_id,r.roster_version,r.group,r.title,r.channel_name??'',
       r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.source_label,hash));
-    if(r.lifecycle_state==='ended'&&r.source_label===YOUTUBE_LIVE_SOURCE&&r.actual_start&&r.actual_end){
+    if(projectHistory&&r.lifecycle_state==='ended'&&r.source_label===YOUTUBE_LIVE_SOURCE&&r.actual_start&&r.actual_end){
       const catalogAvatar=await db.prepare(`SELECT avatar_url FROM public_catalog
         WHERE channel_id=? AND avatar_url IS NOT NULL
         ORDER BY COALESCE(actual_start,scheduled_start) DESC,video_id DESC LIMIT 1`).bind(r.channel_id).first();
@@ -146,12 +146,11 @@ export function classifyHomeConsumer(stream){
  if(lifecycle==='ended')return 'ended';
  return 'degraded';
 }
-function consumerRow(row,nowStamp,supportColors){
+function consumerRow(row,nowStamp,profile){
  const video_id=idPattern.test(row?.video_id??'')?row.video_id:null;
  const channel_id=channelPattern.test(row?.publisher_channel_id??'')?row.publisher_channel_id:null;
  // Broken primary identity is a corrupt candidate, not a fabricated Home card.
  if(!video_id||!channel_id)return null;
- const color=supportColorFor(channel_id,supportColors);
  const observed=consumerTime(row.lifecycle_observed_at);
  const age=observed?Date.parse(nowStamp)-Date.parse(observed):NaN;
  const fresh=Number.isFinite(age)&&age>=0&&age<=1200000;
@@ -160,21 +159,19 @@ function consumerRow(row,nowStamp,supportColors){
  const trusted=source_label===YOUTUBE_LIVE_SOURCE;
  const actual_start=trusted?consumerTime(row.actual_start):null;
  const actual_end=trusted?consumerTime(row.actual_end):null;
- // Lifecycle identity is canonical-state authority; timestamp provenance only gates playback bounds.
  const lifecycle_state=state==='upcoming'?
   (consumerTime(row.scheduled_start)&&row.scheduled_start<=nowStamp?'waiting':'upcoming'):state;
  const stale=state==='live'&&!fresh;
- return {video_id,title:consumerText(row.title),channel_id,channel_name:consumerText(row.channel_name),
-  group:groups.has(row.channel_group)?row.channel_group:'other',lifecycle_state,observed_at:observed,
+ return applyChannelProfile({
+  video_id,title:consumerText(row.title),channel_id,channel_name:consumerText(row.channel_name),
+  lifecycle_state,observed_at:observed,
   start_at:actual_start??consumerTime(row.scheduled_start),
   actual_start,actual_end,
   anchor_source:actual_start?'youtube-liveStreamingDetails-actualStartTime':null,
-  avatar_url:verifiedChannelAvatar(row.trusted_channel_avatar),
-  member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,
-  support_mode:color.support_mode,support_color_source:color.support_color_source,
-  source_label,stale};
+  source_label,stale
+ },profile);
 }
-export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false,supportColors=null}={}) {
+export async function readToday(db,{day,limit=200,offset=0,now=new Date(),env=null,profileTableEnabled=false}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
     throw Error('invalid canonical Today day');
   if (!Number.isInteger(limit)||limit<1||limit>200) throw Error('invalid limit');
@@ -195,13 +192,11 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
   const previous=previousStart.toISOString().replace(/\.\d{3}Z$/,'Z');
   const nowStamp=now.toISOString().replace(/\.\d{3}Z$/,'Z');
   const freshCutoff=new Date(now.getTime()-1200000).toISOString().replace(/\.\d{3}Z$/,'Z');
-  // Profile table is a separate owner-approved migration; legacy SQL remains
-  // unchanged until that table is proven available and explicitly enabled.
-  const profileExpr=profileTableEnabled?`(SELECT p.avatar_url FROM public_today_channel_profiles p WHERE p.channel_id=public_today_canonical.publisher_channel_id AND p.roster_version=ac.roster_version)`:null;
+  const legacyProfileExpr=profileTableEnabled?`(SELECT p.avatar_url FROM public_today_channel_profiles p WHERE p.channel_id=public_today_canonical.publisher_channel_id AND p.roster_version=ac.roster_version)`:null;
   const rows=await db.prepare(`SELECT public_today_canonical.*,
-    ${profileExpr?`COALESCE(${profileExpr},`:''}(SELECT c.avatar_url FROM public_catalog c
-       WHERE c.channel_id=public_today_canonical.publisher_channel_id AND c.avatar_url IS NOT NULL
-       ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC LIMIT 1)${profileExpr?')':''} AS trusted_channel_avatar
+    ${legacyProfileExpr?`COALESCE(${legacyProfileExpr},`:''}(SELECT c.avatar_url FROM public_catalog c
+      WHERE c.channel_id=public_today_canonical.publisher_channel_id AND c.avatar_url IS NOT NULL
+      ORDER BY COALESCE(c.actual_start,c.scheduled_start) DESC,c.video_id DESC LIMIT 1)${legacyProfileExpr?')':''} AS trusted_channel_avatar
     FROM public_today_canonical
     JOIN public_today_approved_channels ac
       ON ac.channel_id=public_today_canonical.publisher_channel_id AND ac.roster_version=?
@@ -225,5 +220,9 @@ export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profil
     completeness:{status:coverage?(coverage.gap||coverage.scanned_channels>0?'partial':'unverified'):'unverified',
                   gap:!coverage||Boolean(coverage.gap)||truncated,limited:truncated,has_more:truncated,offset,before_noon_grace:beforeNoon},
     checkpoint:coverage?.checkpoint??null,
-    streams:(rows.results??[]).slice(0,limit).map(r=>consumerRow(r,nowStamp,supportColors)).filter(Boolean)};
+    streams:await (async()=>{
+      const selected=(rows.results??[]).slice(0,limit);
+      const profiles=await readChannelProfiles(db,selected.map(r=>r.publisher_channel_id),{env});
+      return selected.map(r=>consumerRow(r,nowStamp,profiles.get(r.publisher_channel_id))).filter(Boolean);
+    })()};
 }

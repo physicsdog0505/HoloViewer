@@ -4,18 +4,7 @@
  * No Worker creation, deploy, migration, provider API calls or implicit side effects.
  */
 import {readToday} from './store.mjs';
-import {validateSupportColorExport} from './support-colors.mjs';
 const MAX_BODY = 262144;
-function supportColorJson(env){
-  if(env?.TODAY_SUPPORT_COLORS_JSON)return String(env.TODAY_SUPPORT_COLORS_JSON);
-  const parts=[];
-  for(let i=0;i<16;i++){
-    const v=env?.['TODAY_SUPPORT_COLORS_JSON_'+i];
-    if(v==null){ if(i===0)return null; break; }
-    parts.push(String(v));
-  }
-  return parts.length?parts.join(''):null;
-}
 function json(body,status=200,headers={}) {
   return new Response(JSON.stringify(body),{status,headers:{
     'content-type':'application/json; charset=utf-8',
@@ -37,9 +26,7 @@ export async function handleTodayRead(request,env,now=new Date()) {
   const rawOffset=url.searchParams.get('offset')??'0';
   if (!/^(0|[1-9][0-9]{0,4})$/.test(rawOffset) || Number(rawOffset)>10000) return json({error:'bad_offset'},400);
   try {
-    const rawColors=supportColorJson(env);
-    const colors=rawColors?validateSupportColorExport(JSON.parse(rawColors)):null;
-    const result=await readToday(env.DB,{day,limit:Number(rawLimit),offset:Number(rawOffset),now,profileTableEnabled:env.TODAY_PROFILES_ENABLED==='true',supportColors:colors});
+    const result=await readToday(env.DB,{day,limit:Number(rawLimit),offset:Number(rawOffset),now,env});
     const serialized=JSON.stringify(result);
     if (new TextEncoder().encode(serialized).length>MAX_BODY) return json({error:'response_limit'},503);
     return new Response(serialized,{status:200,headers:{
