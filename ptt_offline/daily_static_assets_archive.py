@@ -190,7 +190,7 @@ def _validate_payload(*,raw: bytes,day: str,
                 raise DailyArchiveError("successor-thread handoff outside valid window")
         else:
             raise DailyArchiveError("day.json handoff source invalid")
-    elif schema is not None:
+    elif isinstance(schema,str) and schema.startswith("holoviewer-ptt-history-day-"):
         raise DailyArchiveError("unsupported day.json schema version")
 
     identities=[]
