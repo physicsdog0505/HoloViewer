@@ -153,7 +153,7 @@ def render_sql(doc: dict) -> str:
         # independent of the artifact's source date range. Do not retire canonical
         # history rows when they simply leave live scope.
         statements.append(
-            "UPDATE public_collab_events SET live_scope=0 WHERE live_scope=1;"
+            "UPDATE public_collab_events SET live_scope=0 WHERE is_current=1 AND live_scope=1;"
         )
     else:
         # Historical publication owns only non-live rows in its bounded range.
