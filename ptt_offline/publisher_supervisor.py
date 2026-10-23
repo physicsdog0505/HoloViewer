@@ -61,7 +61,9 @@ def _lock_holders(lock_path):
 def render_plist(*,repo_root,runtime_root,python_executable,log_path):
     repo_root=str(Path(repo_root).expanduser().resolve())
     runtime_root=str(Path(runtime_root).expanduser().resolve())
-    python_executable=str(Path(python_executable).expanduser().resolve())
+    # Preserve a stable owner-supplied symlink such as /opt/homebrew/bin/python3.
+    # Resolving into a Homebrew Cellar version would make launchd brittle after upgrades.
+    python_executable=os.path.abspath(os.path.expanduser(str(python_executable)))
     log_path=str(Path(log_path).expanduser().resolve())
     return {
         "Label":LABEL,
