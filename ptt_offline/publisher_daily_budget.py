@@ -66,6 +66,9 @@ def snapshot(path,*,now=None,write_cap=None,query_cap=None):
         "modeled_query_cap":query_cap,
         "write_remaining":max(0,write_cap-writes),
         "query_remaining":max(0,query_cap-queries),
+        "write_over_cap":max(0,writes-write_cap),
+        "query_over_cap":max(0,queries-query_cap),
+        "blocked":bool(writes>=write_cap or queries>=query_cap),
     }
 
 def allows(path,*,projected_writes,projected_queries,now=None,write_cap=None,query_cap=None):
@@ -103,10 +106,10 @@ def record(path,*,batches,rows,modeled_writes,modeled_queries,now=None,
         "modeled_writes":int(existing.get("modeled_writes",0))+modeled_writes,
         "modeled_queries":int(existing.get("modeled_queries",0))+modeled_queries,
     }
-    if updated["modeled_writes"]>write_cap:
-        raise ContractError("daily modeled write cap exceeded")
-    if updated["modeled_queries"]>query_cap:
-        raise ContractError("daily modeled query cap exceeded")
+    # Accounting may discover a remote commit only after an ambiguous outcome.
+    # Never reject truthful durable accounting because the soft cap was crossed
+    # by a write that already happened. The next admission snapshot will expose
+    # zero remaining budget and block any new Publisher-attributable write.
     days={k:v for k,v in days.items() if k>=current_day}
     days[current_day]=updated
     atomic_receipt(Path(path),{"version":1,"days":days})
