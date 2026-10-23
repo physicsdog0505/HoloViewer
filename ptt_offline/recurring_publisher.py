@@ -354,19 +354,35 @@ def main(argv=None):
                 prune_rolling(rolling,now_mono)
                 before=rolling_totals(rolling)
                 durable_now=time.time()
-                durable_before=(durable_snapshot(admission_path,now=durable_now)
-                    if args.adaptive_live_cadence else None)
-                rolling_blocked=bool(args.adaptive_live_cadence and args.send and
-                    (not rolling_budget_allows(rolling,now_mono) or
-                     not durable_allows_batch(admission_path,now=durable_now)))
+                admission_state_error=None
+                try:
+                    durable_before=(durable_snapshot(admission_path,now=durable_now)
+                        if args.adaptive_live_cadence else None)
+                    rolling_blocked=bool(args.adaptive_live_cadence and args.send and
+                        (not rolling_budget_allows(rolling,now_mono) or
+                         not durable_allows_batch(admission_path,now=durable_now)))
+                except ContractError:
+                    durable_before=None
+                    rolling_blocked=bool(args.send)
+                    admission_state_error="DURABLE_ADMISSION_STATE_INVALID"
+
                 projected_writes=2+2*args.batch_cap
                 projected_queries=5+2*args.batch_cap+2
-                daily_allowed,daily_reason,daily_before=daily_allows(
-                    daily_path,projected_writes=projected_writes,
-                    projected_queries=projected_queries,now=durable_now,
-                    write_cap=args.daily_modeled_write_cap,
-                    query_cap=args.daily_modeled_query_cap)
-                query_reconcile_allowed=daily_before["query_remaining"]>=2
+                daily_state_error=None
+                try:
+                    daily_allowed,daily_reason,daily_before=daily_allows(
+                        daily_path,projected_writes=projected_writes,
+                        projected_queries=projected_queries,now=durable_now,
+                        write_cap=args.daily_modeled_write_cap,
+                        query_cap=args.daily_modeled_query_cap)
+                    query_reconcile_allowed=daily_before["query_remaining"]>=2
+                except ContractError:
+                    daily_allowed=False
+                    daily_reason="DAILY_BUDGET_STATE_INVALID"
+                    daily_before=None
+                    query_reconcile_allowed=False
+                    daily_state_error=daily_reason
+
                 write_allowed=bool(args.send and not rolling_blocked and daily_allowed)
                 budget_blocked=bool(args.send and (rolling_blocked or not daily_allowed))
                 effective_burst=(args.max_batches if args.adaptive_live_cadence else args.burst_max_batches)
@@ -406,10 +422,19 @@ def main(argv=None):
                 retained=result.get("retained_recovery_candidates",0)
                 fresh=result.get("fresh_eligible",0)
                 recovery=max(0,retained-fresh) if isinstance(retained,int) and isinstance(fresh,int) else 0
-                daily_after=daily_snapshot(daily_path,now=time.time(),
-                    write_cap=args.daily_modeled_write_cap,
-                    query_cap=args.daily_modeled_query_cap)
-                stop_reason=("ROLLING_60S_BATCH_CAP" if rolling_blocked else
+                try:
+                    daily_after=daily_snapshot(daily_path,now=time.time(),
+                        write_cap=args.daily_modeled_write_cap,
+                        query_cap=args.daily_modeled_query_cap)
+                except ContractError:
+                    daily_after={
+                        "day":None,"modeled_writes":None,"modeled_queries":None,
+                        "modeled_write_cap":args.daily_modeled_write_cap,
+                        "modeled_query_cap":args.daily_modeled_query_cap,
+                    }
+                    daily_state_error="DAILY_BUDGET_STATE_INVALID"
+                stop_reason=(admission_state_error or daily_state_error or
+                             "ROLLING_60S_BATCH_CAP" if rolling_blocked else
                              daily_reason if budget_blocked else None)
                 result={**result,
                     "adaptive_live_cadence":bool(args.adaptive_live_cadence),
@@ -428,6 +453,8 @@ def main(argv=None):
                     "daily_modeled_write_cap":daily_after["modeled_write_cap"],
                     "daily_modeled_query_cap":daily_after["modeled_query_cap"],
                     "daily_budget_blocked":bool(budget_blocked and not rolling_blocked),
+                    "admission_state_error":admission_state_error,
+                    "daily_budget_state_error":daily_state_error,
                     "stop_reason":stop_reason,
                 }
             except Exception as exc:
