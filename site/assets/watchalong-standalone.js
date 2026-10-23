@@ -56,6 +56,8 @@ const topbar=document.querySelector('.watchalong-topbar');
 const sourceStandby=document.getElementById('sourceStandby');
 const subtitleOverlay=document.getElementById('subtitleOverlay');
 const subtitleTranslation=document.getElementById('subtitleTranslation');
+const sourceSubtitleOverlay=document.getElementById('sourceSubtitleOverlay');
+const sourceSubtitleTranslation=document.getElementById('sourceSubtitleTranslation');
 const danmakuLayer=document.getElementById('danmakuLayer');
 
 let hostPlayer=null;
@@ -80,6 +82,7 @@ let subtitles=[];
 let activeSegmentIndex=-1;
 let activeSourceVideoId=sourceVideoId||'';
 let sourceStandbyActive=false;
+let sourceGapUntilHostSeconds=null;
 let staticArtifactsReady=!STATIC_EVENT_MODE;
 let staticArtifactsFailed=false;
 let watchalongSessionDay='';
@@ -344,6 +347,7 @@ function refreshSubtitleModeUi(){
  });
  if(mobileSubtitleMode)mobileSubtitleMode.textContent='字幕：'+subtitleModeLabel();
  if(!subtitleEnabled)subtitleOverlay.hidden=true;
+ if(!subtitleEnabled||danmakuEnabled)sourceSubtitleOverlay.hidden=true;
  if(!danmakuEnabled)clearDanmaku();
 }
 function persistSubtitleMode(){
@@ -539,7 +543,31 @@ function sourceExpectedTime(hostSeconds){
  if(!timelineAligned||!Number.isFinite(hostSeconds))return null;
  return hostSeconds+segmentBaseOffsetSeconds+userOffsetSeconds;
 }
+function staticSegmentStarts(){
+ return segments.map(item=>({host_start_ms:item.host*1000}));
+}
+function sourceGapActive(hostSeconds){
+ return Number.isFinite(sourceGapUntilHostSeconds)&&Number.isFinite(hostSeconds)&&hostSeconds<sourceGapUntilHostSeconds;
+}
+function maybeLatchSourceGap(hostSeconds,sourceState){
+ if(!STATIC_EVENT_MODE||!segments.length||!Number.isFinite(hostSeconds))return false;
+ if(sourceGapActive(hostSeconds))return true;
+ const gapUntil=HoloViewerWatchalongStatic.interSegmentGapUntil(
+  staticSegmentStarts(),
+  activeSegmentIndex,
+  hostSeconds,
+  sourceState===YT.PlayerState.ENDED
+ );
+ if(!Number.isFinite(gapUntil))return false;
+ sourceGapUntilHostSeconds=gapUntil;
+ setSourceStandby(true,{rewind:false});
+ return true;
+}
+function clearSourceGap(){
+ sourceGapUntilHostSeconds=null;
+}
 function setSourceStandby(active){
+ const {rewind=true}=arguments[1]||{};
  const next=Boolean(active);
  if(sourceStandbyActive===next)return;
  sourceStandbyActive=next;
@@ -549,8 +577,10 @@ function setSourceStandby(active){
   try{
    const state=sourcePlayer?.getPlayerState?.();
    if(state===YT.PlayerState.PLAYING||state===YT.PlayerState.BUFFERING)sourcePlayer.pauseVideo();
-   const current=sourcePlayer?.getCurrentTime?.();
-   if(Number.isFinite(current)&&current>0.75)sourcePlayer.seekTo(0,true);
+   if(rewind){
+    const current=sourcePlayer?.getCurrentTime?.();
+    if(Number.isFinite(current)&&current>0.75)sourcePlayer.seekTo(0,true);
+   }
   }catch{}
  }
 }
@@ -558,6 +588,7 @@ function onHostStateChange(event){
  if(event.data===YT.PlayerState.PAUSED||event.data===YT.PlayerState.ENDED)saveCheckpoint();
  if(!linkedPlayback.checked||!timelineAligned||!sourcePlayer||suppressLinkedCommand)return;
  let host=null;try{host=hostPlayer?.getCurrentTime?.()}catch{}
+ if(Number.isFinite(host)&&sourceGapActive(host)){setSourceStandby(true,{rewind:false});return}
  if(Number.isFinite(host)&&sourceExpectedTime(host)<0){setSourceStandby(true);return}
  setSourceStandby(false);
  try{
@@ -620,6 +651,7 @@ function startSyncLoop(){
    const nextSegment=segmentIndexForHost(host);
    if(nextSegment>=0&&nextSegment!==activeSegmentIndex)applyStaticSegment(nextSegment,{seek:true});
   }
+  if(sourceGapActive(host)){setSourceStandby(true,{rewind:false});return}
   if(!linkedPlayback.checked||!timelineAligned){setSourceStandby(false);return}
   const expected=sourceExpectedTime(host);
   if(!Number.isFinite(expected))return;
@@ -628,9 +660,10 @@ function startSyncLoop(){
    return;
   }
   setSourceStandby(false);
-  let source,state;
-  try{source=sourcePlayer.getCurrentTime();state=hostPlayer.getPlayerState()}catch{return}
+  let source,state,sourceState;
+  try{source=sourcePlayer.getCurrentTime();state=hostPlayer.getPlayerState();sourceState=sourcePlayer.getPlayerState()}catch{return}
   if(!Number.isFinite(source))return;
+  if(maybeLatchSourceGap(host,sourceState))return;
   if(Math.abs(source-expected)>2.5){
    try{sourcePlayer.seekTo(expected,true)}catch{}
   }
@@ -673,10 +706,14 @@ function spawnDanmaku(row){
 function renderSubtitleCue(row){
  const cueId=row?String(row.id||row.index||row.start):'';
  if(subtitleEnabled){
-  subtitleTranslation.textContent=row?.translation||'';
-  subtitleOverlay.hidden=!row?.translation;
+  const text=row?.translation||'';
+  subtitleTranslation.textContent=text;
+  subtitleOverlay.hidden=!text;
+  sourceSubtitleTranslation.textContent=text;
+  sourceSubtitleOverlay.hidden=danmakuEnabled||!text;
  }else{
   subtitleOverlay.hidden=true;
+  sourceSubtitleOverlay.hidden=true;
  }
  if(danmakuEnabled){
   if(!row){
@@ -804,6 +841,8 @@ function segmentIndexForHost(hostSeconds){
 }
 function applyStaticSegment(index,{seek=true}={}){
  if(!STATIC_EVENT_MODE||index<0||index>=segments.length)return;
+ clearSourceGap();
+ setSourceStandby(false);
  activeSegmentIndex=index;
  const segment=segments[index];
  const baseOffset=segment.source-segment.host;

@@ -71,5 +71,14 @@
   for(let i=1;i<segments.length;i++){if(hostMs>=Number(segments[i].host_start_ms))index=i;else break}
   return index;
  }
- root.HoloViewerWatchalongStatic={manifestEntry,verifyDigest,validateEvent,segmentIndexAt};
+ function interSegmentGapUntil(segments,activeIndex,hostSeconds,sourceEnded){
+  if(!sourceEnded||!Array.isArray(segments)||!finite(hostSeconds))return null;
+  const index=Number(activeIndex);
+  if(!Number.isInteger(index)||index<0||index>=segments.length-1)return null;
+  const nextMs=Number(segments[index+1]?.host_start_ms);
+  if(!Number.isFinite(nextMs))return null;
+  const hostMs=Number(hostSeconds)*1000;
+  return hostMs<nextMs?nextMs/1000:null;
+ }
+ root.HoloViewerWatchalongStatic={manifestEntry,verifyDigest,validateEvent,segmentIndexAt,interSegmentGapUntil};
 })(globalThis);
