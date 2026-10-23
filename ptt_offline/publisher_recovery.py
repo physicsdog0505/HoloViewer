@@ -115,7 +115,7 @@ def recover_pending_state(state_path,*,reconcile_executor,publish_executor,clock
 
     if outcome=="NONE_PRESENT":
         if not allow_replay:
-            atomic_receipt(path,_wait_state(current,attempt,now,"DAILY_BUDGET_BLOCKED"))
+            atomic_receipt(path,_wait_state(current,attempt,now,"ADMISSION_BUDGET_BLOCKED"))
             return {"status":"RECOVERY_WAIT","aid":current.get("pending_aid"),
                     "retry_after_seconds":_delay(attempt),"sent":0,
                     "reconcile_reads":1,"budget_blocked":True}
