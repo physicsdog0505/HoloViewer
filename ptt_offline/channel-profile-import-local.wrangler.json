@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "holoviewer-profile-import-local-only",
-  "main": "ptt_offline/worker_host/today/channel-profile-import-local.mjs",
+  "main": "worker_host/today/channel-profile-import-local.mjs",
   "compatibility_date": "2026-10-14",
   "workers_dev": false,
   "d1_databases": [
