@@ -11,18 +11,32 @@ Status: REVIEW PACKAGE. No Production mutation is authorized by this document.
 - D1 binding: `DB`
 - compatibility date: `2026-10-14`
 - canonical migration: `ptt_offline/worker_host/today/0005_channel_profiles.sql`
-- Production rollout config: `ptt_offline/channel-profile-rollout.wrangler.json`
+- D1/readback config only: `ptt_offline/channel-profile-rollout.wrangler.json`
 - local-only importer config: `ptt_offline/channel-profile-import-local.wrangler.json`
 - importer: `ptt_offline/worker_host/today/channel-profile-import-local.mjs`
 - deterministic exporter: `ptt_offline/export_canonical_channel_profiles.py`
-- artifact path: `/tmp/hv47-canonical-channel-profiles-85.json`
+- reviewed support-color artifact:
+  `$HOME/Downloads/Hololive-PTT-Viewer/holoviewer-channel-support-colors.json`
+- canonical artifact path: `/tmp/hv47-canonical-channel-profiles-85.json`
 - reviewed roster: `today85-20261016-d0e326c0496b`
 - expected profile count: **85**
-- last known deployed Worker version before this rollout:
-  `f95019e8-7c5c-42d6-bef4-0845ff6eccb7`
+- accepted Production baseline after domain cutover:
+  `df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96` (#62 @ 100%)
+- #61/#62 immutable equivalence: **PASS**
+- legacy + `https://holodocchi.com` CORS postflight: **PASS**
 
-Execution preflight MUST re-read the current active deployment and abort if an
-unreviewed later deployment is active.
+The accepted #62 UUID is a rollout admission baseline, **not** a hard-coded
+rollback target. Execution preflight MUST re-read the active deployment and
+capture the actual 100% version immediately before upload. If the active
+version is not the accepted #62 baseline (or another separately reviewed
+equivalent successor), abort before any Worker upload.
+
+The minimal `channel-profile-rollout.wrangler.json` is allowed for D1
+preflight/migration/export/readback only. **It must never be used to upload a
+Worker version.** Worker upload must use the same Owner-local complete backend
+Wrangler config/mechanism that produced the accepted Production runtime, with
+the complete binding/compatibility contract and Dashboard-managed vars
+preserved.
 
 The profile artifact is derived READ-ONLY from the already-live approved roster
 and verified legacy profile table. It contains no credentials, request headers,
@@ -99,8 +113,11 @@ unchanged.
 ### 4. Deterministic input artifact — READ-ONLY
 
 ```bash
+SUPPORT_COLORS="$HOME/Downloads/Hololive-PTT-Viewer/holoviewer-channel-support-colors.json"
+
 python3 -B ptt_offline/export_canonical_channel_profiles.py \
   --config ptt_offline/channel-profile-rollout.wrangler.json \
+  --support-colors-json "$SUPPORT_COLORS" \
   --output /tmp/hv47-canonical-channel-profiles-85.json
 
 ARTIFACT=/tmp/hv47-canonical-channel-profiles-85.json
@@ -114,9 +131,20 @@ Exporter acceptance:
 - 85 approved unique channel IDs;
 - 85 trusted YouTube avatars;
 - valid group on every row;
+- exact reviewed support-color receipt: 66 rows / 57 colored / 9 neutral / 1 dual;
+- support-color projection follows the same `channel_id`-only verification
+  semantics as `support-colors.mjs`;
+- known reviewed colors are stored directly in canonical rows;
+- channels with no reviewed support color remain neutral/null;
+- artifact authority embeds the support-color SHA-256;
 - deterministic canonical JSON;
 - no secret/provider key;
 - `production_mutation=false`.
+
+This closes the migration gap where canonical rows previously stored all
+members as neutral and relied on `TODAY_SUPPORT_COLORS_JSON*` at read time.
+Runtime support-color fallback may remain temporarily, but a populated
+canonical row wins and must already carry the accepted color fields.
 
 The exact SHA printed here is the only approved identity for validate/apply.
 Never edit/reformat the artifact afterward.
@@ -234,56 +262,113 @@ wait "$IMPORT_PID" 2>/dev/null || true
 ## D. Worker deploy package
 
 Do not use frontend `cloudflare/wrangler.json`.
+Do not use `ptt_offline/channel-profile-rollout.wrangler.json` for Worker
+upload; that file is intentionally only the pinned D1/readback identity.
 
-The API rollout config uses `keep_vars=true` and existing D1 identity.
-Use Workers Versions; do not call `wrangler triggers deploy`, so current
-routes/domains/Cron are not changed by this package.
+Cloudflare Worker versions capture code, bindings and compatibility settings,
+so the candidate must be built from the same complete Owner-local backend
+Wrangler configuration used for the accepted Production runtime. Routes and
+Cron are not changed by `versions deploy`.
 
-### Record rollback target
+### Record the actual rollback target dynamically
 
 ```bash
-npx wrangler deployments list \
+BACKEND_CONFIG='<owner-local complete backend wrangler config used for #62>'
+
+npx wrangler deployments status \
   --name holoviewer-public-api \
-  --config ptt_offline/channel-profile-rollout.wrangler.json \
-  | tee /tmp/hv47-profile-deployments-before.txt
+  --config "$BACKEND_CONFIG" \
+  --json \
+  | tee /tmp/hv155-deployment-before.json
+
+OLD_VERSION_ID="$(jq -r '
+  [.. | objects
+    | select((.percentage? // .traffic? // 0) == 100)
+    | (.version_id? // .versionId? // .id? // empty)]
+  | map(select(type=="string")) | first // empty
+' /tmp/hv155-deployment-before.json)"
+
+test -n "$OLD_VERSION_ID"
+printf 'OLD_VERSION_ID=%s\n' "$OLD_VERSION_ID"
 ```
 
-Expected previously accepted version:
-`f95019e8-7c5c-42d6-bef4-0845ff6eccb7`.
+Admission:
+- accepted baseline is #62
+  `df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96`;
+- if `OLD_VERSION_ID` differs, stop unless that successor has separately
+  passed the same formal-machine equivalence gate;
+- never substitute a remembered/stale UUID for the captured value.
 
-If the active version is newer and not reviewed here, ABORT.
+Capture the full current version contract before upload:
 
-### Upload reviewed version without activating traffic
+```bash
+npx wrangler versions view "$OLD_VERSION_ID" \
+  --name holoviewer-public-api \
+  --config "$BACKEND_CONFIG" \
+  --json \
+  > /tmp/hv155-old-version.json
+```
+
+### Upload reviewed source without activating traffic
 
 ```bash
 npx wrangler versions upload ptt_offline/worker_host/index.mjs \
   --name holoviewer-public-api \
-  --config ptt_offline/channel-profile-rollout.wrangler.json \
+  --config "$BACKEND_CONFIG" \
+  --keep-vars \
   --message "PR155 canonical-channel-profile authority $(git rev-parse HEAD)" \
-  | tee /tmp/hv47-profile-version-upload.txt
+  | tee /tmp/hv155-version-upload.txt
 ```
 
-Capture `NEW_VERSION_ID`.
+Capture `NEW_VERSION_ID`, then inspect the candidate before it receives
+traffic:
+
+```bash
+NEW_VERSION_ID='<captured-version-id>'
+
+npx wrangler versions view "$NEW_VERSION_ID" \
+  --name holoviewer-public-api \
+  --config "$BACKEND_CONFIG" \
+  --json \
+  > /tmp/hv155-new-version.json
+```
+
+**Pre-activation hard gate:** compare the old and candidate version contracts.
+The complete binding name/type set and compatibility settings must be
+equivalent, except only for intentionally reviewed PR #155 source/version
+metadata. The current formal-machine inventory contained 31 binding names/types;
+the candidate may not drop any of them. In particular:
+- `DB` remains the existing `holoviewer-public-v1` binding;
+- `ALLOWED_ORIGIN` remains present under the current Dashboard-managed var
+  contract and must still allow `https://holodocchi.com`;
+- all existing secrets/service/storage bindings remain present by name/type;
+- no new Worker, D1, route, domain or trigger is created.
+
+If this equivalence cannot be demonstrated from the two `versions view --json`
+receipts plus the authoritative backend config, **ABORT before activation**.
 
 ### Activate at 100%
 
 ```bash
-NEW_VERSION_ID='<captured-version-id>'
 npx wrangler versions deploy "${NEW_VERSION_ID}@100%" -y \
   --name holoviewer-public-api \
-  --config ptt_offline/channel-profile-rollout.wrangler.json
+  --config "$BACKEND_CONFIG"
 ```
+
+Immediately repeat legacy + custom-domain CORS postflight. A failure is a
+rollback condition.
 
 ### Rollback
 
 ```bash
-OLD_VERSION_ID='f95019e8-7c5c-42d6-bef4-0845ff6eccb7'
 npx wrangler versions deploy "${OLD_VERSION_ID}@100%" -y \
   --name holoviewer-public-api \
-  --config ptt_offline/channel-profile-rollout.wrangler.json
+  --config "$BACKEND_CONFIG"
 ```
 
-Never DROP/reseed the additive profile table during Worker rollback.
+`OLD_VERSION_ID` is the value captured immediately before this rollout, never
+a hard-coded historical UUID. Never DROP/reseed the additive profile table
+during Worker rollback.
 
 ## E. Production endpoint readback matrix
 
@@ -375,11 +460,13 @@ Abort/rollback investigation trigger:
 6. population execute
 7. population validation
 8. replay/idempotency check
-9. Worker version upload
-10. Worker version deploy
-11. endpoint readback matrix
-12. D1 Rows Read observation
-13. final PASS / rollback decision
+9. capture active Worker + old version contract
+10. Worker candidate upload with complete backend config
+11. candidate-vs-active binding/compatibility equivalence gate
+12. Worker version deploy
+13. endpoint + legacy/custom-domain CORS readback matrix
+14. D1 Rows Read observation
+15. final PASS / rollback decision
 
 Abort boundary exists before every subsequent mutation.
 
@@ -395,7 +482,9 @@ profile_count=85
 population_dry_run=<PASS|FAIL|NOT_RUN>
 profiles_written_first=<85|...>
 profiles_written_replay=<0|...>
-previous_worker_version=<exact ID>
+previous_worker_version=<dynamically captured exact ID>
+accepted_baseline_worker_version=df0bb93e-d3b6-4824-8c33-e1d9ffb6bd96
+candidate_binding_contract=<PASS|FAIL|NOT_RUN>
 new_worker_version=<exact ID>
 endpoint_readback=<PASS|FAIL|NOT_RUN>
 d1_rows_read_before=<value>
