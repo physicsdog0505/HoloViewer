@@ -5,6 +5,7 @@ import {createExistingApiRouter} from './today/api-shell.mjs';
 import {composeFullPttOnExistingApi} from '../full_ptt_api_composition.mjs';
 import {verifyPublisherTimeProof} from './time_authority.mjs';
 import {mountTodayPublisherOnCombinedApi} from './today/today-private-post.mjs';
+import {mountCanonicalCollabPublisherOnCombinedApi} from './today/collab-private-post.mjs';
 import {mountTodayCadence} from './today/cadence-refresh.mjs';
 import {mountTodayWebSubOnWorker} from './today/websub-runtime.mjs';
 import {mountVideoMetadataRecoveryOnWorker} from './today/video-metadata-recovery.mjs';
@@ -14,5 +15,11 @@ const combined = composeFullPttOnExistingApi(createExistingApiRouter,{
 });
 
 export default mountTodayWebSubOnWorker(
-  mountTodayCadence(mountVideoMetadataRecoveryOnWorker(mountTodayPublisherOnCombinedApi(combined)))
+  mountTodayCadence(
+    mountVideoMetadataRecoveryOnWorker(
+      mountTodayPublisherOnCombinedApi(
+        mountCanonicalCollabPublisherOnCombinedApi(combined)
+      )
+    )
+  )
 );
