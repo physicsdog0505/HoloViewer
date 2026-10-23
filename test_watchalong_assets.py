@@ -158,6 +158,23 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertIn("if(rewind){", standby_body)
         self.assertIn("sourcePlayer.seekTo(0,true)", standby_body)
 
+    def test_subtitle_and_danmaku_layers_are_independent(self):
+        html = (ROOT / "site/watchalong-viewer/index.html").read_text(encoding="utf-8")
+        source = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/watchalong-standalone.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="subtitleOverlay"', html)
+        self.assertIn('id="sourceSubtitleOverlay"', html)
+        self.assertIn('id="danmakuLayer"', html)
+        self.assertIn("const sourceSubtitleOverlay=document.getElementById('sourceSubtitleOverlay');", source)
+        self.assertIn("const sourceSubtitleTranslation=document.getElementById('sourceSubtitleTranslation');", source)
+        self.assertIn("sourceSubtitleOverlay.hidden=danmakuEnabled||!text;", source)
+        self.assertIn("if(!subtitleEnabled||danmakuEnabled)sourceSubtitleOverlay.hidden=true;", source)
+        self.assertIn("subtitleOverlay.hidden=!text;", source)
+        self.assertIn("if(danmakuEnabled){", source)
+        self.assertIn(".source-subtitle-overlay{", css)
+        self.assertIn(".source-subtitle-overlay[hidden]{display:none}", css)
+
     def test_integrated_release_uses_existing_static_watchalong_assets(self):
         player = ROOT / "site/assets/watchalong-standalone.js"
         viewer = ROOT / "site/watchalong-viewer/index.html"
