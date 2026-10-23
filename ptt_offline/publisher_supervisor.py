@@ -22,8 +22,9 @@ from .public_today_contract import ContractError
 LABEL="com.holodocchi.ptt-publisher"
 DEFAULT_PLIST=Path.home()/"Library"/"LaunchAgents"/f"{LABEL}.plist"
 
-def _run(cmd,*,check=True):
-    return subprocess.run(cmd,check=check,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+def _run(cmd,*,check=True,cwd=None):
+    return subprocess.run(cmd,check=check,text=True,cwd=cwd,
+        stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
 
 def _pid_alive(pid):
     try:
@@ -43,6 +44,20 @@ def _publisher_kind(command):
     if "ptt_offline.recurring_publisher" in command:
         return "manual_recurring"
     return None
+
+def validate_candidate_service(*,repo_root,python_executable):
+    repo_root=Path(repo_root).expanduser().resolve()
+    python_executable=os.path.abspath(os.path.expanduser(str(python_executable)))
+    result=_run([
+        python_executable,"-B","-m","ptt_offline.publisher_service","--help"
+    ],cwd=str(repo_root))
+    if "usage:" not in (result.stdout or "").lower():
+        raise ContractError("candidate Publisher service import preflight failed")
+    return {
+        "python":python_executable,
+        "repo_root":str(repo_root),
+        "service_import":"PASS",
+    }
 
 def _wait_dead(pid,timeout=20.0):
     deadline=time.monotonic()+timeout
@@ -152,6 +167,8 @@ def _atomic_plist(path,body):
 
 def apply_cutover(*,repo_root,runtime_root,expected_head,python_executable,plist_path=DEFAULT_PLIST):
     proof=preflight(repo_root=repo_root,runtime_root=runtime_root,expected_head=expected_head)
+    candidate_service=validate_candidate_service(
+        repo_root=repo_root,python_executable=python_executable)
     state_root=Path(proof["state_root"])
     state_dir=state_root/"state"
     pidfile=state_root/"publisher.pid"
@@ -202,6 +219,7 @@ def apply_cutover(*,repo_root,runtime_root,expected_head,python_executable,plist
         "plist":str(Path(plist_path).resolve()),
         "log":str(log_path),
         "head":proof["head"],
+        "candidate_service":candidate_service,
         "worker_deploy":False,
         "collector_restart":False,
         "secrets_rotated":False,
