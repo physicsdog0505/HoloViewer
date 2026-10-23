@@ -155,6 +155,13 @@ class PreviewTests(unittest.TestCase):
         self.assertLessEqual(len(alias + "-holoviewer-public"), 63)
         self.assertNotRegex(alias, r"[A-Z]")
 
+    def test_gate3_runner_has_no_tee_pipeline_masking_failures(self):
+        runner = (Path(__file__).parent / "scripts/run_youtube_static_assets_gate3_preview.sh").read_text()
+        self.assertNotIn("| tee", runner)
+        self.assertIn('fail "Version URL HTTP readback failed"', runner)
+        self.assertIn('fail "Cloudflare version upload failed"', runner)
+        self.assertIn('fail "offline regression failed"', runner)
+
     def test_http_readback_verifies_all_declared_objects(self):
         objects = {}
         for path in self.v1.rglob("*.json"):

@@ -52,15 +52,39 @@ echo "OUT=$OUT"
 
 echo
 echo "=== 1. LOCAL TREE + TESTS ==="
-python3 scripts/youtube_static_assets_preview.py check-local   --v1 "$SOURCE_V1"   | tee "$OUT/local-readback.json"
+if ! python3 scripts/youtube_static_assets_preview.py check-local \
+  --v1 "$SOURCE_V1" >"$OUT/local-readback.json" 2>&1; then
+  cat "$OUT/local-readback.json"
+  fail "local youtube/v1 readback failed"
+fi
+cat "$OUT/local-readback.json"
 
-python3 -B -m unittest -v   test_youtube_static_assets_preview   2>&1 | tee "$OUT/tests.txt"
+if ! python3 -B -m unittest -v \
+  test_youtube_static_assets_preview >"$OUT/tests.txt" 2>&1; then
+  cat "$OUT/tests.txt"
+  fail "offline regression failed"
+fi
+cat "$OUT/tests.txt"
 
 echo
 echo "=== 2. STAGE EXISTING SITE + ACCEPTED YOUTUBE TREE ==="
-python3 scripts/youtube_static_assets_preview.py stage   --source-site site   --source-v1 "$SOURCE_V1"   --target-site "$TMP/site"   | tee "$OUT/stage.json"
+if ! python3 scripts/youtube_static_assets_preview.py stage \
+  --source-site site \
+  --source-v1 "$SOURCE_V1" \
+  --target-site "$TMP/site" >"$OUT/stage.json" 2>&1; then
+  cat "$OUT/stage.json"
+  fail "Static Assets staging failed"
+fi
+cat "$OUT/stage.json"
 
-python3 scripts/youtube_static_assets_preview.py write-config   --source-config cloudflare/wrangler.json   --output-config "$TMP/wrangler.json"   --staged-site "$TMP/site"   | tee "$OUT/config.json"
+if ! python3 scripts/youtube_static_assets_preview.py write-config \
+  --source-config cloudflare/wrangler.json \
+  --output-config "$TMP/wrangler.json" \
+  --staged-site "$TMP/site" >"$OUT/config.json" 2>&1; then
+  cat "$OUT/config.json"
+  fail "preview Wrangler config generation failed"
+fi
+cat "$OUT/config.json"
 
 echo
 echo "=== 3. CAPTURE ACTIVE PRODUCTION DEPLOYMENT ==="
@@ -75,7 +99,16 @@ echo "BASELINE_ACTIVE_VERSION=$BASELINE_VERSION"
 echo
 echo "=== 4. UPLOAD VERSION ONLY — NO DEPLOYMENT ==="
 UPLOAD_OUT="$OUT/version-upload.txt"
-npx --yes wrangler versions upload   --config "$TMP/wrangler.json"   --name holoviewer-public   --preview-alias "$ALIAS"   --message "Issue #448 Static Assets Version URL pilot $EXPECTED_HEAD"   $PROFILE_ARGS   2>&1 | tee "$UPLOAD_OUT"
+if ! npx --yes wrangler versions upload \
+  --config "$TMP/wrangler.json" \
+  --name holoviewer-public \
+  --preview-alias "$ALIAS" \
+  --message "Issue #448 Static Assets Version URL pilot $EXPECTED_HEAD" \
+  $PROFILE_ARGS >"$UPLOAD_OUT" 2>&1; then
+  cat "$UPLOAD_OUT"
+  fail "Cloudflare version upload failed"
+fi
+cat "$UPLOAD_OUT"
 
 VERSION_URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' "$UPLOAD_OUT" | tail -n1 || true)"
 [ -n "$VERSION_URL" ] || fail "Wrangler did not return a Version URL"
@@ -83,7 +116,14 @@ echo "PREVIEW_OR_VERSION_URL=$VERSION_URL"
 
 echo
 echo "=== 5. HTTP READBACK OF COMPLETE YOUTUBE/V1 TREE ==="
-python3 scripts/youtube_static_assets_preview.py verify-http   --base-url "$VERSION_URL"   --v1 "$SOURCE_V1"   --nonce "$STAMP"   | tee "$OUT/http-readback.json"
+if ! python3 scripts/youtube_static_assets_preview.py verify-http \
+  --base-url "$VERSION_URL" \
+  --v1 "$SOURCE_V1" \
+  --nonce "$STAMP" >"$OUT/http-readback.json" 2>&1; then
+  cat "$OUT/http-readback.json"
+  fail "Version URL HTTP readback failed"
+fi
+cat "$OUT/http-readback.json"
 
 echo
 echo "=== 6. VERIFY PRODUCTION ACTIVE DEPLOYMENT UNCHANGED ==="
