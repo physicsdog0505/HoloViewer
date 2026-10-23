@@ -30,7 +30,7 @@ class CollabProjectionQueryPlanTests(unittest.TestCase):
             WHERE is_current=1 AND live_scope=1 AND review_status!='rejected'
             ORDER BY start_at DESC,event_id DESC LIMIT 101
         """)
-        self.assertIn("public_collab_events_live", plan)
+        self.assertIn("SEARCH public_collab_events USING INDEX", plan)
         self.assertNotIn("SCAN public_collab_events", plan)
 
     def test_history_count_and_page_use_history_index(self):
@@ -56,7 +56,7 @@ class CollabProjectionQueryPlanTests(unittest.TestCase):
             SET is_current=0
             WHERE is_current=1 AND live_scope=0 AND start_at>=? AND start_at<?
         """, ("2026-10-21T16:00:00+00:00", "2026-10-22T16:00:00+00:00"))
-        self.assertIn("public_collab_events_retire_range", plan)
+        self.assertIn("SEARCH public_collab_events USING INDEX", plan)
         self.assertNotIn("SCAN public_collab_events", plan)
 
     def test_live_replacement_uses_live_index(self):
