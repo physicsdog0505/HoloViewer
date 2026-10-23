@@ -41,6 +41,15 @@ class FrontendReleaseGateTests(unittest.TestCase):
         with self.assertRaises(ReleaseGateError):
             validate_watchalong_addition(prod, cand, "new")
 
+    def test_changed_old_manifest_identity_fails_closed(self):
+        prod = manifest([{"event_id": "old", "sha256": "aaa", "title": "original"}])
+        cand = manifest([
+            {"event_id": "old", "sha256": "aaa", "title": "changed"},
+            {"event_id": "new", "sha256": "bbb"},
+        ])
+        with self.assertRaises(ReleaseGateError):
+            validate_watchalong_addition(prod, cand, "new")
+
     def test_unexpected_site_file_fails_closed(self):
         rows = [
             "M\tsite/data/watchalong/manifest.json",
