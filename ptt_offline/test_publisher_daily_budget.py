@@ -35,17 +35,28 @@ class DailyBudgetTests(unittest.TestCase):
             self.assertEqual(after["day"],"2026-10-24")
             self.assertEqual(after["modeled_writes"],0)
 
-    def test_corrupt_or_over_cap_record_fails_closed(self):
+    def test_corrupt_ledger_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"daily.json"
             p.write_text("{bad",encoding="utf-8")
             with self.assertRaises(ContractError):
                 snapshot(p,now=ts("2026-10-23T12:00:00"))
+
+    def test_recovered_commit_is_recorded_even_past_soft_cap(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"daily.json"
-            with self.assertRaises(ContractError):
-                record(p,batches=1,rows=10,modeled_writes=51,modeled_queries=1,
-                       now=ts("2026-10-23T12:00:00"),write_cap=50,query_cap=60)
+            now=ts("2026-10-23T12:00:00")
+            record(p,batches=1,rows=10,modeled_writes=40,modeled_queries=40,
+                   now=now,write_cap=50,query_cap=100)
+            state=record(p,batches=1,rows=10,modeled_writes=22,modeled_queries=25,
+                         now=now+1,write_cap=50,query_cap=100)
+            self.assertEqual(state["modeled_writes"],62)
+            self.assertEqual(state["write_over_cap"],12)
+            self.assertTrue(state["blocked"])
+            ok,reason,_=allows(p,projected_writes=1,projected_queries=1,
+                               now=now+2,write_cap=50,query_cap=100)
+            self.assertFalse(ok)
+            self.assertEqual(reason,"DAILY_MODELED_WRITE_CAP")
 
 if __name__=="__main__":
     unittest.main()
