@@ -44,14 +44,16 @@ function profileContentKey(p){
   p.member_accent_dual,p.support_mode,p.support_color_source,p.profile_revision,p.updated_at
  ]);
 }
-export async function upsertChannelProfiles(db,rows){
+export async function upsertChannelProfiles(db,rows,{existingById=null}={}){
  if(!db?.prepare||!Array.isArray(rows))throw Error('profile writer input required');
  const seen=new Set(),statements=[];
  for(const raw of rows){
   const p=validateChannelProfileWrite(raw);
   if(seen.has(p.channel_id))throw Error('duplicate channel profile');
   seen.add(p.channel_id);
-  const existing=await db.prepare('SELECT channel_id,channel_name,display_name,avatar_url,channel_group AS "group",member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at FROM public_channel_profiles WHERE channel_id=? LIMIT 1').bind(p.channel_id).first();
+  const existing=existingById
+   ? existingById.get(p.channel_id)
+   : await db.prepare('SELECT channel_id,channel_name,display_name,avatar_url,channel_group AS "group",member_accent,member_accent_dual,support_mode,support_color_source,profile_revision,updated_at FROM public_channel_profiles WHERE channel_id=? LIMIT 1').bind(p.channel_id).first();
   if(existing){
    const current=validateChannelProfileWrite({...existing,member_accent_dual:existing.member_accent_dual?JSON.parse(existing.member_accent_dual):null});
    if(current.updated_at===p.updated_at){
