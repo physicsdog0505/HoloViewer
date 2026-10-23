@@ -38,6 +38,22 @@ class ChannelProfileRolloutScriptTests(unittest.TestCase):
         self.assertIn("if ! python3 - /tmp/hv155-profile-readback.json <<'PY'",SOURCE)
         self.assertIn("PY\nthen\n  rollback\n  exit 1\nfi",SOURCE)
 
+    def test_wrangler_4152_upload_uses_machine_readable_output_receipt(self):
+        self.assertIn('WRANGLER_OUTPUT_FILE_PATH="$UPLOAD_OUTPUT"',SOURCE)
+        self.assertIn('UPLOAD_OUTPUT="/tmp/hv155-version-upload.ndjson"',SOURCE)
+        self.assertNotIn('--message "PR155 canonical profile authority $HEAD" --json',SOURCE)
+        self.assertIn('--name "$WORKER" --config "$BACKEND_CONFIG" --keep-vars',SOURCE)
+        self.assertIn('obj.get("type")!="version-upload"',SOURCE)
+        self.assertIn('obj.get("worker_name") not in (None,worker)',SOURCE)
+        self.assertIn('expected exactly one uploaded candidate version',SOURCE)
+        self.assertIn('version-upload receipt missing canonical version_id',SOURCE)
+        self.assertIn('wrangler versions view "$NEW_VERSION_ID"',SOURCE)
+        upload=SOURCE.index('WRANGLER_OUTPUT_FILE_PATH="$UPLOAD_OUTPUT"')
+        verify=SOURCE.index('wrangler versions view "$NEW_VERSION_ID"')
+        activate=SOURCE.index('=== MUTATION 3: ACTIVATE CANDIDATE 100% ===')
+        self.assertLess(upload,verify)
+        self.assertLess(verify,activate)
+
     def test_population_and_readback_contract_is_present(self):
         for marker in (
             'PROFILE_ROWS=85',
