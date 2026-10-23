@@ -194,7 +194,7 @@ d=json.load(open(sys.argv[1]))
 assert d["status"]=="VALIDATED"
 assert d["production_mutation"] is False
 assert d["profile_count"]==85
-assert d["plan"]["inserts"]==85
+p=d["plan"]\nassert p["updates"]==0, p\nassert p["older"]==0, p\nassert p["inserts"]+p["noops"]==85, p
 print("POPULATION_DRY_RUN=PASS")
 PY
 
@@ -211,7 +211,7 @@ import json,sys
 d=json.load(open(sys.argv[1]))
 assert d["status"]=="APPLIED"
 assert d["profile_count"]==85
-assert d["profiles_written"]==85
+p=d["plan"]\nassert p["updates"]==0, p\nassert p["older"]==0, p\nassert p["inserts"]+p["noops"]==85, p\nassert d["profiles_written"]==p["inserts"], d
 print("PROFILE_POPULATION=PASS")
 PY
 
