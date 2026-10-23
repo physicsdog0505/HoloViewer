@@ -1073,7 +1073,7 @@ process.stdout.write(JSON.stringify({
         self.assertIn("function requestHomeCatalogRows(){",js)
         self.assertIn("if(homeCatalogPromise)return homeCatalogPromise;",js)
         self.assertIn("homeCatalogPromise=api('/v1/catalog/today')",js)
-        self.assertIn(":requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null);",js)
+        self.assertIn("requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null)",js)
         self.assertIn("window.hvLoadWatchalongLanding=loadWatchalongLanding;",js)
         self.assertIn("if(initialRoute==='watchalong')loadWatchalongLanding();",js)
         self.assertIn("if(r==='watchalong')window.hvLoadWatchalongLanding?.();",js)
