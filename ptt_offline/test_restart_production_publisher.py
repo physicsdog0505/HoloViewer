@@ -58,6 +58,11 @@ class RestartProductionPublisherTests(unittest.TestCase):
                    return_value="python unrelated.py"):
             with self.assertRaises(SystemExit):
                 assert_expected_process(123)
+        with patch("ptt_offline.restart_production_publisher.process_command",
+                   return_value="python -B -m ptt_offline.publisher_service --root /tmp/runtime"):
+            with self.assertRaises(SystemExit) as caught:
+                assert_expected_process(123)
+            self.assertIn("launchd-managed",str(caught.exception))
 
     def test_wait_stopped_never_escalates_to_sigkill(self):
         calls=[]

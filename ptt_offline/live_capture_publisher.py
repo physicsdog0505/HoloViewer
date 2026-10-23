@@ -19,11 +19,12 @@ from .ptt_aid_identity import identity_receipt, verify_aid_url
 from .url_epoch_authority import reconstruct_events
 from .d1_publisher import canonical_record
 from .owner_publisher_once import sign_time_proof
-from .owner_http_transport import owner_signed_http_executor
+from .owner_http_transport import owner_signed_http_executor, RemoteOutcomeUnknown
 from .publisher_cli import atomic_receipt,exclusive_lock
 from .resumable_publisher import new_checkpoint,make_batch,apply_ack
 from .d1_transport_contract import execute_once
 from .public_today_contract import ContractError
+from .publisher_recovery import recover_pending_state
 
 TPE=ZoneInfo("Asia/Taipei")
 RECOVERY_MAX_DELAY_SECONDS=2*60*60
@@ -176,8 +177,8 @@ def _fresh_for_burst(row, *, now=None, max_age_seconds=180):
     age=_row_age_seconds(row,now=now)
     return age is not None and 0<=age<=max_age_seconds
 
-def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap=5,article_id=None,
-                  fresh_only=False,now=None):
+def run_live_once(db,*,state_path,secret=None,executor=None,reconcile_executor=None,send=False,batch_cap=5,article_id=None,
+                  fresh_only=False,now=None,write_allowed=True):
     if type(batch_cap) is not int or not 1<=batch_cap<=25:
         raise ContractError('invalid bounded live batch cap')
     path=Path(state_path)
@@ -188,8 +189,15 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
         current={}
         if path.exists():
             current=json.loads(path.read_text(encoding="utf-8"))
+            if current.get("status")=="STOP_MANUAL":
+                return {"status":"RECOVERY_QUARANTINED","aid":plan["aid"],"sent":0,
+                        "recovery_reason":current.get("recovery_reason")}
             if current.get("status")=="REMOTE_UNCERTAIN":
-                raise ContractError("remote ACK unresolved; inspect D1 before any replay")
+                if not callable(reconcile_executor) or not callable(executor):
+                    return {"status":"RECOVERY_BLOCKED","aid":plan["aid"],"sent":0}
+                return recover_pending_state(path,reconcile_executor=reconcile_executor,
+                                             publish_executor=executor,
+                                             allow_replay=bool(write_allowed))
             if current.get("source_identity")!=plan["source_identity"]:
                 raise ContractError("live source identity changed; separate state needed")
         accepted=dict(current.get("accepted",{}))
@@ -266,7 +274,7 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
             else:
                 keep.append(row)
         stale_fenced_rows=0
-        if send and current:
+        if send and write_allowed and current:
             for row in stale:
                 accepted[row["source_record_key"]]=content_digest(row)
             stale_fenced_rows=len(stale)
@@ -304,6 +312,8 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
                  "pending":len(plan["pending_source_lines"]),
                  "source_identity":plan["source_identity"],"sent":0}
         if not send:return receipt
+        if not write_allowed:
+            return {**receipt,"status":"ADMISSION_BUDGET_BLOCKED","budget_blocked":True}
         if not isinstance(secret,str) or len(secret)<32 or not callable(executor):
             raise ContractError("separate trusted source proof and transport required")
         if not missing:return {**receipt,"status":"NO_NEW_ROWS"}
@@ -336,13 +346,23 @@ def run_live_once(db,*,state_path,secret=None,executor=None,send=False,batch_cap
         day=batch_day
         checkpoint=new_checkpoint(source_identity=plan["source_identity"],day=day,aids=[plan["aid"]])
         batch=make_batch(checkpoint=checkpoint,rows=rows,batch_cap=batch_cap)
+        pending_updates={row["source_record_key"]:content_digest(row) for row in selected}
         atomic_receipt(path,{"status":"REMOTE_UNCERTAIN","source_identity":plan["source_identity"],
                             "accepted":accepted,"pending_batch_id":batch["batch_id"],
+                            "pending_batch":batch,
+                            "pending_accepted_updates":pending_updates,
+                            "pending_aid":plan["aid"],
+                            "recovery_attempts":0,
                             "baseline_source_line":baseline_source_line,
                             "legacy_backlog_fence_v2":bool(current.get("legacy_backlog_fence_v2")),
-                            "reconciled_from_remote_commit":bool(current.get("reconciled_from_remote_commit"))})
-        ack=execute_once(batch=batch,executor=executor,max_rows=batch_cap,
-            max_queries=min(150,2+5*batch_cap),max_written=min(80,2+2*batch_cap))
+                            "reconciled_from_remote_commit":bool(current.get("reconciled_from_remote_commit")),
+                            "pending_count":len(plan["pending_source_lines"])})
+        try:
+            ack=execute_once(batch=batch,executor=executor,max_rows=batch_cap,
+                max_queries=min(150,2+5*batch_cap),max_written=min(80,2+2*batch_cap))
+        except (RemoteOutcomeUnknown,ContractError):
+            return {**receipt,"status":"REMOTE_UNCERTAIN","aid":plan["aid"],
+                    "sent":0,"batch_id":batch["batch_id"]}
         apply_ack(checkpoint=checkpoint,batch=batch,ack=ack)
         # Checkpoint digests intentionally stay bound to the Collector-source
         # row shape (floor=None). Floor is display enrichment derived from

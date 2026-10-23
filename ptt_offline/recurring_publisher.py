@@ -13,9 +13,11 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from .collector_source_preview import open_source
 from .live_capture_publisher import active_article_ids,inspect_latest_article,run_live_once,state_for_source
-from .owner_http_transport import owner_signed_http_executor
+from .owner_http_transport import owner_signed_http_executor, owner_signed_reconcile_executor
 from .publisher_cli import exclusive_lock
 from .publisher_telemetry import update_publisher_telemetry
+from .publisher_admission import allows_batch as durable_allows_batch, record as durable_record, snapshot as durable_snapshot
+from .publisher_daily_budget import allows as daily_allows, record as daily_record, snapshot as daily_snapshot, DEFAULT_MODELED_WRITE_CAP, DEFAULT_MODELED_QUERY_CAP
 from .public_today_contract import ContractError
 
 TAIPEI=ZoneInfo('Asia/Taipei')
@@ -71,7 +73,7 @@ def seconds_until_next_snapshot(now=None):
         target=local.replace(hour=next_minute//60,minute=next_minute%60,second=0,microsecond=0)
     return max(0,(target-local).total_seconds())
 
-def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=time.time,batch_cap=5,max_batches=1,burst_max_batches=None,max_articles=4,rotation_interval_seconds=None):
+def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,reconcile_executor=None,clock=time.time,batch_cap=5,max_batches=1,burst_max_batches=None,max_articles=4,rotation_interval_seconds=None,write_allowed=True):
     if type(max_batches) is not int or not 1<=max_batches<=16:
         raise ContractError('invalid bounded batches per snapshot')
     if burst_max_batches is None:
@@ -113,6 +115,14 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
             burst_batches=0
             mutation_blocked_aids=[]
             mutation_blocked_count=0
+            recovery_aids=[]
+            recovery_quarantined_aids=[]
+            recovery_retry_after_seconds=0
+            reconcile_reads=0
+            budget_batches=0
+            budget_rows=0
+            budget_modeled_queries=0
+            budget_modeled_writes=0
             stale_fenced_rows=0
             for article_index,article_id in enumerate(article_ids):
                 plan=inspect_latest_article(db,article_id=article_id)
@@ -121,7 +131,8 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                 state=state_for_source(state_dir,plan["source_identity"])
                 if not send:
                     result=run_live_once(db,state_path=state,secret=secret,
-                       executor=executor,send=False,batch_cap=batch_cap,article_id=article_id)
+                       executor=executor,reconcile_executor=reconcile_executor,send=False,batch_cap=batch_cap,article_id=article_id,
+                       write_allowed=write_allowed)
                     pending+=result.get("eligible",0)
                     # A budget-blocked adaptive tick probes without sending. Its
                     # recoverable backlog still requires 10s polling, even if
@@ -149,9 +160,18 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                 count=0
                 for _ in range(per_article_cap):
                     batch=run_live_once(db,state_path=state,secret=secret,
-                        executor=executor,send=True,batch_cap=batch_cap,article_id=article_id)
+                        executor=executor,reconcile_executor=reconcile_executor,send=True,batch_cap=batch_cap,article_id=article_id,
+                        write_allowed=write_allowed)
                     last_status=batch.get("status",last_status)
                     stale_fenced_rows+=batch.get("stale_fenced_rows",0)
+                    batch_reconcile_reads=batch.get("reconcile_reads",0)
+                    reconcile_reads+=batch_reconcile_reads
+                    modeled_queries+=2*batch_reconcile_reads
+                    budget_modeled_queries+=2*batch_reconcile_reads
+                    budget_batches+=int(batch.get("budget_batches",0) or 0)
+                    budget_rows+=int(batch.get("budget_rows",0) or 0)
+                    budget_modeled_writes+=int(batch.get("budget_modeled_writes",0) or 0)
+                    budget_modeled_queries+=int(batch.get("budget_modeled_queries",0) or 0)
                     pending+=batch.get("eligible",0)
                     legacy_baseline_candidates+=batch.get("legacy_baseline_candidates",0)
                     retained_recovery_candidates+=batch.get("retained_recovery_candidates",0)
@@ -161,6 +181,19 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     if batch.get("status")=="LOCAL_SOURCE_MUTATION_BLOCKED":
                         mutation_blocked_aids.append(batch.get("aid"))
                         mutation_blocked_count+=batch.get("mutation_count",0)
+                        count=0
+                        break
+                    if batch.get("status") in ("RECOVERY_WAIT","RECOVERY_BLOCKED","RECOVERED_REMOTE_COMMIT"):
+                        recovery_aids.append(batch.get("aid"))
+                        recovery_retry_after_seconds=max(recovery_retry_after_seconds,
+                            int(batch.get("retry_after_seconds",0) or 0))
+                        backlog=True
+                    if batch.get("status")=="RECOVERY_QUARANTINED":
+                        recovery_aids.append(batch.get("aid"))
+                        recovery_quarantined_aids.append(batch.get("aid"))
+                        backlog=True
+                    if batch.get("status") in ("ADMISSION_BUDGET_BLOCKED","DAILY_BUDGET_BLOCKED"):
+                        backlog=True
                         count=0
                         break
                     if batch.get("status")=="BASELINED":
@@ -180,6 +213,11 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     # verification SELECT families per HTTP batch.
                     modeled_writes+=2+2*count
                     modeled_queries+=5+2*count
+                    if not batch.get("budget_batches"):
+                        budget_batches+=1
+                        budget_rows+=count
+                        budget_modeled_writes+=2+2*count
+                        budget_modeled_queries+=5+2*count
                     if count<batch_cap:
                         break
                 backlog=backlog or (count==batch_cap)
@@ -195,8 +233,8 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     initial_burst_safe==initial_eligible):
                     while total_posts<burst_max_batches:
                         burst=run_live_once(db,state_path=state,secret=secret,
-                            executor=executor,send=True,batch_cap=batch_cap,
-                            article_id=article_id,fresh_only=True)
+                            executor=executor,reconcile_executor=reconcile_executor,send=True,batch_cap=batch_cap,
+                            article_id=article_id,fresh_only=True,write_allowed=write_allowed)
                         stale_fenced_rows+=burst.get("stale_fenced_rows",0)
                         if burst.get("status")=="BURST_BLOCKED":
                             break
@@ -209,6 +247,10 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                         total_sent+=burst_count
                         modeled_writes+=2+2*burst_count
                         modeled_queries+=5+2*burst_count
+                        budget_batches+=1
+                        budget_rows+=burst_count
+                        budget_modeled_writes+=2+2*burst_count
+                        budget_modeled_queries+=5+2*burst_count
                         backlog=backlog or (burst_count==batch_cap)
                         if burst_count<batch_cap:
                             break
@@ -231,6 +273,14 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,clock=t
                     "mutation_blocked_articles":len(mutation_blocked_aids),
                     "mutation_blocked_aids":mutation_blocked_aids,
                     "mutation_blocked_count":mutation_blocked_count,
+                    "recovery_aids":[x for x in dict.fromkeys(recovery_aids) if x],
+                    "recovery_quarantined_aids":[x for x in dict.fromkeys(recovery_quarantined_aids) if x],
+                    "recovery_retry_after_seconds":recovery_retry_after_seconds,
+                    "reconcile_reads":reconcile_reads,
+                    "budget_batches":budget_batches,
+                    "budget_rows":budget_rows,
+                    "budget_modeled_queries":budget_modeled_queries,
+                    "budget_modeled_writes":budget_modeled_writes,
                     "stale_fenced_rows":stale_fenced_rows}
     return {**result,"elapsed_ms":round((clock()-started)*1000),
         "observed_at":datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -255,6 +305,9 @@ def main(argv=None):
     p.add_argument("--max-articles",type=int,default=4)
     p.add_argument("--approve-live-capture-policy",action="store_true")
     p.add_argument("--endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/publish")
+    p.add_argument("--reconcile-endpoint",default="https://holoviewer-public-api.singlebagel.workers.dev/private/ptt/reconcile")
+    p.add_argument("--daily-modeled-write-cap",type=int,default=DEFAULT_MODELED_WRITE_CAP)
+    p.add_argument("--daily-modeled-query-cap",type=int,default=DEFAULT_MODELED_QUERY_CAP)
     args=p.parse_args(argv)
     if not 0<=args.iterations<=1440:
         p.error("iterations must be 0 (continuous) or 1-1440")
@@ -270,6 +323,8 @@ def main(argv=None):
         p.error('adaptive Phase A requires max-batches=1')
     if args.adaptive_live_cadence and args.interval_seconds is not None:
         p.error('adaptive cadence cannot be combined with fixed interval override')
+    if args.daily_modeled_write_cap<1 or args.daily_modeled_query_cap<1:
+        p.error('daily modeled caps must be positive')
     import os
     if args.send and (not args.approve_live_capture_policy or
        os.environ.get("PTT_ALLOW_CAPTURE_TIME_POLICY")!="true"):
@@ -279,12 +334,18 @@ def main(argv=None):
              secret=os.environ.get("PTT_PUBLISH_HMAC_SECRET",""),allow_write=True,
              max_rows=args.batch_cap,max_bytes=131072 if args.batch_cap>5 else 65536)
               if args.send else None)
+    reconcile_executor=(owner_signed_reconcile_executor(endpoint=args.reconcile_endpoint,
+             secret=os.environ.get("PTT_PUBLISH_HMAC_SECRET",""),allow_write=True,
+             max_rows=args.batch_cap,max_bytes=131072)
+              if args.send else None)
     metric=Path(args.metrics)
     metric.parent.mkdir(parents=True,exist_ok=True)
     telemetry=metric.parent/"publisher-telemetry.json"
     with exclusive_lock(Path(args.state_dir)/".single-publisher.lock"):
         iteration=0
         rolling=deque()
+        admission_path=metric.parent/"publisher-admission.json"
+        daily_path=metric.parent/"publisher-daily-budget.json"
         previous_backlog=None
         while args.iterations==0 or iteration<args.iterations:
             started=time.monotonic()
@@ -292,21 +353,71 @@ def main(argv=None):
                 now_mono=time.monotonic()
                 prune_rolling(rolling,now_mono)
                 before=rolling_totals(rolling)
-                budget_blocked=bool(args.adaptive_live_cadence and args.send and not rolling_budget_allows(rolling,now_mono))
-                send_this_tick=args.send and not budget_blocked
+                durable_now=time.time()
+                admission_state_error=None
+                try:
+                    durable_before=(durable_snapshot(admission_path,now=durable_now)
+                        if args.adaptive_live_cadence else None)
+                    rolling_blocked=bool(args.adaptive_live_cadence and args.send and
+                        (not rolling_budget_allows(rolling,now_mono) or
+                         not durable_allows_batch(admission_path,now=durable_now)))
+                except ContractError:
+                    durable_before=None
+                    rolling_blocked=bool(args.send)
+                    admission_state_error="DURABLE_ADMISSION_STATE_INVALID"
+
+                projected_writes=2+2*args.batch_cap
+                projected_queries=5+2*args.batch_cap
+                daily_state_error=None
+                try:
+                    daily_allowed,daily_reason,daily_before=daily_allows(
+                        daily_path,projected_writes=projected_writes,
+                        projected_queries=projected_queries,now=durable_now,
+                        write_cap=args.daily_modeled_write_cap,
+                        query_cap=args.daily_modeled_query_cap)
+                    query_reconcile_allowed=daily_before["query_remaining"]>=2
+                except ContractError:
+                    daily_allowed=False
+                    daily_reason="DAILY_BUDGET_STATE_INVALID"
+                    daily_before=None
+                    query_reconcile_allowed=False
+                    daily_state_error=daily_reason
+
+                write_allowed=bool(args.send and not rolling_blocked and daily_allowed)
+                budget_blocked=bool(args.send and (rolling_blocked or not daily_allowed))
                 effective_burst=(args.max_batches if args.adaptive_live_cadence else args.burst_max_batches)
-                result=run_snapshot(source=args.source,state_dir=args.state_dir,send=send_this_tick,
-                                    secret=proof_secret,executor=executor,batch_cap=args.batch_cap,max_batches=args.max_batches,
+                result=run_snapshot(source=args.source,state_dir=args.state_dir,send=args.send,
+                                    secret=proof_secret,executor=executor,
+                                    reconcile_executor=(reconcile_executor if query_reconcile_allowed else None),
+                                    batch_cap=args.batch_cap,max_batches=args.max_batches,
                                     burst_max_batches=effective_burst,max_articles=args.max_articles,
-                                    rotation_interval_seconds=(LIVE_INTERVAL_SECONDS if args.adaptive_live_cadence else None))
+                                    rotation_interval_seconds=(LIVE_INTERVAL_SECONDS if args.adaptive_live_cadence else None),
+                                    write_allowed=write_allowed)
                 posts=result.get("http_posts",0)
                 sent_rows=result.get("sent",0)
                 modeled_queries=result.get("modeled_d1_queries_ceiling",0)
                 modeled_writes=result.get("modeled_d1_writes_ceiling",0)
-                if send_this_tick and posts:
+                budget_batches=int(result.get("budget_batches",0) or 0)
+                budget_rows=int(result.get("budget_rows",0) or 0)
+                budget_queries=int(result.get("budget_modeled_queries",0) or 0)
+                budget_writes=int(result.get("budget_modeled_writes",0) or 0)
+                if write_allowed and posts:
                     rolling.append((now_mono,posts,sent_rows,modeled_queries,modeled_writes))
+                # Durable rolling admission must also account for a batch whose
+                # ACK was lost and later reconciled as ALL_PRESENT, or an exact
+                # recovery replay. Otherwise restart recovery could bypass 6/60.
+                if args.adaptive_live_cadence and budget_batches:
+                    durable_record(admission_path,batches=budget_batches,rows=budget_rows,
+                        modeled_queries=budget_queries,modeled_writes=budget_writes,
+                        now=time.time())
+                if args.send and (budget_batches or budget_queries or budget_writes):
+                    daily_record(daily_path,batches=budget_batches,rows=budget_rows,
+                        modeled_queries=budget_queries,modeled_writes=budget_writes,
+                        now=time.time(),write_cap=args.daily_modeled_write_cap,
+                        query_cap=args.daily_modeled_query_cap)
                 prune_rolling(rolling,now_mono)
-                totals=rolling_totals(rolling)
+                totals=(durable_snapshot(admission_path,now=time.time())
+                        if args.adaptive_live_cadence else rolling_totals(rolling))
                 eligible=result.get("eligible",0)
                 backlog_after=max(0,eligible-sent_rows) if isinstance(eligible,int) else 0
                 backlog_delta=(None if previous_backlog is None else backlog_after-previous_backlog)
@@ -314,7 +425,27 @@ def main(argv=None):
                 retained=result.get("retained_recovery_candidates",0)
                 fresh=result.get("fresh_eligible",0)
                 recovery=max(0,retained-fresh) if isinstance(retained,int) and isinstance(fresh,int) else 0
-                stop_reason=("ROLLING_60S_BATCH_CAP" if budget_blocked else None)
+                try:
+                    daily_after=daily_snapshot(daily_path,now=time.time(),
+                        write_cap=args.daily_modeled_write_cap,
+                        query_cap=args.daily_modeled_query_cap)
+                except ContractError:
+                    daily_after={
+                        "day":None,"modeled_writes":None,"modeled_queries":None,
+                        "modeled_write_cap":args.daily_modeled_write_cap,
+                        "modeled_query_cap":args.daily_modeled_query_cap,
+                    }
+                    daily_state_error="DAILY_BUDGET_STATE_INVALID"
+                if admission_state_error:
+                    stop_reason=admission_state_error
+                elif daily_state_error:
+                    stop_reason=daily_state_error
+                elif rolling_blocked:
+                    stop_reason="ROLLING_60S_BATCH_CAP"
+                elif budget_blocked:
+                    stop_reason=daily_reason
+                else:
+                    stop_reason=None
                 result={**result,
                     "adaptive_live_cadence":bool(args.adaptive_live_cadence),
                     "live_pressure":adaptive_live_pressure(result),
@@ -325,6 +456,15 @@ def main(argv=None):
                     "rolling_60s_rows":totals["rows"],
                     "rolling_60s_modeled_queries":totals["modeled_queries"],
                     "rolling_60s_modeled_writes":totals["modeled_writes"],
+                    "durable_admission":bool(args.adaptive_live_cadence),
+                    "daily_budget_day":daily_after["day"],
+                    "daily_modeled_writes":daily_after["modeled_writes"],
+                    "daily_modeled_queries":daily_after["modeled_queries"],
+                    "daily_modeled_write_cap":daily_after["modeled_write_cap"],
+                    "daily_modeled_query_cap":daily_after["modeled_query_cap"],
+                    "daily_budget_blocked":bool(budget_blocked and not rolling_blocked),
+                    "admission_state_error":admission_state_error,
+                    "daily_budget_state_error":daily_state_error,
                     "stop_reason":stop_reason,
                 }
             except Exception as exc:
