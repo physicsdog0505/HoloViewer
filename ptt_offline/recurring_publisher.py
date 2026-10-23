@@ -192,7 +192,7 @@ def run_snapshot(*,source,state_dir,send=False,secret=None,executor=None,reconci
                         recovery_aids.append(batch.get("aid"))
                         recovery_quarantined_aids.append(batch.get("aid"))
                         backlog=True
-                    if batch.get("status")=="ADMISSION_BUDGET_BLOCKED":
+                    if batch.get("status") in ("ADMISSION_BUDGET_BLOCKED","DAILY_BUDGET_BLOCKED"):
                         backlog=True
                         count=0
                         break
@@ -367,7 +367,7 @@ def main(argv=None):
                     admission_state_error="DURABLE_ADMISSION_STATE_INVALID"
 
                 projected_writes=2+2*args.batch_cap
-                projected_queries=5+2*args.batch_cap+2
+                projected_queries=5+2*args.batch_cap
                 daily_state_error=None
                 try:
                     daily_allowed,daily_reason,daily_before=daily_allows(
@@ -403,10 +403,13 @@ def main(argv=None):
                 budget_writes=int(result.get("budget_modeled_writes",0) or 0)
                 if write_allowed and posts:
                     rolling.append((now_mono,posts,sent_rows,modeled_queries,modeled_writes))
-                    if args.adaptive_live_cadence:
-                        durable_record(admission_path,batches=posts,rows=sent_rows,
-                            modeled_queries=modeled_queries,modeled_writes=modeled_writes,
-                            now=time.time())
+                # Durable rolling admission must also account for a batch whose
+                # ACK was lost and later reconciled as ALL_PRESENT, or an exact
+                # recovery replay. Otherwise restart recovery could bypass 6/60.
+                if args.adaptive_live_cadence and budget_batches:
+                    durable_record(admission_path,batches=budget_batches,rows=budget_rows,
+                        modeled_queries=budget_queries,modeled_writes=budget_writes,
+                        now=time.time())
                 if args.send and (budget_batches or budget_queries or budget_writes):
                     daily_record(daily_path,batches=budget_batches,rows=budget_rows,
                         modeled_queries=budget_queries,modeled_writes=budget_writes,
