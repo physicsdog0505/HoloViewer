@@ -58,6 +58,7 @@ jobs:
             ptt_offline.test_live_capture_publisher \
             ptt_offline.test_publisher_recovery \
             ptt_offline.test_publisher_admission \
+            ptt_offline.test_publisher_service \
             ptt_offline.test_recurring_publisher \
             ptt_offline.test_publisher_telemetry \
             ptt_offline.test_data_lifecycle_evidence \
