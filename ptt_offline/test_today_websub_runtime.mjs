@@ -61,8 +61,9 @@ async function delivery(worker,e,body=atom(),signature=null){
  return worker.fetch(new Request('https://api.example/internal/today/websub',{method:'POST',headers:{'x-hub-signature-256':sig,'content-type':'application/atom+xml'},body}),e,{});
 }
 async function activeLease(db,channel=channels[0].id,rosterVersion=version,mode='subscribe'){
- await recordSubscriptionRequest(db,{channelId:channel,rosterVersion,mode,now:at});
- return confirmSubscriptionChallenge(db,{channelId:channel,rosterVersion,mode,leaseSeconds:432000,now:at});
+ const now=new Date();
+ await recordSubscriptionRequest(db,{channelId:channel,rosterVersion,mode,now});
+ return confirmSubscriptionChallenge(db,{channelId:channel,rosterVersion,mode,leaseSeconds:432000,now});
 }
 
 test('runtime roster comes from exact D1-approved roster and validates all 85 rows',async()=>{
