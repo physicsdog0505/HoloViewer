@@ -298,9 +298,13 @@ class LiveCapturePublisherTests(unittest.TestCase):
             run_live_once(self.db,state_path=alt,secret="k"*40,
                 executor=lambda _: (_ for _ in ()).throw(RuntimeError("connection lost")),send=True,
                 now=datetime.fromisoformat("2026-10-15T10:04:00+00:00"))
-        with self.assertRaisesRegex(ContractError,"remote ACK unresolved"):
-            run_live_once(self.db,state_path=alt,secret="k"*40,
-                executor=lambda _:self.fail("must not replay"),send=True)
+        blocked=run_live_once(self.db,state_path=alt,secret="k"*40,
+            executor=lambda _:self.fail("must not replay"),send=True)
+        self.assertEqual(blocked["status"],"RECOVERY_BLOCKED")
+        saved=json.loads(Path(alt).read_text(encoding="utf-8"))
+        self.assertEqual(saved["status"],"REMOTE_UNCERTAIN")
+        self.assertIn("pending_batch",saved)
+        self.assertIn("pending_accepted_updates",saved)
 
     def test_verified_delayed_row_after_baseline_still_publishes(self):
         baseline=run_live_once(self.db,state_path=self.state,secret="k"*40,
