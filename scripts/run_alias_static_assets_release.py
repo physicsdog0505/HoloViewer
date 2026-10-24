@@ -127,6 +127,7 @@ def candidate_from_production_baseline(
 
     # Preserve the currently published Alias immutable object if it is distinct and not
     # already in the accepted source baseline, so a pointer rollback remains possible.
+    nonce = f"preflight-{int(time.time())}-{os.getpid()}"
     current_alias_raw = fetch_bytes(
         production_url(origin, "/data/search/aliases/v1/latest.json", nonce),
         allow_404=True,
