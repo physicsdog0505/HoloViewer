@@ -774,3 +774,48 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
     line-height:30px!important;
   }
 }
+
+
+/* Global topbar hierarchy: brand left, status/date right, consistent sizing. */
+.client-topbar{
+  justify-content:space-between;
+  gap:16px
+}
+.mobile-top-brand{
+  margin-left:0;
+  font-size:18px;
+  font-weight:900;
+  letter-spacing:-.02em;
+  line-height:1
+}
+.top-status{
+  margin-left:auto;
+  font-size:14px;
+  line-height:1;
+  white-space:nowrap
+}
+@media(min-width:761px){
+  .client-topbar::before{
+    content:"HoloDocchi";
+    color:var(--brand-main);
+    font-size:18px;
+    font-weight:900;
+    letter-spacing:-.02em;
+    line-height:1;
+  }
+}
+@media(max-width:760px){
+  .client-topbar{
+    padding-left:20px;
+    padding-right:20px
+  }
+  .mobile-top-brand{
+    display:block;
+    font-size:18px
+  }
+  .top-status{
+    margin-left:auto;
+    font-size:14px;
+    text-align:right
+  }
+}
