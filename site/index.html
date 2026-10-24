@@ -15,6 +15,7 @@
 <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="開啟導覽">☰</button>
 <a class="mobile-top-brand" href="/">HoloDocchi</a>
 <button id="page-title" class="top-status top-date-trigger" type="button" aria-haspopup="dialog" aria-controls="timeHub">今日直播</button>
+<input id="historyTopDate" class="history-top-date-native" type="date" aria-label="選擇歷史直播日期" tabindex="-1">
 </header>
 <div id="mobileNav" class="mobile-nav" hidden> <a data-mobile-route="home" href="/" class="active">今日直播</a>
  <a data-mobile-route="history" href="/history" class="">歷史直播</a>
@@ -177,7 +178,7 @@
  </section>
  <section id="history" class="page">
   <div id="historyDynamic">
-   <div class="page-head"><div><h1>歷史直播</h1><p>依日期瀏覽已發布的歷史直播，或搜尋所選月份的標題與頻道。</p></div></div>
+   <div class="page-head"><div><h1>歷史直播</h1></div></div>
    <div id="history-picker" class="history-toolbar">
     <div class="history-date-nav" aria-label="歷史直播日期">
      <button id="historyPrevDay" class="subtle-action history-nav-button" type="button" aria-label="前一天">←</button>
