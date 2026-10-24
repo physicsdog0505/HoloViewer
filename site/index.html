@@ -8,7 +8,7 @@
   <a data-route="history" href="/history" class=""><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
   <a data-route="watchalong" href="/watchalong" class=""><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a>
   <a data-route="single" href="/custom-view" class=""><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a>
-  <a data-route="multi" href="/collab" class=""><span class="rail-icon">👥</span><span class="rail-label">多人連動</span></a>
+  <a data-route="multi" href="/collab" class=""><span class="rail-icon" aria-hidden="true"></span><span class="rail-label">多人連動</span></a>
   <a data-route="ptt" href="/ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a>
 </nav></aside>
 <nav class="mobile-bottom-dock" aria-label="手機主要功能">
@@ -204,7 +204,7 @@
     </label>
    </div>
    <div id="history-search-intent" class="history-search-intent" hidden aria-live="polite"></div>
-   <div class="history-status-row"><span id="history-availability" class="history-availability"></span><span id="history-search-summary" class="history-search-summary"></span></div>
+   <div class="history-status-row"><span id="history-availability" class="history-availability" hidden></span><span id="history-search-summary" class="history-search-summary"></span></div>
    <p id="history-error" class="form-error" hidden></p>
    <section class="section"><div class="section-head"><div><h2 id="history-heading"></h2></div></div>
     <div id="history-list" class="client-grid"></div>
