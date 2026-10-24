@@ -8,13 +8,26 @@
   <a data-route="history" href="/history" class=""><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
   <a data-route="watchalong" href="/watchalong" class=""><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a>
   <a data-route="single" href="/custom-view" class=""><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a>
-  <a data-route="multi" href="/collab" class=""><span class="rail-icon">👥</span><span class="rail-label">多人連動</span></a>
+  <a data-route="multi" href="/collab" class=""><span class="rail-icon" aria-hidden="true"></span><span class="rail-label">多人連動</span></a>
   <a data-route="ptt" href="/ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a>
 </nav></aside>
+<nav class="mobile-bottom-dock" aria-label="手機主要功能">
+  <a data-mobile-dock-route="home" href="/" aria-label="今日直播">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 10.5V20h13v-9.5M9.5 20v-5h5v5"/></svg>
+  </a>
+  <a data-mobile-dock-route="history" href="/history" aria-label="歷史直播">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+  </a>
+  <a data-mobile-dock-route="multi" href="/collab" aria-label="多人連動">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="2.7"/><circle cx="16" cy="8" r="2.7"/><path d="M3.5 19c.4-3 1.9-4.7 4.5-4.7s4.1 1.7 4.5 4.7M11.5 19c.4-3 1.9-4.7 4.5-4.7s4.1 1.7 4.5 4.7"/></svg>
+  </a>
+  <a data-mobile-dock-route="ptt" href="/ptt-today/" aria-label="PTT 今日專串"><span>PTT</span></a>
+</nav>
 <header class="client-topbar">
 <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="開啟導覽">☰</button>
 <a class="mobile-top-brand" href="/">HoloDocchi</a>
 <button id="page-title" class="top-status top-date-trigger" type="button" aria-haspopup="dialog" aria-controls="timeHub">今日直播</button>
+<input id="historyTopDate" class="history-top-date-native" type="date" aria-label="選擇歷史直播日期" tabindex="-1">
 </header>
 <div id="mobileNav" class="mobile-nav" hidden> <a data-mobile-route="home" href="/" class="active">今日直播</a>
  <a data-mobile-route="history" href="/history" class="">歷史直播</a>
@@ -177,7 +190,7 @@
  </section>
  <section id="history" class="page">
   <div id="historyDynamic">
-   <div class="page-head"><div><h1>歷史直播</h1><p>依日期瀏覽已發布的歷史直播，或搜尋所選月份的標題與頻道。</p></div></div>
+   <div class="page-head"><div><h1>歷史直播</h1></div></div>
    <div id="history-picker" class="history-toolbar">
     <div class="history-date-nav" aria-label="歷史直播日期">
      <button id="historyPrevDay" class="subtle-action history-nav-button" type="button" aria-label="前一天">←</button>
@@ -191,7 +204,7 @@
     </label>
    </div>
    <div id="history-search-intent" class="history-search-intent" hidden aria-live="polite"></div>
-   <div class="history-status-row"><span id="history-availability" class="history-availability"></span><span id="history-search-summary" class="history-search-summary"></span></div>
+   <div class="history-status-row"><span id="history-availability" class="history-availability" hidden></span><span id="history-search-summary" class="history-search-summary"></span></div>
    <p id="history-error" class="form-error" hidden></p>
    <section class="section"><div class="section-head"><div><h2 id="history-heading"></h2></div></div>
     <div id="history-list" class="client-grid"></div>
