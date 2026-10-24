@@ -3,7 +3,7 @@
  * This is a runtime publication boundary, not a detector. The accepted producer
  * sends a complete public-collab-projection-v1 live projection. The Worker only
  * validates identity/integrity and atomically applies it to the existing D1
- * canonical Collab tables consumed by PR #197.
+ * canonical Collab publication tables.
  */
 const enc=new TextEncoder();
 const EVENT_ID=/^[A-Za-z0-9:_-]{1,160}$/;
