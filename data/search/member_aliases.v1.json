@@ -1,0 +1,3301 @@
+{
+  "schema_version": 1,
+  "dataset": "holodocchi-member-aliases-v1",
+  "generated_at": "2026-10-24",
+  "status": "seed_for_owner_review",
+  "scope": {
+    "source": "site/assets/app.js TIME_HUB_MEMBERS",
+    "identity_count": 69,
+    "note": "V1 covers the 69 identities currently present in the frontend member registry. It is not yet a complete historical-channel registry; #50 must reconcile this against YouTube Static manifest channel_indexes before treating coverage as complete."
+  },
+  "normalization_contract": {
+    "unicode": "NFKC",
+    "latin_case": "case-insensitive",
+    "whitespace": "collapse",
+    "punctuation": "token boundary",
+    "strong_alias": "may resolve directly to member identity",
+    "weak_alias": "ranking hint only; never uniquely resolves a member without corroborating evidence"
+  },
+  "intended_query_semantics": {
+    "one_member": "member-aware history search",
+    "multiple_members": "collab/co-occurrence intent first, text match fallback second",
+    "member_plus_text": "member constraint plus remaining text keywords"
+  },
+  "source_notes": [
+    {
+      "label": "PTT / C_Chat numeric nickname discussion",
+      "url": "https://www.ptt.cc/bbs/C_Chat/M.1640146374.A.DED.html",
+      "evidence_examples": [
+        "35",
+        "486",
+        "446",
+        "61",
+        "TMT"
+      ]
+    },
+    {
+      "label": "Bahamut Holo server history",
+      "url": "https://forum.gamer.com.tw/G2.php?bsn=60608&sn=57",
+      "evidence_examples": [
+        "486",
+        "蘿蔔子",
+        "巧可"
+      ]
+    },
+    {
+      "label": "Bahamut Hololive community naming list",
+      "url": "https://forum.gamer.com.tw/Co.php?bsn=18966&sn=583805",
+      "evidence_examples": [
+        "時乃空",
+        "星街彗星",
+        "Miko",
+        "蘿蔔子",
+        "486",
+        "癒月巧可",
+        "兔田佩克拉",
+        "寶鐘瑪琳",
+        "常闇永遠"
+      ]
+    },
+    {
+      "label": "PTT Hololive schedule usage",
+      "url": "https://www.ptt.cc/bbs/C_Chat/M.1580985528.A.FEE.html",
+      "evidence_examples": [
+        "船長",
+        "486",
+        "兔子",
+        "巧可老師",
+        "蘿蔔子"
+      ]
+    }
+  ],
+  "members": [
+    {
+      "channel_id": "UCp6993wxpyDPHUpavwDFqgg",
+      "canonical_name": "ときのそら",
+      "aliases": [
+        {
+          "value": "ときのそら",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Tokino Sora",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Sora",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "時乃空",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "时乃空",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "空媽",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "空妈",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCDqI2jOz0weumE8s7paEk6g",
+      "canonical_name": "ロボ子さん",
+      "aliases": [
+        {
+          "value": "ロボ子さん",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Roboco",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Roboco-san",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Roboco san",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "ロボ子",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "蘿蔔子",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "萝卜子",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "蘿蔔",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "萝卜",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "RBC",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "二姐",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "二姊",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC0TXe_LYZ4scaW2XMyi5_kw",
+      "canonical_name": "AZKi",
+      "aliases": [
+        {
+          "value": "AZKi",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "AZ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC-hM6YJuNYVAmUWxeIr9FeA",
+      "canonical_name": "さくらみこ",
+      "aliases": [
+        {
+          "value": "さくらみこ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Sakura Miko",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Miko",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "みこ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "櫻巫女",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "樱巫女",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "35",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "咪口",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Mikochi",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC5CwaMl1eIgY8h02uZw7u8A",
+      "canonical_name": "星街すいせい",
+      "aliases": [
+        {
+          "value": "星街すいせい",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Hoshimachi Suisei",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Suisei",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "すいちゃん",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "星街彗星",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "星街",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "彗星",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Suichan",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCFTLzh12_nrtzqBPsTCqenA",
+      "canonical_name": "アキ・ローゼンタール",
+      "aliases": [
+        {
+          "value": "アキ・ローゼンタール",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Aki Rosenthal",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Aki",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Akirose",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "アキロゼ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "亞綺",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "亚绮",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC1CfXB_kRs3C-zaeTG3oGyg",
+      "canonical_name": "赤井はあと",
+      "aliases": [
+        {
+          "value": "赤井はあと",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Akai Haato",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Haato",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Haachama",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "はあちゃま",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "哈洽馬",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "哈洽马",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "心心",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCdn5BQ06XqgXoAxIhbqw5Rg",
+      "canonical_name": "白上フブキ",
+      "aliases": [
+        {
+          "value": "白上フブキ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Shirakami Fubuki",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Fubuki",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "FBK",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "白上吹雪",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "好狐",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "狐狸",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "白狐",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCQ0UDLQCjY0rmuxCDE38FGg",
+      "canonical_name": "夏色まつり",
+      "aliases": [
+        {
+          "value": "夏色まつり",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Natsuiro Matsuri",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Matsuri",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "夏色祭",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "夏哥",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC7fk0CB07ly8oSl0aqKkqFg",
+      "canonical_name": "百鬼あやめ",
+      "aliases": [
+        {
+          "value": "百鬼あやめ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Nakiri Ayame",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Ayame",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "百鬼綾目",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "百鬼绫目",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "阿鬼",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "余",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "大小姐",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC1suqwovbL1kzsoaZgFZLKg",
+      "canonical_name": "癒月ちょこ",
+      "aliases": [
+        {
+          "value": "癒月ちょこ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Yuzuki Choco",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Choco",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "癒月巧可",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "疗月巧可",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "巧可",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "巧可老師",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "巧可老师",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Choco-sensei",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Choco sensei",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "老師",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "老师",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCvzGlP9oQwU--Y0r9id_jnA",
+      "canonical_name": "大空スバル",
+      "aliases": [
+        {
+          "value": "大空スバル",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Oozora Subaru",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Ozora Subaru",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Subaru",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "大空昴",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "486",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "鴨鴨",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "鸭鸭",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "鴨子",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "鸭子",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCp-5t9SrOQwXMU7iIjQfARg",
+      "canonical_name": "大神ミオ",
+      "aliases": [
+        {
+          "value": "大神ミオ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Ookami Mio",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Ogami Mio",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Mio",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "大神澪",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "狼媽",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "狼妈",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCvaTdHTWBGv3MKj3KVqJVCw",
+      "canonical_name": "猫又おかゆ",
+      "aliases": [
+        {
+          "value": "猫又おかゆ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Nekomata Okayu",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Okayu",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "貓又小粥",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "猫又小粥",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "小粥",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "飯糰貓",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "饭团猫",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UChAnqc_AY5_I3Px5dig3X1Q",
+      "canonical_name": "戌神ころね",
+      "aliases": [
+        {
+          "value": "戌神ころね",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Inugami Korone",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Korone",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "戌神沁音",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "沁音",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "麵包狗",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "面包狗",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "狗狗",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC1DCedRgGHBdm81E1llLhOQ",
+      "canonical_name": "兎田ぺこら",
+      "aliases": [
+        {
+          "value": "兎田ぺこら",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Usada Pekora",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Pekora",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Peko",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "兔田佩克拉",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "佩克拉",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "兔子",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "兔兔",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCvInZx9h3jC2JzsIzoOebWg",
+      "canonical_name": "不知火フレア",
+      "aliases": [
+        {
+          "value": "不知火フレア",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Shiranui Flare",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Flare",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "不知火芙蕾雅",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "芙蕾雅",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "阿火",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCdyqAaZDKHXg4Ahi7VENThQ",
+      "canonical_name": "白銀ノエル",
+      "aliases": [
+        {
+          "value": "白銀ノエル",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Shirogane Noel",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Noel",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "白銀諾艾爾",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "白银诺艾尔",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "諾艾爾",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "诺艾尔",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "團長",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "团长",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCCzUftO8KOVkV4wQG1vkUvg",
+      "canonical_name": "宝鐘マリン",
+      "aliases": [
+        {
+          "value": "宝鐘マリン",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Houshou Marine",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Hosho Marine",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Marine",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "寶鐘瑪琳",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "宝钟玛琳",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "瑪琳",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "玛琳",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "船長",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "船长",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "阿船",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCqm3BQLlJfvkTsX_hvm0UmA",
+      "canonical_name": "角巻わため",
+      "aliases": [
+        {
+          "value": "角巻わため",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Tsunomaki Watame",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Watame",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "角卷綿芽",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "角卷绵芽",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "綿芽",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "绵芽",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "羊",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC1uv2Oq6kNxgATlCiez59hw",
+      "canonical_name": "常闇トワ",
+      "aliases": [
+        {
+          "value": "常闇トワ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Tokoyami Towa",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Towa",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "常闇永遠",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "常暗永远",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "永遠",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "永远",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "TMT",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCa9Y57gfeY0Zro_noHRVrnw",
+      "canonical_name": "姫森ルーナ",
+      "aliases": [
+        {
+          "value": "姫森ルーナ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Himemori Luna",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Luna",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "姬森璐娜",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "璐娜",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "公主",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCFKOVgVbGmX65RxO3EtH3iw",
+      "canonical_name": "雪花ラミィ",
+      "aliases": [
+        {
+          "value": "雪花ラミィ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Yukihana Lamy",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Lamy",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "雪花菈米",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "菈米",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCAWSyEs_Io8MtpY3m-zqILA",
+      "canonical_name": "桃鈴ねね",
+      "aliases": [
+        {
+          "value": "桃鈴ねね",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Momosuzu Nene",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Nene",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Nenechi",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "桃鈴音音",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "桃铃音音",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "音音",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCUKD-uaobj9jiqB-VXt71mA",
+      "canonical_name": "獅白ぼたん",
+      "aliases": [
+        {
+          "value": "獅白ぼたん",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Shishiro Botan",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Botan",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "獅白牡丹",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "狮白牡丹",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "獅白",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "狮白",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "446",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCK9V2B22uJYu3N7eR_BT9QA",
+      "canonical_name": "尾丸ポルカ",
+      "aliases": [
+        {
+          "value": "尾丸ポルカ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Omaru Polka",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Polka",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "尾丸波爾卡",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "尾丸波尔卡",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "波爾卡",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "波尔卡",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "座長",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "座长",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCENwRMx5Yh42zWpzURebzTw",
+      "canonical_name": "ラプラス・ダークネス",
+      "aliases": [
+        {
+          "value": "ラプラス・ダークネス",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "La+ Darknesss",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Laplus Darknesss",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Laplus",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "La+",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "拉普拉斯",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "山田",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCs9_O1tRPMQTHQ-N_L6FU2g",
+      "canonical_name": "鷹嶺ルイ",
+      "aliases": [
+        {
+          "value": "鷹嶺ルイ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Takane Lui",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Lui",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "鷹嶺",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "鹰岭",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "61",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC6eWCld0KwmyHFbAqK3V-Rw",
+      "canonical_name": "博衣こより",
+      "aliases": [
+        {
+          "value": "博衣こより",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Hakui Koyori",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Koyori",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "こよ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "博衣",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "博士",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCIBY1ollUsauvVi4hW4cumw",
+      "canonical_name": "沙花叉クロヱ",
+      "aliases": [
+        {
+          "value": "沙花叉クロヱ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Sakamata Chloe",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Chloe",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "沙花叉",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "クロヱ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "虎鯨",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "虎鲸",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC_vMYWcDjmfdpH6r4TTn1MQ",
+      "canonical_name": "風真いろは",
+      "aliases": [
+        {
+          "value": "風真いろは",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Kazama Iroha",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Iroha",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "風真伊呂波",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "风真伊吕波",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "伊呂波",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "伊吕波",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "ござる",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCOyYb1c43VlX9rc_lT6NKQw",
+      "canonical_name": "Ayunda Risu",
+      "aliases": [
+        {
+          "value": "Ayunda Risu",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Risu",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCP0BspO_AMEe3aQqqpo89Dg",
+      "canonical_name": "Moona Hoshinova",
+      "aliases": [
+        {
+          "value": "Moona Hoshinova",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Moona",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCAoy6rzhSf4ydcYjJw3WoVg",
+      "canonical_name": "Airani Iofifteen",
+      "aliases": [
+        {
+          "value": "Airani Iofifteen",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Iofifteen",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Iofi",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Iofi15",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCYz_5n-uDuChHtLo7My1HnQ",
+      "canonical_name": "Kureiji Ollie",
+      "aliases": [
+        {
+          "value": "Kureiji Ollie",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Ollie",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "殭屍",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "僵尸",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC727SQYUvx5pDDGQpTICNWg",
+      "canonical_name": "Anya Melfissa",
+      "aliases": [
+        {
+          "value": "Anya Melfissa",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Anya",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UChgTyjG-pdNvxxhdsXfHQ5Q",
+      "canonical_name": "Pavolia Reine",
+      "aliases": [
+        {
+          "value": "Pavolia Reine",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Reine",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCTvHWSfBZgtxE4sILOaurIQ",
+      "canonical_name": "Vestia Zeta",
+      "aliases": [
+        {
+          "value": "Vestia Zeta",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Zeta",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCZLZ8Jjx_RN2CXloOmgTHVg",
+      "canonical_name": "Kaela Kovalskia",
+      "aliases": [
+        {
+          "value": "Kaela Kovalskia",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Kaela",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCjLEmnpCNeisMxy134KPwWw",
+      "canonical_name": "Kobo Kanaeru",
+      "aliases": [
+        {
+          "value": "Kobo Kanaeru",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Kobo",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCL_qhgtOy0dy1Agp8vkySQg",
+      "canonical_name": "Mori Calliope",
+      "aliases": [
+        {
+          "value": "Mori Calliope",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Calliope",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Calli",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Mori",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "死神",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCHsx4Hqa-1ORjQTh9TYDhww",
+      "canonical_name": "Takanashi Kiara",
+      "aliases": [
+        {
+          "value": "Takanashi Kiara",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Kiara",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "火雞",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "火鸡",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "KFP",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCMwGHR0BTZuLsmjY_NT5Pwg",
+      "canonical_name": "Ninomae Ina'nis",
+      "aliases": [
+        {
+          "value": "Ninomae Ina'nis",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Ina'nis",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Ina",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "伊娜",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "章魚",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "章鱼",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCyl1z3jo3XHR1riLFKG5UAg",
+      "canonical_name": "Watson Amelia",
+      "aliases": [
+        {
+          "value": "Watson Amelia",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Amelia Watson",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Amelia",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Ame",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Watson",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "華生",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "华生",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "偵探",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "侦探",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC8rcEBzJSleTkf_-agPM20g",
+      "canonical_name": "IRyS",
+      "aliases": [
+        {
+          "value": "IRyS",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCmbs8T6MWqUHP1tIQvSgKrg",
+      "canonical_name": "Ouro Kronii",
+      "aliases": [
+        {
+          "value": "Ouro Kronii",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Kronii",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Kroni",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "時鐘",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "时钟",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCgmPnx-EEeOrZSg5Tiw7ZRQ",
+      "canonical_name": "Hakos Baelz",
+      "aliases": [
+        {
+          "value": "Hakos Baelz",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Baelz",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Bae",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "老鼠",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "鼠",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCgnfPPb9JI3e9A4cXHnWbyg",
+      "canonical_name": "Shiori Novella",
+      "aliases": [
+        {
+          "value": "Shiori Novella",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Shiori",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "詩織",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "诗织",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC9p_lqQ0FEDz327Vgf5JwqA",
+      "canonical_name": "Koseki Bijou",
+      "aliases": [
+        {
+          "value": "Koseki Bijou",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Bijou",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Biboo",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "石頭",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "石头",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "寶石",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "宝石",
+          "type": "ambiguous_alias",
+          "strength": "weak",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC_sFNM0z0MWm9A6WlKPuMMg",
+      "canonical_name": "Nerissa Ravencroft",
+      "aliases": [
+        {
+          "value": "Nerissa Ravencroft",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Nerissa",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCt9H_RpQzhxzlyBxFqrdHqA",
+      "canonical_name": "Fuwawa Abyssgard",
+      "aliases": [
+        {
+          "value": "Fuwawa Abyssgard",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Fuwawa",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Fuwa",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCt9H_RpQzhxzlyBxFqrdHqA",
+      "canonical_name": "Mococo Abyssgard",
+      "aliases": [
+        {
+          "value": "Mococo Abyssgard",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Mococo",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Moco",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCW5uhrG1eCBYditmhL0Ykjw",
+      "canonical_name": "Elizabeth Rose Bloodflame",
+      "aliases": [
+        {
+          "value": "Elizabeth Rose Bloodflame",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Elizabeth",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "ERB",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Liz",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCDHABijvPBnJm7F-KlNME3w",
+      "canonical_name": "Gigi Murin",
+      "aliases": [
+        {
+          "value": "Gigi Murin",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Gigi",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "GG",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCvN5h1ShZtc7nly3pezRayg",
+      "canonical_name": "Cecilia Immergreen",
+      "aliases": [
+        {
+          "value": "Cecilia Immergreen",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Cecilia",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "CC",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCl69AEx4MdqMZH7Jtsm7Tig",
+      "canonical_name": "Raora Panthera",
+      "aliases": [
+        {
+          "value": "Raora Panthera",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Raora",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCWQtYtq9EOB4-I5P-3fh8lA",
+      "canonical_name": "音乃瀬奏",
+      "aliases": [
+        {
+          "value": "音乃瀬奏",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Otonose Kanade",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Kanade",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "奏",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "音乃瀨奏",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "音乃濑奏",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCtyWhCj3AqKh2dXctLkDtng",
+      "canonical_name": "一条莉々華",
+      "aliases": [
+        {
+          "value": "一条莉々華",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Ichijou Ririka",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Ichijo Ririka",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Ririka",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "一條莉莉華",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "一条莉莉华",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "莉莉華",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "莉莉华",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCdXAk5MpyLD8594lm_OvtGQ",
+      "canonical_name": "儒烏風亭らでん",
+      "aliases": [
+        {
+          "value": "儒烏風亭らでん",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Juufuutei Raden",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Jufuutei Raden",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Raden",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "らでん",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "儒烏風亭",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "儒乌风亭",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC1iA6_NT4mtAcIII6ygrvCw",
+      "canonical_name": "轟はじめ",
+      "aliases": [
+        {
+          "value": "轟はじめ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Todoroki Hajime",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Hajime",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "はじめ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "轟",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "轰",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC9LSiN9hXI55svYEBrrK-tw",
+      "canonical_name": "響咲リオナ",
+      "aliases": [
+        {
+          "value": "響咲リオナ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Isaki Riona",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Riona",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "リオナ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "響咲",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "响咲",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCuI_opAVX6qbxZY-a-AxFuQ",
+      "canonical_name": "虎金妃笑虎",
+      "aliases": [
+        {
+          "value": "虎金妃笑虎",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Koganei Niko",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Niko",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "笑虎",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "ニコ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCjk2nKmHzgH5Xy-C5qYRd5A",
+      "canonical_name": "水宮枢",
+      "aliases": [
+        {
+          "value": "水宮枢",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Mizumiya Su",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Su",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "水宮",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "水宫",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "枢",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCKMWFR6lAstLa7Vbf5dH7ig",
+      "canonical_name": "輪堂千速",
+      "aliases": [
+        {
+          "value": "輪堂千速",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Rindo Chihaya",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Chihaya",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "千速",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "輪堂",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "轮堂",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCGzTVXqMQHa4AgJVJIVvtDQ",
+      "canonical_name": "綺々羅々ヴィヴィ",
+      "aliases": [
+        {
+          "value": "綺々羅々ヴィヴィ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Kikirara Vivi",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Vivi",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "ヴィヴィ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "綺々羅々",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "绮绮罗罗",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UC8eitCE9Z6EwUCs-VUi1blg",
+      "canonical_name": "Achichi Mela",
+      "aliases": [
+        {
+          "value": "Achichi Mela",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Mela",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCy9mgxB8pn2C4aNK_MPthDQ",
+      "canonical_name": "Sorashina Sopia",
+      "aliases": [
+        {
+          "value": "Sorashina Sopia",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Sopia",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCROQtXcp2loQEmvpe5rhJzQ",
+      "canonical_name": "Suzuna Tsuzuri",
+      "aliases": [
+        {
+          "value": "Suzuna Tsuzuri",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Tsuzuri",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "channel_id": "UCSjQDxud2HkAO2DVD3lwxmw",
+      "canonical_name": "百灯キョーコ",
+      "aliases": [
+        {
+          "value": "百灯キョーコ",
+          "type": "canonical",
+          "strength": "strong",
+          "source": "canonical",
+          "enabled": true
+        },
+        {
+          "value": "Kyoko",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "キョーコ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        }
+      ],
+      "needs_review": false
+    }
+  ]
+}
