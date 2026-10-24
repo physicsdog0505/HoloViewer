@@ -190,7 +190,15 @@ body.home-wide .section-head{margin-bottom:9px}
 .multi-select-bar{position:fixed;z-index:50;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:12px 16px;background:#17191d;color:white;border-radius:16px;box-shadow:0 10px 35px rgba(0,0,0,.27);max-width:calc(100vw - 24px)}
 .multi-select-bar button{border:1px solid #555;border-radius:9px;padding:9px 13px;color:white;background:#34393f;cursor:pointer;white-space:nowrap}
 .multi-select-bar #multiWatch{background:#fff;color:#17191d;font-weight:800}
-@media(max-width:600px){.multi-select-bar{bottom:8px;gap:7px;padding:8px;font-size:12px}.multi-select-bar button{padding:8px}}
+@media(max-width:600px){
+ .multi-select-bar{
+  z-index:90;
+  bottom:calc(70px + env(safe-area-inset-bottom));
+  gap:7px;padding:8px 10px;font-size:12px;
+  max-width:calc(100vw - 32px)
+ }
+ .multi-select-bar button{padding:8px}
+}
 
 .client-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:28px 18px}
 .stream-card{position:relative;border:1px solid var(--line);background:var(--surface);border-radius:18px;overflow:visible;box-shadow:none;padding:8px;transition:border-color .14s ease,box-shadow .14s ease,background .14s ease}
