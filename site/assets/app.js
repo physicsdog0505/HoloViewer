@@ -1009,11 +1009,12 @@ function historyAliasIndex(registry,strength){
    if(alias?.enabled===false||alias?.strength!==strength)continue;
    const key=normalizeHistorySearchText(alias.value);
    if(!key)continue;
-   if(!map.has(key))map.set(key,[]);
-   map.get(key).push(member);
+   if(!map.has(key))map.set(key,new Map());
+   const id=String(member?.channel_id||'');
+   if(id&&!map.get(key).has(id))map.get(key).set(id,member);
   }
  }
- return map;
+ return new Map([...map].map(([key,members])=>[key,[...members.values()]]));
 }
 function parseHistorySearchQuery(raw,registry){
  const terms=normalizeHistorySearchText(raw).split(' ').filter(Boolean);
