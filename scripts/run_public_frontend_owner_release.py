@@ -97,24 +97,6 @@ def active_version(repo: Path) -> str:
     raise ReleaseBlocked("unable to determine active Worker version")
 
 
-def validate_config(repo: Path) -> dict:
-    data = json.loads((repo / WRANGLER_CONFIG).read_text())
-    if data.get("name") != WORKER_NAME:
-        raise ReleaseBlocked("unexpected Worker name")
-    assets = data.get("assets")
-    if not isinstance(assets, dict) or assets.get("directory") != "../site":
-        raise ReleaseBlocked("Wrangler assets directory is not ../site")
-
-    cfg = json.loads((repo / "site/assets/config.js").read_text().split("Object.freeze(", 1)[1].rsplit(");", 1)[0]
-                     .replace("apiBase:", '"apiBase":')
-                     .replace("youtubeStaticBase:", '"youtubeStaticBase":')
-                     .replace("pttArchiveMonths:", '"pttArchiveMonths":')
-                     .replace("base:", '"base":')
-                     .replace("manifest:", '"manifest":')
-                     .replace("Object.freeze(", "").replace(")", ""))
-    return cfg
-
-
 def parse_frontend_config(repo: Path) -> tuple[str, list[tuple[str, str]]]:
     text = (repo / "site/assets/config.js").read_text()
     marker = 'youtubeStaticBase: "'
