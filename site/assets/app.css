@@ -306,6 +306,10 @@ body.home-wide .section-head{margin-bottom:9px}
 .history-nav-button{min-width:40px}
 .history-search-field{display:block}
 .history-search-field input{width:100%}
+.history-search-intent{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 4px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;background:var(--surface);font-size:12px}
+.history-search-intent-label{color:var(--muted);font-weight:800}
+.history-search-chip{display:inline-flex;align-items:center;min-height:28px;padding:4px 9px;border:1px solid var(--line);border-radius:999px;background:#fff;font-weight:800;color:var(--text)}
+.history-search-intent-note{color:var(--muted)}
 .history-status-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;min-height:24px;margin:0 0 8px;color:var(--muted);font-size:12px}
 .history-availability,.history-search-summary{min-width:0}
 .history-shortcuts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
