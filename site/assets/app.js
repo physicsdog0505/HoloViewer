@@ -903,6 +903,12 @@ function normalizeYoutubeHistoryVideo(row){
  if(!row||typeof row!=='object')return null;
  const videoId=String(row.video_id||'');
  if(!/^[A-Za-z0-9_-]{11}$/.test(videoId))return null;
+ const liveArchive=row.is_live===true||Number(row.is_live)===1;
+ const start=String(row.actual_start||'');
+ const end=String(row.actual_end||'');
+ const availability=String(row.availability||'unknown').toLowerCase();
+ if(!liveArchive||!Number.isFinite(Date.parse(start))||!Number.isFinite(Date.parse(end))||Date.parse(end)<=Date.parse(start))return null;
+ if(availability==='private'||availability==='unavailable')return null;
  return {
   ...row,
   video_id:videoId,
