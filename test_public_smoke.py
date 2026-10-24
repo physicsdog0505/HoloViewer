@@ -249,6 +249,10 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("setTimeout(()=>{desktopClickTimer=null;toggleCardSelection()},220)", app_js)
         self.assertIn("card.addEventListener('dblclick'", app_js)
         self.assertIn("routeName==='history'?'選擇歷史直播日期'", app_js)
+        self.assertIn("classList.toggle('history-time-machine',routeName==='history')", app_js)
+        self.assertIn("history-heading').textContent=query?'搜尋結果':''", app_js)
+        self.assertIn(".top-status.history-time-machine", app_css)
+        self.assertIn("#history .section-head:has(#history-heading:empty){display:none}", app_css)
         self.assertIn("typeof picker.showPicker==='function'", app_js)
         self.assertIn("if(window.matchMedia('(max-width:760px)').matches)return;", app_js)
     def test_mobile_ptt_reader_v1_contract(self):
