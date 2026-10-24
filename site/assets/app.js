@@ -815,8 +815,8 @@ $('timeHub').addEventListener('click',event=>{if(event.target===$('timeHub'))$('
 
 function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));return o.year+'-'+o.month+'-'+o.day}
 function shiftDay(day,delta){const date=new Date(day+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+delta);return date.toISOString().slice(0,10)}
-function historyBounds(){const today=taipeiDay();return {earliest:shiftDay(today,-30),latest:shiftDay(today,-1)}}
-function historyDateValid(day){const b=historyBounds();return /^\\d{4}-\\d{2}-\\d{2}$/.test(day)&&day>=b.earliest&&day<=b.latest}
+function historyBounds(){const today=taipeiDay();return {latest:shiftDay(today,-1)}}
+function historyDateValid(day){const b=historyBounds();return /^\d{4}-\d{2}-\d{2}$/.test(day)&&day<=b.latest}
 function historyLink(label,day,page=1){const link=node('a',label,'subtle-action');link.href='/history?date='+encodeURIComponent(day)+(page>1?'&page='+page:'');link.onclick=e=>{e.preventDefault();$('historyDate').value=day;state.offset=(page-1)*50;loadHistory()};return link}
 const YOUTUBE_HISTORY_MANIFEST_PATH='/youtube/v1/manifest.json';
 const YOUTUBE_HISTORY_MANIFEST_TTL_MS=60000;
@@ -871,6 +871,16 @@ function youtubeHistoryMonthEntry(manifest,month){
   const itemMonth=String(item.month||'');
   return itemMonth===month||item.path.endsWith('/'+month+'.json');
  })||null;
+}
+function historyPublishedMonths(manifest){
+ return [...new Set((manifest?.availability?.published_months||[]).filter(month=>/^\d{4}-\d{2}$/.test(String(month))))].sort();
+}
+function applyHistoryAvailability(manifest,day){
+ const input=$('historyDate'),month=String(day||'').slice(0,7),published=historyPublishedMonths(manifest);
+ if(published.length)input.min=published[0]+'-01';else input.removeAttribute('min');
+ input.max=historyBounds().latest;
+ const state=youtubeHistoryMonthState(manifest,month);
+ $('history-availability').textContent=state==='published'?month+' 已發布':state==='known_not_published'?month+' 歷史資料尚未發布':published.length?'已發布月份：'+published[0]+' ～ '+published[published.length-1]:'目前沒有已發布的歷史月份';
 }
 async function loadYoutubeHistoryMonth(day){
  const month=String(day||'').slice(0,7);
@@ -929,24 +939,34 @@ function youtubeHistoryPayloadMonthsForDay(day){
  const previous=shiftDay(day,-1).slice(0,7);
  return previous===selected?[selected]:[previous,selected];
 }
-async function loadYoutubeHistoryDay(day,offset=0,limit=50){
- const months=youtubeHistoryPayloadMonthsForDay(day);
+async function youtubeHistoryPayloadsForTaipeiMonth(month){
  const payloads=[];
- for(const month of months){
-  try{payloads.push(await loadYoutubeHistoryMonth(month+'-01'))}
+ for(const candidate of youtubeHistoryPayloadMonthsForDay(month+'-01')){
+  try{payloads.push(await loadYoutubeHistoryMonth(candidate+'-01'))}
   catch(error){
-   if(month!==String(day).slice(0,7)&&error?.code==='HISTORY_STATIC_UNAVAILABLE')continue;
+   if(candidate!==month&&error?.code==='HISTORY_STATIC_UNAVAILABLE')continue;
    throw error;
   }
  }
+ return payloads;
+}
+function uniqueSortedHistoryRows(rows){
  const seen=new Set();
- const rows=payloads.flatMap(payload=>payload.videos)
-  .filter(row=>youtubeHistoryTaipeiDay(row)===day)
-  .map(normalizeYoutubeHistoryVideo)
+ return rows.map(normalizeYoutubeHistoryVideo)
   .filter(row=>row&&!seen.has(row.video_id)&&seen.add(row.video_id))
   .sort((a,b)=>Date.parse(String(b.actual_start||b.scheduled_start||0))-Date.parse(String(a.actual_start||a.scheduled_start||0))||String(b.video_id).localeCompare(String(a.video_id)));
+}
+async function loadYoutubeHistoryDay(day,offset=0,limit=50){
+ const payloads=await youtubeHistoryPayloadsForTaipeiMonth(String(day).slice(0,7));
+ const rows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos).filter(row=>youtubeHistoryTaipeiDay(row)===day));
  const page=rows.slice(offset,offset+limit);
  return {items:page,total:rows.length,has_more:offset+page.length<rows.length,source:'youtube-static'};
+}
+async function loadYoutubeHistorySearchMonth(day){
+ const month=String(day||'').slice(0,7);
+ const payloads=await youtubeHistoryPayloadsForTaipeiMonth(month);
+ const rows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos).filter(row=>youtubeHistoryTaipeiDay(row).slice(0,7)===month));
+ return {items:rows,total:rows.length,has_more:false,source:'youtube-static',search_month:month};
 }
 async function loadLegacyHistoryDay(day,offset=0){
  return api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+offset);
@@ -960,42 +980,74 @@ async function loadHistoryData(day,offset=0){
   return {...legacy,source:'legacy-api',static_error:String(staticError?.message||staticError)};
  }
 }
-
-function historyChrome(){const b=historyBounds();const input=$('historyDate');input.min=b.earliest;input.max=b.latest;if(!historyDateValid(input.value)){input.value=b.latest;state.offset=0}
- const selected=input.value;const shortcuts=$('history-shortcuts');shortcuts.replaceChildren();
- [['昨天',b.latest],['前天',shiftDay(b.latest,-1)],['7 天前',shiftDay(b.latest,-6)],['← 前一天',shiftDay(selected,-1)],['後一天 →',shiftDay(selected,1)]].forEach(([label,day])=>{if(historyDateValid(day))shortcuts.append(historyLink(label,day))});
- $('history-heading').textContent=selected.replaceAll('-','/');
+function historyQuery(){return String($('historySearch')?.value||'').trim().toLocaleLowerCase()}
+function historyMatchesQuery(item,query){
+ if(!query)return true;
+ return [item?.title,item?.channel_name,item?.channel_title,item?.channel_id].map(value=>String(value||'').toLocaleLowerCase()).join('\n').includes(query);
+}
+function historyChrome(){
+ const b=historyBounds(),input=$('historyDate');
+ input.max=b.latest;
+ if(!historyDateValid(input.value)){input.value=b.latest;state.offset=0}
+ const selected=input.value,next=shiftDay(selected,1);
+ $('historyPrevDay').disabled=!historyDateValid(shiftDay(selected,-1));
+ $('historyNextDay').disabled=!historyDateValid(next);
+ $('historyYesterday').disabled=selected===b.latest;
+ const query=historyQuery();
+ $('history-heading').textContent=query?selected.slice(0,7).replace('-','/')+' 搜尋結果':selected.replaceAll('-','/');
  if($('history').classList.contains('active'))updateClientTopbar('history');
 }
+function historySetDay(day){
+ if(!historyDateValid(day))return;
+ $('historyDate').value=day;state.offset=0;loadHistory();
+}
 async function loadHistory(){
- historyChrome();const day=$('historyDate').value;const error=$('history-error');error.hidden=true;error.textContent='';
- const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;
+ historyChrome();const day=$('historyDate').value,query=historyQuery(),error=$('history-error');error.hidden=true;error.textContent='';
+ const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';
  if(!config.youtubeStaticBase&&!config.apiBase){error.textContent='History 資料來源尚未設定。';error.hidden=false;return}
  try{
-  const historyPromise=loadHistoryData(day,state.offset);
-  const collabPromise=config.apiBase?api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null):Promise.resolve(null);
+  const manifestPromise=config.youtubeStaticBase?loadYoutubeHistoryManifest().catch(()=>null):Promise.resolve(null);
+  const historyPromise=query?loadYoutubeHistorySearchMonth(day):loadHistoryData(day,state.offset);
+  const collabPromise=!query&&config.apiBase?api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null):Promise.resolve(null);
   const catalogPromise=config.apiBase
    ?(homeCatalogRows.length
      ?Promise.resolve({streams:homeCatalogRows})
      :requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null))
    :Promise.resolve(null);
-  const [data,collabData,catalogData]=await Promise.all([historyPromise,collabPromise,catalogPromise]);
+  const [manifest,data,collabData,catalogData]=await Promise.all([manifestPromise,historyPromise,collabPromise,catalogPromise]);
+  if(manifest)applyHistoryAvailability(manifest,day);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
   const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
   const displayByChannel=homeDisplayMetadataByChannel(catalogRows);
-  const endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
+  let endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
+  if(query)endedItems=endedItems.filter(item=>historyMatchesQuery(item,query));
+  const resultCount=endedItems.length,renderedItems=query?endedItems.slice(0,200):endedItems;
   const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map();
   historyVodWindows.clear();
-  endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));
-  const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
-  const total=Number(data.total||0);if(!endedItems.length)$('history-empty').hidden=false;
+  renderedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));
+  const ids=new Set(renderedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
+  const total=Number(data.total||0);if(!renderedItems.length)$('history-empty').hidden=false;
+  if(query){
+   $('history-empty').textContent='這個月份沒有符合搜尋條件的已結束直播。';
+   $('history-search-summary').textContent=resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆':'找到 '+resultCount+' 筆';
+  }else{
+   $('history-empty').textContent='這一天沒有可顯示的已結束直播，或歷史資料尚未接入。';
+  }
   const notices=[];
   if(data.source==='legacy-api'&&data.static_error)notices.push('YouTube 歷史 Static Assets 暫時不可用，已使用既有 History API。');
-  if(!collabData&&endedItems.length&&config.apiBase)notices.push('多人連動資料暫時無法讀取。');
+  if(!query&&!collabData&&endedItems.length&&config.apiBase)notices.push('多人連動資料暫時無法讀取。');
   if(notices.length){error.textContent=notices.join(' ');error.hidden=false}
-  const page=Math.floor(state.offset/50)+1;if(page>1)pagination.append(historyLink('上一頁',day,page-1));
-  if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
- }catch(e){error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false}
+  if(!query){
+   const page=Math.floor(state.offset/50)+1;if(page>1)pagination.append(historyLink('上一頁',day,page-1));
+   if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
+  }
+  const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',$('historySearch').value.trim());
+  if($('history').classList.contains('active'))history.replaceState(null,'','/history?'+params.toString());
+ }catch(e){
+  $('history-availability').textContent='';
+  $('history-search-summary').textContent='';
+  error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false
+ }
 }
 function collabEventState(event){
  const streams=collabEventStreams(event);
@@ -1645,7 +1697,19 @@ function navigateSidebarLink(event,destination){
  // Keep keyboard focus for accessible navigation and rail expansion.
  if(event.detail>0)event.currentTarget.blur();
 }
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.route)));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileRoute)));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,'home')));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};$('history-picker').onsubmit=event=>{event.preventDefault();state.offset=0;loadHistory()};$('historyDate').value=historyBounds().latest;renderMulti();
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.route)));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileRoute)));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,'home')));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};{
+ const params=new URLSearchParams(location.search);
+ const requested=params.get('date');
+ $('historyDate').value=historyDateValid(requested)?requested:historyBounds().latest;
+ $('historySearch').value=params.get('q')||'';
+ $('historyDate').addEventListener('change',event=>{if(historyDateValid(event.target.value)){state.offset=0;loadHistory()}});
+ $('historyPrevDay').onclick=()=>historySetDay(shiftDay($('historyDate').value,-1));
+ $('historyNextDay').onclick=()=>historySetDay(shiftDay($('historyDate').value,1));
+ $('historyYesterday').onclick=()=>historySetDay(historyBounds().latest);
+ let historySearchTimer=null;
+ $('historySearch').addEventListener('input',()=>{clearTimeout(historySearchTimer);historySearchTimer=setTimeout(()=>{state.offset=0;loadHistory()},180)});
+}
+renderMulti();
 const hashRoute=location.hash.substring(1).split('?')[0];
 const pathRoute=location.pathname==='/history'?'history':
  location.pathname==='/ptt-today'?(new URLSearchParams(location.search).get('focus')==='1'?'ptt-focus':'ptt'):
