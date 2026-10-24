@@ -278,6 +278,30 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("window.open(pttSourceUrl,'_blank','noopener,noreferrer')", js)
         self.assertIn('id="ptt-reader-action"', (ROOT / "site/ptt-today/index.html").read_text(encoding="utf-8"))
 
+    def test_mobile_bottom_dock_is_four_link_isolated_contract(self):
+        index = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        ptt = (ROOT / "site/ptt-today/index.html").read_text(encoding="utf-8")
+        viewer = (ROOT / "site/viewer/index.html").read_text(encoding="utf-8")
+        app_css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        shared = (ROOT / "site/assets/shared-shell.css").read_text(encoding="utf-8")
+        app_js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+
+        for html in (index, ptt, viewer):
+            self.assertIn('class="mobile-bottom-dock"', html)
+            self.assertIn('data-mobile-dock-route="home"', html)
+            self.assertIn('data-mobile-dock-route="history"', html)
+            self.assertIn('data-mobile-dock-route="multi"', html)
+            self.assertIn('data-mobile-dock-route="ptt"', html)
+            dock = html.split('class="mobile-bottom-dock"', 1)[1].split('</nav>', 1)[0]
+            self.assertNotIn('/watchalong', dock)
+            self.assertNotIn('/custom-view', dock)
+
+        self.assertIn('.client-rail{display:none!important}', app_css)
+        self.assertIn('.client-rail{display:none!important}', shared)
+        self.assertIn('.mobile-bottom-dock{display:none}', app_css)
+        self.assertIn("data-mobile-dock-route", app_js)
+        self.assertIn("dataset.mobileDockRoute===activeNav", app_js)
+
 
     def test_standalone_watchalong_contract(self):
         html = (ROOT / "site/watchalong-viewer/index.html").read_text(encoding="utf-8")
