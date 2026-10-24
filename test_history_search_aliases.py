@@ -112,6 +112,19 @@ console.log(JSON.stringify({{
         self.assertEqual(roboco["canonical_name"], "ロボ子さん")
         self.assertEqual(choco["canonical_name"], "癒月ちょこ")
 
+    def test_equivalent_strong_alias_rows_dedupe_by_channel(self):
+        roboco = self.by_name["ロボ子さん"]
+        values = {
+            norm(alias["value"])
+            for alias in roboco.get("aliases", [])
+            if alias.get("enabled") is not False and alias.get("strength") == "strong"
+        }
+        self.assertIn("roboco-san", values)
+        self.assertIn("roboco san", values)
+        parsed = self.parse_query("Roboco-san")
+        self.assertEqual(parsed["members"], ["ロボ子さん"])
+        self.assertEqual(parsed["keywords"], [])
+
     def test_multi_token_strong_aliases_resolve_longest_span(self):
         cases = {
             "Roboco-san": ["ロボ子さん"],
