@@ -11,7 +11,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,8 +23,7 @@ from alias_static_assets_release_gate import (
     sha256_bytes,
     validate_alias_contract,
     validate_alias_site_delta,
-    verify_declared_bytes,
-    youtube_manifest_paths,
+    validate_frontend_candidate_ownership,
 )
 
 CUSTOM_ORIGIN = "https://holodocchi.com"
@@ -94,7 +92,7 @@ def candidate_from_production_baseline(
     *,
     origin: str,
 ) -> dict:
-    """Build complete candidate = accepted site baseline + prod runtime assets + Alias delta."""
+    """Build candidate from accepted frontend-owned baseline + reviewed Alias delta only."""
     target.mkdir(parents=True, exist_ok=False)
     archive = subprocess.Popen(
         ["git", "archive", production_site_base_sha, "site"],
@@ -124,33 +122,8 @@ def candidate_from_production_baseline(
         dest.write_bytes(data)
     alias_contract = validate_alias_contract(site)
 
-    # Preserve runtime-owned YouTube Static Assets exactly as Production declares them.
-    nonce = f"preflight-{int(time.time())}-{os.getpid()}"
-    manifest_raw = fetch_bytes(production_url(origin, "/youtube/v1/manifest.json", nonce), allow_404=True)
-    youtube = {"present": False, "object_count": 0, "manifest_sha256": None}
-    if manifest_raw is not None:
-        try:
-            manifest = json.loads(manifest_raw.decode("utf-8"))
-        except (UnicodeError, ValueError) as exc:
-            raise AliasReleaseGateError("Production YouTube manifest invalid") from exc
-        entries = youtube_manifest_paths(manifest)
-        youtube_root = site / "youtube/v1"
-        if youtube_root.exists():
-            shutil.rmtree(youtube_root)
-        youtube_root.mkdir(parents=True)
-        (youtube_root / "manifest.json").write_bytes(manifest_raw)
-        for entry in entries:
-            raw = fetch_bytes(production_url(origin, "/" + entry["path"], nonce))
-            assert raw is not None
-            verify_declared_bytes(raw, entry)
-            dest = site / entry["path"]
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(raw)
-        youtube = {
-            "present": True,
-            "object_count": 1 + len(entries),
-            "manifest_sha256": sha256_bytes(manifest_raw),
-        }
+    # Foreign-owner Static Assets must never be copied into holoviewer-public staging.
+    ownership = validate_frontend_candidate_ownership(site)
 
     # Preserve the currently published Alias immutable object if it is distinct and not
     # already in the accepted source baseline, so a pointer rollback remains possible.
@@ -178,6 +151,8 @@ def candidate_from_production_baseline(
             prior_dest.write_bytes(prior_raw)
         prior_alias = {"sha256": prior_sha, "asset_path": prior_path}
 
+    ownership = validate_frontend_candidate_ownership(site)
+
     # Build a temporary Wrangler config that points at the staged full site but keeps
     # all other authoritative Worker settings unchanged.
     config_raw = git_bytes(repo, expected_head, WRANGLER_CONFIG)
@@ -201,7 +176,7 @@ def candidate_from_production_baseline(
         "config": str(config_path),
         "alias": alias_contract,
         "alias_delta": alias_delta,
-        "youtube": youtube,
+        "ownership": ownership,
         "prior_alias": prior_alias,
     }
 
@@ -225,7 +200,7 @@ def verify_repo_owned_production_baseline(
         rel = path[len("site/"):]
         if rel in {"_headers", "_redirects"}:
             continue
-        if rel.startswith("youtube/v1/") or rel.startswith("data/search/aliases/v1/"):
+        if rel.startswith("youtube/v1/") or rel.startswith("ptt/v1/") or rel.startswith("data/search/aliases/v1/"):
             continue
         expected = git_bytes(repo, production_site_base_sha, path)
         actual = fetch_bytes(production_url(origin, "/" + rel, nonce))
@@ -254,27 +229,6 @@ def readback_alias(origin: str, expected_sha: str) -> bool:
         return False
     immutable = fetch_bytes(production_url(origin, expected_path, nonce))
     return immutable is not None and sha256_bytes(immutable) == expected_sha
-
-
-def readback_youtube(origin: str, staged_site: Path) -> bool:
-    manifest_path = staged_site / "youtube/v1/manifest.json"
-    if not manifest_path.is_file():
-        return True
-    nonce = f"youtube-readback-{int(time.time())}-{os.getpid()}"
-    expected_manifest = manifest_path.read_bytes()
-    remote_manifest = fetch_bytes(production_url(origin, "/youtube/v1/manifest.json", nonce))
-    if remote_manifest != expected_manifest:
-        return False
-    manifest = json.loads(expected_manifest)
-    for entry in youtube_manifest_paths(manifest):
-        remote = fetch_bytes(production_url(origin, "/" + entry["path"], nonce))
-        if remote is None:
-            return False
-        try:
-            verify_declared_bytes(remote, entry)
-        except AliasReleaseGateError:
-            return False
-    return True
 
 
 def bounded_readback(check, delays=(0, 2, 4, 8, 12)) -> int:
@@ -389,9 +343,6 @@ def main() -> int:
                 attempts[label + "_ALIAS"] = bounded_readback(
                     lambda origin=origin: readback_alias(origin, local_alias_sha)
                 )
-                attempts[label + "_YOUTUBE"] = bounded_readback(
-                    lambda origin=origin: readback_youtube(origin, staged_site)
-                )
                 attempts[label + "_REPO_BASELINE"] = bounded_readback(
                     lambda origin=origin: bool(
                         verify_repo_owned_production_baseline(
@@ -413,7 +364,7 @@ def main() -> int:
                     candidate["alias"]["latest_path"],
                     candidate["alias"]["immutable_path"],
                 ],
-                "YOUTUBE_RUNTIME_ASSETS_PRESERVED": "YES",
+                "FOREIGN_OWNER_STATIC_ASSETS_EXCLUDED": "YES",
                 "REPO_OWNED_BASELINE_PRESERVED": "YES",
                 "DUAL_ORIGIN_READBACK": "PASS",
                 "READBACK_ATTEMPTS": attempts,
