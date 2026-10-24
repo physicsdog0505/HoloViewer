@@ -168,5 +168,13 @@ class AliasStaticAssetsReleaseGateTests(unittest.TestCase):
             self.assertEqual(result["forbidden_foreign_owner_asset_count"], 0)
 
 
+    def test_runner_defines_preflight_nonce_before_alias_readback(self):
+        runner = (Path(__file__).parent / "scripts/run_alias_static_assets_release.py").read_text()
+        nonce_pos = runner.find('nonce = f"preflight-')
+        alias_readback_pos = runner.find('current_alias_raw = fetch_bytes(')
+        self.assertGreaterEqual(nonce_pos, 0)
+        self.assertGreater(alias_readback_pos, nonce_pos)
+
+
 if __name__ == "__main__":
     unittest.main()
