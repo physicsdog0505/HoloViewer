@@ -125,6 +125,7 @@ class ParityContract(unittest.TestCase):
             'id="historySearch"',
             'id="history-availability"',
             'id="history-search-summary"',
+            'id="history-search-intent"',
             'id="history-pagination"',
             'id="historyMultiSelectBar"',
             '搜尋所選月份的標題與頻道',
@@ -135,6 +136,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.history-toolbar{display:grid', css)
         self.assertIn('.history-date-nav{display:flex', css)
         self.assertIn('.history-search-field input{width:100%}', css)
+        self.assertIn('.history-search-intent{display:flex', css)
+        self.assertIn('.history-search-chip{display:inline-flex', css)
 
         for snippet in (
             "historyDate').addEventListener('change'",
@@ -148,6 +151,9 @@ class ParityContract(unittest.TestCase):
             "function parseHistorySearchQuery(raw,registry)",
             "intent:members.length>1?'member_set':members.length===1?'member':'text'",
             "function historySearchRows(items,parsed)",
+            "function renderHistorySearchIntent(parsed,rows)",
+            "已辨識多人搜尋：",
+            "優先顯示同時命中全部成員的直播",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
             "const aliasesPromise=query?loadHistoryMemberAliases():Promise.resolve(null)",
             "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
