@@ -32,7 +32,9 @@ Production deploy and rollback are Owner-local only.
 From an exact reviewed release SHA already contained in `origin/main`:
 
 ```sh
-./scripts/run_public_frontend_owner_release.sh <exact-reviewed-release-sha>
+./scripts/run_public_frontend_owner_release.sh \
+  <exact-reviewed-release-sha> \
+  <accepted-production-source-sha>
 ```
 
 Default behavior is PREPARE_ONLY. It verifies:
@@ -41,9 +43,12 @@ Default behavior is PREPARE_ONLY. It verifies:
 - release SHA contained in current `origin/main`;
 - no `site/youtube/v1/**`;
 - no `site/ptt/v1/**`;
-- frontend-owned Watchalong manifest is present;
-- Alias pointer is present when the Alias dataset directory exists;
-- Wrangler still targets `holoviewer-public` with `../site`;
+- frontend consumers point to dedicated YouTube/PTT Static Assets targets;
+- dedicated YouTube/PTT manifests are healthy;
+- every unchanged frontend-owned file from the accepted Production source matches both `holodocchi.com` and workers.dev byte-for-byte;
+- current Production Watchalong manifest/event inventory is preserved unless an exact reviewed delta changes or deletes it;
+- current Production Alias immutable object is preserved across generic frontend releases;
+- the first-run legacy foreign-owner inventory is surfaced in PREPARE evidence;
 - current active Worker version can be read.
 
 PREPARE exits with:
@@ -61,13 +66,21 @@ Only after the Owner reviews the exact PREPARE output and approves the captured 
 ```sh
 ./scripts/run_public_frontend_owner_release.sh \
   <exact-reviewed-release-sha> \
+  <accepted-production-source-sha> \
   --execute \
   --expected-active-version <approved-active-version>
 ```
 
 EXECUTE repeats all gates and refuses deployment if the active Worker version changed since approval.
 
-After a successful deploy it prints the prior active version as the rollback target. It never auto-rolls back.
+After deploy, PASS is not declared until:
+
+- every candidate frontend-owned asset is read back byte-for-byte from both `holodocchi.com` and workers.dev;
+- Watchalong/Alias candidate assets are therefore included in the dual-origin verification;
+- dedicated YouTube/PTT target health is rechecked;
+- a new active Worker version is observed.
+
+Only then does the release emit `PUBLIC_FRONTEND_RELEASE=PASS`. The prior active version is printed as the rollback target. It never auto-rolls back.
 
 ## Incident rule from #201
 
@@ -85,4 +98,4 @@ After deployment, verify at minimum:
 - dedicated YouTube and PTT targets remain independently healthy;
 - no D1/API Worker mutation occurred.
 
-The absence of foreign-owner paths in the frontend release candidate is the source-of-truth contract; dedicated data targets are not copied back into `holoviewer-public`.
+The absence of foreign-owner paths in the frontend release candidate is necessary but not sufficient. A release is accepted only after Production reconciliation before deploy and dual-origin byte readback after deploy. Dedicated data targets are never copied back into `holoviewer-public`.
