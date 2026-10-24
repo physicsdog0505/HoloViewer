@@ -202,11 +202,22 @@ function openTimeHub(){
 }
 
 function updateClientTopbar(routeName){
+ const historyDay=$('historyDate').value||historyBounds().latest;
  const label=routeName==='home'?clientTopbarDate(taipeiDay()):
-  routeName==='history'?clientTopbarDate($('historyDate').value||historyBounds().latest):'';
+  routeName==='history'?clientTopbarDate(historyDay):'';
  $('page-title').textContent=label;
- $('page-title').disabled=routeName!=='home';
- $('page-title').setAttribute('aria-label',routeName==='home'?'開啟月份行程':'目前頁面日期');
+ $('page-title').disabled=routeName!=='home'&&routeName!=='history';
+ $('page-title').dataset.topbarRoute=routeName;
+ $('page-title').classList.toggle('history-time-machine',routeName==='history');
+ $('page-title').setAttribute('aria-haspopup',routeName==='home'?'dialog':routeName==='history'?'true':'false');
+ $('page-title').setAttribute('aria-label',
+  routeName==='home'?'開啟月份行程':
+  routeName==='history'?'選擇歷史直播日期':'目前頁面日期');
+ const topDate=$('historyTopDate');
+ if(topDate){
+  topDate.max=historyBounds().latest;
+  topDate.value=historyDay;
+ }
 }
 
 
@@ -226,6 +237,7 @@ function route(r){
  const activeNav=r==='custom-session'?'single':pageId;
  document.querySelectorAll('[data-route]').forEach(el=>el.classList.toggle('active',el.dataset.route===activeNav));
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
+ document.querySelectorAll('[data-mobile-dock-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileDockRoute===activeNav));
  updateClientTopbar(r);$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
  // Canonical public routes use clean paths. Only the internal viewing session
  // keeps hash state because it carries mounted-player/session parameters.
@@ -550,12 +562,27 @@ function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={})
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
  const collab=collabMap.get(id);const collabButton=collabEntry(collab);if(collabButton)card.append(collabButton);
+ function toggleCardSelection(){
+  if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);
+  homeSelection();
+ }
  card.addEventListener('click',event=>{
   if(event.target.closest('.stream-collab-entry'))return;
   const source=event.target.closest('[data-youtube-href]');
   if(source){event.preventDefault();event.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer');return}
   event.preventDefault();if(!card.dataset.multiviewId){openStandaloneViewer([id]);return}
-  if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);homeSelection()
+  const mobileInput=window.matchMedia('(max-width:760px)').matches;
+  if(mobileInput){toggleCardSelection();return}
+  // First desktop click selects immediately. The second click of a double-click
+  // reverts that transient selection before dblclick opens the viewer.
+  toggleCardSelection();
+ });
+ card.addEventListener('dblclick',event=>{
+  if(window.matchMedia('(max-width:760px)').matches)return;
+  if(event.target.closest('.stream-collab-entry,[data-youtube-href]'))return;
+  event.preventDefault();
+  toggleCardSelection();
+  location.href=href;
  });
  card.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open(event.target.dataset.youtubeHref,'_blank','noopener,noreferrer')}});
  container.append(card);
@@ -806,7 +833,18 @@ async function loadHome(){
  }
  finally{homeLoadInFlight=false}
 }
-$('page-title').onclick=openTimeHub;
+$('page-title').onclick=()=>{
+ const routeName=$('page-title').dataset.topbarRoute||'';
+ if(routeName==='home'){openTimeHub();return}
+ if(routeName!=='history')return;
+ const picker=$('historyTopDate');
+ picker.max=historyBounds().latest;
+ picker.value=$('historyDate').value||historyBounds().latest;
+ if(typeof picker.showPicker==='function')picker.showPicker();else picker.click();
+};
+$('historyTopDate').addEventListener('change',event=>{
+ if(historyDateValid(event.target.value))historySetDay(event.target.value);
+});
 $('timeHubClose').onclick=()=>$('timeHub').close();
 $('timeHubToday').onclick=()=>{timeHubMonth=taipeiDay().slice(0,7);timeHubSelected=taipeiDay();renderTimeHub()};
 $('timeHubPrev').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,-1);if(!timeHubSelected.startsWith(timeHubMonth))timeHubSelected=timeHubMonth+'-01';renderTimeHub()};
@@ -876,11 +914,9 @@ function historyPublishedMonths(manifest){
  return [...new Set((manifest?.availability?.published_months||[]).filter(month=>/^\d{4}-\d{2}$/.test(String(month))))].sort();
 }
 function applyHistoryAvailability(manifest,day){
- const input=$('historyDate'),month=String(day||'').slice(0,7),published=historyPublishedMonths(manifest);
+ const input=$('historyDate'),published=historyPublishedMonths(manifest);
  if(published.length)input.min=published[0]+'-01';else input.removeAttribute('min');
  input.max=historyBounds().latest;
- const state=youtubeHistoryMonthState(manifest,month);
- $('history-availability').textContent=state==='published'?month+' 已發布':state==='known_not_published'?month+' 歷史資料尚未發布':published.length?'已發布月份：'+published[0]+' ～ '+published[published.length-1]:'目前沒有已發布的歷史月份';
 }
 async function loadYoutubeHistoryMonth(day){
  const month=String(day||'').slice(0,7);
@@ -1140,7 +1176,7 @@ function historyChrome(){
  $('historyNextDay').disabled=!historyDateValid(next);
  $('historyYesterday').disabled=selected===b.latest;
  const query=historyQuery();
- $('history-heading').textContent=query?selected.slice(0,7).replace('-','/')+' 搜尋結果':selected.replaceAll('-','/');
+ $('history-heading').textContent=query?'搜尋結果':'';
  if($('history').classList.contains('active'))updateClientTopbar('history');
 }
 function historySetDay(day){
@@ -1200,7 +1236,6 @@ async function loadHistory(){
   const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',$('historySearch').value.trim());
   if($('history').classList.contains('active'))history.replaceState(null,'','/history?'+params.toString());
  }catch(e){
-  $('history-availability').textContent='';
   $('history-search-summary').textContent='';
   error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false
  }
@@ -1853,7 +1888,9 @@ function navigateSidebarLink(event,destination){
  // Keep keyboard focus for accessible navigation and rail expansion.
  if(event.detail>0)event.currentTarget.blur();
 }
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.route)));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileRoute)));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,'home')));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};{
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.route)));
+document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileRoute)));
+document.querySelectorAll('[data-mobile-dock-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileDockRoute)));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,'home')));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};{
  const params=new URLSearchParams(location.search);
  const requested=params.get('date');
  $('historyDate').value=historyDateValid(requested)?requested:historyBounds().latest;
