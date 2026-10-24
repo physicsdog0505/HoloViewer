@@ -80,7 +80,7 @@ let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;
 // stays sidebar for both Carousel and Lock so PTT never changes containers/rows.
 workspaceLayout='sidebar';
 let secondaryOffset=0;
-const mobileViewerMedia=window.matchMedia('(max-width:760px)');
+const mobileViewerMedia=window.matchMedia('(max-width:760px), (max-width:900px) and (orientation:landscape)');
 let pttFollowing=true;
 let pttLoaded=false;
 let pttLayoutRepinTimer=null;
