@@ -817,6 +817,7 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
   body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
   .client-main{padding-bottom:calc(86px + env(safe-area-inset-bottom))}
   .client-rail{display:none!important}
+  .mobile-nav-button,.mobile-nav{display:none!important}
   .mobile-bottom-dock{
     position:fixed;
     left:24px;
