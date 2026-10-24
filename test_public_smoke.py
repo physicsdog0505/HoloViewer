@@ -205,6 +205,9 @@ class PublicSmokeTests(unittest.TestCase):
 
         self.assertIn("Mobile Shell V1", shared)
         self.assertIn("grid-template-columns:repeat(4,minmax(0,1fr))", shared)
+        self.assertIn(".rail-label{display:none!important}", shared)
+        self.assertIn('.rail-nav a[href="/collab"] .rail-icon', shared)
+        self.assertIn('.rail-nav a[href="/"] .rail-icon::after', shared)
         self.assertIn('.rail-nav a[data-route="watchalong"]', shared)
         self.assertIn('.rail-nav a[data-route="single"]', shared)
         self.assertIn('content:"⌂"', shared)
@@ -221,6 +224,16 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".viewer-stage .player-card.mobile-primary", viewer_css)
         self.assertIn(".viewer-stage .player-card.mobile-secondary", viewer_css)
         self.assertIn(".mobile-secondary-pager", viewer_css)
+    def test_mobile_ptt_reader_v1_contract(self):
+        css = (ROOT / "site/assets/ptt-today.css").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/ptt-today.js").read_text(encoding="utf-8")
+        self.assertIn("height:calc(100dvh - 58px)", css)
+        self.assertIn(".page-head,.ptt-toolbar{display:none!important}", css)
+        self.assertIn("-webkit-overflow-scrolling:touch", css)
+        self.assertIn("body{padding-bottom:0!important}", css)
+        self.assertIn("const pttMobileMedia=window.matchMedia('(max-width:760px)');", js)
+        self.assertIn("if(pttMobileMedia.matches)show=true;", js)
+
 
     def test_standalone_watchalong_contract(self):
         html = (ROOT / "site/watchalong-viewer/index.html").read_text(encoding="utf-8")
