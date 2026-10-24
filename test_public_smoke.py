@@ -227,7 +227,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".viewer-stage .player-card.mobile-secondary", viewer_css)
         self.assertIn(".mobile-secondary-pager", viewer_css)
         self.assertIn("max-width:342px", app_css)
-        self.assertIn("grid-template-columns:repeat(4,1fr)", app_css)
+        self.assertIn("grid-template-columns:repeat(4,minmax(0,1fr))", app_css)
         self.assertIn("bottom:calc(70px + env(safe-area-inset-bottom))", app_css)
         self.assertIn("#history .history-date-nav{display:none!important}", app_css)
         self.assertIn(".history-top-date-native", app_css)
