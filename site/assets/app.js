@@ -1018,24 +1018,42 @@ function historyAliasIndex(registry,strength){
 function parseHistorySearchQuery(raw,registry){
  const terms=normalizeHistorySearchText(raw).split(' ').filter(Boolean);
  const strong=historyAliasIndex(registry,'strong'),weak=historyAliasIndex(registry,'weak');
- const members=[],memberIds=new Set(),consumed=new Set();
- const accept=(member,index)=>{
+ const members=[],memberIds=new Set(),consumed=new Set(),weakHints=[];
+ const acceptStrong=(member,indexes)=>{
   const id=String(member?.channel_id||'');if(!id||memberIds.has(id))return;
-  members.push(member);memberIds.add(id);consumed.add(index);
+  members.push(member);memberIds.add(id);indexes.forEach(index=>consumed.add(index));
  };
- terms.forEach((term,index)=>{
-  const matches=strong.get(term)||[];
-  if(matches.length===1)accept(matches[0],index);
- });
- if(members.length){
-  terms.forEach((term,index)=>{
-   if(consumed.has(index))return;
-   const matches=weak.get(term)||[];
-   if(matches.length===1)accept(matches[0],index);
-  });
+ const aliases=[...strong.entries()]
+  .map(([alias,matches])=>({alias,matches,tokens:historyAliasTokens(alias)}))
+  .filter(row=>row.matches.length===1&&row.tokens.length)
+  .sort((a,b)=>b.tokens.length-a.tokens.length||b.alias.length-a.alias.length);
+ for(let start=0;start<terms.length;start++){
+  if(consumed.has(start))continue;
+  for(const row of aliases){
+   const end=start+row.tokens.length;
+   if(end>terms.length)continue;
+   const indexes=Array.from({length:row.tokens.length},(_,offset)=>start+offset);
+   if(indexes.some(index=>consumed.has(index)))continue;
+   if(indexes.every((index,offset)=>terms[index]===row.tokens[offset])){
+    acceptStrong(row.matches[0],indexes);
+    break;
+   }
+  }
+ }
+ for(let index=0;index<terms.length;index++){
+  if(consumed.has(index))continue;
+  const matches=weak.get(terms[index])||[];
+  if(matches.length===1)weakHints.push({term:terms[index],member:matches[0]});
  }
  const keywords=terms.filter((_,index)=>!consumed.has(index));
- return {raw:String(raw||''),members,memberIds,keywords,intent:members.length>1?'member_set':members.length===1?'member':'text'};
+ return {
+  raw:String(raw||''),
+  members,
+  memberIds,
+  weakHints,
+  keywords,
+  intent:members.length?'member':'text'
+ };
 }
 function historyMemberAliases(member){
  return (member?.aliases||[]).filter(alias=>alias?.enabled!==false&&alias?.strength==='strong').map(alias=>alias.value);
@@ -1081,7 +1099,7 @@ function renderHistorySearchIntent(parsed,rows){
  if(!parsed?.raw||!parsed.members.length){box.hidden=true;return}
  const label=document.createElement('span');
  label.className='history-search-intent-label';
- label.textContent=parsed.intent==='member_set'?'已辨識多人搜尋：':'已辨識成員：';
+ label.textContent='已辨識成員：';
  box.append(label);
  for(const member of parsed.members){
   const chip=document.createElement('span');
@@ -1097,10 +1115,10 @@ function renderHistorySearchIntent(parsed,rows){
  }
  const note=document.createElement('span');
  note.className='history-search-intent-note';
- if(parsed.intent==='member_set'){
+ if(parsed.members.length>1){
   const full=rows.filter(row=>row.score.allMembers).length;
   const partial=rows.length-full;
-  note.textContent='優先顯示同時命中全部成員的直播'+(partial?'，其後列出部分命中 '+partial+' 筆':'');
+  note.textContent='優先顯示同時相關的結果'+(partial?'，其後列出個別相關 '+partial+' 筆':'');
  }else{
   note.textContent='已套用粉絲暱稱／別名對照';
  }
