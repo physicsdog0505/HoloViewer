@@ -914,11 +914,9 @@ function historyPublishedMonths(manifest){
  return [...new Set((manifest?.availability?.published_months||[]).filter(month=>/^\d{4}-\d{2}$/.test(String(month))))].sort();
 }
 function applyHistoryAvailability(manifest,day){
- const input=$('historyDate'),month=String(day||'').slice(0,7),published=historyPublishedMonths(manifest);
+ const input=$('historyDate'),published=historyPublishedMonths(manifest);
  if(published.length)input.min=published[0]+'-01';else input.removeAttribute('min');
  input.max=historyBounds().latest;
- const state=youtubeHistoryMonthState(manifest,month);
- $('history-availability').textContent=state==='published'?month+' 已發布':state==='known_not_published'?month+' 歷史資料尚未發布':published.length?'已發布月份：'+published[0]+' ～ '+published[published.length-1]:'目前沒有已發布的歷史月份';
 }
 async function loadYoutubeHistoryMonth(day){
  const month=String(day||'').slice(0,7);
@@ -1238,7 +1236,6 @@ async function loadHistory(){
   const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',$('historySearch').value.trim());
   if($('history').classList.contains('active'))history.replaceState(null,'','/history?'+params.toString());
  }catch(e){
-  $('history-availability').textContent='';
   $('history-search-summary').textContent='';
   error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false
  }
