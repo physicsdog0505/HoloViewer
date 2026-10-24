@@ -149,11 +149,11 @@ class ParityContract(unittest.TestCase):
             "async function loadYoutubeHistorySearchMonth(day)",
             "const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json'",
             "function parseHistorySearchQuery(raw,registry)",
-            "intent:members.length>1?'member_set':members.length===1?'member':'text'",
+            "intent:members.length?'member':'text'",
             "function historySearchRows(items,parsed)",
             "function renderHistorySearchIntent(parsed,rows)",
-            "已辨識多人搜尋：",
-            "優先顯示同時命中全部成員的直播",
+            "label.textContent='已辨識成員：'",
+            "優先顯示同時相關的結果",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
             "const aliasesPromise=query?loadHistoryMemberAliases():Promise.resolve(null)",
             "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
@@ -162,6 +162,8 @@ class ParityContract(unittest.TestCase):
         ):
             self.assertIn(snippet, js)
 
+        self.assertNotIn("已辨識多人搜尋：", js)
+        self.assertNotIn("member_set", js[js.index("function parseHistorySearchQuery"):js.index("function historyMemberAliases")])
         self.assertNotIn("shiftDay(today,-30)", js[js.index("function historyBounds()"):js.index("const YOUTUBE_HISTORY_MANIFEST_PATH")])
 
     def test_history_prefers_youtube_static_manifest_month_read_path(self):
