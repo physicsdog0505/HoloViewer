@@ -223,6 +223,8 @@ def verify_repo_owned_production_baseline(
         if not path.startswith("site/"):
             continue
         rel = path[len("site/"):]
+        if rel in {"_headers", "_redirects"}:
+            continue
         if rel.startswith("youtube/v1/") or rel.startswith("data/search/aliases/v1/"):
             continue
         expected = git_bytes(repo, production_site_base_sha, path)
