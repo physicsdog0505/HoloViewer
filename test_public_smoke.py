@@ -214,7 +214,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn('mask-size:24px 24px', shared)
         self.assertIn('.rail-nav a[data-route="watchalong"]', shared)
         self.assertIn('.rail-nav a[data-route="single"]', shared)
-        self.assertIn('content:"⌂"', shared)
+        self.assertIn('class="mobile-bottom-dock"', (ROOT / "site/ptt-today/index.html").read_text(encoding="utf-8"))
+        self.assertIn('.mobile-bottom-dock svg', shared)
         self.assertIn('.feature-card[href="/watchalong"]', app_css)
 
         self.assertIn("const mobileViewerMedia=window.matchMedia('(max-width:760px), (max-width:900px) and (orientation:landscape)');", viewer_js)
