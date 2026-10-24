@@ -875,16 +875,17 @@ function youtubeHistoryMonthEntry(manifest,month){
 async function loadYoutubeHistoryMonth(day){
  const month=String(day||'').slice(0,7);
  if(!/^\d{4}-\d{2}$/.test(month))throw new Error('YouTube 歷史月份不合法');
- if(youtubeHistoryMonthCache.has(month))return youtubeHistoryMonthCache.get(month);
  const manifest=await loadYoutubeHistoryManifest();
  const monthState=youtubeHistoryMonthState(manifest,month).toLowerCase();
  if(monthState&&monthState!=='published'&&monthState!=='available')throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開');
  const entry=youtubeHistoryMonthEntry(manifest,month);
  if(!entry)throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開');
+ const cacheKey=String(entry.path||'');
+ if(youtubeHistoryMonthCache.has(cacheKey))return youtubeHistoryMonthCache.get(cacheKey);
  const payload=await fetchYoutubeStaticJson(entry.path);
  if(payload?.schema_version!==1||!Array.isArray(payload.videos))throw new Error('YouTube 歷史月份格式錯誤');
  if(payload.month&&payload.month!==month)throw new Error('YouTube 歷史月份識別不一致');
- youtubeHistoryMonthCache.set(month,payload);
+ youtubeHistoryMonthCache.set(cacheKey,payload);
  return payload;
 }
 function youtubeHistoryVideoStart(row){
