@@ -182,3 +182,33 @@ button,input,select{font:inherit}
     text-align:center!important;
   }
 }
+
+
+/* Keep standalone mobile topbar aligned with the SPA shell. */
+@media(max-width:760px){
+  .client-topbar{
+    height:58px;
+    margin-left:0;
+    padding-left:20px!important;
+    padding-right:20px!important;
+    justify-content:space-between!important;
+    align-items:center!important;
+    gap:16px!important;
+  }
+  .mobile-top-brand{
+    display:block!important;
+    margin-left:0!important;
+    color:var(--brand-main);
+    font-size:18px!important;
+    font-weight:900!important;
+    letter-spacing:-.02em!important;
+    line-height:1!important;
+  }
+  .top-status{
+    margin-left:auto!important;
+    font-size:14px!important;
+    line-height:1!important;
+    text-align:right!important;
+    white-space:nowrap!important;
+  }
+}
