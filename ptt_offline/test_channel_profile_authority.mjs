@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 
 import {readChannelProfile,readChannelProfiles,neutralChannelProfile} from './worker_host/today/channel-profile.mjs';
 import {upsertChannelProfiles} from './worker_host/today/channel-profile-write.mjs';
-import {handleChannelProfileRead} from './worker_host/today/channel-profile-read.mjs';
+import {handleChannelProfileRead,handleChannelProfilesBatchRead} from './worker_host/today/channel-profile-read.mjs';
 import {handleVideoMetadataRead} from './worker_host/today/video-metadata-read.mjs';
 import {handleExperienceRead} from './worker_host/today/experience-read.mjs';
 
@@ -278,5 +278,40 @@ test('Watchalong unknown video keeps channel_id null and neutral profile instead
  assert.equal(body.event.hosts[0].channel_id,null);
  assert.equal(body.event.hosts[0].channel.support_mode,'neutral');
  assert.equal(body.event.hosts[0].channel.avatar_url,null);
+ db.close();
+});
+
+
+test('batch profile API returns requested profiles through one bounded resolver call',async()=>{
+ const base=sqliteD1();
+ await upsertChannelProfiles(base,[profile()]);
+ let queries=0;
+ const counted={
+  ...base,
+  prepare(sql){queries++;return base.prepare(sql)}
+ };
+ const other='UC'+'B'.repeat(22);
+ const req=new Request('https://api.example/v1/channels/profiles?id='+CHANNEL+'&id='+other);
+ const res=await handleChannelProfilesBatchRead(req,{DB:counted});
+ const body=await res.json();
+ assert.equal(res.status,200);
+ assert.equal(body.schema_version,'holoviewer-channel-profiles-v1');
+ assert.deepEqual(body.profiles.map(x=>x.channel_id),[CHANNEL,other]);
+ assert.equal(queries,7,'batch endpoint must use one bounded seven-source resolver pass');
+ base.close();
+});
+
+test('batch profile API validates count and channel ids fail-closed',async()=>{
+ const db=sqliteD1();
+ let res=await handleChannelProfilesBatchRead(new Request('https://api.example/v1/channels/profiles'),{DB:db});
+ assert.equal(res.status,400);
+ assert.equal((await res.json()).error,'channel_ids_required');
+ res=await handleChannelProfilesBatchRead(new Request('https://api.example/v1/channels/profiles?id=not-a-channel'),{DB:db});
+ assert.equal(res.status,400);
+ assert.equal((await res.json()).error,'invalid_channel_id');
+ const ids=Array.from({length:101},(_,i)=>'UC'+(i.toString(36).toUpperCase()+'A'.repeat(22)).slice(0,22));
+ res=await handleChannelProfilesBatchRead(new Request('https://api.example/v1/channels/profiles?'+ids.map(id=>'id='+id).join('&')),{DB:db});
+ assert.equal(res.status,400);
+ assert.equal((await res.json()).error,'too_many_channel_ids');
  db.close();
 });
