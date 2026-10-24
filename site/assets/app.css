@@ -635,12 +635,12 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
   }
   .client-rail:hover,.client-rail:focus-within{width:auto;box-shadow:0 10px 30px rgba(52,44,36,.14)}
   .rail-brand{display:none}
-  .rail-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;height:100%}
+  .rail-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;height:100%}
   .rail-nav a{
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
     height:50px;min-width:0;padding:2px;border-radius:13px;color:var(--muted)
   }
-  .rail-nav a[data-route="watchalong"],.rail-nav a[href="/watchalong"]{display:none}
+  .rail-nav a[data-route="watchalong"],.rail-nav a[href="/watchalong"],.rail-nav a[data-route="single"],.rail-nav a[href="/custom-view"]{display:none}
   .rail-icon{width:auto;min-width:0;height:27px;display:grid;place-items:center;font-size:14px;line-height:1}
   .rail-label{opacity:1;transform:none;font-size:9px;line-height:1.05;font-weight:750;max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .rail-nav a[data-route="home"] .rail-icon{font-size:0}
