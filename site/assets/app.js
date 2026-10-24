@@ -983,7 +983,7 @@ async function loadHistoryData(day,offset=0){
 const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json';
 let historyMemberAliasesPromise=null;
 function normalizeHistorySearchText(value){
- return String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/[^\\p{L}\\p{N}]+/gu,' ').trim().replace(/\\s+/g,' ');
+ return String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
 }
 function historyQuery(){return String($('historySearch')?.value||'').trim()}
 async function loadHistoryMemberAliases(){
@@ -998,7 +998,7 @@ function historyAliasTokens(value){return normalizeHistorySearchText(value).spli
 function historyAliasMatchesText(text,alias){
  const normalizedText=normalizeHistorySearchText(text),normalizedAlias=normalizeHistorySearchText(alias);
  if(!normalizedAlias)return false;
- if(/[\\u3040-\\u30ff\\u3400-\\u9fff]/u.test(normalizedAlias))return normalizedText.replace(/ /g,'').includes(normalizedAlias.replace(/ /g,''));
+ if(/[\u3040-\u30ff\u3400-\u9fff]/u.test(normalizedAlias))return normalizedText.replace(/ /g,'').includes(normalizedAlias.replace(/ /g,''));
  const aliasTokens=historyAliasTokens(normalizedAlias),textTokens=new Set(historyAliasTokens(normalizedText));
  return aliasTokens.length===1?textTokens.has(aliasTokens[0]):normalizedText.includes(normalizedAlias);
 }
