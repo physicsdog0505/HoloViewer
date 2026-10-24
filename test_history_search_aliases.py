@@ -145,7 +145,7 @@ console.log(JSON.stringify({{
             parsed["weakHints"],
             [{"term": "公主", "member": "姫森ルーナ"}],
         )
-        self.assertEqual(parsed["keywords"], ["公主"])
+        self.assertEqual(parsed["keywords"], [])
 
     def test_multi_member_query_is_relevance_not_collab_intent(self):
         parsed = self.parse_query("roboco choco")
