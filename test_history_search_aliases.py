@@ -149,6 +149,13 @@ console.log(JSON.stringify({{
         self.assertEqual(parsed["keywords"], ["roboco", "minecraft"])
         self.assertEqual(parsed["intent"], "text")
 
+    def test_unicode_regexes_are_not_double_escaped(self):
+        js = APP_JS.read_text(encoding="utf-8")
+        self.assertIn(r"/[^\p{L}\p{N}]+/gu", js)
+        self.assertIn(r"/[\u3040-\u30ff\u3400-\u9fff]/u", js)
+        self.assertNotIn(r"/[^\\p{L}\\p{N}]+/gu", js)
+        self.assertNotIn(r"/[\\u3040-\\u30ff\\u3400-\\u9fff]/u", js)
+
 
 if __name__ == "__main__":
     unittest.main()
