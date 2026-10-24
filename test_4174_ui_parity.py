@@ -111,28 +111,47 @@ class ParityContract(unittest.TestCase):
         # Display fallback is metadata-only; lifecycle still comes from /v1/history.
         self.assertNotIn("scheduled_start",history.split("historyDisplayRow",1)[0].split("lifecycle_state",1)[-1])
 
-    def test_history_matches_accepted_4174_date_and_paging_contract(self):
+    def test_history_uses_direct_date_navigation_and_month_search(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
-        for snippet in ('id="history-picker"', 'id="historyDate"', 'id="history-shortcuts"',
-                        'id="history-pagination"', 'id="historyMultiSelectBar"',
-                        '依直播開始日期瀏覽最近 30 天的已結束影片。'):
+
+        for snippet in (
+            'id="history-picker"',
+            'id="historyDate"',
+            'id="historyPrevDay"',
+            'id="historyNextDay"',
+            'id="historyYesterday"',
+            'id="historySearch"',
+            'id="history-availability"',
+            'id="history-search-summary"',
+            'id="history-pagination"',
+            'id="historyMultiSelectBar"',
+            '搜尋所選月份的標題與頻道',
+        ):
             self.assertIn(snippet, html)
-        for snippet in ('shiftDay(today,-30)', 'shiftDay(today,-1)', 'limit=50&offset=',
-                        "['昨天',b.latest]", "['前天',shiftDay(b.latest,-1)]",
-                        "['7 天前',shiftDay(b.latest,-6)]", "['← 前一天',shiftDay(selected,-1)]",
-                        "['後一天 →',shiftDay(selected,1)]"):
+
+        self.assertNotIn('type="submit">查看</button>', html[html.index('id="history"'):html.index('id="ptt"')])
+        self.assertIn('.history-toolbar{display:grid', css)
+        self.assertIn('.history-date-nav{display:flex', css)
+        self.assertIn('.history-search-field input{width:100%}', css)
+
+        for snippet in (
+            "historyDate').addEventListener('change'",
+            "historyPrevDay').onclick=()=>historySetDay",
+            "historyNextDay').onclick=()=>historySetDay",
+            "historyYesterday').onclick=()=>historySetDay(historyBounds().latest)",
+            "historySearch').addEventListener('input'",
+            "setTimeout(()=>{state.offset=0;loadHistory()},180)",
+            "async function loadYoutubeHistorySearchMonth(day)",
+            "historyMatchesQuery(item,query)",
+            "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
+            "params.set('date',day)",
+            "params.set('q',$('historySearch').value.trim())",
+        ):
             self.assertIn(snippet, js)
-        self.assertIn('.history-picker,.history-shortcuts', css)
-        self.assertIn("api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0')", js)
-        self.assertIn("const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map()", js)
-        self.assertIn("const endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel))", js)
-        self.assertIn("endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}))", js)
-        self.assertIn("if(!history)overlay.append(node('span',status[0],'thumb-badge '+status[1]))", js)
-        self.assertIn("if(history&&String(item.lifecycle_state||item.state||'').toLowerCase()!=='ended')return", js)
-        self.assertNotIn('id="history-prev"', html)
-        self.assertNotIn('id="history-next"', html)
+
+        self.assertNotIn("shiftDay(today,-30)", js[js.index("function historyBounds()"):js.index("const YOUTUBE_HISTORY_MANIFEST_PATH")])
 
     def test_history_prefers_youtube_static_manifest_month_read_path(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
@@ -150,7 +169,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("function youtubeHistoryPayloadMonthsForDay(day)", js)
         self.assertIn("String(day||'').slice(8,10)!=='01'", js)
         self.assertIn("const previous=shiftDay(day,-1).slice(0,7)", js)
-        self.assertIn("payloads.flatMap(payload=>payload.videos)", js)
+        self.assertIn("youtubeHistoryPayloadsForTaipeiMonth", js)
         self.assertIn("const liveArchive=row.is_live===true||Number(row.is_live)===1", js)
         self.assertIn("if(!liveArchive||!Number.isFinite(Date.parse(start))||!Number.isFinite(Date.parse(end))||Date.parse(end)<=Date.parse(start))return null", js)
         self.assertIn("if(availability==='private'||availability==='unavailable')return null", js)
@@ -159,6 +178,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("data.source==='legacy-api'&&data.static_error", js)
         self.assertIn("staticError?.code==='HISTORY_STATIC_UNAVAILABLE'", js)
         self.assertIn("throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開')", js)
+        self.assertIn("published_months", js)
+        self.assertIn("known_not_published", js)
         self.assertNotIn("/objects/", js[js.index("const YOUTUBE_HISTORY_MANIFEST_PATH"):js.index("function historyChrome(){")])
 
     def test_custom_builder_matches_accepted_4174_controls(self):
