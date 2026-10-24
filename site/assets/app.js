@@ -875,16 +875,17 @@ function youtubeHistoryMonthEntry(manifest,month){
 async function loadYoutubeHistoryMonth(day){
  const month=String(day||'').slice(0,7);
  if(!/^\d{4}-\d{2}$/.test(month))throw new Error('YouTube 歷史月份不合法');
- if(youtubeHistoryMonthCache.has(month))return youtubeHistoryMonthCache.get(month);
  const manifest=await loadYoutubeHistoryManifest();
  const monthState=youtubeHistoryMonthState(manifest,month).toLowerCase();
  if(monthState&&monthState!=='published'&&monthState!=='available')throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開');
  const entry=youtubeHistoryMonthEntry(manifest,month);
  if(!entry)throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開');
+ const cacheKey=String(entry.path||'');
+ if(youtubeHistoryMonthCache.has(cacheKey))return youtubeHistoryMonthCache.get(cacheKey);
  const payload=await fetchYoutubeStaticJson(entry.path);
  if(payload?.schema_version!==1||!Array.isArray(payload.videos))throw new Error('YouTube 歷史月份格式錯誤');
  if(payload.month&&payload.month!==month)throw new Error('YouTube 歷史月份識別不一致');
- youtubeHistoryMonthCache.set(month,payload);
+ youtubeHistoryMonthCache.set(cacheKey,payload);
  return payload;
 }
 function youtubeHistoryVideoStart(row){
@@ -902,6 +903,12 @@ function normalizeYoutubeHistoryVideo(row){
  if(!row||typeof row!=='object')return null;
  const videoId=String(row.video_id||'');
  if(!/^[A-Za-z0-9_-]{11}$/.test(videoId))return null;
+ const liveArchive=row.is_live===true||Number(row.is_live)===1;
+ const start=String(row.actual_start||'');
+ const end=String(row.actual_end||'');
+ const availability=String(row.availability||'unknown').toLowerCase();
+ if(!liveArchive||!Number.isFinite(Date.parse(start))||!Number.isFinite(Date.parse(end))||Date.parse(end)<=Date.parse(start))return null;
+ if(availability==='private'||availability==='unavailable')return null;
  return {
   ...row,
   video_id:videoId,
@@ -915,12 +922,28 @@ function normalizeYoutubeHistoryVideo(row){
   lifecycle_state:'ended'
  };
 }
+function youtubeHistoryPayloadMonthsForDay(day){
+ const selected=String(day||'').slice(0,7);
+ if(!/^\d{4}-\d{2}$/.test(selected))return [];
+ if(String(day||'').slice(8,10)!=='01')return [selected];
+ const previous=shiftDay(day,-1).slice(0,7);
+ return previous===selected?[selected]:[previous,selected];
+}
 async function loadYoutubeHistoryDay(day,offset=0,limit=50){
- const payload=await loadYoutubeHistoryMonth(day);
- const rows=payload.videos
+ const months=youtubeHistoryPayloadMonthsForDay(day);
+ const payloads=[];
+ for(const month of months){
+  try{payloads.push(await loadYoutubeHistoryMonth(month+'-01'))}
+  catch(error){
+   if(month!==String(day).slice(0,7)&&error?.code==='HISTORY_STATIC_UNAVAILABLE')continue;
+   throw error;
+  }
+ }
+ const seen=new Set();
+ const rows=payloads.flatMap(payload=>payload.videos)
   .filter(row=>youtubeHistoryTaipeiDay(row)===day)
   .map(normalizeYoutubeHistoryVideo)
-  .filter(Boolean)
+  .filter(row=>row&&!seen.has(row.video_id)&&seen.add(row.video_id))
   .sort((a,b)=>Date.parse(String(b.actual_start||b.scheduled_start||0))-Date.parse(String(a.actual_start||a.scheduled_start||0))||String(b.video_id).localeCompare(String(a.video_id)));
  const page=rows.slice(offset,offset+limit);
  return {items:page,total:rows.length,has_more:offset+page.length<rows.length,source:'youtube-static'};
