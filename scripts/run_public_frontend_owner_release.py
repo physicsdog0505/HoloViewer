@@ -229,7 +229,14 @@ def reconcile_runtime(repo: Path, base: str, head: str) -> dict:
         try:
             pointer = json.loads(alias_raw)
         except ValueError as exc:
-            raise ReleaseBlocked("Production Alias latest invalid") from exc
+            # Static Assets SPA fallback returns index.html with HTTP 200 for a missing path.
+            if alias_raw.lstrip().lower().startswith(b"<!doctype html"):
+                pointer = None
+                alias_raw = None
+            else:
+                raise ReleaseBlocked("Production Alias latest invalid") from exc
+        if pointer is None:
+            return {"protected_runtime_assets": sorted(set(protected)), "status": "PASS"}
         immutable_rel = str(pointer.get("asset_path") or "").lstrip("/")
         if not immutable_rel.startswith("data/search/aliases/v1/versions/"):
             raise ReleaseBlocked("Production Alias immutable path invalid")
@@ -268,9 +275,13 @@ def enumerate_first_run_foreign(repo: Path) -> dict:
                     for x in v:
                         walk(x)
                 elif isinstance(v, str):
+                    if v.startswith("http://") or v.startswith("https://"):
+                        return
                     p = "/" + v.lstrip("/")
                     if p.startswith("/youtube/v1/"):
                         paths["youtube"].append(p)
+                    elif p.endswith(".json"):
+                        paths["youtube"].append("/youtube/v1/" + p.lstrip("/"))
             walk(obj)
         except ValueError:
             raise ReleaseBlocked("legacy frontend YouTube manifest is not JSON")
