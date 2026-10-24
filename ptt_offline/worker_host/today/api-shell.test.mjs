@@ -10,6 +10,22 @@ const env={DB:null,ALLOWED_ORIGIN:ORIGIN};
 const db={prepare(sql){if(sql.includes('catalog_meta'))return {first:async()=>null};
  if(sql.includes('public_today_canonical'))return {bind(){return {all:async()=>({results:[]})}}};
  if(sql.includes('public_history'))return {bind(){return {all:async()=>({results:[]})}}};
+ if(sql.includes('public_collab_projection_meta'))return {
+  bind(key){
+   return {
+    first:async()=>key==='live'?{
+     projection_key:'live',source_revision:'sha256:'+'a'.repeat(64),
+     published_at:'2026-10-22T17:00:00Z',range_start:'2026-10-21T16:00:00Z',
+     range_end:'2026-10-22T16:00:00Z',source_event_count:0,effective_event_count:0
+    }:null
+   };
+  }
+ };
+ if(sql.includes('COUNT(*) AS n FROM public_collab_events'))return {bind(){return {first:async()=>({n:0})}}};
+ if(sql.includes('FROM public_collab_events'))return {
+  bind(){return {all:async()=>({results:[]}),first:async()=>null}},
+  all:async()=>({results:[]})
+ };
  throw Error('unexpected SELECT');}};
 function req(path,method='GET',origin=ORIGIN){return new Request('https://api.example'+path,{method,headers:{origin}});}
 test('known origin gets CORS, OPTIONS and GET gate',async()=>{
