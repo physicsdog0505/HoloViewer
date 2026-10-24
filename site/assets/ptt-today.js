@@ -44,12 +44,17 @@ async function api(path){
  }
  return response.json();
 }
-async function loadPttTodayPayload(today){
+async function loadPttRecentPayload(today){
  try{
-  return await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
+  return await api('/v1/ptt/recent?limit=1000');
  }catch(error){
-  if(![400,413,422].includes(Number(error?.status)))throw error;
-  return api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+  if(![404,405,501].includes(Number(error?.status)))throw error;
+  try{
+   return await api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=1000');
+  }catch(fallbackError){
+   if(![400,413,422].includes(Number(fallbackError?.status)))throw fallbackError;
+   return api('/v1/ptt/today?day='+encodeURIComponent(today)+'&limit=300');
+  }
  }
 }
 function pushKey(row){return String(row.push_id||String(row.aid||'')+':'+String(row.source_line||''))}
@@ -110,7 +115,7 @@ async function loadPtt(){
  updateTopbarDate();
  const meta=$('ptt-today-meta'),list=$('ptt-list'),empty=$('ptt-empty'),latest=$('ptt-newest');
  if(pttLastGoodDay&&pttLastGoodDay!==today){
-  pttLastGoodCount=0;pttLastGoodDay='';list.replaceChildren();list.hidden=true;latest.hidden=true;pttFollowing=true;
+  pttLastGoodDay=today;
  }
  if(!pttLastGoodCount){
   meta.textContent=today.replaceAll('-','/')+' · 讀取中 · 純 PTT 閱讀';
@@ -123,7 +128,7 @@ async function loadPtt(){
  }
  pttLoadInFlight=true;
  try{
-  const data=await loadPttTodayPayload(today);
+  const data=await loadPttRecentPayload(today);
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
   const rows=data.pushes.filter(row=>row&&typeof row.content==='string');
   const wasEmpty=!pttLastGoodCount;
