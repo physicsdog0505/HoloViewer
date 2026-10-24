@@ -93,11 +93,17 @@ class ParityContract(unittest.TestCase):
         self.assertIn("if(key==='unknown')",render)
         self.assertIn("$('home-unknown-section').hidden=true",render)
 
-    def test_history_cards_reuse_home_display_metadata_and_actual_start(self):
+    def test_history_cards_use_canonical_profile_api_with_catalog_fallback(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn("item?.start_at||item?.actual_start||item?.scheduled_start",js)
         self.assertIn("'yt3.googleusercontent.com'",js)
         self.assertIn('function homeDisplayMetadataByChannel(rows)',js)
+        self.assertIn('function normalizeHistoryChannelProfile(profile)',js)
+        self.assertIn('async function loadHistoryChannelProfile(channelId)',js)
+        self.assertIn("api('/v1/channels/'+encodeURIComponent(id)+'/profile')",js)
+        self.assertIn('async function historyDisplayMetadataByChannel(items,catalogRows)',js)
+        self.assertIn('for(let start=0;start<ids.length;start+=8)',js)
+        self.assertIn('else if(fallback.has(id))byChannel.set(id,fallback.get(id))',js)
         self.assertIn('function historyDisplayRow(item,byChannel)',js)
         self.assertIn("avatar_url:item.avatar_url||profile.avatar_url||''",js)
         self.assertIn("member_accent:item.member_accent||profile.member_accent||''",js)
@@ -107,6 +113,7 @@ class ParityContract(unittest.TestCase):
         history=js[start:end]
         self.assertIn("requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null)",history)
         self.assertIn("homeCatalogPromise=api('/v1/catalog/today')",js)
+        self.assertIn("const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows)",history)
         self.assertIn("historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel)",history)
         # Display fallback is metadata-only; lifecycle still comes from /v1/history.
         self.assertNotIn("scheduled_start",history.split("historyDisplayRow",1)[0].split("lifecycle_state",1)[-1])
