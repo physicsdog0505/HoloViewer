@@ -177,13 +177,20 @@
  </section>
  <section id="history" class="page">
   <div id="historyDynamic">
-   <div class="page-head"><div><h1>歷史直播</h1><p>依直播開始日期瀏覽最近 30 天的已結束影片。</p></div></div>
-   <form id="history-picker" class="history-picker">
-    <label for="historyDate">選擇日期</label>
-    <input id="historyDate" name="date" type="date" required>
-    <button class="primary-action" type="submit">查看</button>
-   </form>
-   <div class="history-shortcuts" id="history-shortcuts"></div>
+   <div class="page-head"><div><h1>歷史直播</h1><p>依日期瀏覽已發布的歷史直播，或搜尋所選月份的標題與頻道。</p></div></div>
+   <div id="history-picker" class="history-toolbar">
+    <div class="history-date-nav" aria-label="歷史直播日期">
+     <button id="historyPrevDay" class="subtle-action history-nav-button" type="button" aria-label="前一天">←</button>
+     <label class="history-date-field" for="historyDate"><span>日期</span><input id="historyDate" name="date" type="date" required></label>
+     <button id="historyNextDay" class="subtle-action history-nav-button" type="button" aria-label="後一天">→</button>
+     <button id="historyYesterday" class="subtle-action" type="button">昨天</button>
+    </div>
+    <label class="history-search-field" for="historySearch">
+     <span class="sr-only">搜尋歷史直播</span>
+     <input id="historySearch" type="search" autocomplete="off" placeholder="搜尋這個月份的直播或頻道…">
+    </label>
+   </div>
+   <div class="history-status-row"><span id="history-availability" class="history-availability"></span><span id="history-search-summary" class="history-search-summary"></span></div>
    <p id="history-error" class="form-error" hidden></p>
    <section class="section"><div class="section-head"><div><h2 id="history-heading"></h2></div></div>
     <div id="history-list" class="client-grid"></div>
