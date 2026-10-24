@@ -8,6 +8,7 @@ let pttProgrammatic=false;
 let pttLoadInFlight=false;
 let pttLastGoodCount=0;
 let pttLastGoodDay='';
+const pttMobileMedia=window.matchMedia('(max-width:760px)');
 
 function taipeiDay(){
  const parts=new Intl.DateTimeFormat('en-CA',{
@@ -169,6 +170,7 @@ function init(){
  updateTopbarDate();
  const list=$('ptt-list'),latest=$('ptt-newest');
  let show=true;try{show=localStorage.getItem('holoviewer-ptt-show-floor')!=='false'}catch{}
+ if(pttMobileMedia.matches)show=true;
  pttApplyFloorPreference(show);
  latest.addEventListener('click',()=>{pttFollowing=true;pttToLatest(true)});
  list.addEventListener('wheel',event=>{
@@ -181,6 +183,7 @@ function init(){
   latest.hidden=pttFollowing;
  },{passive:true});
  $('ptt-show-floor').addEventListener('change',()=>pttApplyFloorPreference($('ptt-show-floor').checked));
+ pttMobileMedia.addEventListener?.('change',event=>{if(event.matches)pttApplyFloorPreference(true)});
  $('ptt-refresh').addEventListener('click',loadPtt);
  $('ptt-focus').addEventListener('click',()=>setFocus(!document.body.classList.contains('ptt-focus-mode')));
  $('mobileNavButton').addEventListener('click',()=>{
