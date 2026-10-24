@@ -110,37 +110,19 @@ def validate_alias_contract(site_root: str | Path) -> dict:
     }
 
 
-def youtube_manifest_paths(manifest: dict) -> list[dict]:
-    if manifest.get("schema_version") != 1:
-        raise AliasReleaseGateError("Production YouTube manifest schema mismatch")
-    months = manifest.get("months")
-    indexes = manifest.get("channel_indexes")
-    if not isinstance(months, list) or not isinstance(indexes, list):
-        raise AliasReleaseGateError("Production YouTube manifest inventory missing")
-    entries: list[dict] = []
-    for item in [*months, *indexes]:
-        if not isinstance(item, dict):
-            raise AliasReleaseGateError("malformed Production YouTube manifest entry")
-        logical = str(item.get("path") or "")
-        if not logical.startswith("youtube/v1/"):
-            raise AliasReleaseGateError(f"unsafe Production YouTube path: {logical!r}")
-        rel = Path(logical)
-        if rel.is_absolute() or ".." in rel.parts:
-            raise AliasReleaseGateError(f"unsafe Production YouTube path: {logical!r}")
-        size = item.get("bytes")
-        digest = str(item.get("sha256") or "")
-        if not isinstance(size, int) or size < 0:
-            raise AliasReleaseGateError(f"invalid Production YouTube byte count: {logical}")
-        require_lower_hex(digest, 64, f"YouTube SHA for {logical}")
-        entries.append({"path": logical, "bytes": size, "sha256": digest})
-    paths = [e["path"] for e in entries]
-    if len(paths) != len(set(paths)):
-        raise AliasReleaseGateError("duplicate Production YouTube manifest path")
-    return entries
-
-
-def verify_declared_bytes(data: bytes, entry: dict) -> None:
-    if len(data) != entry["bytes"]:
-        raise AliasReleaseGateError(f"byte length mismatch: {entry['path']}")
-    if sha256_bytes(data) != entry["sha256"]:
-        raise AliasReleaseGateError(f"sha256 mismatch: {entry['path']}")
+def validate_frontend_candidate_ownership(site_root: str | Path) -> dict:
+    """Fail closed if foreign-owner Static Assets are staged into holoviewer-public."""
+    root = Path(site_root)
+    forbidden = []
+    for prefix in ("youtube/v1", "ptt/v1"):
+        base = root / prefix
+        if base.exists():
+            for path in sorted(p for p in base.rglob("*") if p.is_file()):
+                forbidden.append(path.relative_to(root).as_posix())
+    if forbidden:
+        raise AliasReleaseGateError(
+            "foreign-owner Static Assets present in frontend candidate: "
+            + ", ".join(forbidden[:10])
+            + (" ..." if len(forbidden) > 10 else "")
+        )
+    return {"status": "PASS", "forbidden_foreign_owner_asset_count": 0}
