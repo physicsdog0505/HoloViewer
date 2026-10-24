@@ -13,9 +13,13 @@ Deploy only:
 while preserving:
 
 - accepted repo-owned Production frontend bytes;
-- independently published Production `youtube/v1/**` Static Assets;
 - the previous published Alias immutable asset for rollback;
 - Worker routes/config/triggers.
+
+Foreign-owner static trees are explicitly excluded from the frontend candidate:
+
+- `youtube/v1/**` belongs to `holoviewer-youtube-static-assets`;
+- `ptt/v1/**` belongs to `holoviewer-ptt-static-assets`.
 
 This is an Owner-local Cloudflare Workers Static Assets release. It does not
 write D1, API, Collector, Publisher or R2.
@@ -45,14 +49,14 @@ PREPARE mode:
 1. verifies exact checkout and clean tree;
 2. verifies the release is already contained in current `origin/main`;
 3. verifies Wrangler config is unchanged versus accepted Production source;
-4. reconciles every repo-owned Production site file (excluding runtime-owned
-   `youtube/v1/**` and Alias paths) against `https://holodocchi.com`;
+4. reconciles every repo-owned Production site file (excluding foreign-owner
+   `youtube/v1/**`, `ptt/v1/**`, and Alias paths) against `https://holodocchi.com`;
 5. materializes the accepted Production `site/` source tree;
 6. overlays only the reviewed Alias pointer + immutable object;
-7. downloads and hash-validates every object declared by current Production
-   `/youtube/v1/manifest.json` into the staged candidate;
+7. fails closed if the staged frontend candidate contains any `youtube/v1/**`
+   or `ptt/v1/**` files;
 8. preserves the current Production Alias immutable object when present;
-9. creates a temporary Wrangler config pointing at the complete staged site;
+9. creates a temporary Wrangler config pointing at the staged frontend-owned site;
 10. validates the public-safe Alias schema, unique channel IDs and SHA contract;
 11. captures the active Worker version read-only;
 12. writes a preflight evidence receipt;
@@ -86,8 +90,11 @@ It verifies:
 
 - Alias pointer SHA;
 - immutable Alias bytes;
-- all Production YouTube manifest-declared objects;
+- repo-owned frontend baseline bytes;
+- foreign-owner `youtube/v1/**` and `ptt/v1/**` are absent from the frontend candidate;
 - a new active Worker version exists.
+
+Dedicated YouTube/PTT targets are verified independently before release approval; they are never copied back into `holoviewer-public`.
 
 It writes a final receipt with the captured rollback target and command.
 
@@ -95,20 +102,20 @@ There is no automatic redeploy and no automatic rollback.
 
 ## Why Production baseline source is explicit
 
-Production can contain runtime-owned Static Assets that are not represented by
-an arbitrary moving repo checkout. The release therefore begins from the
-accepted Production source SHA, then composes:
+Production can contain foreign-owner Static Assets that must not define the
+frontend release candidate. The release therefore begins from the accepted
+frontend-owned Production source SHA, then composes:
 
 ```text
-accepted Production repo-owned site
-+ current Production runtime YouTube assets
+accepted Production frontend-owned site
 + current previous Alias immutable
 + reviewed Alias delta
-= complete deployment candidate
+= frontend deployment candidate
 ```
 
-This avoids a plain `wrangler deploy` from accidentally rolling back unrelated
-Production frontend bytes or deleting independently published YouTube assets.
+The candidate fails closed if `youtube/v1/**` or `ptt/v1/**` appears. Dedicated
+YouTube/PTT workers remain authoritative and are checked separately rather than
+being copied into the frontend Worker.
 
 ## Boundaries
 
