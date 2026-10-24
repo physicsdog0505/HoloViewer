@@ -80,6 +80,7 @@ let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;
 // stays sidebar for both Carousel and Lock so PTT never changes containers/rows.
 workspaceLayout='sidebar';
 let secondaryOffset=0;
+const mobileViewerMedia=window.matchMedia('(max-width:760px)');
 let pttFollowing=true;
 let pttLoaded=false;
 let pttLayoutRepinTimer=null;
@@ -451,6 +452,16 @@ function playerDisplayLabel(stream){
  if(!label||label===videoId||/^[A-Za-z0-9_-]{11}$/.test(label))return '';
  return label;
 }
+function mobileSecondaryIndexes(){
+ return playerCards.map((card,index)=>card&&viewingPovVisible(index)&&index!==primaryIndex?index:-1).filter(index=>index>=0);
+}
+function cycleMobileSecondary(direction){
+ if(!mobileViewerMedia.matches||watchMode!=='multi')return;
+ const secondaryIndexes=mobileSecondaryIndexes();
+ if(secondaryIndexes.length<2)return;
+ secondaryOffset=(secondaryOffset+(direction<0?-1:1)+secondaryIndexes.length)%secondaryIndexes.length;
+ refreshControlState();
+}
 function createPlayerCard(index){
  const stream=streams[index];
  const card=node('section',undefined,'player-card');
@@ -466,7 +477,16 @@ function createPlayerCard(index){
  });
  const host=node('div',undefined,'player-host');
  host.id=playerHostId(stream);
- card.append(label,remove,host);
+ const pager=node('div',undefined,'mobile-secondary-pager');
+ const previous=node('button','‹','mobile-secondary-prev');
+ previous.type='button';previous.setAttribute('aria-label','上一個副視角');
+ const status=node('span','','mobile-secondary-status');
+ const next=node('button','›','mobile-secondary-next');
+ next.type='button';next.setAttribute('aria-label','下一個副視角');
+ previous.addEventListener('click',event=>{event.stopPropagation();cycleMobileSecondary(-1)});
+ next.addEventListener('click',event=>{event.stopPropagation();cycleMobileSecondary(1)});
+ pager.append(previous,status,next);
+ card.append(label,remove,host,pager);
  playerCards[index]=card;
  return card;
 }
@@ -542,11 +562,25 @@ function refreshControlState(){
  playerCards.forEach((card,index)=>{
   if(!card)return;
   card.hidden=!viewingPovVisible(index);
-  card.classList.remove('primary','secondary-1','secondary-2','secondary-3','viewer-hidden');
+  card.classList.remove('primary','secondary-1','secondary-2','secondary-3','viewer-hidden','mobile-primary','mobile-secondary');
   if(preset!=='equal'&&viewingPovVisible(index))card.classList.toggle('primary',index===primaryIndex);
  });
- if(preset!=='equal'){
-  const secondaryIndexes=playerCards.map((card,index)=>card&&viewingPovVisible(index)&&index!==primaryIndex?index:-1).filter(index=>index>=0);
+ const mobileTwoUp=mobileViewerMedia.matches&&watchMode==='multi'&&streams.length>1;
+ if(mobileTwoUp){
+  const secondaryIndexes=mobileSecondaryIndexes();
+  const offset=secondaryIndexes.length?((secondaryOffset%secondaryIndexes.length)+secondaryIndexes.length)%secondaryIndexes.length:0;
+  const secondaryIndex=secondaryIndexes.length?secondaryIndexes[offset]:-1;
+  playerCards.forEach((card,index)=>{
+   if(!card||!viewingPovVisible(index))return;
+   const show=index===primaryIndex||index===secondaryIndex;
+   card.classList.toggle('viewer-hidden',!show);
+   card.classList.toggle('mobile-primary',index===primaryIndex);
+   card.classList.toggle('mobile-secondary',index===secondaryIndex);
+   const status=card.querySelector('.mobile-secondary-status');
+   if(status&&index===secondaryIndex)status.textContent=(offset+1)+' / '+secondaryIndexes.length;
+  });
+ }else if(preset!=='equal'){
+  const secondaryIndexes=mobileSecondaryIndexes();
   const visibleCount=Math.min(FOCUS_VISIBLE_SLOTS-1,secondaryIndexes.length);
   const offset=secondaryIndexes.length?secondaryOffset%secondaryIndexes.length:0;
   const visible=new Set(Array.from({length:visibleCount},(_,slot)=>secondaryIndexes[(offset+slot)%secondaryIndexes.length]));
@@ -2006,8 +2040,14 @@ async function loadPtt(){
 function startCarousel(){
  clearInterval(carouselTimer);
  carouselTimer=null;
- if(currentLayoutPreset()==='equal'||watchMode!=='multi'||streams.length<2)return;
+ if(watchMode!=='multi'||streams.length<2)return;
  const ms=Math.max(30,Math.min(60,Number(carouselInterval.value)||30))*1000;
+ if(mobileViewerMedia.matches){
+  if(currentLayoutPreset()==='equal')return;
+  carouselTimer=setInterval(()=>cycleMobileSecondary(1),ms);
+  return;
+ }
+ if(currentLayoutPreset()==='equal')return;
  if(currentLayoutPreset()==='primary'){
   carouselTimer=setInterval(()=>setPrimary((primaryIndex+1)%streams.length),ms);
  }else{
@@ -2134,6 +2174,11 @@ window.addEventListener('orientationchange',()=>{
  if(!wasFollowing)return;
  pttFollowing=true;
  repinPttAfterLayout({force:true});
+});
+mobileViewerMedia.addEventListener?.('change',()=>{
+ secondaryOffset=0;
+ refreshControlState();
+ startCarousel();
 });
 window.addEventListener('blur',()=>{
  if(!callEnabled)return;
