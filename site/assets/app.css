@@ -639,16 +639,21 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
 .rail-nav a[href="/collab"] .rail-icon{
   position:relative;
   font-size:0!important;
-  width:30px;
-  min-width:30px;
-  height:30px;
-  display:block;
+  width:54px;
+  min-width:54px;
+  height:44px;
+  display:grid;
+  place-items:center;
 }
 .rail-nav a[data-route="multi"] .rail-icon::before,
 .rail-nav a[href="/collab"] .rail-icon::before{
   content:"";
+  width:26px;
+  height:26px;
   position:absolute;
-  inset:2px;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
   background:currentColor;
   -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8.5 11.2a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Zm7 0a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2ZM2.5 20c.3-4.2 2.4-6.4 6-6.4 3.5 0 5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S5 17.1 4.7 20H2.5Zm7 0c.3-4.2 2.4-6.4 6-6.4s5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S12 17.1 11.7 20H9.5Z'/%3E%3C/svg%3E");
   mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8.5 11.2a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Zm7 0a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2ZM2.5 20c.3-4.2 2.4-6.4 6-6.4 3.5 0 5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S5 17.1 4.7 20H2.5Zm7 0c.3-4.2 2.4-6.4 6-6.4s5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S12 17.1 11.7 20H9.5Z'/%3E%3C/svg%3E");
