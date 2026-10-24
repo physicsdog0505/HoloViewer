@@ -202,11 +202,21 @@ function openTimeHub(){
 }
 
 function updateClientTopbar(routeName){
+ const historyDay=$('historyDate').value||historyBounds().latest;
  const label=routeName==='home'?clientTopbarDate(taipeiDay()):
-  routeName==='history'?clientTopbarDate($('historyDate').value||historyBounds().latest):'';
+  routeName==='history'?clientTopbarDate(historyDay):'';
  $('page-title').textContent=label;
- $('page-title').disabled=routeName!=='home';
- $('page-title').setAttribute('aria-label',routeName==='home'?'開啟月份行程':'目前頁面日期');
+ $('page-title').disabled=routeName!=='home'&&routeName!=='history';
+ $('page-title').dataset.topbarRoute=routeName;
+ $('page-title').setAttribute('aria-haspopup',routeName==='home'?'dialog':routeName==='history'?'true':'false');
+ $('page-title').setAttribute('aria-label',
+  routeName==='home'?'開啟月份行程':
+  routeName==='history'?'選擇歷史直播日期':'目前頁面日期');
+ const topDate=$('historyTopDate');
+ if(topDate){
+  topDate.max=historyBounds().latest;
+  topDate.value=historyDay;
+ }
 }
 
 
@@ -822,7 +832,18 @@ async function loadHome(){
  }
  finally{homeLoadInFlight=false}
 }
-$('page-title').onclick=openTimeHub;
+$('page-title').onclick=()=>{
+ const routeName=$('page-title').dataset.topbarRoute||'';
+ if(routeName==='home'){openTimeHub();return}
+ if(routeName!=='history')return;
+ const picker=$('historyTopDate');
+ picker.max=historyBounds().latest;
+ picker.value=$('historyDate').value||historyBounds().latest;
+ if(typeof picker.showPicker==='function')picker.showPicker();else picker.click();
+};
+$('historyTopDate').addEventListener('change',event=>{
+ if(historyDateValid(event.target.value))historySetDay(event.target.value);
+});
 $('timeHubClose').onclick=()=>$('timeHub').close();
 $('timeHubToday').onclick=()=>{timeHubMonth=taipeiDay().slice(0,7);timeHubSelected=taipeiDay();renderTimeHub()};
 $('timeHubPrev').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,-1);if(!timeHubSelected.startsWith(timeHubMonth))timeHubSelected=timeHubMonth+'-01';renderTimeHub()};
