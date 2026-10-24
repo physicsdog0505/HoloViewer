@@ -721,3 +721,23 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
 }
 .rail-nav a[data-route="multi"] .rail-icon::after,
 .rail-nav a[href="/collab"] .rail-icon::after{content:none!important}
+
+.history-top-date-native{
+ position:fixed;right:18px;top:10px;width:1px;height:1px;opacity:0;pointer-events:none
+}
+@media(max-width:760px){
+ #history .page-head{margin-bottom:12px}
+ #history .history-toolbar{
+   display:block;
+   margin:8px 0 6px;
+   padding:0;
+   border:0;
+   background:transparent
+ }
+ #history .history-date-nav{display:none!important}
+ #history .history-search-field input{
+   min-height:42px;
+   border-radius:12px;
+   background:var(--surface)
+ }
+}
