@@ -819,3 +819,57 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
     text-align:right
   }
 }
+
+
+/* Unified dock icon geometry. Keep every destination optically centered. */
+@media(max-width:760px){
+  .rail-nav{
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    align-items:center;
+  }
+  .rail-nav a{
+    display:grid!important;
+    place-items:center!important;
+    width:100%!important;
+    height:44px!important;
+    min-width:0!important;
+    padding:0!important;
+    transform:none!important;
+  }
+  .rail-nav a .rail-icon{
+    width:30px!important;
+    min-width:30px!important;
+    height:30px!important;
+    margin:0!important;
+    display:grid!important;
+    place-items:center!important;
+    transform:none!important;
+    line-height:30px!important;
+  }
+  .rail-nav a.active,
+  .rail-nav a:hover,
+  .rail-nav a:focus-visible{
+    transform:none!important;
+  }
+  .rail-nav a[data-route="home"] .rail-icon::before,
+  .rail-nav a[href="/"] .rail-icon::before,
+  .rail-nav a[data-route="history"] .rail-icon::before,
+  .rail-nav a[href="/history"] .rail-icon::before{
+    inset:3px!important;
+    -webkit-mask-size:24px 24px!important;
+    mask-size:24px 24px!important;
+  }
+  .rail-nav a[data-route="multi"] .rail-icon::before,
+  .rail-nav a[href="/collab"] .rail-icon::before{
+    inset:2px!important;
+  }
+  .rail-nav a[data-route="ptt"] .rail-icon,
+  .rail-nav a[href="/ptt-today/"] .rail-icon,
+  .rail-nav a[href="/ptt-today"] .rail-icon{
+    font-size:13px!important;
+    font-weight:850!important;
+    letter-spacing:-.03em!important;
+    text-align:center!important;
+  }
+}
+#history .history-availability{display:none!important}
