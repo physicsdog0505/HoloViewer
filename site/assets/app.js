@@ -208,6 +208,7 @@ function updateClientTopbar(routeName){
  $('page-title').textContent=label;
  $('page-title').disabled=routeName!=='home'&&routeName!=='history';
  $('page-title').dataset.topbarRoute=routeName;
+ $('page-title').classList.toggle('history-time-machine',routeName==='history');
  $('page-title').setAttribute('aria-haspopup',routeName==='home'?'dialog':routeName==='history'?'true':'false');
  $('page-title').setAttribute('aria-label',
   routeName==='home'?'開啟月份行程':
@@ -1177,7 +1178,7 @@ function historyChrome(){
  $('historyNextDay').disabled=!historyDateValid(next);
  $('historyYesterday').disabled=selected===b.latest;
  const query=historyQuery();
- $('history-heading').textContent=query?selected.slice(0,7).replace('-','/')+' 搜尋結果':selected.replaceAll('-','/');
+ $('history-heading').textContent=query?'搜尋結果':'';
  if($('history').classList.contains('active'))updateClientTopbar('history');
 }
 function historySetDay(day){
