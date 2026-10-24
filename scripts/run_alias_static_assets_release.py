@@ -392,6 +392,15 @@ def main() -> int:
                 attempts[label + "_YOUTUBE"] = bounded_readback(
                     lambda origin=origin: readback_youtube(origin, staged_site)
                 )
+                attempts[label + "_REPO_BASELINE"] = bounded_readback(
+                    lambda origin=origin: bool(
+                        verify_repo_owned_production_baseline(
+                            repo,
+                            args.production_site_base_sha,
+                            origin=origin,
+                        )
+                    )
+                )
 
             receipt = {
                 "ALIAS_STATIC_ASSETS_RELEASE": "PASS",
