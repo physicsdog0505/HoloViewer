@@ -423,6 +423,55 @@ function homeDisplayMetadataByChannel(rows){
  }
  return byChannel;
 }
+const historyChannelProfileCache=new Map();
+const historyChannelProfileInFlight=new Map();
+function normalizeHistoryChannelProfile(profile){
+ if(!profile||typeof profile!=='object')return null;
+ const channelId=String(profile.channel_id||'');
+ if(!/^UC[A-Za-z0-9_-]{22}$/.test(channelId))return null;
+ return {
+  channel_id:channelId,
+  channel_name:String(profile.channel_name||profile.display_name||''),
+  channel_title:String(profile.display_name||profile.channel_name||''),
+  avatar_url:String(profile.avatar_url||''),
+  group:String(profile.group||''),
+  member_accent:String(profile.member_accent||''),
+  member_accent_dual:Array.isArray(profile.member_accent_dual)?profile.member_accent_dual:[],
+  support_mode:String(profile.support_mode||''),
+  support_color_source:profile.support_color_source||null
+ };
+}
+async function loadHistoryChannelProfile(channelId){
+ const id=String(channelId||'');
+ if(!config.apiBase||!/^UC[A-Za-z0-9_-]{22}$/.test(id))return null;
+ if(historyChannelProfileCache.has(id))return historyChannelProfileCache.get(id);
+ if(historyChannelProfileInFlight.has(id))return historyChannelProfileInFlight.get(id);
+ const pending=api('/v1/channels/'+encodeURIComponent(id)+'/profile')
+  .then(data=>{
+   const profile=normalizeHistoryChannelProfile(data?.profile);
+   if(profile)historyChannelProfileCache.set(id,profile);
+   return profile;
+  })
+  .catch(()=>null)
+  .finally(()=>historyChannelProfileInFlight.delete(id));
+ historyChannelProfileInFlight.set(id,pending);
+ return pending;
+}
+async function historyDisplayMetadataByChannel(items,catalogRows){
+ const fallback=homeDisplayMetadataByChannel(catalogRows);
+ const ids=[...new Set((Array.isArray(items)?items:[]).map(item=>String(item?.channel_id||'')).filter(id=>/^UC[A-Za-z0-9_-]{22}$/.test(id)))];
+ const byChannel=new Map();
+ for(let start=0;start<ids.length;start+=8){
+  const batch=ids.slice(start,start+8);
+  const profiles=await Promise.all(batch.map(id=>loadHistoryChannelProfile(id)));
+  batch.forEach((id,index)=>{
+   const canonical=profiles[index];
+   if(canonical)byChannel.set(id,canonical);
+   else if(fallback.has(id))byChannel.set(id,fallback.get(id));
+  });
+ }
+ return byChannel;
+}
 function historyDisplayRow(item,byChannel){
  const channelId=String(item?.channel_id||'');
  const profile=byChannel?.get(channelId);
@@ -1018,7 +1067,7 @@ async function loadHistory(){
   if(manifest)applyHistoryAvailability(manifest,day);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
   const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
-  const displayByChannel=homeDisplayMetadataByChannel(catalogRows);
+  const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows);
   let endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
   if(query)endedItems=endedItems.filter(item=>historyMatchesQuery(item,query));
   const resultCount=endedItems.length,renderedItems=query?endedItems.slice(0,200):endedItems;
