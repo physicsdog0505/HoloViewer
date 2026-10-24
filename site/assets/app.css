@@ -650,3 +650,8 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
   .client-topbar{margin-left:0}
   .client-main{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
 }
+
+
+@media(max-width:760px){
+  a[data-page-link="watchalong"],.feature-card[href="/watchalong"]{display:none!important}
+}
