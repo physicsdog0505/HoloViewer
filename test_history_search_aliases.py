@@ -155,6 +155,12 @@ console.log(JSON.stringify({{
         self.assertNotIn("已辨識多人搜尋", js)
         self.assertIn("優先顯示同時相關的結果", js)
 
+    def test_weak_hint_is_ranking_only_not_required_keyword(self):
+        parsed = self.parse_query("roboco 公主")
+        self.assertEqual(parsed["members"], ["ロボ子さん"])
+        self.assertEqual(parsed["keywords"], [])
+        self.assertEqual(parsed["weakHints"], [{"term": "公主", "member": "姫森ルーナ"}])
+
     def test_alias_registry_unavailable_falls_back_to_text_terms(self):
         parsed = self.parse_query("roboco minecraft", registry=False)
         self.assertEqual(parsed["members"], [])
