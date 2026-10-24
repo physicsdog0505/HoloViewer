@@ -617,3 +617,76 @@ body.immersive .viewer-workspace.workspace-focus.layout-primary{
   .viewer-stage .player-card.mobile-primary .mobile-secondary-pager{display:none}
   body.mode-multi .viewer-controls{max-height:min(54vh,420px);overflow:auto}
 }
+
+
+/* Mobile Viewer V2: phone-specific geometry only. Desktop viewer remains unchanged. */
+@media(max-width:760px){
+  html,body{width:100%;min-height:100%;overflow:hidden}
+  .viewer-shell{margin-left:0!important;width:100vw;min-height:100dvh}
+  .viewer-live-rail{display:none!important}
+  .viewer-mode-switch{display:none!important}
+  #viewerFullscreen{display:none!important}
+  .viewer-topbar{
+    min-height:44px;padding:4px 8px;gap:6px;flex-wrap:nowrap;overflow-x:auto
+  }
+  .viewer-watch-actions{margin-left:auto}
+  .viewer-main,body.settings-open .viewer-main{
+    height:calc(100dvh - 44px)!important;
+    min-height:0!important;
+    padding:4px 4px calc(64px + env(safe-area-inset-bottom))!important;
+    overflow:hidden
+  }
+  .viewer-workspace{
+    height:100%!important;min-height:0!important;
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    grid-template-rows:auto minmax(0,1fr)!important;
+    gap:4px!important
+  }
+  .viewer-workspace.video-only{grid-template-rows:auto!important}
+  .viewer-stage{
+    width:100%!important;height:auto!important;min-height:0!important;
+    align-content:start!important
+  }
+  .player-card{width:100%!important}
+  .viewer-ptt{
+    width:100%!important;height:auto!important;min-height:0!important;
+    grid-column:1!important;grid-row:2!important
+  }
+  .viewer-workspace.video-only .viewer-stage{grid-row:1!important}
+  .viewer-workspace.video-only .viewer-ptt{display:none!important}
+  body.mode-single #viewerSettings{display:none!important}
+}
+
+/* Phone landscape: video left, PTT right. This stays isolated from desktop layouts. */
+@media(max-width:900px) and (orientation:landscape){
+  html,body{width:100%;height:100%;overflow:hidden}
+  .client-rail,.viewer-live-rail{display:none!important}
+  .viewer-shell{margin-left:0!important;width:100vw;height:100dvh;min-height:0!important}
+  .viewer-topbar{display:none!important}
+  .viewer-main,body.settings-open .viewer-main{
+    width:100vw;height:100dvh!important;min-height:0!important;
+    padding:4px!important;overflow:hidden
+  }
+  .viewer-workspace{
+    width:100%;height:100%!important;min-height:0!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1.25fr) minmax(260px,.85fr)!important;
+    grid-template-rows:minmax(0,1fr)!important;
+    gap:4px!important
+  }
+  .viewer-stage{
+    grid-column:1!important;grid-row:1!important;
+    width:100%!important;height:100%!important;min-height:0!important;
+    overflow:auto;align-content:center!important
+  }
+  .viewer-ptt{
+    display:flex!important;
+    grid-column:2!important;grid-row:1!important;
+    width:100%!important;height:100%!important;min-height:0!important
+  }
+  .viewer-workspace.video-only{grid-template-columns:1fr!important}
+  .viewer-workspace.video-only .viewer-stage{grid-column:1!important}
+  .viewer-workspace.video-only .viewer-ptt{display:none!important}
+  .player-card{width:100%!important}
+}
