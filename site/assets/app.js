@@ -550,12 +550,28 @@ function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={})
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
  const collab=collabMap.get(id);const collabButton=collabEntry(collab);if(collabButton)card.append(collabButton);
+ let desktopClickTimer=null;
+ function toggleCardSelection(){
+  if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);
+  homeSelection();
+ }
  card.addEventListener('click',event=>{
   if(event.target.closest('.stream-collab-entry'))return;
   const source=event.target.closest('[data-youtube-href]');
   if(source){event.preventDefault();event.stopPropagation();window.open(source.dataset.youtubeHref,'_blank','noopener,noreferrer');return}
   event.preventDefault();if(!card.dataset.multiviewId){openStandaloneViewer([id]);return}
-  if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);homeSelection()
+  const mobileInput=window.matchMedia('(max-width:760px)').matches;
+  if(mobileInput){toggleCardSelection();return}
+  if(event.detail>1){clearTimeout(desktopClickTimer);desktopClickTimer=null;return}
+  clearTimeout(desktopClickTimer);
+  desktopClickTimer=setTimeout(()=>{desktopClickTimer=null;toggleCardSelection()},220);
+ });
+ card.addEventListener('dblclick',event=>{
+  if(window.matchMedia('(max-width:760px)').matches)return;
+  if(event.target.closest('.stream-collab-entry,[data-youtube-href]'))return;
+  event.preventDefault();
+  clearTimeout(desktopClickTimer);desktopClickTimer=null;
+  location.href=href;
  });
  card.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-youtube-href]')){event.preventDefault();event.stopPropagation();window.open(event.target.dataset.youtubeHref,'_blank','noopener,noreferrer')}});
  container.append(card);
