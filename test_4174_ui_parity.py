@@ -125,6 +125,7 @@ class ParityContract(unittest.TestCase):
             'id="historySearch"',
             'id="history-availability"',
             'id="history-search-summary"',
+            'id="history-search-intent"',
             'id="history-pagination"',
             'id="historyMultiSelectBar"',
             '搜尋所選月份的標題與頻道',
@@ -135,6 +136,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.history-toolbar{display:grid', css)
         self.assertIn('.history-date-nav{display:flex', css)
         self.assertIn('.history-search-field input{width:100%}', css)
+        self.assertIn('.history-search-intent{display:flex', css)
+        self.assertIn('.history-search-chip{display:inline-flex', css)
 
         for snippet in (
             "historyDate').addEventListener('change'",
@@ -144,13 +147,23 @@ class ParityContract(unittest.TestCase):
             "historySearch').addEventListener('input'",
             "historySearchFrame=requestAnimationFrame(()=>{historySearchFrame=0;state.offset=0;loadHistory()})",
             "async function loadYoutubeHistorySearchMonth(day)",
-            "historyMatchesQuery(item,query)",
+            "const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json'",
+            "function parseHistorySearchQuery(raw,registry)",
+            "intent:members.length?'member':'text'",
+            "function historySearchRows(items,parsed)",
+            "function renderHistorySearchIntent(parsed,rows)",
+            "label.textContent='已辨識成員：'",
+            "優先顯示同時相關的結果",
+            "Number(b.score.allMembers)-Number(a.score.allMembers)",
+            "const aliasesPromise=query?loadHistoryMemberAliases():Promise.resolve(null)",
             "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
             "params.set('date',day)",
             "params.set('q',$('historySearch').value.trim())",
         ):
             self.assertIn(snippet, js)
 
+        self.assertNotIn("已辨識多人搜尋：", js)
+        self.assertNotIn("member_set", js[js.index("function parseHistorySearchQuery"):js.index("function historyMemberAliases")])
         self.assertNotIn("shiftDay(today,-30)", js[js.index("function historyBounds()"):js.index("const YOUTUBE_HISTORY_MANIFEST_PATH")])
 
     def test_history_prefers_youtube_static_manifest_month_read_path(self):
