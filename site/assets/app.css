@@ -634,17 +634,16 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
 @media(max-width:760px){
   body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
   .client-rail{
-    display:block;position:fixed;left:50%;right:auto;top:auto;
-    bottom:calc(8px + env(safe-area-inset-bottom));width:min(342px,calc(100vw - 48px));height:50px;
-    transform:translateX(-50%);
+    display:block;position:fixed;left:24px;right:24px;top:auto;
+    bottom:calc(8px + env(safe-area-inset-bottom));width:auto;max-width:342px;height:50px;
+    margin-inline:auto;transform:none;
     padding:3px 6px;border:1px solid rgba(230,225,218,.9);border-radius:16px;
     background:rgba(255,253,250,.92);backdrop-filter:blur(20px);
     box-shadow:0 10px 30px rgba(52,44,36,.14);overflow:visible;z-index:80;
     transition:transform .18s ease,opacity .18s ease
   }
   .client-rail:hover,.client-rail:focus-within{
-      width:min(342px,calc(100vw - 48px));
-      transform:translateX(-50%);
+      width:auto;max-width:342px;margin-inline:auto;transform:none;
       box-shadow:0 10px 30px rgba(52,44,36,.14)
     }
   .rail-brand{display:none}
@@ -697,26 +696,28 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
   a[data-page-link="watchalong"],.feature-card[href="/watchalong"]{display:none!important}
 }
 
-/* Shared collab navigation icon: replace platform emoji on desktop and mobile. */
+
+/* Shared collab navigation icon: one SVG mask on desktop and mobile. */
 .rail-nav a[data-route="multi"] .rail-icon,
 .rail-nav a[href="/collab"] .rail-icon{
-  position:relative;font-size:0!important
-}
-.rail-nav a[data-route="multi"] .rail-icon::before,
-.rail-nav a[href="/collab"] .rail-icon::before,
-.rail-nav a[data-route="multi"] .rail-icon::after,
-.rail-nav a[href="/collab"] .rail-icon::after{
-  content:"";position:absolute;border:2px solid currentColor;box-sizing:border-box;
-  background:transparent!important;-webkit-mask-image:none!important;mask-image:none!important;
-  box-shadow:none
+  position:relative;
+  font-size:0!important;
+  width:30px;
+  min-width:30px;
+  height:30px;
+  display:block;
 }
 .rail-nav a[data-route="multi"] .rail-icon::before,
 .rail-nav a[href="/collab"] .rail-icon::before{
-  left:7px;top:6px;width:8px;height:8px;border-radius:50%;
-  box-shadow:15px 0 0 -2px var(--surface),15px 0 0 0 currentColor
+  content:"";
+  position:absolute;
+  inset:2px;
+  background:currentColor;
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8.5 11.2a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Zm7 0a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2ZM2.5 20c.3-4.2 2.4-6.4 6-6.4 3.5 0 5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S5 17.1 4.7 20H2.5Zm7 0c.3-4.2 2.4-6.4 6-6.4s5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S12 17.1 11.7 20H9.5Z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8.5 11.2a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Zm7 0a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2ZM2.5 20c.3-4.2 2.4-6.4 6-6.4 3.5 0 5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S5 17.1 4.7 20H2.5Zm7 0c.3-4.2 2.4-6.4 6-6.4s5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S12 17.1 11.7 20H9.5Z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  -webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:100% 100%;mask-size:100% 100%;
 }
 .rail-nav a[data-route="multi"] .rail-icon::after,
-.rail-nav a[href="/collab"] .rail-icon::after{
-  left:2px;bottom:5px;width:18px;height:9px;border-bottom:0;border-radius:10px 10px 0 0;
-  box-shadow:15px 0 0 -2px var(--surface),15px 0 0 0 currentColor
-}
+.rail-nav a[href="/collab"] .rail-icon::after{content:none!important}
