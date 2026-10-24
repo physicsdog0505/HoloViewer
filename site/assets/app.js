@@ -237,6 +237,7 @@ function route(r){
  const activeNav=r==='custom-session'?'single':pageId;
  document.querySelectorAll('[data-route]').forEach(el=>el.classList.toggle('active',el.dataset.route===activeNav));
  document.querySelectorAll('[data-mobile-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileRoute===activeNav));
+ document.querySelectorAll('[data-mobile-dock-route]').forEach(el=>el.classList.toggle('active',el.dataset.mobileDockRoute===activeNav));
  updateClientTopbar(r);$('mobileNav').hidden=true;$('mobileNavButton').setAttribute('aria-expanded','false');
  // Canonical public routes use clean paths. Only the internal viewing session
  // keeps hash state because it carries mounted-player/session parameters.
@@ -1888,7 +1889,9 @@ function navigateSidebarLink(event,destination){
  // Keep keyboard focus for accessible navigation and rail expansion.
  if(event.detail>0)event.currentTarget.blur();
 }
-document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.route)));document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileRoute)));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,'home')));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};{
+document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.route)));
+document.querySelectorAll('[data-mobile-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileRoute)));
+document.querySelectorAll('[data-mobile-dock-route]').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,link.dataset.mobileDockRoute)));document.querySelectorAll('.rail-brand,.mobile-top-brand').forEach(link=>link.addEventListener('click',event=>navigateSidebarLink(event,'home')));$('mobileNavButton').onclick=()=>{const opening=$('mobileNav').hidden;$('mobileNav').hidden=!opening;$('mobileNavButton').setAttribute('aria-expanded',String(opening))};{
  const params=new URLSearchParams(location.search);
  const requested=params.get('date');
  $('historyDate').value=historyDateValid(requested)?requested:historyBounds().latest;
