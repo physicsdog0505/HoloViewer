@@ -197,6 +197,30 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("開啟多人連動", app)
         self.assertFalse((ROOT / "site/custom-view/index.html").exists())
 
+    def test_mobile_shell_and_viewer_v1_contract(self):
+        shared = (ROOT / "site/assets/shared-shell.css").read_text(encoding="utf-8")
+        app_css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        viewer_css = (ROOT / "site/assets/viewer-standalone.css").read_text(encoding="utf-8")
+        viewer_js = (ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+
+        self.assertIn("Mobile Shell V1", shared)
+        self.assertIn("grid-template-columns:repeat(5,minmax(0,1fr))", shared)
+        self.assertIn('.rail-nav a[data-route="watchalong"]', shared)
+        self.assertIn('content:"⌂"', shared)
+        self.assertIn('.feature-card[href="/watchalong"]', app_css)
+
+        self.assertIn("const mobileViewerMedia=window.matchMedia('(max-width:760px)');", viewer_js)
+        self.assertIn("function mobileSecondaryIndexes()", viewer_js)
+        self.assertIn("function cycleMobileSecondary(direction)", viewer_js)
+        self.assertIn("const mobileTwoUp=mobileViewerMedia.matches&&watchMode==='multi'&&streams.length>1;", viewer_js)
+        self.assertIn("card.classList.toggle('mobile-primary',index===primaryIndex);", viewer_js)
+        self.assertIn("card.classList.toggle('mobile-secondary',index===secondaryIndex);", viewer_js)
+        self.assertIn("carouselTimer=setInterval(()=>cycleMobileSecondary(1),ms);", viewer_js)
+        self.assertIn("Mobile Viewer V1", viewer_css)
+        self.assertIn(".viewer-stage .player-card.mobile-primary", viewer_css)
+        self.assertIn(".viewer-stage .player-card.mobile-secondary", viewer_css)
+        self.assertIn(".mobile-secondary-pager", viewer_css)
+
     def test_standalone_watchalong_contract(self):
         html = (ROOT / "site/watchalong-viewer/index.html").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
