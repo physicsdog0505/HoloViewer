@@ -1,5 +1,5 @@
 # HOLOVIEWER_PROJECT_GUIDELINES — mandatory first read
-Last updated: 2026-10-11. Applies to **both** `physicsdog0505/Hololive-PTT-Viewer` (private engineering) and `physicsdog0505/HoloViewer` (public site), every ChatGPT/Codex/Antigravity/other agent, every new chat, handoff, review, implementation, and deployment task.
+Last updated: 2026-10-25. Applies to **both** `physicsdog0505/Hololive-PTT-Viewer` (private engineering) and `physicsdog0505/HoloViewer` (public site), every ChatGPT/Codex/Antigravity/other agent, every new chat, handoff, review, implementation, and deployment task.
 
 ## 0. Read before acting (mandatory)
 1. Read THIS file **from the current GitHub repository revision**, not a pasted historical copy. Read the counterpart file in the other repository when work crosses repository boundaries. The two copies must stay synchronized.
@@ -8,6 +8,31 @@ Last updated: 2026-10-11. Applies to **both** `physicsdog0505/Hololive-PTT-Viewe
 4. Confirm repo, branch, HEAD SHA, task capability (INVESTIGATE / IMPLEMENT / HIGH_RISK), acceptance criteria, protected resources, and what is **actually deployed**. If a file cannot be read, state this and STOP risky work. Never pretend to have read it.
 5. In the **first substantive reply**, explicitly report: guideline revision/link read; repo/branch/HEAD; task scope; permitted actions; prohibited actions; evidence gaps. Do not mistake reading a file or CI passing for compliance or user acceptance.
 6. A task prompt without this preflight is incomplete. The agent must run this preflight itself even if the initiating chat forgot to include it.
+
+## 0.5 Production Worker deployment hard gate (owner-approved lesson, 2026-10-25)
+
+This gate applies to every Cloudflare Worker backend release, especially `holoviewer-public-api`. It was derived from the failed binding-preservation rollout before #231 and the successful #231 / #235 releases. Treat it as a mandatory deployment safety invariant, not optional ceremony.
+
+1. **Lock the actual active Production version first.** Before building or uploading anything, run authoritative deployment readback and record the exact active Worker Version ID. That immediately-predeploy version is the rollback target. Do not reuse an older historical rollback ID just because it worked before.
+2. **Lock exact source HEAD and test that exact HEAD.** Source review, focused tests, syntax checks and cost/read-amplification checks must refer to the candidate SHA that will actually be uploaded. A prior PASS does not carry across a new HEAD.
+3. **Never trust a direct `wrangler deploy` or upload receipt as proof of runtime parity.** A Worker can upload successfully and still lose version-bound runtime resources. The 2026-10-24 rejected candidate `c20c90bc-04e4-409a-aa1f-4b4558847e71` returned HTTP 200 on some routes but had lost 12 Production plain-text bindings and caused Today/WebSub regression.
+4. **`--keep-vars` alone is NOT a parity proof.** The rejected preview candidate `7f508a34-dc11-4f06-9def-c4239a7ed2a5` still lacked the same plain-text runtime bindings despite using a keep-vars flow. Always inspect authoritative version resources for both the active version and the candidate using `wrangler versions view <version> --json`.
+5. **Compare candidate vs active version resources by name and type before traffic cutover.** Required result is exact parity for all runtime resources that the current service depends on: plain-text vars, secrets, D1 bindings and any other versioned resources. Compare names and types; report missing, extra and type differences. The accepted #231/#235 baseline happened to be 31 bindings = 19 plain_text + 11 secret_text + 1 D1, but **the number 31 is not a permanent contract**. The contract is exact parity with the current active Production version unless the release explicitly and intentionally changes resources.
+6. **Preserve active plain vars from authoritative version resources without printing secret or sensitive values.** Build a temporary deploy config from the active version's plain-text values plus the reviewed base config. Keep generated configs in disposable local paths (for example `/tmp`); do not commit runtime values.
+7. **Upload candidate with zero Production traffic first.** Record candidate Worker Version ID and preview URL. Immediately confirm Production still serves 100% of the old active version.
+8. **Run preview semantic parity, not just HTTP smoke.** Compare the candidate preview with current Production for unchanged critical behavior. For Today, compare row count, lifecycle-state distribution and video-id set; for profile releases compare existing single-profile output and required fields such as non-empty `avatar_url`; exercise the new endpoint with real known IDs. A 200 response alone is insufficient.
+9. **Use valid endpoint semantics in regression checks.** Do not misclassify expected 400s as regressions: for example `/v1/history` requires a valid `day=YYYY-MM-DD` query. For API CORS/read checks use GET/OPTIONS rather than HEAD unless the route explicitly supports HEAD.
+10. **Verify protected dormant/write boundaries before cutover.** If a release is read-only, prove no new writer/migration/backfill path was introduced. For the current Collab rollout, `POST /internal/collab/live` must remain `503 {"error":"publisher_disabled"}` until a separately approved publication gate. Capture read-only D1 counts when they are part of the protected invariant.
+11. **Cut traffic only by the already-verified candidate version ID.** Use `wrangler versions deploy <candidate>@100%`; do not rebuild/re-upload during the final cutover step. This preserves the exact artifact that passed parity and preview checks.
+12. **Post-cutover authoritative readback is mandatory.** Re-run deployment status, critical API checks, the newly added endpoint, required payload semantics, dormant/write gates and any protected D1 invariants. Only then label DEPLOYED/PASS.
+13. **Rollback immediately on semantic regression, not only transport failure.** If Today collapses, lifecycle sets diverge unexpectedly, required profile/avatar fields disappear, bindings differ, or a dormant writer becomes active, route 100% back to the immediately previous active Worker version and investigate offline.
+14. **Record the deployment receipt on the owning PR.** Include exact source SHA, accepted Worker Version ID, rollback version, binding/resource parity result, preview gate result, post-cutover readback and protected no-write/dormant evidence.
+
+Verified successful pattern:
+- #231 accepted Worker `4fd32112-3233-4203-97d8-9e2823b98c81`: exact resource parity, preview semantic parity, dormant Collab writer, then 100% cutover.
+- #235 accepted Worker `1edc5f00-5660-4721-8b74-287a78b0aecd`: exact resource parity, single-profile parity, batch-profile + avatar preview gate, Today parity, then 100% cutover.
+
+The important lesson is **version-resource parity + semantic preview parity + exact-version cutover**. Passing source review, passing tests, successful upload, or HTTP 200 by themselves are not sufficient Production evidence.
 
 ## 1. Authoritative THREE-STAGE product architecture (owner clarification, 2026-10-09; supersedes earlier 8501=all user-facing behavior interpretation)
 - **8501 = INTERNAL development and verification** of source data, complete engineering information, acquisition/synchronization, core behavior/underlying logic and diagnostics. It is NOT the public user interface specification; engineering controls need not appear publicly.
