@@ -642,7 +642,11 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
     box-shadow:0 10px 30px rgba(52,44,36,.14);overflow:visible;z-index:80;
     transition:transform .18s ease,opacity .18s ease
   }
-  .client-rail:hover,.client-rail:focus-within{width:auto;box-shadow:0 10px 30px rgba(52,44,36,.14)}
+  .client-rail:hover,.client-rail:focus-within{
+      width:min(342px,calc(100vw - 48px));
+      transform:translateX(-50%);
+      box-shadow:0 10px 30px rgba(52,44,36,.14)
+    }
   .rail-brand{display:none}
   .rail-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:0;height:100%;width:100%}
   .rail-nav a{
@@ -656,6 +660,8 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
     font-size:0;line-height:1;color:currentColor;transform:none!important
   }
   .rail-label{display:none!important}
+  .rail-nav a[data-route="multi"] .rail-icon,
+  .rail-nav a[href="/collab"] .rail-icon{font-size:0!important}
   .rail-nav a[data-route="home"] .rail-icon::before,.rail-nav a[href="/"] .rail-icon::before,
   .rail-nav a[data-route="history"] .rail-icon::before,.rail-nav a[href="/history"] .rail-icon::before,
   .rail-nav a[data-route="multi"] .rail-icon::before,.rail-nav a[href="/collab"] .rail-icon::before{
@@ -689,4 +695,26 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
 
 @media(max-width:760px){
   a[data-page-link="watchalong"],.feature-card[href="/watchalong"]{display:none!important}
+}
+
+/* Shared collab navigation icon: replace platform emoji on desktop and mobile. */
+.rail-nav a[data-route="multi"] .rail-icon,
+.rail-nav a[href="/collab"] .rail-icon{
+  position:relative;font-size:0!important
+}
+.rail-nav a[data-route="multi"] .rail-icon::before,
+.rail-nav a[href="/collab"] .rail-icon::before,
+.rail-nav a[data-route="multi"] .rail-icon::after,
+.rail-nav a[href="/collab"] .rail-icon::after{
+  content:"";position:absolute;border:2px solid currentColor;box-sizing:border-box
+}
+.rail-nav a[data-route="multi"] .rail-icon::before,
+.rail-nav a[href="/collab"] .rail-icon::before{
+  left:7px;top:6px;width:8px;height:8px;border-radius:50%;
+  box-shadow:15px 0 0 -2px var(--surface),15px 0 0 0 currentColor
+}
+.rail-nav a[data-route="multi"] .rail-icon::after,
+.rail-nav a[href="/collab"] .rail-icon::after{
+  left:2px;bottom:5px;width:18px;height:9px;border-bottom:0;border-radius:10px 10px 0 0;
+  box-shadow:15px 0 0 -2px var(--surface),15px 0 0 0 currentColor
 }
