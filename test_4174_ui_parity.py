@@ -142,7 +142,7 @@ class ParityContract(unittest.TestCase):
             "historyNextDay').onclick=()=>historySetDay",
             "historyYesterday').onclick=()=>historySetDay(historyBounds().latest)",
             "historySearch').addEventListener('input'",
-            "setTimeout(()=>{state.offset=0;loadHistory()},180)",
+            "historySearchFrame=requestAnimationFrame(()=>{historySearchFrame=0;state.offset=0;loadHistory()})",
             "async function loadYoutubeHistorySearchMonth(day)",
             "historyMatchesQuery(item,query)",
             "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
