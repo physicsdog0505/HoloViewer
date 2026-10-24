@@ -626,12 +626,9 @@ body.immersive .viewer-workspace.workspace-focus.layout-primary{
   .viewer-live-rail{display:none!important}
   .viewer-mode-switch{display:none!important}
   #viewerFullscreen{display:none!important}
-  .viewer-topbar{
-    min-height:44px;padding:4px 8px;gap:6px;flex-wrap:nowrap;overflow-x:auto
-  }
-  .viewer-watch-actions{margin-left:auto}
+  .viewer-topbar{display:none!important}
   .viewer-main,body.settings-open .viewer-main{
-    height:calc(100dvh - 44px)!important;
+    height:100dvh!important;
     min-height:0!important;
     padding:4px 4px calc(64px + env(safe-area-inset-bottom))!important;
     overflow:hidden
