@@ -8,6 +8,8 @@ let pttProgrammatic=false;
 let pttLoadInFlight=false;
 let pttLastGoodCount=0;
 let pttLastGoodDay='';
+let pttSourceUrl='';
+let pttReaderPressStartedAt=0;
 const pttMobileMedia=window.matchMedia('(max-width:760px)');
 
 function taipeiDay(){
@@ -103,8 +105,16 @@ function pttApplyFloorPreference(show){
 }
 function setFocus(on){
  document.body.classList.toggle('ptt-focus-mode',on);
- $('ptt-focus').textContent=on?'退出專注':'⛶ 專注模式';
- $('ptt-focus').setAttribute('aria-label',on?'退出專注模式':'進入專注模式');
+ const toolbarFocus=$('ptt-focus');
+ if(toolbarFocus){
+  toolbarFocus.textContent=on?'退出專注':'⛶ 專注模式';
+  toolbarFocus.setAttribute('aria-label',on?'退出專注模式':'進入專注模式');
+ }
+ const readerAction=$('ptt-reader-action');
+ if(readerAction){
+  readerAction.textContent=on?'×':'⛶';
+  readerAction.setAttribute('aria-label',on?'退出專注模式':'進入專注模式');
+ }
  $('ptt-floor-toggle').hidden=!on;
  const url=new URL(location.href);
  if(on)url.searchParams.set('focus','1');else url.searchParams.delete('focus');
@@ -132,6 +142,8 @@ async function loadPtt(){
   const data=await loadPttRecentPayload(today);
   if(data?.schema_version!=='public-consumer-v1'||!Array.isArray(data.pushes))throw Error('資料格式錯誤');
   const rows=data.pushes.filter(row=>row&&typeof row.content==='string');
+  const sourceRow=rows.find(row=>/^https:\/\//.test(String(row?.source_url||'')));
+  if(sourceRow)pttSourceUrl=String(sourceRow.source_url);
   const wasEmpty=!pttLastGoodCount;
   const nearBottom=pttFollowing||pttAtBottom();
   const previousScroll=list.scrollTop;
@@ -186,6 +198,23 @@ function init(){
  pttMobileMedia.addEventListener?.('change',event=>{if(event.matches)pttApplyFloorPreference(true)});
  $('ptt-refresh').addEventListener('click',loadPtt);
  $('ptt-focus').addEventListener('click',()=>setFocus(!document.body.classList.contains('ptt-focus-mode')));
+ const readerAction=$('ptt-reader-action');
+ readerAction.addEventListener('pointerdown',event=>{
+  if(event.button!==undefined&&event.button!==0)return;
+  pttReaderPressStartedAt=performance.now();
+ });
+ readerAction.addEventListener('pointerup',event=>{
+  if(event.button!==undefined&&event.button!==0)return;
+  const held=performance.now()-pttReaderPressStartedAt;
+  pttReaderPressStartedAt=0;
+  if(held>=650&&/^https:\/\//.test(pttSourceUrl)){
+   window.open(pttSourceUrl,'_blank','noopener,noreferrer');
+   return;
+  }
+  setFocus(!document.body.classList.contains('ptt-focus-mode'));
+ });
+ readerAction.addEventListener('pointercancel',()=>{pttReaderPressStartedAt=0});
+ readerAction.addEventListener('contextmenu',event=>event.preventDefault());
  $('mobileNavButton').addEventListener('click',()=>{
   const nav=$('mobileNav');
   const opening=nav.hidden;
