@@ -204,8 +204,9 @@ class PublicSmokeTests(unittest.TestCase):
         viewer_js = (ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
 
         self.assertIn("Mobile Shell V1", shared)
-        self.assertIn("grid-template-columns:repeat(5,minmax(0,1fr))", shared)
+        self.assertIn("grid-template-columns:repeat(4,minmax(0,1fr))", shared)
         self.assertIn('.rail-nav a[data-route="watchalong"]', shared)
+        self.assertIn('.rail-nav a[data-route="single"]', shared)
         self.assertIn('content:"⌂"', shared)
         self.assertIn('.feature-card[href="/watchalong"]', app_css)
 
