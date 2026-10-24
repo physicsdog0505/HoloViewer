@@ -207,7 +207,9 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("grid-template-columns:repeat(4,minmax(0,1fr))", shared)
         self.assertIn(".rail-label{display:none!important}", shared)
         self.assertIn('.rail-nav a[href="/collab"] .rail-icon', shared)
-        self.assertIn('.rail-nav a[href="/"] .rail-icon::after', shared)
+        self.assertIn('.rail-nav a[href="/history"] .rail-icon::before', shared)
+        self.assertIn('.rail-nav a[href="/"] .rail-icon::before', shared)
+        self.assertIn('mask-size:24px 24px', shared)
         self.assertIn('.rail-nav a[data-route="watchalong"]', shared)
         self.assertIn('.rail-nav a[data-route="single"]', shared)
         self.assertIn('content:"⌂"', shared)
@@ -233,6 +235,10 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("body{padding-bottom:0!important}", css)
         self.assertIn("const pttMobileMedia=window.matchMedia('(max-width:760px)');", js)
         self.assertIn("if(pttMobileMedia.matches)show=true;", js)
+        self.assertIn("let pttSourceUrl='';", js)
+        self.assertIn("held>=650", js)
+        self.assertIn("window.open(pttSourceUrl,'_blank','noopener,noreferrer')", js)
+        self.assertIn('id="ptt-reader-action"', (ROOT / "site/ptt-today/index.html").read_text(encoding="utf-8"))
 
 
     def test_standalone_watchalong_contract(self):
