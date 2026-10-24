@@ -1074,6 +1074,39 @@ function historySearchRows(items,parsed){
  );
  return filtered;
 }
+function renderHistorySearchIntent(parsed,rows){
+ const box=$('history-search-intent');
+ if(!box)return;
+ box.replaceChildren();
+ if(!parsed?.raw||!parsed.members.length){box.hidden=true;return}
+ const label=document.createElement('span');
+ label.className='history-search-intent-label';
+ label.textContent=parsed.intent==='member_set'?'已辨識多人搜尋：':'已辨識成員：';
+ box.append(label);
+ for(const member of parsed.members){
+  const chip=document.createElement('span');
+  chip.className='history-search-chip';
+  chip.textContent=member.canonical_name;
+  box.append(chip);
+ }
+ if(parsed.keywords.length){
+  const keyword=document.createElement('span');
+  keyword.className='history-search-chip';
+  keyword.textContent='關鍵字：'+parsed.keywords.join(' ');
+  box.append(keyword);
+ }
+ const note=document.createElement('span');
+ note.className='history-search-intent-note';
+ if(parsed.intent==='member_set'){
+  const full=rows.filter(row=>row.score.allMembers).length;
+  const partial=rows.length-full;
+  note.textContent='優先顯示同時命中全部成員的直播'+(partial?'，其後列出部分命中 '+partial+' 筆':'');
+ }else{
+  note.textContent='已套用粉絲暱稱／別名對照';
+ }
+ box.append(note);
+ box.hidden=false;
+}
 function historyChrome(){
  const b=historyBounds(),input=$('historyDate');
  input.max=b.latest;
@@ -1092,7 +1125,7 @@ function historySetDay(day){
 }
 async function loadHistory(){
  historyChrome();const day=$('historyDate').value,query=historyQuery(),error=$('history-error');error.hidden=true;error.textContent='';
- const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';
+ const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';const intentBox=$('history-search-intent');if(intentBox){intentBox.replaceChildren();intentBox.hidden=true}
  if(!config.youtubeStaticBase&&!config.apiBase){error.textContent='History 資料來源尚未設定。';error.hidden=false;return}
  try{
   const manifestPromise=config.youtubeStaticBase?loadYoutubeHistoryManifest().catch(()=>null):Promise.resolve(null);
@@ -1114,6 +1147,7 @@ async function loadHistory(){
   if(query){
    parsedSearch=parseHistorySearchQuery(query,aliasRegistry);
    searchRows=historySearchRows(endedItems,parsedSearch);
+   renderHistorySearchIntent(parsedSearch,searchRows);
    endedItems=searchRows.map(row=>row.item);
   }
   const resultCount=endedItems.length,renderedItems=query?endedItems.slice(0,200):endedItems;
