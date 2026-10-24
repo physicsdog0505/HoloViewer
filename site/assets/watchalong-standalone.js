@@ -76,6 +76,7 @@ let hostWindow=null;
 let pttRows=[];
 let pttVisible=0;
 let pttFollowing=true;
+let pttUserScrollIntentUntil=0;
 const archiveManifestCache=new Map();
 let segments=[];
 let subtitles=[];
@@ -181,6 +182,9 @@ hostMuteToggle?.addEventListener('click',()=>{
  }catch{}
  refreshHostVolumeUi();
 });
+function markPttUserScrollIntent(ms=1800){pttUserScrollIntentUntil=performance.now()+ms}
+function hasPttUserScrollIntent(){return performance.now()<=pttUserScrollIntentUntil}
+function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
 function syncPttFromHostNow(){
  if(!hostPlayer||!hostWindow||!pttRows.length)return false;
  try{
@@ -490,9 +494,18 @@ try{
 }catch{}
 pttNewest.onclick=()=>{pttFollowing=true;pttFeed.scrollTop=pttFeed.scrollHeight;pttNewest.hidden=true};
 pttFeed.addEventListener('scroll',()=>{
- pttFollowing=pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48;
+ // Seeking can rebuild the PTT DOM and move scrollTop without user intent.
+ // Only explicit PTT scroll gestures are allowed to change follow state.
+ if(!hasPttUserScrollIntent())return;
+ pttFollowing=pttAtBottom();
  pttNewest.hidden=pttFollowing;
 },{passive:true});
+pttFeed.addEventListener('wheel',event=>{
+ markPttUserScrollIntent();
+ if(event.deltaY<0){pttFollowing=false;pttNewest.hidden=false}
+},{passive:true});
+pttFeed.addEventListener('touchstart',()=>markPttUserScrollIntent(2400),{passive:true});
+pttFeed.addEventListener('pointerdown',()=>markPttUserScrollIntent(2400),{passive:true});
 function clearImmersiveToolbarTimer(){clearTimeout(immersiveToolbarTimer);immersiveToolbarTimer=null}
 function hideImmersiveToolbar(){
  clearImmersiveToolbarTimer();
