@@ -10,8 +10,7 @@ from scripts.alias_static_assets_release_gate import (
     AliasReleaseGateError,
     validate_alias_contract,
     validate_alias_site_delta,
-    verify_declared_bytes,
-    youtube_manifest_paths,
+    validate_frontend_candidate_ownership,
 )
 
 
@@ -139,34 +138,34 @@ class AliasStaticAssetsReleaseGateTests(unittest.TestCase):
             with self.assertRaisesRegex(AliasReleaseGateError, "duplicate channel_id"):
                 validate_alias_contract(site)
 
-    def test_youtube_manifest_inventory_is_bounded_to_declared_prefix(self):
-        entries = youtube_manifest_paths({
-            "schema_version": 1,
-            "months": [{"path": "youtube/v1/current/2026-10.json", "bytes": 3, "sha256": SHA}],
-            "channel_indexes": [{"path": "youtube/v1/index/channels/UC.json", "bytes": 4, "sha256": "b" * 64}],
-        })
-        self.assertEqual(len(entries), 2)
+    def test_frontend_candidate_rejects_youtube_tree(self):
+        with tempfile.TemporaryDirectory() as temp:
+            site = Path(temp)
+            target = site / "youtube/v1/current/2026-10.json"
+            target.parent.mkdir(parents=True)
+            target.write_text("{}")
+            with self.assertRaisesRegex(AliasReleaseGateError, "foreign-owner Static Assets"):
+                validate_frontend_candidate_ownership(site)
 
-    def test_youtube_manifest_rejects_path_escape_or_wrong_prefix(self):
-        for bad in ("../secret", "site/assets/app.js", "/youtube/v1/manifest.json"):
-            with self.subTest(bad=bad):
-                with self.assertRaises(AliasReleaseGateError):
-                    youtube_manifest_paths({
-                        "schema_version": 1,
-                        "months": [{"path": bad, "bytes": 1, "sha256": SHA}],
-                        "channel_indexes": [],
-                    })
+    def test_frontend_candidate_rejects_ptt_tree(self):
+        with tempfile.TemporaryDirectory() as temp:
+            site = Path(temp)
+            target = site / "ptt/v1/manifests/static-assets-full-2026-10.json"
+            target.parent.mkdir(parents=True)
+            target.write_text("{}")
+            with self.assertRaisesRegex(AliasReleaseGateError, "foreign-owner Static Assets"):
+                validate_frontend_candidate_ownership(site)
 
-    def test_declared_youtube_bytes_must_match_hash_and_length(self):
-        data = b"abc"
-        entry = {
-            "path": "youtube/v1/current/2026-10.json",
-            "bytes": len(data),
-            "sha256": hashlib.sha256(data).hexdigest(),
-        }
-        verify_declared_bytes(data, entry)
-        with self.assertRaises(AliasReleaseGateError):
-            verify_declared_bytes(b"abd", entry)
+    def test_frontend_candidate_allows_frontend_and_alias_assets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            site = Path(temp)
+            (site / "assets").mkdir(parents=True)
+            (site / "assets/app.js").write_text("ok")
+            (site / "data/search/aliases/v1").mkdir(parents=True)
+            (site / "data/search/aliases/v1/latest.json").write_text("{}")
+            result = validate_frontend_candidate_ownership(site)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["forbidden_foreign_owner_asset_count"], 0)
 
 
 if __name__ == "__main__":
