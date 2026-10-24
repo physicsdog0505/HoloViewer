@@ -93,14 +93,16 @@ Do **not** use fuzzy edit-distance matching in V1. This corpus is intended to en
 
 `roboco choco`
 
-→ resolve to two canonical member IDs and treat this as **collab/co-occurrence intent**.
+→ resolve to two canonical member IDs and treat this as a **multi-member relevance query**, not a collab declaration.
 
 Ranking order:
 
-1. Canonical collab event / participant roster contains all requested member IDs.
-2. Host channel is one requested member and title/metadata resolves another requested member.
-3. Title/metadata resolves all requested members.
-4. Partial member matches as fallback, clearly ranked below full co-occurrence matches.
+1. Results with search evidence for all requested members.
+2. Results with search evidence for one requested member as fallback.
+
+Search evidence in V1 comes from stable host `channel_id` plus title/channel metadata alias matches.
+
+Important: matching multiple member names in title/metadata does **not** create canonical collab truth and must not add a collab badge. Existing collab materialization remains a separate authority used only by the existing collab presentation path.
 
 ### Member + free text
 
@@ -112,7 +114,7 @@ Ranking order:
 
 `roboco choco minecraft`
 
-→ collab/co-occurrence intent for Roboco + Choco, then rank/filter by minecraft.
+→ resolve Roboco + Choco as requested members, require the free-text keyword `minecraft`, and rank results related to both members ahead of one-member fallback results.
 
 ## Owner CRUD requirements for #50
 
