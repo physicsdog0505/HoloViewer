@@ -741,3 +741,36 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
    background:var(--surface)
  }
 }
+
+.top-status.history-time-machine{
+  color:var(--brand-main);
+  background:color-mix(in srgb,var(--brand-soft) 18%,#fff);
+  border:1px solid color-mix(in srgb,var(--brand-main) 22%,var(--line));
+  border-radius:999px;
+  padding:7px 11px;
+  box-shadow:0 1px 2px rgba(166,87,136,.08)
+}
+.top-status.history-time-machine:hover,
+.top-status.history-time-machine:focus-visible{
+  background:color-mix(in srgb,var(--brand-soft) 28%,#fff);
+  outline:none;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--brand-soft) 28%,transparent)
+}
+#history .section-head:has(#history-heading:empty){display:none}
+@media(max-width:760px){
+  .rail-nav a{min-width:0!important}
+  .rail-nav a .rail-icon{
+    width:30px!important;
+    min-width:30px!important;
+    height:30px!important;
+    margin:0 auto!important;
+    display:grid!important;
+    place-items:center!important;
+  }
+  .rail-nav a[data-route="ptt"] .rail-icon,
+  .rail-nav a[href="/ptt-today/"] .rail-icon,
+  .rail-nav a[href="/ptt-today"] .rail-icon{
+    font-size:13px!important;
+    line-height:30px!important;
+  }
+}
