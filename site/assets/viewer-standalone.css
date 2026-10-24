@@ -591,3 +591,29 @@ body.immersive .viewer-workspace.workspace-focus.layout-primary{
  background:#e6213c;
  vertical-align:1px;
 }
+
+
+/* Mobile Viewer V1: isolate phone geometry from desktop layout.
+   Keep exactly one primary and one selectable secondary card visible. */
+.mobile-secondary-pager{display:none}
+@media(max-width:760px){
+  .viewer-main{padding-bottom:calc(86px + env(safe-area-inset-bottom))}
+  .viewer-stage{display:grid!important;grid-template-columns:1fr!important;grid-template-rows:none!important;gap:8px}
+  .viewer-stage .player-card.viewer-hidden{display:none!important}
+  .viewer-stage .player-card.mobile-primary,
+  .viewer-stage .player-card.mobile-secondary{
+    display:flex!important;grid-column:1!important;grid-row:auto!important;width:100%;aspect-ratio:16/9;height:auto
+  }
+  .viewer-stage .player-card.mobile-primary{order:1}
+  .viewer-stage .player-card.mobile-secondary{order:2}
+  .viewer-stage .player-card.mobile-secondary .mobile-secondary-pager{
+    display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;
+    min-height:38px;background:#151515;border-top:1px solid #2b2b2b;color:#eee
+  }
+  .mobile-secondary-pager button{
+    height:38px;border:0;background:transparent;color:#fff;font-size:28px;line-height:1;cursor:pointer
+  }
+  .mobile-secondary-status{text-align:center;font-size:11px;font-weight:800;color:#b8bec3;font-variant-numeric:tabular-nums}
+  .viewer-stage .player-card.mobile-primary .mobile-secondary-pager{display:none}
+  body.mode-multi .viewer-controls{max-height:min(54vh,420px);overflow:auto}
+}
