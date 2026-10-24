@@ -80,14 +80,15 @@ body.ptt-focus-mode .ptt-toolbar .subtle-action{font-size:11px;padding:6px 9px}
  .client-main{
   height:calc(100dvh - 58px);
   max-width:none;
-  padding:8px 8px calc(66px + env(safe-area-inset-bottom));
+  padding:8px 8px calc(82px + env(safe-area-inset-bottom));
   overflow:hidden
  }
  .ptt-shell{max-width:none;height:100%;min-height:0}
  .page-head,.ptt-toolbar{display:none!important}
  .ptt-reader{
   height:100%;min-height:0;border-radius:14px;box-shadow:none;
-  overscroll-behavior:contain
+  overscroll-behavior:contain;
+  margin-bottom:2px
  }
  .ptt-reader .pushes{
   height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain;
