@@ -1044,7 +1044,10 @@ function parseHistorySearchQuery(raw,registry){
  for(let index=0;index<terms.length;index++){
   if(consumed.has(index))continue;
   const matches=weak.get(terms[index])||[];
-  if(matches.length===1)weakHints.push({term:terms[index],member:matches[0]});
+  if(matches.length===1){
+   weakHints.push({term:terms[index],member:matches[0]});
+   consumed.add(index);
+  }
  }
  const keywords=terms.filter((_,index)=>!consumed.has(index));
  return {
@@ -1071,10 +1074,11 @@ function historyKeywordMatches(item,keyword){
 function historySearchScore(item,parsed){
  const matched=parsed.members.filter(member=>historyMemberMatched(item,member)).length;
  const keywordMatched=parsed.keywords.filter(keyword=>historyKeywordMatches(item,keyword)).length;
+ const weakHintMatched=(parsed.weakHints||[]).filter(hint=>historyMemberMatched(item,hint.member)||historyKeywordMatches(item,hint.term)).length;
  const allMembers=parsed.members.length>0&&matched===parsed.members.length;
  const allKeywords=parsed.keywords.length===0||keywordMatched===parsed.keywords.length;
  const hostRequested=parsed.memberIds.has(String(item?.channel_id||''))?1:0;
- return {matched,keywordMatched,allMembers,allKeywords,hostRequested};
+ return {matched,keywordMatched,weakHintMatched,allMembers,allKeywords,hostRequested};
 }
 function historySearchRows(items,parsed){
  const scored=items.map(item=>({item,score:historySearchScore(item,parsed)}));
@@ -1087,6 +1091,7 @@ function historySearchRows(items,parsed){
  filtered.sort((a,b)=>
   Number(b.score.allMembers)-Number(a.score.allMembers)||
   b.score.matched-a.score.matched||
+  b.score.weakHintMatched-a.score.weakHintMatched||
   b.score.hostRequested-a.score.hostRequested||
   b.score.keywordMatched-a.score.keywordMatched||
   Date.parse(String(b.item.actual_start||b.item.scheduled_start||0))-Date.parse(String(a.item.actual_start||a.item.scheduled_start||0))
