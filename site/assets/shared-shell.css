@@ -47,7 +47,7 @@ button,input,select{font:inherit}
 @media(max-width:760px){
   body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
   .client-rail{
-    display:block;position:fixed;left:10px;right:10px;top:auto;
+    display:block;position:fixed;left:24px;right:24px;top:auto;
     bottom:calc(8px + env(safe-area-inset-bottom));width:auto;height:50px;
     padding:3px 6px;border:1px solid rgba(230,225,218,.9);border-radius:16px;
     background:rgba(255,253,250,.92);backdrop-filter:blur(20px);
