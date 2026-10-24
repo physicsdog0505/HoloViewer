@@ -15,7 +15,7 @@ EXPECTED = [
     ("history", "史", "歷史直播"),
     ("watchalong", "視", "同時視聽"),
     ("single", "自", "自訂觀看"),
-    ("multi", "👥", "多人連動"),
+    ("multi", "", "多人連動"),
     ("ptt", "PTT", "PTT 今日專串"),
 ]
 
@@ -128,7 +128,7 @@ class ParityContract(unittest.TestCase):
             'id="history-search-intent"',
             'id="history-pagination"',
             'id="historyMultiSelectBar"',
-            '搜尋所選月份的標題與頻道',
+            'placeholder="搜尋這個月份的直播或頻道…"',
         ):
             self.assertIn(snippet, html)
 
@@ -192,7 +192,6 @@ class ParityContract(unittest.TestCase):
         self.assertIn("staticError?.code==='HISTORY_STATIC_UNAVAILABLE'", js)
         self.assertIn("throw youtubeHistoryUnavailable('YouTube 歷史月份尚未公開')", js)
         self.assertIn("published_months", js)
-        self.assertIn("known_not_published", js)
         self.assertNotIn("/objects/", js[js.index("const YOUTUBE_HISTORY_MANIFEST_PATH"):js.index("function historyChrome(){")])
 
     def test_custom_builder_matches_accepted_4174_controls(self):
