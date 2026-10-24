@@ -1706,8 +1706,11 @@ document.querySelectorAll('[data-route]').forEach(link=>link.addEventListener('c
  $('historyPrevDay').onclick=()=>historySetDay(shiftDay($('historyDate').value,-1));
  $('historyNextDay').onclick=()=>historySetDay(shiftDay($('historyDate').value,1));
  $('historyYesterday').onclick=()=>historySetDay(historyBounds().latest);
- let historySearchTimer=null;
- $('historySearch').addEventListener('input',()=>{clearTimeout(historySearchTimer);historySearchTimer=setTimeout(()=>{state.offset=0;loadHistory()},180)});
+ let historySearchFrame=0;
+ $('historySearch').addEventListener('input',()=>{
+  if(historySearchFrame)cancelAnimationFrame(historySearchFrame);
+  historySearchFrame=requestAnimationFrame(()=>{historySearchFrame=0;state.offset=0;loadHistory()});
+ });
 }
 renderMulti();
 const hashRoute=location.hash.substring(1).split('?')[0];
