@@ -417,6 +417,14 @@ function homeStartLabel(item,{includeYear=false}={}){
  const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
  return (includeYear?out.year+'/':'')+out.month+'/'+out.day+' '+out.hour+':'+out.minute;
 }
+function historyDurationLabel(item){
+ const start=Date.parse(String(item?.actual_start||item?.start_at||item?.scheduled_start||''));
+ const end=Date.parse(String(item?.actual_end||item?.end_at||''));
+ if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return '';
+ const minutes=Math.max(1,Math.round((end-start)/60000));
+ const hours=Math.floor(minutes/60),rest=minutes%60;
+ return hours?(hours+'小時'+(rest?rest+'分':'')):(minutes+'分');
+}
 function homeAvatarUrl(item){
  const raw=String(item.avatar_url||'');
  try{
@@ -621,7 +629,7 @@ function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={})
  const youTube=node('span','YouTube ↗','youtube-source-link');youTube.role='link';youTube.tabIndex=0;youTube.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;thumb.append(youTube);
  const overlay=node('div',undefined,'thumb-overlay');
  if(!history)overlay.append(node('span',status[0],'thumb-badge '+status[1]));
- const time=homeStartLabel(item,{includeYear:history});overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
+ const time=homeStartLabel(item,{includeYear:history});const duration=history?historyDurationLabel(item):'';overlay.append(node('span',time+(duration?' · '+duration:''),'thumb-time'));thumb.append(overlay);card.append(thumb);
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
