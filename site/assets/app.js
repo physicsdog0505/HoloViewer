@@ -1107,7 +1107,6 @@ function parseHistoryDateIntent(raw,yearHint=''){
   const start=historyNormalizeDateToken(range[1],yearHint),end=historyNormalizeDateToken(range[2],start.slice(0,4)||yearHint);
   if(!start||!end||start>end)return {kind:'invalid_range'};
   const span=Math.floor((Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000)+1;
-  if(span>62)return {kind:'range_too_large',start,end,span};
   if(!historyDateValid(start)||!historyDateValid(end))return {kind:'invalid_range'};
   return {kind:'range',start,end,span};
  }
@@ -1118,11 +1117,28 @@ function parseHistoryDateIntent(raw,yearHint=''){
  }
  return null;
 }
+function parseHistoryCombinedIntent(raw,yearHint=''){
+ const value=String(raw||'').trim();
+ if(!value)return {dateIntent:null,query:''};
+ const range=value.match(/(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*[~～]\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)/);
+ if(range){
+  const dateIntent=parseHistoryDateIntent(range[0],yearHint);
+  return {dateIntent,query:value.replace(range[0],' ').replace(/\s+/g,' ').trim()};
+ }
+ const single=value.match(/(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)/);
+ if(single){
+  const dateIntent=parseHistoryDateIntent(single[0],yearHint);
+  if(dateIntent?.kind==='day'){
+   return {dateIntent:{kind:'range',start:dateIntent.day,end:dateIntent.day,span:1},query:value.replace(single[0],' ').replace(/\s+/g,' ').trim(),singleDay:dateIntent.day};
+  }
+ }
+ return {dateIntent:null,query:value};
+}
 function historyMonthsBetween(start,end){
  const months=[];
  let cursor=start.slice(0,7);
  const last=end.slice(0,7);
- while(cursor<=last&&months.length<3){
+ while(cursor<=last){
   months.push(cursor);
   const [y,m]=cursor.split('-').map(Number);
   const next=new Date(Date.UTC(y,m,1));
@@ -1309,11 +1325,12 @@ async function loadHistory(){
  const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';const intentBox=$('history-search-intent');if(intentBox){intentBox.replaceChildren();intentBox.hidden=true}
  if(!config.youtubeStaticBase&&!config.apiBase){error.textContent='History 資料來源尚未設定。';error.hidden=false;return}
  try{
-  const dateIntent=parseHistoryDateIntent(query,day.slice(0,4));
-  if(dateIntent?.kind==='range_too_large'){throw Error('日期區間最多 62 天')}
+  const combinedIntent=parseHistoryCombinedIntent(query,day.slice(0,4));
+  const dateIntent=combinedIntent.dateIntent,searchQuery=combinedIntent.query;
   if(dateIntent?.kind==='invalid_range'){throw Error('日期區間格式或範圍不正確')}
-  if(dateIntent?.kind==='day'){
-   $('historyDate').value=dateIntent.day;
+  const pureDateIntent=parseHistoryDateIntent(query,day.slice(0,4));
+  if(pureDateIntent?.kind==='day'){
+   $('historyDate').value=pureDateIntent.day;
    $('historySearch').value='';
    state.offset=0;
    return loadHistory();
@@ -1322,7 +1339,7 @@ async function loadHistory(){
   const historyPromise=dateIntent?.kind==='range'
    ?loadYoutubeHistoryRange(dateIntent.start,dateIntent.end)
    :query?loadYoutubeHistorySearchMonth(day):loadHistoryData(day,state.offset);
-  const aliasesPromise=query&&!dateIntent?loadHistoryMemberAliases():Promise.resolve(null);
+  const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);
   const collabPromise=!query&&config.apiBase?api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null):Promise.resolve(null);
   const catalogPromise=config.apiBase
    ?(homeCatalogRows.length
@@ -1336,8 +1353,8 @@ async function loadHistory(){
   const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows);
   let endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
   let parsedSearch=null,searchRows=[];
-  if(query&&!dateIntent){
-   parsedSearch=parseHistorySearchQuery(query,aliasRegistry);
+  if(searchQuery){
+   parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry);
    searchRows=historySearchRows(endedItems,parsedSearch);
    renderHistorySearchIntent(parsedSearch,searchRows);
    endedItems=searchRows.map(row=>row.item);
@@ -1350,8 +1367,9 @@ async function loadHistory(){
   const total=Number(data.total||0);if(!renderedItems.length)$('history-empty').hidden=false;
   if(query){
    if(dateIntent?.kind==='range'){
-    $('history-empty').textContent='這個日期區間沒有可顯示的已結束直播。';
-    $('history-search-summary').textContent=dateIntent.start+' ～ '+dateIntent.end+' · '+(resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆':'找到 '+resultCount+' 筆');
+    $('history-empty').textContent=searchQuery?'這個日期區間沒有符合搜尋條件的已結束直播。':'這個日期區間沒有可顯示的已結束直播。';
+    const searchLabel=searchQuery?' · 搜尋：'+searchQuery:'';
+    $('history-search-summary').textContent=dateIntent.start+' ～ '+dateIntent.end+searchLabel+' · '+(resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆':'找到 '+resultCount+' 筆');
    }else{
     $('history-empty').textContent='這個月份沒有符合搜尋條件的已結束直播。';
     const resolved=parsedSearch?.members?.map(member=>member.canonical_name).join(' + ')||'';
