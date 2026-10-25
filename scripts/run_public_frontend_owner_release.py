@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -160,9 +161,29 @@ def ownership_gate(repo: Path) -> dict:
     return {"forbidden_count": 0, "status": "PASS"}
 
 
+CF_BEACON_RE = re.compile(
+    rb'<script(?=[^>]*\\bsrc="https://static\\.cloudflareinsights\\.com/beacon\\.min\\.js/[^"]+")'
+    rb'(?=[^>]*\\bdata-cf-beacon=)[^>]*></script>'
+)
+
+
+def normalize_custom_html_edge(data: bytes) -> bytes:
+    matches = list(CF_BEACON_RE.finditer(data))
+    if len(matches) > 1:
+        raise ReleaseBlocked("multiple Cloudflare Insights beacon injections in custom-domain HTML")
+    if not matches:
+        return data
+    match = matches[0]
+    return data[:match.start()] + data[match.end():]
+
+
 def verify_bytes(origin: str, rel: str, expected: bytes, label: str) -> None:
     actual = fetch(origin, "/" + rel)
-    if actual is None or actual != expected:
+    if actual is None:
+        raise ReleaseBlocked(f"{label} byte mismatch at /{rel}")
+    if origin == CUSTOM_ORIGIN and rel.endswith(".html"):
+        actual = normalize_custom_html_edge(actual)
+    if actual != expected:
         raise ReleaseBlocked(f"{label} byte mismatch at /{rel}")
 
 
