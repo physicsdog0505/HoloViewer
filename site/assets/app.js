@@ -1087,7 +1087,7 @@ function normalizeHistorySearchText(value){
 }
 function historyQuery(){return String($('historySearch')?.value||'').trim()}
 function historyNormalizeDateToken(token,yearHint=''){
- const raw=String(token||'').trim().replace(/[.]/g,'/').replace(/-/g,'/');
+ const raw=String(token||'').normalize('NFKC').trim().replace(/[.]/g,'/').replace(/-/g,'/');
  const parts=raw.split('/').filter(Boolean);
  if(parts.length!==2&&parts.length!==3)return '';
  const fallbackYear=/^\d{4}$/.test(String(yearHint))?Number(yearHint):Number(taipeiDay().slice(0,4));
@@ -1100,7 +1100,7 @@ function historyNormalizeDateToken(token,yearHint=''){
  return String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
 }
 function parseHistoryDateIntent(raw,yearHint=''){
- const value=String(raw||'').trim();
+ const value=String(raw||'').normalize('NFKC').trim();
  if(!value)return null;
  const range=value.match(/^\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*[~～]\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*$/);
  if(range){
@@ -1118,7 +1118,7 @@ function parseHistoryDateIntent(raw,yearHint=''){
  return null;
 }
 function parseHistoryCombinedIntent(raw,yearHint=''){
- const value=String(raw||'').trim();
+ const value=String(raw||'').normalize('NFKC').trim();
  if(!value)return {dateIntent:null,query:''};
  const range=value.match(/(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*[~～]\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)/);
  if(range){
