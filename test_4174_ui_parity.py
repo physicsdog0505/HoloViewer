@@ -196,25 +196,33 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const generation=++historyLoadGeneration;", js)
         self.assertGreaterEqual(js.count("if(generation!==historyLoadGeneration)return;"), 3)
 
-        self.assertIn("const HISTORY_CONTENT_ALIAS_GROUPS=[", js)
-        for snippet in (
-            "['歌回','歌枠','歌配信','カラオケ','karaoke','singing','singing stream']",
-            "['雜談','杂谈','雑談','おしゃべり','zatsudan','chatting','free talk']",
-            "['minecraft','mine craft','マインクラフト','マイクラ','麥塊','麦块','我的世界']",
-            "['valorant','ヴァロラント','ヴァロ','特戰英豪','特战英豪']",
-            "['monster hunter','monsterhunter','モンスターハンター','モンハン','魔物獵人','魔物猎人']",
-            "['street fighter 6','streetfighter6','sf6','ストリートファイター6','スト6','快打旋風6','快打旋风6']",
-            "['final fantasy xiv','final fantasy 14','ffxiv','ff14'",
-            "['resident evil','resident evil village','biohazard','バイオハザード','惡靈古堡','恶灵古堡']",
-            "['mahjong soul','mahjongsoul','雀魂','麻雀','mahjong','麻將','麻将']",
-            "['holocure','holo cure','ホロキュア']",
+        self.assertIn("const HISTORY_CONTENT_ALIASES_PATH='/assets/search/history-content-aliases.v1.json';", js)
+        self.assertIn("async function loadHistoryContentAliases()", js)
+        self.assertIn("function historyContentAliasGroups(registry)", js)
+        self.assertIn("function historyCollapseContentAliasPhrases(value,registry)", js)
+        self.assertIn("function historyKeywordVariants(keyword,registry)", js)
+        self.assertIn("const contentAliasesPromise=searchQuery?loadHistoryContentAliases():Promise.resolve(null);", js)
+        self.assertIn("parseHistorySearchQuery(searchQuery,aliasRegistry,contentAliasRegistry)", js)
+        self.assertNotIn("const HISTORY_CONTENT_ALIAS_GROUPS=[", js)
+
+        aliases = json.loads((ROOT / "site/assets/search/history-content-aliases.v1.json").read_text(encoding="utf-8"))
+        self.assertEqual(aliases["schema_version"], 1)
+        self.assertEqual(aliases["dataset"], "holodocchi-history-content-aliases-v1")
+        self.assertEqual(aliases["ownership"], "frontend-code-owned")
+        self.assertGreaterEqual(len(aliases["groups"]), 90)
+        flat_groups = [set(group) for group in aliases["groups"]]
+        for expected in (
+            {"歌回", "歌枠", "karaoke"},
+            {"雜談", "雑談", "zatsudan"},
+            {"minecraft", "マイクラ", "麥塊"},
+            {"monster hunter", "モンハン", "魔物獵人"},
+            {"street fighter 6", "スト6", "快打旋風6"},
+            {"final fantasy xiv", "ff14", "ファイナルファンタジー14"},
+            {"resident evil", "バイオハザード", "惡靈古堡"},
+            {"mahjong soul", "雀魂", "麻將"},
+            {"holocure", "ホロキュア"},
         ):
-            self.assertIn(snippet, js)
-        self.assertIn("const HISTORY_CONTENT_ALIAS_PHRASES=", js)
-        self.assertIn("function historyCollapseContentAliasPhrases(value)", js)
-        self.assertIn("const terms=historyCollapseContentAliasPhrases(normalizeHistorySearchText(raw)).split(' ').filter(Boolean);", js)
-        self.assertIn("function historyKeywordVariants(keyword)", js)
-        self.assertIn("return historyKeywordVariants(keyword).some(variant=>historyAliasMatchesText(text,variant));", js)
+            self.assertTrue(any(expected.issubset(group) for group in flat_groups), expected)
 
         self.assertIn("const historyChannelSelection=new Set();", js)
         self.assertIn("function historyChannelFacetEntries(rows)", js)
