@@ -162,8 +162,8 @@ def ownership_gate(repo: Path) -> dict:
 
 
 CF_BEACON_RE = re.compile(
-    rb'<script(?=[^>]*\\bsrc="https://static\\.cloudflareinsights\\.com/beacon\\.min\\.js/[^"]+")'
-    rb'(?=[^>]*\\bdata-cf-beacon=)[^>]*></script>'
+    rb'<script(?=[^>]*\bsrc="https://static\.cloudflareinsights\.com/beacon\.min\.js/[^"]+")'
+    rb'(?=[^>]*\bdata-cf-beacon=)[^>]*></script>'
 )
 
 
