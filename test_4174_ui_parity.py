@@ -1455,6 +1455,20 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_watchalong_landing_uses_stable_channel_id_batch_profiles(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn('function watchalongProfileByChannel(channelId,fallback=null)',js)
+        self.assertIn('function watchalongChannelByVideo(todayRows,recentEvents)',js)
+        self.assertIn("String(host?.channel_id||'')",js)
+        self.assertIn('const channelByVideo=watchalongChannelByVideo(todayRows,recentEvents)',js)
+        self.assertIn('const watchalongChannelIds=[...new Set(channelByVideo.values())]',js)
+        self.assertIn('await loadCanonicalChannelProfiles(watchalongChannelIds)',js)
+        self.assertIn('canonicalChannelProfileCache.get(id)||fallback||null',js)
+        self.assertIn("const channelId=String(host.channel_id||channelByVideo.get(videoId)||'')",js)
+        self.assertIn("const channelId=String(row?.channel_id||channelByVideo.get(videoId)||'')",js)
+        self.assertNotIn('function watchalongProfile(label,rows=[])',js)
+        self.assertNotIn('name.includes(key)||key.includes(name)',js)
+
     def test_watchalong_landing_cards_expose_youtube_without_hijacking_primary_action(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
