@@ -1455,6 +1455,33 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_watchalong_past_uses_recent_history_months_without_touching_featured(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+
+        self.assertIn('const recentMonths=published.slice(-2);',js)
+        self.assertIn('.filter(row=>watchalongCandidateTitle(row?.title));',js)
+        self.assertIn('watchalongPastRows=historyRows.map(row=>historyDisplayRow(row,canonical));',js)
+        self.assertIn('renderWatchalongPastRows(curatedHosts);',js)
+        self.assertNotIn("api('/v1/watchalong/recent?days=90&limit=100')",js)
+        self.assertIn('id="watchalongPastSearch"',html)
+        self.assertIn("fetch('/data/watchalong/manifest.json'",js)
+        self.assertIn("href:'/watchalong-viewer/?watchalong_event='",js)
+
+    def test_history_search_accepts_single_dates_and_bounded_cross_month_ranges(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+
+        self.assertIn('function parseHistoryDateIntent(raw,yearHint=\'\')',js)
+        self.assertIn("return {kind:'range',start,end,span};",js)
+        self.assertIn("if(span>62)return {kind:'range_too_large',start,end,span};",js)
+        self.assertIn('async function loadYoutubeHistoryRange(start,end)',js)
+        self.assertIn("historyMonthsBetween(start,end)",js)
+        self.assertIn("if(dateIntent?.kind==='day')",js)
+        self.assertIn("return loadHistory();",js)
+        self.assertIn("dateIntent?.kind==='range'",js)
+        self.assertIn('9/10~10/15',html)
+
     def test_watchalong_landing_uses_stable_channel_id_batch_profiles(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn('function watchalongProfileByChannel(channelId,fallback=null)',js)
