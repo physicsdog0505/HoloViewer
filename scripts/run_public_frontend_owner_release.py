@@ -293,31 +293,58 @@ def reconcile_runtime(repo: Path, base: str, head: str) -> dict:
     return {"protected_runtime_assets": sorted(set(protected)), "status": "PASS"}
 
 
+def _legacy_frontend_youtube_manifest() -> dict | None:
+    custom = fetch(CUSTOM_ORIGIN, "/youtube/v1/manifest.json", allow_404=True)
+    workers = fetch(WORKERS_ORIGIN, "/youtube/v1/manifest.json", allow_404=True)
+
+    custom_fallback = is_spa_fallback_html(custom)
+    workers_fallback = is_spa_fallback_html(workers)
+
+    if custom_fallback or workers_fallback:
+        if custom_fallback and workers_fallback:
+            return None
+        raise ReleaseBlocked("legacy frontend YouTube manifest exists on only one Production origin")
+
+    if custom is None or workers is None:
+        if custom is None and workers is None:
+            return None
+        raise ReleaseBlocked("legacy frontend YouTube manifest exists on only one Production origin")
+
+    if custom != workers:
+        raise ReleaseBlocked("legacy frontend YouTube manifest differs between Production origins")
+
+    try:
+        obj = json.loads(custom)
+    except ValueError as exc:
+        raise ReleaseBlocked("legacy frontend YouTube manifest is not JSON") from exc
+    if not isinstance(obj, dict):
+        raise ReleaseBlocked("legacy frontend YouTube manifest is not an object")
+    return obj
+
+
 def enumerate_first_run_foreign(repo: Path) -> dict:
     paths = {"youtube": [], "ptt": []}
-    yraw = fetch(CUSTOM_ORIGIN, "/youtube/v1/manifest.json", allow_404=True)
-    if yraw:
+    obj = _legacy_frontend_youtube_manifest()
+    if obj is not None:
         paths["youtube"].append("/youtube/v1/manifest.json")
-        try:
-            obj = json.loads(yraw)
-            def walk(v):
-                if isinstance(v, dict):
-                    for x in v.values():
-                        walk(x)
-                elif isinstance(v, list):
-                    for x in v:
-                        walk(x)
-                elif isinstance(v, str):
-                    if v.startswith("http://") or v.startswith("https://"):
-                        return
-                    p = "/" + v.lstrip("/")
-                    if p.startswith("/youtube/v1/"):
-                        paths["youtube"].append(p)
-                    elif p.endswith(".json"):
-                        paths["youtube"].append("/youtube/v1/" + p.lstrip("/"))
-            walk(obj)
-        except ValueError:
-            raise ReleaseBlocked("legacy frontend YouTube manifest is not JSON")
+
+        def walk(v):
+            if isinstance(v, dict):
+                for x in v.values():
+                    walk(x)
+            elif isinstance(v, list):
+                for x in v:
+                    walk(x)
+            elif isinstance(v, str):
+                if v.startswith("http://") or v.startswith("https://"):
+                    return
+                p = "/" + v.lstrip("/")
+                if p.startswith("/youtube/v1/"):
+                    paths["youtube"].append(p)
+                elif p.endswith(".json"):
+                    paths["youtube"].append("/youtube/v1/" + p.lstrip("/"))
+
+        walk(obj)
 
     _, ptt = parse_frontend_config(repo)
     for _, manifest in ptt:
