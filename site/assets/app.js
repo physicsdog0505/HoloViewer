@@ -1190,7 +1190,7 @@ function historyAliasIndex(registry,strength){
  return new Map([...map].map(([key,members])=>[key,[...members.values()]]));
 }
 function parseHistorySearchQuery(raw,registry){
- const terms=normalizeHistorySearchText(raw).split(' ').filter(Boolean);
+ const terms=historyCollapseContentAliasPhrases(normalizeHistorySearchText(raw)).split(' ').filter(Boolean);
  const strong=historyAliasIndex(registry,'strong'),weak=historyAliasIndex(registry,'weak');
  const members=[],memberIds=new Set(),consumed=new Set(),weakHints=[];
  const acceptStrong=(member,indexes)=>{
@@ -1241,41 +1241,145 @@ function historyMemberMatched(item,member){
  return historyMemberAliases(member).some(alias=>historyAliasMatchesText(text,alias));
 }
 const HISTORY_CONTENT_ALIAS_GROUPS=[
- ['歌回','歌枠','歌配信','karaoke','singing','singingstream'],
- ['雜談','杂谈','雑談','zatsudan','chatting','freetalk'],
- ['同時視聽','同时视听','同時視聴','watchalong','watch-along'],
- ['生日','誕生日','birthday'],
- ['周年','週年','anniversary'],
- ['新衣裝','新衣装','新服裝','新服装','newoutfit','outfitreveal'],
- ['重大告知','重要告知','announcement','bigannouncement'],
- ['料理','cooking'],
- ['耐久','endurance'],
- ['凸待','凸待ち','callin'],
- ['asmr'],
- ['minecraft','マイクラ','麥塊','麦块','我的世界'],
- ['apex','エーペックス','エペ'],
+ // Stream / content types.
+ ['歌回','歌枠','歌配信','カラオケ','karaoke','singing','singing stream'],
+ ['雜談','杂谈','雑談','おしゃべり','zatsudan','chatting','free talk'],
+ ['同時視聽','同时视听','同時視聴','ウォッチパーティー','watchalong','watch along','watch-along'],
+ ['遊戲','游戏','ゲーム','game','gaming','gameplay'],
+ ['生日','誕生日','birthday','birthday live'],
+ ['周年','週年','周年記念','anniversary'],
+ ['新衣裝','新衣装','新服裝','新服装','衣装お披露目','new outfit','outfit reveal'],
+ ['重大告知','重要告知','告知','announcement','big announcement'],
+ ['3d live','3dlive','3dライブ','3d演唱會','3d演唱会'],
+ ['料理','料理配信','cooking'],
+ ['手作','工作','作業','作业','作業配信','作业直播','作業雑談','work stream'],
+ ['繪圖','绘图','畫畫','画画','お絵描き','イラスト','drawing','art stream'],
+ ['手元','手元配信','handcam','hand cam'],
+ ['開箱','开箱','開封','unboxing'],
+ ['耐久','耐久配信','endurance'],
+ ['凸待','凸待ち','call in','call-in'],
+ ['朝活','早安台','早安臺','morning stream','morning'],
+ ['深夜','深夜配信','late night'],
+ ['企劃','企划','企画','event','special stream'],
+ ['大會','大会','比賽','比赛','tournament'],
+ ['挑戰','挑战','チャレンジ','challenge'],
+ ['速通','rta','speedrun','speed run'],
+ ['asmr','耳語','耳语','囁き','whispering'],
+ ['歌唱比賽','歌唱比赛','歌謡祭','music festival','歌祭'],
+ ['live','ライブ','演唱會','演唱会','concert'],
+
+ // Sandbox / survival / party.
+ ['minecraft','mine craft','マインクラフト','マイクラ','麥塊','麦块','我的世界'],
+ ['ark','ark survival evolved','ark survival ascended','アーク'],
+ ['rust','ラスト'],
+ ['terraria','テラリア','泰拉瑞亞','泰拉瑞亚'],
+ ['palworld','pal world','パルワールド','幻獸帕魯','幻兽帕鲁'],
+ ['among us','amongus','アモングアス','アモアス','太空狼人殺','太空狼人杀'],
+ ['fall guys','fallguys','フォールガイズ','糖豆人'],
+ ['human fall flat','humanfallflat','ヒューマンフォールフラット','人類一敗塗地','人类一败涂地'],
+ ['lethal company','lethalcompany','リーサルカンパニー'],
+ ['content warning','contentwarning','コンテントウォーニング'],
+ ['chained together','chainedtogether','チェインドトゥギャザー'],
+
+ // Competitive / shooters.
+ ['apex','apex legends','エーペックス','エペ'],
  ['valorant','ヴァロラント','ヴァロ','特戰英豪','特战英豪'],
- ['splatoon','スプラトゥーン','スプラ','漆彈','漆弹'],
- ['mariokart','マリオカート','マリカ','瑪利歐賽車','玛利欧赛车'],
- ['pokemon','pokémon','ポケモン','寶可夢','宝可梦'],
- ['monsterhunter','モンスターハンター','モンハン','魔物獵人','魔物猎人'],
- ['eldenring','エルデンリング','艾爾登法環','艾尔登法环'],
- ['streetfighter6','sf6','ストリートファイター6','スト6','快打旋風6','快打旋风6'],
- ['leagueoflegends','lol','リーグオブレジェンド','英雄聯盟','英雄联盟'],
+ ['overwatch','overwatch 2','ow2','オーバーウォッチ','鬥陣特攻','斗阵特攻'],
  ['fortnite','フォートナイト','要塞英雄'],
- ['ark','アーク'],
- ['gta','グラセフ','俠盜獵車手','侠盗猎车手'],
- ['rust'],
- ['overwatch','overwatch2','オーバーウォッチ','鬥陣特攻','斗阵特攻'],
- ['supermariobros','マリオ','瑪利歐','玛利欧'],
- ['zelda','ゼルダ','薩爾達','塞尔达'],
- ['animalcrossing','あつ森','どうぶつの森','動物森友會','动物森友会']
-].map(group=>group.map(value=>normalizeHistorySearchText(value).replace(/ /g,'')));
+ ['pubg','playerunknowns battlegrounds','パブジー','絕地求生','绝地求生'],
+ ['rainbow six siege','rainbowsixsiege','r6s','レインボーシックス シージ','虹彩六號','彩虹六号'],
+ ['counter strike 2','counterstrike2','cs2','カウンターストライク2'],
+
+ // Nintendo / family.
+ ['splatoon','splatoon 3','スプラトゥーン','スプラ','漆彈','漆弹'],
+ ['mario kart','mariokart','マリオカート','マリカ','瑪利歐賽車','玛利欧赛车'],
+ ['super mario','super mario bros','supermario','スーパーマリオ','マリオ','瑪利歐','玛利欧'],
+ ['zelda','the legend of zelda','legend of zelda','ゼルダ','ゼルダの伝説','薩爾達','萨尔达'],
+ ['animal crossing','animalcrossing','どうぶつの森','あつ森','動物森友會','动物森友会'],
+ ['pokemon','pokémon','ポケットモンスター','ポケモン','寶可夢','宝可梦'],
+ ['smash bros','super smash bros','スマブラ','大亂鬥','大乱斗'],
+ ['kirby','星のカービィ','カービィ','卡比'],
+ ['pikmin','ピクミン','皮克敏'],
+
+ // Action RPG / soulslike.
+ ['monster hunter','monsterhunter','モンスターハンター','モンハン','魔物獵人','魔物猎人'],
+ ['elden ring','eldenring','エルデンリング','艾爾登法環','艾尔登法环'],
+ ['dark souls','darksouls','ダークソウル','黑暗靈魂','黑暗之魂'],
+ ['sekiro','隻狼','只狼','せきろ','セキロ'],
+ ['bloodborne','ブラッドボーン','血源詛咒','血源诅咒'],
+ ['nioh','仁王'],
+ ['dragon s dogma','dragons dogma','ドラゴンズドグマ','龍族教義','龙之信条'],
+
+ // Fighters / MOBA.
+ ['street fighter 6','streetfighter6','sf6','ストリートファイター6','スト6','快打旋風6','快打旋风6'],
+ ['tekken 8','tekken8','鉄拳8','鐵拳8','铁拳8'],
+ ['guilty gear strive','guiltygearstrive','ggst','ギルティギア ストライヴ','聖騎士之戰','罪恶装备'],
+ ['league of legends','leagueoflegends','lol','リーグオブレジェンド','英雄聯盟','英雄联盟'],
+
+ // RPG / long-form.
+ ['final fantasy xiv','final fantasy 14','ffxiv','ff14','ファイナルファンタジー14','ファイナルファンタジーxiv','最終幻想14','最终幻想14'],
+ ['final fantasy vii','final fantasy 7','ff7','ファイナルファンタジー7','最終幻想7','最终幻想7'],
+ ['dragon quest','dragonquest','ドラクエ','ドラゴンクエスト','勇者鬥惡龍','勇者斗恶龙'],
+ ['persona 3','persona3','ペルソナ3','女神異聞錄3','女神异闻录3'],
+ ['persona 5','persona5','ペルソナ5','女神異聞錄5','女神异闻录5'],
+ ['honkai star rail','honkaistarrail','崩壊スターレイル','崩壞星穹鐵道','崩坏星穹铁道'],
+ ['genshin impact','genshinimpact','原神'],
+ ['zenless zone zero','zenlesszonezero','zzz','ゼンレスゾーンゼロ','絕區零','绝区零'],
+
+ // Horror / story.
+ ['resident evil','resident evil village','biohazard','バイオハザード','惡靈古堡','恶灵古堡'],
+ ['silent hill','silenthill','サイレントヒル','沉默之丘'],
+ ['phasmophobia','ファズモフォビア','恐鬼症'],
+ ['outlast','アウトラスト','絕命精神病院','逃生'],
+ ['the exit 8','exit 8','8番出口','8號出口','8号出口'],
+ ['little nightmares','littlenightmares','リトルナイトメア','小小夢魘','小小梦魇'],
+
+ // Casual / puzzle / challenge.
+ ['suika game','suikagame','スイカゲーム','西瓜遊戲','西瓜游戏'],
+ ['tetris','テトリス','俄羅斯方塊','俄罗斯方块'],
+ ['puyo puyo','puyopuyo','ぷよぷよ','魔法氣泡','魔法气泡'],
+ ['getting over it','gettingoverit','壺男','壶男','掘地求升'],
+ ['jump king','jumpking','ジャンプキング'],
+ ['only up','onlyup'],
+ ['buckshot roulette','buckshotroulette','バックショットルーレット'],
+ ['geoguessr','geo guesser','ジオゲッサー','地理猜謎','地理猜谜'],
+
+ // Card / board / mahjong.
+ ['mahjong soul','mahjongsoul','雀魂','麻雀','mahjong','麻將','麻将'],
+ ['yu gi oh master duel','yugioh master duel','master duel','遊戯王マスターデュエル','遊戲王master duel','游戏王master duel'],
+ ['shadowverse','シャドウバース','闇影詩章','影之诗'],
+
+ // Hololive-related games.
+ ['holocure','holo cure','ホロキュア'],
+ ['holo x break','holoxbreak','ホロxブレイク','ホロエックスブレイク'],
+
+ // Major open-world / crime.
+ ['gta','gta v','gta 5','grand theft auto','グランドセフトオート','グラセフ','俠盜獵車手','侠盗猎车手'],
+ ['cyberpunk 2077','cyberpunk2077','サイバーパンク2077','電馭叛客2077','赛博朋克2077'],
+ ['hogwarts legacy','hogwartslegacy','ホグワーツレガシー','霍格華茲的傳承','霍格沃茨之遗']
+].map(group=>group.map(value=>normalizeHistorySearchText(value)));
 const HISTORY_CONTENT_ALIAS_INDEX=(()=>{
  const index=new Map();
- for(const group of HISTORY_CONTENT_ALIAS_GROUPS)for(const alias of group)index.set(alias,group);
+ for(const group of HISTORY_CONTENT_ALIAS_GROUPS)for(const alias of group)index.set(alias.replace(/ /g,''),group);
  return index;
 })();
+const HISTORY_CONTENT_ALIAS_PHRASES=HISTORY_CONTENT_ALIAS_GROUPS
+ .flatMap(group=>group.map(alias=>({alias,tokens:alias.split(' ').filter(Boolean),compact:alias.replace(/ /g,'')})))
+ .filter(row=>row.tokens.length>1)
+ .sort((a,b)=>b.tokens.length-a.tokens.length||b.alias.length-a.alias.length);
+function historyCollapseContentAliasPhrases(value){
+ const terms=normalizeHistorySearchText(value).split(' ').filter(Boolean);
+ const out=[];
+ for(let i=0;i<terms.length;){
+  let match=null;
+  for(const row of HISTORY_CONTENT_ALIAS_PHRASES){
+   if(i+row.tokens.length>terms.length)continue;
+   if(row.tokens.every((token,offset)=>terms[i+offset]===token)){match=row;break}
+  }
+  if(match){out.push(match.compact);i+=match.tokens.length}else{out.push(terms[i]);i+=1}
+ }
+ return out.join(' ');
+}
 function historyKeywordVariants(keyword){
  const normalized=normalizeHistorySearchText(keyword);
  const compact=normalized.replace(/ /g,'');
