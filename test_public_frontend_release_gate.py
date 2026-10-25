@@ -76,5 +76,18 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
             normalize_custom_html_edge(beacon + beacon)
 
 
+    def test_custom_html_production_beacon_shape_is_removed(self):
+        base = b'<!doctype html><html><body><script src="assets/app.js"></script></body></html>'
+        beacon = (
+            b'<script type="module" '
+            b'src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" '
+            b'integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" '
+            b'data-cf-beacon=\'{"version":"2024.11.0","token":"a62034925dc54f7fb79bb8d87b82c6ed","r":1,"spa":2}\' '
+            b'crossorigin="anonymous"></script>'
+        )
+        actual = base.replace(b"</body>", beacon + b"</body>")
+        self.assertEqual(normalize_custom_html_edge(actual), base)
+
+
 if __name__ == "__main__":
     unittest.main()
