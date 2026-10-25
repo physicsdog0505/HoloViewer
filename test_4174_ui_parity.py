@@ -1462,6 +1462,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
     def test_watchalong_past_uses_recent_history_months_without_touching_featured(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
 
         self.assertIn('const recentMonths=published.slice(-2);',js)
         self.assertIn('.filter(row=>watchalongCandidateTitle(row?.title));',js)
