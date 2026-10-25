@@ -120,6 +120,32 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
         self.assertTrue(is_spa_fallback_html(b"<!doctype html><html></html>"))
         self.assertTrue(is_spa_fallback_html(b"  \n<!DOCTYPE html><html></html>"))
 
+    def test_legacy_youtube_inventory_treats_spa_fallback_as_absent(self):
+        import scripts.run_public_frontend_owner_release as release
+        original_fetch=release.fetch
+        original_parse=release.parse_frontend_config
+        try:
+            release.fetch=lambda origin,path,allow_404=False: b'<!doctype html><html><body>app</body></html>' if path=='/youtube/v1/manifest.json' else None
+            release.parse_frontend_config=lambda repo: ('https://holoviewer-youtube-static-assets.singlebagel.workers.dev',[])
+            result=release.enumerate_first_run_foreign(Path('.'))
+            self.assertEqual(result['youtube_count'],0)
+            self.assertEqual(result['youtube_paths'],[])
+        finally:
+            release.fetch=original_fetch
+            release.parse_frontend_config=original_parse
+
+    def test_legacy_youtube_inventory_blocks_non_json_non_html(self):
+        import scripts.run_public_frontend_owner_release as release
+        original_fetch=release.fetch
+        original_parse=release.parse_frontend_config
+        try:
+            release.fetch=lambda origin,path,allow_404=False: b'not-json' if path=='/youtube/v1/manifest.json' else None
+            release.parse_frontend_config=lambda repo: ('https://holoviewer-youtube-static-assets.singlebagel.workers.dev',[])
+            with self.assertRaisesRegex(Exception,'neither JSON nor SPA fallback'):
+                release.enumerate_first_run_foreign(Path('.'))
+        finally:
+            release.fetch=original_fetch
+            release.parse_frontend_config=original_parse
     def test_spa_fallback_html_rejects_json(self):
         self.assertFalse(is_spa_fallback_html(b'{"schema_version":1}'))
         self.assertFalse(is_spa_fallback_html(None))
