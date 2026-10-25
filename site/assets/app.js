@@ -1086,6 +1086,63 @@ function normalizeHistorySearchText(value){
  return String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
 }
 function historyQuery(){return String($('historySearch')?.value||'').trim()}
+function historyNormalizeDateToken(token,yearHint=''){
+ const raw=String(token||'').trim().replace(/[.]/g,'/').replace(/-/g,'/');
+ const parts=raw.split('/').filter(Boolean);
+ if(parts.length!==2&&parts.length!==3)return '';
+ const fallbackYear=/^\d{4}$/.test(String(yearHint))?Number(yearHint):Number(taipeiDay().slice(0,4));
+ const year=parts.length===3?Number(parts[0]):fallbackYear;
+ const month=Number(parts.length===3?parts[1]:parts[0]);
+ const day=Number(parts.length===3?parts[2]:parts[1]);
+ if(!Number.isInteger(year)||!Number.isInteger(month)||!Number.isInteger(day))return '';
+ const date=new Date(Date.UTC(year,month-1,day));
+ if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day)return '';
+ return String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+}
+function parseHistoryDateIntent(raw,yearHint=''){
+ const value=String(raw||'').trim();
+ if(!value)return null;
+ const range=value.match(/^\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*[~～]\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*$/);
+ if(range){
+  const start=historyNormalizeDateToken(range[1],yearHint),end=historyNormalizeDateToken(range[2],start.slice(0,4)||yearHint);
+  if(!start||!end||start>end)return {kind:'invalid_range'};
+  const span=Math.floor((Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000)+1;
+  if(span>62)return {kind:'range_too_large',start,end,span};
+  if(!historyDateValid(start)||!historyDateValid(end))return {kind:'invalid_range'};
+  return {kind:'range',start,end,span};
+ }
+ const single=value.match(/^\s*\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?\s*$/);
+ if(single){
+  const day=historyNormalizeDateToken(value,yearHint);
+  if(day&&historyDateValid(day))return {kind:'day',day};
+ }
+ return null;
+}
+function historyMonthsBetween(start,end){
+ const months=[];
+ let cursor=start.slice(0,7);
+ const last=end.slice(0,7);
+ while(cursor<=last&&months.length<3){
+  months.push(cursor);
+  const [y,m]=cursor.split('-').map(Number);
+  const next=new Date(Date.UTC(y,m,1));
+  cursor=next.toISOString().slice(0,7);
+ }
+ return months;
+}
+async function loadYoutubeHistoryRange(start,end){
+ const months=historyMonthsBetween(start,end);
+ const payloads=[];
+ for(const month of months){
+  try{payloads.push(await loadYoutubeHistoryMonth(month+'-01'))}
+  catch(error){if(error?.code==='HISTORY_STATIC_UNAVAILABLE')continue;throw error}
+ }
+ const rows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos).filter(row=>{
+  const day=youtubeHistoryTaipeiDay(row);
+  return day>=start&&day<=end;
+ }));
+ return {items:rows,total:rows.length,has_more:false,source:'youtube-static',search_range:{start,end}};
+}
 async function loadHistoryMemberAliases(){
  if(historyMemberAliasesPromise)return historyMemberAliasesPromise;
  historyMemberAliasesPromise=fetch(HISTORY_MEMBER_ALIASES_PATH,{credentials:'same-origin',headers:{Accept:'application/json'}})
@@ -1252,9 +1309,20 @@ async function loadHistory(){
  const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';const intentBox=$('history-search-intent');if(intentBox){intentBox.replaceChildren();intentBox.hidden=true}
  if(!config.youtubeStaticBase&&!config.apiBase){error.textContent='History 資料來源尚未設定。';error.hidden=false;return}
  try{
+  const dateIntent=parseHistoryDateIntent(query,day.slice(0,4));
+  if(dateIntent?.kind==='range_too_large'){throw Error('日期區間最多 62 天')}
+  if(dateIntent?.kind==='invalid_range'){throw Error('日期區間格式或範圍不正確')}
+  if(dateIntent?.kind==='day'){
+   $('historyDate').value=dateIntent.day;
+   $('historySearch').value='';
+   state.offset=0;
+   return loadHistory();
+  }
   const manifestPromise=config.youtubeStaticBase?loadYoutubeHistoryManifest().catch(()=>null):Promise.resolve(null);
-  const historyPromise=query?loadYoutubeHistorySearchMonth(day):loadHistoryData(day,state.offset);
-  const aliasesPromise=query?loadHistoryMemberAliases():Promise.resolve(null);
+  const historyPromise=dateIntent?.kind==='range'
+   ?loadYoutubeHistoryRange(dateIntent.start,dateIntent.end)
+   :query?loadYoutubeHistorySearchMonth(day):loadHistoryData(day,state.offset);
+  const aliasesPromise=query&&!dateIntent?loadHistoryMemberAliases():Promise.resolve(null);
   const collabPromise=!query&&config.apiBase?api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null):Promise.resolve(null);
   const catalogPromise=config.apiBase
    ?(homeCatalogRows.length
@@ -1268,7 +1336,7 @@ async function loadHistory(){
   const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows);
   let endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
   let parsedSearch=null,searchRows=[];
-  if(query){
+  if(query&&!dateIntent){
    parsedSearch=parseHistorySearchQuery(query,aliasRegistry);
    searchRows=historySearchRows(endedItems,parsedSearch);
    renderHistorySearchIntent(parsedSearch,searchRows);
@@ -1281,11 +1349,16 @@ async function loadHistory(){
   const ids=new Set(renderedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
   const total=Number(data.total||0);if(!renderedItems.length)$('history-empty').hidden=false;
   if(query){
-   $('history-empty').textContent='這個月份沒有符合搜尋條件的已結束直播。';
-   const resolved=parsedSearch?.members?.map(member=>member.canonical_name).join(' + ')||'';
-   const intent=parsedSearch?.intent==='member_set'?' · 多人/連動意圖':parsedSearch?.intent==='member'?' · 成員搜尋':'';
-   const prefix=resolved?'辨識：'+resolved+intent+' · ':'';
-   $('history-search-summary').textContent=prefix+(resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆':'找到 '+resultCount+' 筆');
+   if(dateIntent?.kind==='range'){
+    $('history-empty').textContent='這個日期區間沒有可顯示的已結束直播。';
+    $('history-search-summary').textContent=dateIntent.start+' ～ '+dateIntent.end+' · '+(resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆':'找到 '+resultCount+' 筆');
+   }else{
+    $('history-empty').textContent='這個月份沒有符合搜尋條件的已結束直播。';
+    const resolved=parsedSearch?.members?.map(member=>member.canonical_name).join(' + ')||'';
+    const intent=parsedSearch?.intent==='member_set'?' · 多人/連動意圖':parsedSearch?.intent==='member'?' · 成員搜尋':'';
+    const prefix=resolved?'辨識：'+resolved+intent+' · ':'';
+    $('history-search-summary').textContent=prefix+(resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆':'找到 '+resultCount+' 筆');
+   }
   }else{
    $('history-empty').textContent='這一天沒有可顯示的已結束直播，或歷史資料尚未接入。';
   }
@@ -2196,6 +2269,35 @@ const watchalongTodayGrid=document.getElementById('watchalongTodayGrid');
 const watchalongTodayEmpty=document.getElementById('watchalongTodayEmpty');
 const watchalongPastGrid=document.getElementById('watchalongPastGrid');
 const watchalongPastEmpty=document.getElementById('watchalongPastEmpty');
+const watchalongPastSearch=document.getElementById('watchalongPastSearch');
+let watchalongPastRows=[];
+function watchalongPastSearchText(row){
+ return normalizeHistorySearchText([row?.title,row?.channel_name,row?.channel_title,row?.channel_id].filter(Boolean).join(' '));
+}
+function renderWatchalongPastRows(curatedHosts=new Set()){
+ if(!watchalongPastGrid)return;
+ watchalongPastGrid.replaceChildren();
+ const query=normalizeHistorySearchText(watchalongPastSearch?.value||'');
+ const rows=watchalongPastRows.filter(row=>!query||watchalongPastSearchText(row).includes(query));
+ for(const row of rows){
+  const videoId=String(row.video_id||'');
+  const isCurated=curatedHosts.has(videoId);
+  const card=watchalongLandingCard({
+   videoId,title:String(row.title||videoId),day:youtubeHistoryTaipeiDay(row),
+   status:isCurated?'精選已收錄':'已結束',
+   action:isCurated?'直接開始觀看 →':'使用這場建立 →',
+   hostLabel:String(row.channel_name||row.channel_title||'Hololive'),profile:row,compact:true,
+   href:isCurated?'/watchalong-viewer/?watchalong_event='+encodeURIComponent(videoId):'',
+   onpick:isCurated?null:()=>pickWatchalongHost(videoId)
+  });
+  if(card)watchalongPastGrid.append(card);
+ }
+ if(watchalongPastEmpty){
+  watchalongPastEmpty.hidden=Boolean(watchalongPastGrid.childElementCount);
+  if(!watchalongPastGrid.childElementCount)watchalongPastEmpty.textContent=query?'找不到符合搜尋條件的同時視聽直播。':'最近兩個月沒有符合辨識規則的同時視聽直播。';
+ }
+}
+watchalongPastSearch?.addEventListener('input',()=>renderWatchalongPastRows(new Set((window.hvWatchalongCuratedHosts||[]))));
 function watchalongCandidateTitle(title){
  return /(同時視聴|同時視聽|watch\s*along)/i.test(String(title||''));
 }
@@ -2282,20 +2384,23 @@ async function loadWatchalongLanding(){
  watchalongTodayGrid?.replaceChildren();
  watchalongPastGrid?.replaceChildren();
  try{
-  const [manifestResponse,todayResult,recentResult]=await Promise.all([
+  const [manifestResponse,todayResult,historyManifest]=await Promise.all([
    fetch('/data/watchalong/manifest.json',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}}),
    api('/v1/catalog/today').catch(()=>null),
-   api('/v1/watchalong/recent?days=90&limit=100').catch(()=>null)
+   loadYoutubeHistoryManifest().catch(()=>null)
   ]);
   if(!manifestResponse.ok)throw new Error('HTTP '+manifestResponse.status);
   const manifest=await manifestResponse.json();
   if(manifest?.schema_version!=='holoviewer-watchalong-manifest-v1'||!Array.isArray(manifest.events))throw new Error('manifest');
   const todayRows=Array.isArray(todayResult?.streams||todayResult?.items)?(todayResult.streams||todayResult.items):[];
-  const recentEvents=recentResult?.schema_version==='public-experience-v1'&&recentResult?.kind==='watchalong'&&Array.isArray(recentResult.events)
-   ?recentResult.events:[];
-  const channelByVideo=watchalongChannelByVideo(todayRows,recentEvents);
-  const watchalongChannelIds=[...new Set(channelByVideo.values())];
-  await loadCanonicalChannelProfiles(watchalongChannelIds);
+  const published=historyPublishedMonths(historyManifest);
+  const recentMonths=published.slice(-2);
+  const historyPayloads=(await Promise.all(recentMonths.map(month=>loadYoutubeHistoryMonth(month+'-01').catch(()=>null)))).filter(Boolean);
+  const historyRows=uniqueSortedHistoryRows(historyPayloads.flatMap(payload=>payload.videos))
+   .filter(row=>watchalongCandidateTitle(row?.title));
+  const watchalongChannelIds=[...new Set(historyRows.map(row=>String(row?.channel_id||'')).filter(id=>/^UC[A-Za-z0-9_-]{22}$/.test(id)))];
+  const canonical=await loadCanonicalChannelProfiles(watchalongChannelIds);
+  watchalongPastRows=historyRows.map(row=>historyDisplayRow(row,canonical));
   const curatedHosts=new Set();
   const events=manifest.events.slice().sort((a,b)=>String(b.session_day||'').localeCompare(String(a.session_day||'')));
   for(const entry of events){
@@ -2304,9 +2409,8 @@ async function loadWatchalongLanding(){
    if(!/^[A-Za-z0-9_-]{11}$/.test(eventId)||!/^[A-Za-z0-9_-]{11}$/.test(videoId))continue;
    curatedHosts.add(videoId);
    const hostLabel=watchalongHostLabel(entry.title);
-   const channelId=channelByVideo.get(videoId)||'';
-   const fallback=todayRows.find(row=>String(row?.channel_id||'')===channelId)||null;
-   const profile=watchalongProfileByChannel(channelId,fallback);
+   const historyFallback=watchalongPastRows.find(row=>String(row.video_id||'')===videoId)||null;
+   const profile=historyFallback;
    const card=watchalongLandingCard({
     videoId,title:String(entry.title||eventId),day:String(entry.session_day||''),
     detail:String(entry.source_count||0)+' 集',hostLabel,profile,featured:true,badge:'HoloDocchi 精選',
@@ -2318,30 +2422,8 @@ async function loadWatchalongLanding(){
   watchalongStaticEmpty.hidden=watchalongStaticGrid.childElementCount>0;
   if(!watchalongStaticGrid.childElementCount)watchalongStaticEmpty.textContent='目前沒有可直接觀看的精選同時視聽。';
 
-  for(const event of recentEvents){
-   const hosts=Array.isArray(event?.hosts)?event.hosts:[];
-   const host=hosts.find(row=>/^[A-Za-z0-9_-]{11}$/.test(String(row?.video_id||'')));
-   if(!host)continue;
-   const videoId=String(host.video_id);
-   const label=String(host.label||watchalongHostLabel(event.title)||'Hololive');
-   const channelId=String(host.channel_id||channelByVideo.get(videoId)||'');
-   const fallback=todayRows.find(row=>String(row?.channel_id||'')===channelId)||null;
-   const profile=watchalongProfileByChannel(channelId,fallback);
-   const isCurated=curatedHosts.has(videoId);
-   const pastCard=watchalongLandingCard({
-    videoId,title:String(event.title||videoId),day:String(event.day||''),
-    status:isCurated?'精選已收錄':(event.member_only?'會員限定':'已結束'),
-    action:isCurated?'直接開始觀看 →':'使用這場建立 →',
-    hostLabel:label,profile,compact:true,
-    href:isCurated?'/watchalong-viewer/?watchalong_event='+encodeURIComponent(videoId):'',
-    onpick:isCurated?null:()=>pickWatchalongHost(videoId)
-   });
-   if(pastCard)watchalongPastGrid?.append(pastCard);
-  }
-  if(watchalongPastEmpty){
-   watchalongPastEmpty.hidden=Boolean(watchalongPastGrid?.childElementCount);
-   if(!watchalongPastGrid?.childElementCount)watchalongPastEmpty.textContent=recentResult?'目前沒有過去同時視聽直播。':'過去直播暫時無法載入。';
-  }
+  window.hvWatchalongCuratedHosts=[...curatedHosts];
+  renderWatchalongPastRows(curatedHosts);
 
   const candidates=todayRows.filter(row=>watchalongCandidateTitle(row?.title));
   for(const row of candidates){
@@ -2349,7 +2431,7 @@ async function loadWatchalongLanding(){
    const state=String(row?.lifecycle_state||'');
    const status=state==='live'?'直播中':(['upcoming','waiting'].includes(state)?'稍後':'今天');
    const label=String(row?.channel_name||row?.channel_title||'Hololive');
-   const channelId=String(row?.channel_id||channelByVideo.get(videoId)||'');
+   const channelId=String(row?.channel_id||'');
    const profile=watchalongProfileByChannel(channelId,row);
    const card=watchalongLandingCard({
     videoId,title:String(row?.title||videoId),day:taipeiDay(),status,
