@@ -1320,7 +1320,9 @@ function historySetDay(day){
  if(!historyDateValid(day))return;
  $('historyDate').value=day;state.offset=0;loadHistory();
 }
+let historyLoadGeneration=0;
 async function loadHistory(){
+ const generation=++historyLoadGeneration;
  historyChrome();const day=$('historyDate').value,query=historyQuery(),error=$('history-error');error.hidden=true;error.textContent='';
  const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';const intentBox=$('history-search-intent');if(intentBox){intentBox.replaceChildren();intentBox.hidden=true}
  if(!config.youtubeStaticBase&&!config.apiBase){error.textContent='History 資料來源尚未設定。';error.hidden=false;return}
@@ -1347,10 +1349,12 @@ async function loadHistory(){
      :requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null))
    :Promise.resolve(null);
   const [manifest,data,aliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,historyPromise,aliasesPromise,collabPromise,catalogPromise]);
+  if(generation!==historyLoadGeneration)return;
   if(manifest)applyHistoryAvailability(manifest,day);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
   const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
   const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows);
+  if(generation!==historyLoadGeneration)return;
   let endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
   let parsedSearch=null,searchRows=[];
   if(searchQuery){
@@ -1391,6 +1395,7 @@ async function loadHistory(){
   const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',$('historySearch').value.trim());
   if($('history').classList.contains('active'))history.replaceState(null,'','/history?'+params.toString());
  }catch(e){
+  if(generation!==historyLoadGeneration)return;
   $('history-search-summary').textContent='';
   error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false
  }

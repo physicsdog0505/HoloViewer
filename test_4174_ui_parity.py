@@ -188,6 +188,10 @@ class ParityContract(unittest.TestCase):
         ):
             self.assertIn(snippet, js)
 
+        self.assertIn("let historyLoadGeneration=0;", js)
+        self.assertIn("const generation=++historyLoadGeneration;", js)
+        self.assertGreaterEqual(js.count("if(generation!==historyLoadGeneration)return;"), 3)
+
         self.assertNotIn("已辨識多人搜尋：", js)
         self.assertNotIn("member_set", js[js.index("function parseHistorySearchQuery"):js.index("function historyMemberAliases")])
         self.assertNotIn("shiftDay(today,-30)", js[js.index("function historyBounds()"):js.index("const YOUTUBE_HISTORY_MANIFEST_PATH")])
