@@ -7,6 +7,7 @@ import unittest
 from scripts.run_public_frontend_owner_release import (
     FOREIGN_PREFIXES,
     is_foreign_rel,
+    normalize_custom_html_edge,
     ownership_gate,
 )
 
@@ -40,6 +41,52 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
 
     def test_foreign_prefix_contract_is_explicit(self):
         self.assertEqual(FOREIGN_PREFIXES, ("youtube/v1/", "ptt/v1/"))
+
+    def test_custom_html_exact_body_passes_unchanged(self):
+        body = b"<!doctype html><html><body><script src=\"assets/app.js\"></script></body></html>"
+        self.assertEqual(normalize_custom_html_edge(body), body)
+
+    def test_custom_html_single_cloudflare_beacon_is_removed(self):
+        base = b"<!doctype html><html><body><script src=\"assets/app.js\"></script></body></html>"
+        beacon = (
+            b'<script type="module" '
+            b'src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" '
+            b'integrity="sha512-example" '
+            b'data-cf-beacon=\'{"version":"2024.11.0","token":"abc"}\' '
+            b'crossorigin="anonymous"></script>'
+        )
+        actual = base.replace(b"</body>", beacon + b"</body>")
+        self.assertEqual(normalize_custom_html_edge(actual), base)
+
+    def test_custom_html_arbitrary_injected_script_is_not_removed(self):
+        base = b"<!doctype html><html><body></body></html>"
+        injected = base.replace(
+            b"</body>",
+            b'<script src="https://evil.example/x.js"></script></body>',
+        )
+        self.assertEqual(normalize_custom_html_edge(injected), injected)
+        self.assertNotEqual(normalize_custom_html_edge(injected), base)
+
+    def test_custom_html_multiple_cloudflare_beacons_fail_closed(self):
+        beacon = (
+            b'<script src="https://static.cloudflareinsights.com/beacon.min.js/v1" '
+            b'data-cf-beacon=\'{}\'></script>'
+        )
+        with self.assertRaisesRegex(Exception, "multiple Cloudflare Insights"):
+            normalize_custom_html_edge(beacon + beacon)
+
+
+    def test_custom_html_production_beacon_shape_is_removed(self):
+        base = b'<!doctype html><html><body><script src="assets/app.js"></script></body></html>'
+        beacon = (
+            b'<script type="module" '
+            b'src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" '
+            b'integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" '
+            b'data-cf-beacon=\'{"version":"2024.11.0","token":"a62034925dc54f7fb79bb8d87b82c6ed","r":1,"spa":2}\' '
+            b'crossorigin="anonymous"></script>'
+        )
+        actual = base.replace(b"</body>", beacon + b"</body>")
+        self.assertEqual(normalize_custom_html_edge(actual), base)
 
 
 if __name__ == "__main__":
