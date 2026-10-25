@@ -822,7 +822,7 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         self.assertIn('function applyHomeSupportStyle(el,item)',js)
         self.assertIn("item?.member_accent_dual",js)
         self.assertIn("el.dataset.supportMode='dual_color'",js)
-        self.assertIn("function homeStartLabel(item)",js)
+        self.assertIn("function homeStartLabel(item,{includeYear=false}={})",js)
         self.assertIn("item?.start_at",js)
         self.assertIn("timeZone:'Asia/Taipei'",js)
         self.assertIn("hourCycle:'h23'",js)
