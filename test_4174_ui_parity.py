@@ -178,7 +178,7 @@ class ParityContract(unittest.TestCase):
             "if(String(event.target.value||'').trim())return",
             "async function loadYoutubeHistorySearchMonth(day)",
             "const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json'",
-            "function parseHistorySearchQuery(raw,registry)",
+            "function parseHistorySearchQuery(raw,registry,contentRegistry)",
             "intent:members.length?'member':'text'",
             "function historySearchRows(items,parsed)",
             "function renderHistorySearchIntent(parsed,rows)",
@@ -1540,7 +1540,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('async function loadYoutubeHistoryRange(start,end)',js)
         self.assertIn("const dateIntent=combinedIntent.dateIntent,searchQuery=combinedIntent.query;",js)
         self.assertIn("const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);",js)
-        self.assertIn("parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry);",js)
+        self.assertIn("parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry,contentAliasRegistry);",js)
         self.assertIn("if(pureDateIntent?.kind==='day')",js)
         self.assertIn("return loadHistory();",js)
         self.assertIn("dateIntent?.kind==='range'",js)
