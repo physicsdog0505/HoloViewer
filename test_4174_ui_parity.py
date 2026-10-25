@@ -1485,6 +1485,8 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
         self.assertIn('function parseHistoryDateIntent(raw,yearHint=\'\')',js)
         self.assertIn('function parseHistoryCombinedIntent(raw,yearHint=\'\')',js)
+        self.assertIn("String(token||'').normalize('NFKC').trim()",js)
+        self.assertIn("String(raw||'').normalize('NFKC').trim()",js)
         self.assertIn("return {kind:'range',start,end,span};",js)
         self.assertNotIn("if(span>62)return {kind:'range_too_large',start,end,span};",js)
         self.assertIn('while(cursor<=last){',js)
