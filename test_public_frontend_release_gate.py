@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
 from scripts.run_public_frontend_owner_release import (
     FOREIGN_PREFIXES,
+    PROTECTED_RUNTIME_PREFIXES,
+    frontend_release_scope_gate,
     is_foreign_rel,
+    is_protected_runtime_rel,
     is_spa_fallback_html,
     normalize_custom_html_edge,
     ownership_gate,
@@ -42,6 +46,74 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
 
     def test_foreign_prefix_contract_is_explicit(self):
         self.assertEqual(FOREIGN_PREFIXES, ("youtube/v1/", "ptt/v1/"))
+
+
+    def test_protected_runtime_prefix_contract_is_explicit(self):
+        self.assertEqual(
+            PROTECTED_RUNTIME_PREFIXES,
+            ("data/search/aliases/", "data/watchalong/"),
+        )
+        self.assertTrue(is_protected_runtime_rel("data/search/aliases/v1/latest.json"))
+        self.assertTrue(is_protected_runtime_rel("data/watchalong/manifest.json"))
+        self.assertFalse(is_protected_runtime_rel("assets/app.js"))
+
+    def test_frontend_release_scope_gate_blocks_alias_change(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
+            target = root / "site/data/search/aliases/v1/latest.json"
+            target.parent.mkdir(parents=True)
+            target.write_text('{"v":1}')
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "base"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            target.write_text('{"v":2}')
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "alias"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            with self.assertRaisesRegex(Exception, "protected runtime data changes"):
+                frontend_release_scope_gate(root, base, head)
+
+    def test_frontend_release_scope_gate_blocks_watchalong_change(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
+            target = root / "site/data/watchalong/manifest.json"
+            target.parent.mkdir(parents=True)
+            target.write_text('{"events":[]}')
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "base"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            target.write_text('{"events":[{"id":"x"}]}')
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "watchalong"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            with self.assertRaisesRegex(Exception, "protected runtime data changes"):
+                frontend_release_scope_gate(root, base, head)
+
+    def test_frontend_release_scope_gate_allows_frontend_asset_change(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
+            target = root / "site/assets/app.js"
+            target.parent.mkdir(parents=True)
+            target.write_text("one")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "base"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            target.write_text("two")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "frontend"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            result = frontend_release_scope_gate(root, base, head)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["protected_runtime_change_count"], 0)
 
 
     def test_spa_fallback_html_detects_index_fallback(self):
