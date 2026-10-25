@@ -2036,10 +2036,16 @@ document.querySelectorAll('[data-mobile-dock-route]').forEach(link=>link.addEven
  $('historyPrevDay').onclick=()=>historySetDay(shiftDay($('historyDate').value,-1));
  $('historyNextDay').onclick=()=>historySetDay(shiftDay($('historyDate').value,1));
  $('historyYesterday').onclick=()=>historySetDay(historyBounds().latest);
- let historySearchFrame=0;
- $('historySearch').addEventListener('input',()=>{
-  if(historySearchFrame)cancelAnimationFrame(historySearchFrame);
-  historySearchFrame=requestAnimationFrame(()=>{historySearchFrame=0;state.offset=0;loadHistory()});
+ $('historySearch').addEventListener('keydown',event=>{
+  if(event.key!=='Enter')return;
+  event.preventDefault();
+  state.offset=0;
+  loadHistory();
+ });
+ $('historySearch').addEventListener('input',event=>{
+  if(String(event.target.value||'').trim())return;
+  state.offset=0;
+  loadHistory();
  });
 }
 renderMulti();
@@ -2302,7 +2308,15 @@ function renderWatchalongPastRows(curatedHosts=new Set()){
   if(!watchalongPastGrid.childElementCount)watchalongPastEmpty.textContent=query?'找不到符合搜尋條件的同時視聽直播。':'最近兩個月沒有符合辨識規則的同時視聽直播。';
  }
 }
-watchalongPastSearch?.addEventListener('input',()=>renderWatchalongPastRows(new Set((window.hvWatchalongCuratedHosts||[]))));
+watchalongPastSearch?.addEventListener('keydown',event=>{
+ if(event.key!=='Enter')return;
+ event.preventDefault();
+ renderWatchalongPastRows(new Set((window.hvWatchalongCuratedHosts||[])));
+});
+watchalongPastSearch?.addEventListener('input',event=>{
+ if(String(event.target.value||'').trim())return;
+ renderWatchalongPastRows(new Set((window.hvWatchalongCuratedHosts||[])));
+});
 function watchalongCandidateTitle(title){
  return /(同時視聴|同時視聽|watch\s*along)/i.test(String(title||''));
 }
