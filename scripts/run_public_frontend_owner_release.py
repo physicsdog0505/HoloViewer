@@ -318,7 +318,7 @@ def reconcile_runtime(repo: Path, base: str, head: str) -> dict:
 def enumerate_first_run_foreign(repo: Path) -> dict:
     paths = {"youtube": [], "ptt": []}
     yraw = fetch(CUSTOM_ORIGIN, "/youtube/v1/manifest.json", allow_404=True)
-    if yraw:
+    if yraw and not is_spa_fallback_html(yraw):
         paths["youtube"].append("/youtube/v1/manifest.json")
         try:
             obj = json.loads(yraw)
@@ -339,7 +339,7 @@ def enumerate_first_run_foreign(repo: Path) -> dict:
                         paths["youtube"].append("/youtube/v1/" + p.lstrip("/"))
             walk(obj)
         except ValueError:
-            raise ReleaseBlocked("legacy frontend YouTube manifest is not JSON")
+            raise ReleaseBlocked("legacy frontend YouTube manifest is neither JSON nor SPA fallback")
 
     _, ptt = parse_frontend_config(repo)
     for _, manifest in ptt:
