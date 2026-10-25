@@ -181,7 +181,7 @@ class ParityContract(unittest.TestCase):
             "label.textContent='已辨識成員：'",
             "優先顯示同時相關的結果",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
-            "const aliasesPromise=query&&!dateIntent?loadHistoryMemberAliases():Promise.resolve(null)",
+            "const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);",
             "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
             "params.set('date',day)",
             "params.set('q',$('historySearch').value.trim())",
