@@ -141,6 +141,7 @@ class ParityContract(unittest.TestCase):
         for snippet in (
             'id="history-picker"',
             'id="historyDate"',
+            'history-date-field-hidden',
             'id="historyPrevDay"',
             'id="historyNextDay"',
             'id="historyYesterday"',
@@ -157,6 +158,7 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('type="submit">查看</button>', html[html.index('id="history"'):html.index('id="ptt"')])
         self.assertIn('.history-toolbar{display:grid', css)
         self.assertIn('.history-date-nav{display:flex', css)
+        self.assertIn('.history-date-field-hidden{display:none}', css)
         self.assertIn('.history-search-field input{width:100%}', css)
         self.assertIn('.history-search-intent{display:flex', css)
         self.assertIn('.history-search-chip{display:inline-flex', css)
@@ -166,8 +168,10 @@ class ParityContract(unittest.TestCase):
             "historyPrevDay').onclick=()=>historySetDay",
             "historyNextDay').onclick=()=>historySetDay",
             "historyYesterday').onclick=()=>historySetDay(historyBounds().latest)",
+            "historySearch').addEventListener('keydown'",
+            "if(event.key!=='Enter')return",
             "historySearch').addEventListener('input'",
-            "historySearchFrame=requestAnimationFrame(()=>{historySearchFrame=0;state.offset=0;loadHistory()})",
+            "if(String(event.target.value||'').trim())return",
             "async function loadYoutubeHistorySearchMonth(day)",
             "const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json'",
             "function parseHistorySearchQuery(raw,registry)",
@@ -1458,6 +1462,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
     def test_watchalong_past_uses_recent_history_months_without_touching_featured(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+        css=(ROOT/'site/assets/app.css').read_text(encoding='utf-8')
 
         self.assertIn('const recentMonths=published.slice(-2);',js)
         self.assertIn('.filter(row=>watchalongCandidateTitle(row?.title));',js)
@@ -1465,6 +1470,12 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('renderWatchalongPastRows(curatedHosts);',js)
         self.assertNotIn("api('/v1/watchalong/recent?days=90&limit=100')",js)
         self.assertIn('id="watchalongPastSearch"',html)
+        self.assertIn('#watchalong-past .history-search-field{',css)
+        self.assertIn('width:min(620px,100%)',css)
+        self.assertIn('margin:4px 0 22px',css)
+        self.assertIn("watchalongPastSearch?.addEventListener('keydown'",js)
+        self.assertIn("if(event.key!=='Enter')return",js)
+        self.assertIn("watchalongPastSearch?.addEventListener('input'",js)
         self.assertIn("fetch('/data/watchalong/manifest.json'",js)
         self.assertIn("href:'/watchalong-viewer/?watchalong_event='",js)
 
