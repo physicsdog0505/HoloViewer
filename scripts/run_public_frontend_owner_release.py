@@ -182,6 +182,10 @@ def normalize_custom_html_edge(data: bytes) -> bytes:
     return data[:match.start()] + suffix
 
 
+def is_spa_fallback_html(data: bytes | None) -> bool:
+    return bool(data and data.lstrip().lower().startswith(b"<!doctype html"))
+
+
 def verify_bytes(origin: str, rel: str, expected: bytes, label: str) -> None:
     actual = fetch(origin, "/" + rel)
     if actual is None:
@@ -249,20 +253,23 @@ def reconcile_runtime(repo: Path, base: str, head: str) -> dict:
     alias_latest_rel = "data/search/aliases/v1/latest.json"
     alias_raw = fetch(CUSTOM_ORIGIN, "/" + alias_latest_rel, allow_404=True)
     alias_workers = fetch(WORKERS_ORIGIN, "/" + alias_latest_rel, allow_404=True)
+
+    custom_fallback = is_spa_fallback_html(alias_raw)
+    workers_fallback = is_spa_fallback_html(alias_workers)
+
+    if custom_fallback or workers_fallback:
+        if custom_fallback and workers_fallback:
+            return {"protected_runtime_assets": sorted(set(protected)), "status": "PASS"}
+        raise ReleaseBlocked("Alias latest exists on only one Production origin")
+
     if alias_raw != alias_workers:
         raise ReleaseBlocked("Alias latest differs between Production origins")
+
     if alias_raw:
         try:
             pointer = json.loads(alias_raw)
         except ValueError as exc:
-            # Static Assets SPA fallback returns index.html with HTTP 200 for a missing path.
-            if alias_raw.lstrip().lower().startswith(b"<!doctype html"):
-                pointer = None
-                alias_raw = None
-            else:
-                raise ReleaseBlocked("Production Alias latest invalid") from exc
-        if pointer is None:
-            return {"protected_runtime_assets": sorted(set(protected)), "status": "PASS"}
+            raise ReleaseBlocked("Production Alias latest invalid") from exc
         immutable_rel = str(pointer.get("asset_path") or "").lstrip("/")
         if not immutable_rel.startswith("data/search/aliases/v1/versions/"):
             raise ReleaseBlocked("Production Alias immutable path invalid")
