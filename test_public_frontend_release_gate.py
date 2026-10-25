@@ -7,6 +7,7 @@ import unittest
 from scripts.run_public_frontend_owner_release import (
     FOREIGN_PREFIXES,
     is_foreign_rel,
+    is_spa_fallback_html,
     normalize_custom_html_edge,
     ownership_gate,
 )
@@ -41,6 +42,15 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
 
     def test_foreign_prefix_contract_is_explicit(self):
         self.assertEqual(FOREIGN_PREFIXES, ("youtube/v1/", "ptt/v1/"))
+
+
+    def test_spa_fallback_html_detects_index_fallback(self):
+        self.assertTrue(is_spa_fallback_html(b"<!doctype html><html></html>"))
+        self.assertTrue(is_spa_fallback_html(b"  \n<!DOCTYPE html><html></html>"))
+
+    def test_spa_fallback_html_rejects_json(self):
+        self.assertFalse(is_spa_fallback_html(b'{"schema_version":1}'))
+        self.assertFalse(is_spa_fallback_html(None))
 
     def test_custom_html_exact_body_passes_unchanged(self):
         body = b"<!doctype html><html><body><script src=\"assets/app.js\"></script></body></html>"
