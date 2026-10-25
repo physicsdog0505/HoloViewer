@@ -85,8 +85,19 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
             b'data-cf-beacon=\'{"version":"2024.11.0","token":"a62034925dc54f7fb79bb8d87b82c6ed","r":1,"spa":2}\' '
             b'crossorigin="anonymous"></script>'
         )
-        actual = base.replace(b"</body>", beacon + b"</body>")
+        actual = base.replace(b"</body>", beacon + b"\n</body>")
         self.assertEqual(normalize_custom_html_edge(actual), base)
+
+    def test_custom_html_beacon_does_not_hide_other_whitespace_drift(self):
+        base = b'<!doctype html><html><body></body></html>'
+        beacon = (
+            b'<script src="https://static.cloudflareinsights.com/beacon.min.js/v1" '
+            b'data-cf-beacon=\'{}\'></script>'
+        )
+        actual = base.replace(b"</body>", beacon + b"  </body>")
+        normalized = normalize_custom_html_edge(actual)
+        self.assertEqual(normalized, base.replace(b"</body>", b"  </body>"))
+        self.assertNotEqual(normalized, base)
 
 
 if __name__ == "__main__":
