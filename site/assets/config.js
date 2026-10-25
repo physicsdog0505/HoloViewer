@@ -1,6 +1,7 @@
 window.HOLOVIEWER_CONFIG = Object.freeze({
   apiBase: "https://holoviewer-public-api.singlebagel.workers.dev",
   youtubeStaticBase: "https://holoviewer-youtube-static-assets.singlebagel.workers.dev",
+  aliasStaticBase: "https://holoviewer-alias-static-assets.singlebagel.workers.dev",
   pttArchiveMonths: Object.freeze({
     "2026-08": Object.freeze({
       base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
