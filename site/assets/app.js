@@ -2278,7 +2278,12 @@ function renderWatchalongPastRows(curatedHosts=new Set()){
  if(!watchalongPastGrid)return;
  watchalongPastGrid.replaceChildren();
  const query=normalizeHistorySearchText(watchalongPastSearch?.value||'');
- const rows=watchalongPastRows.filter(row=>!query||watchalongPastSearchText(row).includes(query));
+ const terms=query.split(' ').filter(Boolean);
+ const rows=watchalongPastRows.filter(row=>{
+  if(!terms.length)return true;
+  const text=watchalongPastSearchText(row);
+  return terms.every(term=>text.includes(term));
+ });
  for(const row of rows){
   const videoId=String(row.video_id||'');
   const isCurated=curatedHosts.has(videoId);
@@ -2309,20 +2314,6 @@ function watchalongHostLabel(title){
 function watchalongProfileByChannel(channelId,fallback=null){
  const id=String(channelId||'');
  return canonicalChannelProfileCache.get(id)||fallback||null;
-}
-function watchalongChannelByVideo(todayRows,recentEvents){
- const byVideo=new Map();
- for(const row of Array.isArray(todayRows)?todayRows:[]){
-  const videoId=String(row?.video_id||''),channelId=String(row?.channel_id||'');
-  if(/^[A-Za-z0-9_-]{11}$/.test(videoId)&&/^UC[A-Za-z0-9_-]{22}$/.test(channelId))byVideo.set(videoId,channelId);
- }
- for(const event of Array.isArray(recentEvents)?recentEvents:[]){
-  for(const host of Array.isArray(event?.hosts)?event.hosts:[]){
-   const videoId=String(host?.video_id||''),channelId=String(host?.channel_id||'');
-   if(/^[A-Za-z0-9_-]{11}$/.test(videoId)&&/^UC[A-Za-z0-9_-]{22}$/.test(channelId))byVideo.set(videoId,channelId);
-  }
- }
- return byVideo;
 }
 function watchalongCardImage(videoId,title,badge=''){
  const thumb=document.createElement('div');thumb.className='watchalong-static-thumb';
