@@ -472,6 +472,14 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .watchalong-featured-card{border-width:1.5px}
 .watchalong-featured-card .watchalong-static-action{display:inline-flex;align-items:center;justify-content:center;align-self:flex-start;border-radius:999px;padding:8px 11px;background:color-mix(in srgb,var(--watch-card-accent) 10%,white)}
 .watchalong-history-grid .watchalong-static-card{box-shadow:none}
+#watchalong-past .history-search-field{
+ display:block;
+ width:min(620px,100%);
+ margin:4px 0 22px;
+}
+#watchalong-past .history-search-field input{
+ min-height:44px;
+}
 .watchalong-compact-card{display:grid;grid-template-columns:minmax(150px,38%) 1fr;min-height:150px}
 .watchalong-compact-card .watchalong-static-thumb{height:100%;aspect-ratio:auto;min-height:150px}
 .watchalong-compact-card .watchalong-static-body{padding:12px 14px;gap:7px;justify-content:center}
