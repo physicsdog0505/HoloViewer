@@ -178,7 +178,7 @@ class ParityContract(unittest.TestCase):
             "if(String(event.target.value||'').trim())return",
             "async function loadYoutubeHistorySearchMonth(day)",
             "const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json'",
-            "function parseHistorySearchQuery(raw,registry)",
+            "function parseHistorySearchQuery(raw,registry,contentRegistry)",
             "intent:members.length?'member':'text'",
             "function historySearchRows(items,parsed)",
             "function renderHistorySearchIntent(parsed,rows)",
@@ -195,6 +195,34 @@ class ParityContract(unittest.TestCase):
         self.assertIn("let historyLoadGeneration=0;", js)
         self.assertIn("const generation=++historyLoadGeneration;", js)
         self.assertGreaterEqual(js.count("if(generation!==historyLoadGeneration)return;"), 3)
+
+        self.assertIn("const HISTORY_CONTENT_ALIASES_PATH='/assets/search/history-content-aliases.v1.json';", js)
+        self.assertIn("async function loadHistoryContentAliases()", js)
+        self.assertIn("function historyContentAliasGroups(registry)", js)
+        self.assertIn("function historyCollapseContentAliasPhrases(value,registry)", js)
+        self.assertIn("function historyKeywordVariants(keyword,registry)", js)
+        self.assertIn("const contentAliasesPromise=searchQuery?loadHistoryContentAliases():Promise.resolve(null);", js)
+        self.assertIn("parseHistorySearchQuery(searchQuery,aliasRegistry,contentAliasRegistry)", js)
+        self.assertNotIn("const HISTORY_CONTENT_ALIAS_GROUPS=[", js)
+
+        aliases = json.loads((ROOT / "site/assets/search/history-content-aliases.v1.json").read_text(encoding="utf-8"))
+        self.assertEqual(aliases["schema_version"], 1)
+        self.assertEqual(aliases["dataset"], "holodocchi-history-content-aliases-v1")
+        self.assertEqual(aliases["ownership"], "frontend-code-owned")
+        self.assertGreaterEqual(len(aliases["groups"]), 90)
+        flat_groups = [set(group) for group in aliases["groups"]]
+        for expected in (
+            {"歌回", "歌枠", "karaoke"},
+            {"雜談", "雑談", "zatsudan"},
+            {"minecraft", "マイクラ", "麥塊"},
+            {"monster hunter", "モンハン", "魔物獵人"},
+            {"street fighter 6", "スト6", "快打旋風6"},
+            {"final fantasy xiv", "ff14", "ファイナルファンタジー14"},
+            {"resident evil", "バイオハザード", "惡靈古堡"},
+            {"mahjong soul", "雀魂", "麻將"},
+            {"holocure", "ホロキュア"},
+        ):
+            self.assertTrue(any(expected.issubset(group) for group in flat_groups), expected)
 
         self.assertIn("const historyChannelSelection=new Set();", js)
         self.assertIn("function historyChannelFacetEntries(rows)", js)
@@ -1512,7 +1540,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('async function loadYoutubeHistoryRange(start,end)',js)
         self.assertIn("const dateIntent=combinedIntent.dateIntent,searchQuery=combinedIntent.query;",js)
         self.assertIn("const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);",js)
-        self.assertIn("parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry);",js)
+        self.assertIn("parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry,contentAliasRegistry);",js)
         self.assertIn("if(pureDateIntent?.kind==='day')",js)
         self.assertIn("return loadHistory();",js)
         self.assertIn("dateIntent?.kind==='range'",js)

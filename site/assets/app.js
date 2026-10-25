@@ -1167,6 +1167,17 @@ async function loadHistoryMemberAliases(){
   .catch(()=>null);
  return historyMemberAliasesPromise;
 }
+
+const HISTORY_CONTENT_ALIASES_PATH='/assets/search/history-content-aliases.v1.json';
+let historyContentAliasesPromise=null;
+async function loadHistoryContentAliases(){
+ if(historyContentAliasesPromise)return historyContentAliasesPromise;
+ historyContentAliasesPromise=fetch(HISTORY_CONTENT_ALIASES_PATH,{credentials:'same-origin',headers:{Accept:'application/json'}})
+  .then(response=>{if(!response.ok)throw Error('Content Alias HTTP '+response.status);return response.json()})
+  .then(data=>{if(data?.schema_version!==1||!Array.isArray(data.groups))throw Error('Content Alias 資料格式錯誤');return data})
+  .catch(()=>null);
+ return historyContentAliasesPromise;
+}
 function historyAliasTokens(value){return normalizeHistorySearchText(value).split(' ').filter(Boolean)}
 function historyAliasMatchesText(text,alias){
  const normalizedText=normalizeHistorySearchText(text),normalizedAlias=normalizeHistorySearchText(alias);
@@ -1189,8 +1200,8 @@ function historyAliasIndex(registry,strength){
  }
  return new Map([...map].map(([key,members])=>[key,[...members.values()]]));
 }
-function parseHistorySearchQuery(raw,registry){
- const terms=normalizeHistorySearchText(raw).split(' ').filter(Boolean);
+function parseHistorySearchQuery(raw,registry,contentRegistry){
+ const terms=historyCollapseContentAliasPhrases(normalizeHistorySearchText(raw),contentRegistry).split(' ').filter(Boolean);
  const strong=historyAliasIndex(registry,'strong'),weak=historyAliasIndex(registry,'weak');
  const members=[],memberIds=new Set(),consumed=new Set(),weakHints=[];
  const acceptStrong=(member,indexes)=>{
@@ -1229,6 +1240,7 @@ function parseHistorySearchQuery(raw,registry){
   memberIds,
   weakHints,
   keywords,
+  contentAliases:contentRegistry,
   intent:members.length?'member':'text'
  };
 }
@@ -1240,14 +1252,50 @@ function historyMemberMatched(item,member){
  const text=[item?.title,item?.channel_name,item?.channel_title].filter(Boolean).join(' ');
  return historyMemberAliases(member).some(alias=>historyAliasMatchesText(text,alias));
 }
-function historyKeywordMatches(item,keyword){
+function historyContentAliasGroups(registry){
+ return (registry?.groups||[])
+  .filter(group=>Array.isArray(group)&&group.length>1)
+  .map(group=>group.map(value=>normalizeHistorySearchText(value)).filter(Boolean));
+}
+function historyContentAliasIndex(registry){
+ const index=new Map();
+ for(const group of historyContentAliasGroups(registry)){
+  for(const alias of group)index.set(alias.replace(/ /g,''),group);
+ }
+ return index;
+}
+function historyContentAliasPhrases(registry){
+ return historyContentAliasGroups(registry)
+  .flatMap(group=>group.map(alias=>({alias,tokens:alias.split(' ').filter(Boolean),compact:alias.replace(/ /g,'')})))
+  .filter(row=>row.tokens.length>1)
+  .sort((a,b)=>b.tokens.length-a.tokens.length||b.alias.length-a.alias.length);
+}
+function historyCollapseContentAliasPhrases(value,registry){
+ const terms=normalizeHistorySearchText(value).split(' ').filter(Boolean);
+ const phrases=historyContentAliasPhrases(registry),out=[];
+ for(let i=0;i<terms.length;){
+  let match=null;
+  for(const row of phrases){
+   if(i+row.tokens.length>terms.length)continue;
+   if(row.tokens.every((token,offset)=>terms[i+offset]===token)){match=row;break}
+  }
+  if(match){out.push(match.compact);i+=match.tokens.length}else{out.push(terms[i]);i+=1}
+ }
+ return out.join(' ');
+}
+function historyKeywordVariants(keyword,registry){
+ const normalized=normalizeHistorySearchText(keyword);
+ const compact=normalized.replace(/ /g,'');
+ return historyContentAliasIndex(registry).get(compact)||[normalized];
+}
+function historyKeywordMatches(item,keyword,contentRegistry){
  const text=[item?.title,item?.channel_name,item?.channel_title,item?.channel_id].filter(Boolean).join(' ');
- return historyAliasMatchesText(text,keyword);
+ return historyKeywordVariants(keyword,contentRegistry).some(variant=>historyAliasMatchesText(text,variant));
 }
 function historySearchScore(item,parsed){
  const matched=parsed.members.filter(member=>historyMemberMatched(item,member)).length;
- const keywordMatched=parsed.keywords.filter(keyword=>historyKeywordMatches(item,keyword)).length;
- const weakHintMatched=(parsed.weakHints||[]).filter(hint=>historyMemberMatched(item,hint.member)||historyKeywordMatches(item,hint.term)).length;
+ const keywordMatched=parsed.keywords.filter(keyword=>historyKeywordMatches(item,keyword,parsed.contentAliases)).length;
+ const weakHintMatched=(parsed.weakHints||[]).filter(hint=>historyMemberMatched(item,hint.member)||historyKeywordMatches(item,hint.term,parsed.contentAliases)).length;
  const allMembers=parsed.members.length>0&&matched===parsed.members.length;
  const allKeywords=parsed.keywords.length===0||keywordMatched===parsed.keywords.length;
  const hostRequested=parsed.memberIds.has(String(item?.channel_id||''))?1:0;
@@ -1397,13 +1445,14 @@ async function loadHistory(){
    ?loadYoutubeHistoryRange(dateIntent.start,dateIntent.end)
    :query?loadYoutubeHistorySearchMonth(day):loadHistoryData(day,state.offset);
   const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);
+  const contentAliasesPromise=searchQuery?loadHistoryContentAliases():Promise.resolve(null);
   const collabPromise=!query&&config.apiBase?api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null):Promise.resolve(null);
   const catalogPromise=config.apiBase
    ?(homeCatalogRows.length
      ?Promise.resolve({streams:homeCatalogRows})
      :requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null))
    :Promise.resolve(null);
-  const [manifest,data,aliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,historyPromise,aliasesPromise,collabPromise,catalogPromise]);
+  const [manifest,data,aliasRegistry,contentAliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,historyPromise,aliasesPromise,contentAliasesPromise,collabPromise,catalogPromise]);
   if(generation!==historyLoadGeneration)return;
   if(manifest)applyHistoryAvailability(manifest,day);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
@@ -1413,7 +1462,7 @@ async function loadHistory(){
   let endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
   let parsedSearch=null,searchRows=[];
   if(searchQuery){
-   parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry);
+   parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry,contentAliasRegistry);
    searchRows=historySearchRows(endedItems,parsedSearch);
    renderHistorySearchIntent(parsedSearch,searchRows);
    endedItems=searchRows.map(row=>row.item);
