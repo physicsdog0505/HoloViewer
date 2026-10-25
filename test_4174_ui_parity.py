@@ -93,23 +93,45 @@ class ParityContract(unittest.TestCase):
         self.assertIn("if(key==='unknown')",render)
         self.assertIn("$('home-unknown-section').hidden=true",render)
 
-    def test_history_cards_reuse_home_display_metadata_and_actual_start(self):
+    def test_history_cards_use_canonical_batch_profiles_with_catalog_fallback(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         self.assertIn("item?.start_at||item?.actual_start||item?.scheduled_start",js)
         self.assertIn("'yt3.googleusercontent.com'",js)
-        self.assertIn('function homeDisplayMetadataByChannel(rows)',js)
+        self.assertIn('const canonicalChannelProfileCache=new Map()',js)
+        self.assertIn('function normalizeCanonicalChannelProfile(profile)',js)
+        self.assertIn('async function loadCanonicalChannelProfiles(channelIds)',js)
+        self.assertIn("api('/v1/channels/profiles?'+query.toString())",js)
+        self.assertNotIn("api('/v1/channels/'+encodeURIComponent(id)+'/profile')",js)
+        self.assertIn('async function historyDisplayMetadataByChannel(items,catalogRows)',js)
+        self.assertIn('else if(fallback.has(id))byChannel.set(id,fallback.get(id))',js)
         self.assertIn('function historyDisplayRow(item,byChannel)',js)
-        self.assertIn("avatar_url:item.avatar_url||profile.avatar_url||''",js)
-        self.assertIn("member_accent:item.member_accent||profile.member_accent||''",js)
-        self.assertIn("support_mode:item.support_mode||profile.support_mode||''",js)
+        self.assertIn("avatar_url:profile.avatar_url||item.avatar_url||''",js)
+        self.assertIn("member_accent:profile.member_accent||item.member_accent||''",js)
+        self.assertIn("support_mode:profile.support_mode||item.support_mode||''",js)
+        self.assertIn("group:profile.group||profile.channel_group||item.group||item.channel_group||'other'",js)
         start=js.index('async function loadHistory(){')
         end=js.index('function collabEventState(event){',start)
         history=js[start:end]
         self.assertIn("requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null)",history)
         self.assertIn("homeCatalogPromise=api('/v1/catalog/today')",js)
+        self.assertIn("const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows)",history)
         self.assertIn("historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel)",history)
-        # Display fallback is metadata-only; lifecycle still comes from /v1/history.
+        # Canonical profile owns presentation only; lifecycle/timing remains History-owned.
         self.assertNotIn("scheduled_start",history.split("historyDisplayRow",1)[0].split("lifecycle_state",1)[-1])
+
+    def test_time_hub_uses_shared_canonical_batch_profile_cache(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        profile_start=js.index('function timeHubProfileRow(channelId){')
+        profile_end=js.index('function timeHubAvatar(event){',profile_start)
+        profile=js[profile_start:profile_end]
+        self.assertIn('canonicalChannelProfileCache.get(id)',profile)
+        self.assertIn("homeCatalogRows.find(row=>String(row?.channel_id||'')===id)",profile)
+        open_start=js.index('function openTimeHub(){')
+        open_end=js.index('function updateClientTopbar(',open_start)
+        open_hub=js[open_start:open_end]
+        self.assertIn('loadCanonicalChannelProfiles(TIME_HUB_MEMBERS.map(member=>member.channelId))',open_hub)
+        self.assertIn("if($('timeHub')?.open)renderTimeHub()",open_hub)
+        self.assertNotIn("/v1/channels/'+",open_hub)
 
     def test_history_uses_direct_date_navigation_and_month_search(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
