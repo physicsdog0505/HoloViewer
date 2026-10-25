@@ -150,7 +150,7 @@ class ParityContract(unittest.TestCase):
             'id="history-search-intent"',
             'id="history-pagination"',
             'id="historyMultiSelectBar"',
-            'placeholder="搜尋這個月份的直播或頻道…"',
+            'placeholder="搜尋直播、頻道或日期（例：10/15、9/10~10/15）…"',
         ):
             self.assertIn(snippet, html)
 
@@ -177,7 +177,7 @@ class ParityContract(unittest.TestCase):
             "label.textContent='已辨識成員：'",
             "優先顯示同時相關的結果",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
-            "const aliasesPromise=query?loadHistoryMemberAliases():Promise.resolve(null)",
+            "const aliasesPromise=query&&!dateIntent?loadHistoryMemberAliases():Promise.resolve(null)",
             "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
             "params.set('date',day)",
             "params.set('q',$('historySearch').value.trim())",
