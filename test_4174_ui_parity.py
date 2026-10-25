@@ -141,6 +141,7 @@ class ParityContract(unittest.TestCase):
         for snippet in (
             'id="history-picker"',
             'id="historyDate"',
+            'history-date-field-hidden',
             'id="historyPrevDay"',
             'id="historyNextDay"',
             'id="historyYesterday"',
@@ -157,6 +158,7 @@ class ParityContract(unittest.TestCase):
         self.assertNotIn('type="submit">查看</button>', html[html.index('id="history"'):html.index('id="ptt"')])
         self.assertIn('.history-toolbar{display:grid', css)
         self.assertIn('.history-date-nav{display:flex', css)
+        self.assertIn('.history-date-field-hidden{display:none}', css)
         self.assertIn('.history-search-field input{width:100%}', css)
         self.assertIn('.history-search-intent{display:flex', css)
         self.assertIn('.history-search-chip{display:inline-flex', css)
