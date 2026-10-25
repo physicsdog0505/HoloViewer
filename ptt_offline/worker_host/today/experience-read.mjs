@@ -1,4 +1,5 @@
 import {readToday} from './store.mjs';
+import {readChannelProfiles,neutralChannelProfile} from './channel-profile.mjs';
 
 const VIDEO=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
@@ -262,28 +263,67 @@ function publicWatchEvent(row,streams){
   scheduled_time:row.scheduled_time,
   member_only:Boolean(row.member_only),
   provenance:{aid:row.aid,article_title:row.article_title,source_url:row.source_url,article_datetime:row.article_datetime,source:row.source},
-  hosts:(streams.get(row.event_id)??[]).map(s=>({label:s.label,video_id:s.video_id})),
+  hosts:(streams.get(row.event_id)??[]).map(s=>({
+   label:s.label,
+   video_id:s.video_id,
+   channel_id:s.channel_id??null,
+   channel:s.channel??neutralChannelProfile(s.channel_id??null)
+  })),
   source_mapping:null,
   capabilities:{source_mapping:false,translation:false,telemetry:false}
  };
 }
-async function hydrateWatchRows(db,rows){
+async function batchVideoChannelRows(db,sql,videoIds){
+ if(!videoIds.length)return [];
+ try{
+  const placeholders=videoIds.map(()=>'?').join(',');
+  const rows=await db.prepare(sql.replace('__IDS__',placeholders)).bind(...videoIds).all();
+  return rows?.results??[];
+ }catch{return []}
+}
+async function resolveVideoChannelIds(db,videoIds){
+ const ids=[...new Set(videoIds.filter(id=>VIDEO.test(id)))];
+ const out=new Map();
+ const sources=[
+  `SELECT video_id,publisher_channel_id AS channel_id FROM public_today_canonical WHERE video_id IN (__IDS__)`,
+  `SELECT video_id,channel_id FROM public_history WHERE video_id IN (__IDS__)`,
+  `SELECT video_id,channel_id FROM public_catalog WHERE video_id IN (__IDS__)`,
+  `SELECT video_id,channel_id FROM public_video_metadata_cache WHERE video_id IN (__IDS__)`
+ ];
+ for(const sql of sources){
+  const rows=await batchVideoChannelRows(db,sql,ids);
+  for(const row of rows){
+   if(!out.has(row?.video_id)&&VIDEO.test(row?.video_id??'')&&CHANNEL.test(row?.channel_id??'')){
+    out.set(row.video_id,row.channel_id);
+   }
+  }
+ }
+ return out;
+}
+async function hydrateWatchRows(db,rows,{env=null}={}){
  if(!rows.length)return [];
  const ids=rows.map(x=>x.event_id);
  const placeholders=ids.map(()=>'?').join(',');
- const s=await db.prepare(`SELECT event_id,ordinal,label,video_id FROM public_watchalong_streams WHERE event_id IN (${placeholders}) ORDER BY event_id,ordinal`).bind(...ids).all();
+ const result=await db.prepare(`SELECT event_id,ordinal,label,video_id FROM public_watchalong_streams WHERE event_id IN (${placeholders}) ORDER BY event_id,ordinal`).bind(...ids).all();
+ const streamRows=result.results??[];
+ const videoChannels=await resolveVideoChannelIds(db,streamRows.map(x=>x.video_id));
+ const profiles=await readChannelProfiles(db,[...new Set(videoChannels.values())],{env});
  const grouped=new Map();
- for(const x of s.results??[])grouped.set(x.event_id,[...(grouped.get(x.event_id)??[]),x]);
+ for(const x of streamRows){
+  const channel_id=videoChannels.get(x.video_id)??null;
+  const enriched={...x,channel_id,channel:channel_id?(profiles.get(channel_id)??neutralChannelProfile(channel_id)):neutralChannelProfile(null)};
+  grouped.set(x.event_id,[...(grouped.get(x.event_id)??[]),enriched]);
+ }
  return rows.map(x=>publicWatchEvent(x,grouped));
 }
-async function watchalongHistory(db,day,{limit=60,offset=0}={}){
+async function watchalongHistory(db,day,{limit=60,offset=0,env=null}={}){
  const rows=await db.prepare(`SELECT event_id,aid,article_title,source_url,article_datetime,day,scheduled_time,description,member_only,source
  FROM public_watchalong_events WHERE day=? ORDER BY article_datetime DESC,scheduled_time DESC,event_id DESC LIMIT ? OFFSET ?`)
   .bind(day,limit+1,offset).all();
  const raw=rows.results??[],has_more=raw.length>limit;
- return {schema_version:'public-experience-v1',kind:'watchalong',scope:'history',day,limit,offset,has_more,events:await hydrateWatchRows(db,raw.slice(0,limit))};
+ return {schema_version:'public-experience-v1',kind:'watchalong',scope:'history',day,limit,offset,has_more,events:await hydrateWatchRows(db,raw.slice(0,limit),{env})};
 }
-async function watchalongRecent(db,{days=30,limit=60,now=new Date()}={}){
+async function watchalongRecent(db,{days=30,limit=60,now=new Date(),env=null}={}){
  const localDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
  const startDate=new Date(localDay+'T00:00:00+08:00');
  const cutoff=new Date(startDate.getTime()-(days-1)*86400_000);
@@ -292,13 +332,13 @@ async function watchalongRecent(db,{days=30,limit=60,now=new Date()}={}){
  FROM public_watchalong_events WHERE day>=? AND day<=? ORDER BY article_datetime DESC,scheduled_time DESC,event_id DESC LIMIT ?`)
   .bind(cutoffDay,localDay,limit+1).all();
  const raw=rows.results??[],has_more=raw.length>limit;
- return {schema_version:'public-experience-v1',kind:'watchalong',scope:'recent',days,limit,has_more,as_of:now.toISOString().replace(/\.\d{3}Z$/,'Z'),events:await hydrateWatchRows(db,raw.slice(0,limit))};
+ return {schema_version:'public-experience-v1',kind:'watchalong',scope:'recent',days,limit,has_more,as_of:now.toISOString().replace(/\.\d{3}Z$/,'Z'),events:await hydrateWatchRows(db,raw.slice(0,limit),{env})};
 }
-async function watchalongDetail(db,eventId){
+async function watchalongDetail(db,eventId,{env=null}={}){
  const row=await db.prepare(`SELECT event_id,aid,article_title,source_url,article_datetime,day,scheduled_time,description,member_only,source
  FROM public_watchalong_events WHERE event_id=?`).bind(eventId).first();
  if(!row)return null;
- return (await hydrateWatchRows(db,[row]))[0];
+ return (await hydrateWatchRows(db,[row],{env}))[0];
 }
 export async function handleExperienceRead(request,env,now=new Date()){
  if(!request||request.method!=='GET')return json({error:'method_not_allowed'},405,0);
@@ -339,7 +379,7 @@ export async function handleExperienceRead(request,env,now=new Date()){
    const days=intParam(url.searchParams.get('days'),{min:1,max:90,def:30});
    const limit=intParam(url.searchParams.get('limit'),{min:1,max:100,def:60});
    if(days==null||limit==null)return json({error:'invalid_watchalong_query'},400,0);
-   return json(await watchalongRecent(env.DB,{days,limit,now}));
+   return json(await watchalongRecent(env.DB,{days,limit,now,env}));
   }
   if(url.pathname==='/v1/watchalong/history'){
    if(env.WATCHALONG_EVENTS_ENABLED!=='true')return json({error:'watchalong_not_enabled'},503,0);
@@ -347,13 +387,13 @@ export async function handleExperienceRead(request,env,now=new Date()){
    const limit=intParam(url.searchParams.get('limit'),{min:1,max:100,def:60});
    const offset=intParam(url.searchParams.get('offset'),{min:0,max:1000,def:0});
    if(!validDay(day)||limit==null||offset==null)return json({error:'invalid_watchalong_query'},400,0);
-   return json(await watchalongHistory(env.DB,day,{limit,offset}));
+   return json(await watchalongHistory(env.DB,day,{limit,offset,env}));
   }
   if(url.pathname.startsWith('/v1/watchalong/events/')){
    if(env.WATCHALONG_EVENTS_ENABLED!=='true')return json({error:'watchalong_not_enabled'},503,0);
    const eventId=decodeURIComponent(url.pathname.slice('/v1/watchalong/events/'.length));
    if(!/^watch:[0-9a-f]{20}$/.test(eventId))return json({error:'invalid_event_id'},400,0);
-   const event=await watchalongDetail(env.DB,eventId);
+   const event=await watchalongDetail(env.DB,eventId,{env});
    return event?json({schema_version:'public-experience-v1',event}):json({error:'not_found'},404,0);
   }
   return json({error:'not_found'},404,0);
