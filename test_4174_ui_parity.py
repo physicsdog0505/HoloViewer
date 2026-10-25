@@ -225,6 +225,9 @@ class ParityContract(unittest.TestCase):
             self.assertTrue(any(expected.issubset(group) for group in flat_groups), expected)
 
         self.assertIn("const historyChannelSelection=new Set();", js)
+        self.assertIn("function homeStartLabel(item,{includeYear=false}={})", js)
+        self.assertIn("return (includeYear?out.year+'/':'')+out.month+'/'+out.day+' '+out.hour+':'+out.minute;", js)
+        self.assertIn("const time=homeStartLabel(item,{includeYear:history});", js)
         self.assertIn("function historyChannelFacetEntries(rows)", js)
         self.assertIn("if(!map.has(channelId))map.set(channelId,{channelId,count:0,row});", js)
         self.assertIn("function renderHistoryChannelFacets(rows)", js)
