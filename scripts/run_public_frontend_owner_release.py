@@ -174,7 +174,12 @@ def normalize_custom_html_edge(data: bytes) -> bytes:
     if not matches:
         return data
     match = matches[0]
-    return data[:match.start()] + data[match.end():]
+    suffix = data[match.end():]
+    if suffix.startswith(b"\r\n</body>"):
+        suffix = suffix[2:]
+    elif suffix.startswith(b"\n</body>"):
+        suffix = suffix[1:]
+    return data[:match.start()] + suffix
 
 
 def verify_bytes(origin: str, rel: str, expected: bytes, label: str) -> None:
