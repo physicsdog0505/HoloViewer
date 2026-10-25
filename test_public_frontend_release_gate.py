@@ -3,9 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scripts.run_public_frontend_owner_release import (
     FOREIGN_PREFIXES,
+    ReleaseBlocked,
+    _legacy_frontend_youtube_manifest,
     is_foreign_rel,
     is_spa_fallback_html,
     normalize_custom_html_edge,
@@ -51,6 +54,42 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
     def test_spa_fallback_html_rejects_json(self):
         self.assertFalse(is_spa_fallback_html(b'{"schema_version":1}'))
         self.assertFalse(is_spa_fallback_html(None))
+
+
+    @patch("scripts.run_public_frontend_owner_release.fetch")
+    def test_legacy_youtube_dual_spa_fallback_is_absent(self, fetch_mock):
+        fetch_mock.side_effect = [
+            b"<!doctype html><html></html>",
+            b"<!DOCTYPE html><html></html>",
+        ]
+        self.assertIsNone(_legacy_frontend_youtube_manifest())
+
+    @patch("scripts.run_public_frontend_owner_release.fetch")
+    def test_legacy_youtube_single_origin_fallback_fails_closed(self, fetch_mock):
+        fetch_mock.side_effect = [
+            b"<!doctype html><html></html>",
+            b'{"schema_version":1}',
+        ]
+        with self.assertRaisesRegex(ReleaseBlocked, "only one Production origin"):
+            _legacy_frontend_youtube_manifest()
+
+    @patch("scripts.run_public_frontend_owner_release.fetch")
+    def test_legacy_youtube_dual_json_requires_identical_bytes(self, fetch_mock):
+        fetch_mock.side_effect = [
+            b'{"schema_version":1}',
+            b'{"schema_version":2}',
+        ]
+        with self.assertRaisesRegex(ReleaseBlocked, "differs between Production origins"):
+            _legacy_frontend_youtube_manifest()
+
+    @patch("scripts.run_public_frontend_owner_release.fetch")
+    def test_legacy_youtube_dual_json_returns_manifest(self, fetch_mock):
+        raw = b'{"schema_version":1,"months":[]}'
+        fetch_mock.side_effect = [raw, raw]
+        self.assertEqual(
+            _legacy_frontend_youtube_manifest(),
+            {"schema_version": 1, "months": []},
+        )
 
     def test_custom_html_exact_body_passes_unchanged(self):
         body = b"<!doctype html><html><body><script src=\"assets/app.js\"></script></body></html>"
