@@ -18,6 +18,7 @@ WORKERS_ORIGIN = "https://holoviewer-public.singlebagel.workers.dev"
 WORKER_NAME = "holoviewer-public"
 WRANGLER_CONFIG = "cloudflare/wrangler.json"
 FOREIGN_PREFIXES = ("youtube/v1/", "ptt/v1/")
+PROTECTED_RUNTIME_PREFIXES = ("data/search/aliases/", "data/watchalong/")
 SKIP_REMOTE = {"_headers", "_redirects"}
 
 
@@ -82,6 +83,27 @@ def diff_site(repo: Path, base: str, head: str) -> dict[str, str]:
 
 def is_foreign_rel(rel: str) -> bool:
     return rel.startswith(FOREIGN_PREFIXES)
+
+
+def is_protected_runtime_rel(rel: str) -> bool:
+    return rel.startswith(PROTECTED_RUNTIME_PREFIXES)
+
+
+def frontend_release_scope_gate(repo: Path, base: str, head: str) -> dict:
+    changed = diff_site(repo, base, head)
+    protected_changes = []
+    for path, status in sorted(changed.items()):
+        if not path.startswith("site/"):
+            continue
+        rel = path[len("site/"):]
+        if is_protected_runtime_rel(rel):
+            protected_changes.append(f"{status}:{rel}")
+    if protected_changes:
+        raise ReleaseBlocked(
+            "generic frontend release contains protected runtime data changes: "
+            + ", ".join(protected_changes[:20])
+        )
+    return {"protected_runtime_change_count": 0, "status": "PASS"}
 
 
 def active_version(repo: Path) -> str:
@@ -379,6 +401,7 @@ def main() -> int:
         subprocess.run(["git", "cat-file", "-e", f"{args.accepted_production_source_sha}^{{commit}}"], cwd=repo, check=True)
 
         ownership = ownership_gate(repo)
+        scope = frontend_release_scope_gate(repo, args.accepted_production_source_sha, head)
         dedicated = dedicated_health(repo)
         baseline = reconcile_baseline(repo, args.accepted_production_source_sha, head)
         runtime = reconcile_runtime(repo, args.accepted_production_source_sha, head)
@@ -391,6 +414,7 @@ def main() -> int:
             "accepted_production_source_sha": args.accepted_production_source_sha,
             "baseline_active_version": baseline_version,
             "ownership": ownership,
+            "frontend_release_scope": scope,
             "dedicated_target_health": dedicated,
             "production_frontend_reconciliation": baseline,
             "runtime_reconciliation": runtime,
