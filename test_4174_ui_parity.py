@@ -1482,19 +1482,16 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("dateIntent?.kind==='range'",js)
         self.assertIn('9/10~10/15',html)
 
-    def test_watchalong_landing_uses_stable_channel_id_batch_profiles(self):
+    def test_watchalong_landing_uses_history_channel_ids_for_canonical_profiles(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn('function watchalongProfileByChannel(channelId,fallback=null)',js)
-        self.assertIn('function watchalongChannelByVideo(todayRows,recentEvents)',js)
-        self.assertIn("String(host?.channel_id||'')",js)
-        self.assertIn('const channelByVideo=watchalongChannelByVideo(todayRows,recentEvents)',js)
-        self.assertIn('const watchalongChannelIds=[...new Set(channelByVideo.values())]',js)
-        self.assertIn('await loadCanonicalChannelProfiles(watchalongChannelIds)',js)
-        self.assertIn('canonicalChannelProfileCache.get(id)||fallback||null',js)
-        self.assertIn("const channelId=String(host.channel_id||channelByVideo.get(videoId)||'')",js)
-        self.assertIn("const channelId=String(row?.channel_id||channelByVideo.get(videoId)||'')",js)
-        self.assertNotIn('function watchalongProfile(label,rows=[])',js)
-        self.assertNotIn('name.includes(key)||key.includes(name)',js)
+
+        self.assertIn('const watchalongChannelIds=[...new Set(historyRows.map',js)
+        self.assertIn('const canonical=await loadCanonicalChannelProfiles(watchalongChannelIds);',js)
+        self.assertIn('watchalongPastRows=historyRows.map(row=>historyDisplayRow(row,canonical));',js)
+        self.assertIn("const channelId=String(row?.channel_id||'');",js)
+        self.assertNotIn('function watchalongChannelByVideo(todayRows,recentEvents)',js)
+        self.assertNotIn("api('/v1/watchalong/recent",js)
+
 
     def test_watchalong_landing_cards_expose_youtube_without_hijacking_primary_action(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
