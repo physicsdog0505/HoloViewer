@@ -166,8 +166,10 @@ class ParityContract(unittest.TestCase):
             "historyPrevDay').onclick=()=>historySetDay",
             "historyNextDay').onclick=()=>historySetDay",
             "historyYesterday').onclick=()=>historySetDay(historyBounds().latest)",
+            "historySearch').addEventListener('keydown'",
+            "if(event.key!=='Enter')return",
             "historySearch').addEventListener('input'",
-            "historySearchFrame=requestAnimationFrame(()=>{historySearchFrame=0;state.offset=0;loadHistory()})",
+            "if(String(event.target.value||'').trim())return",
             "async function loadYoutubeHistorySearchMonth(day)",
             "const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json'",
             "function parseHistorySearchQuery(raw,registry)",
@@ -1465,6 +1467,9 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('renderWatchalongPastRows(curatedHosts);',js)
         self.assertNotIn("api('/v1/watchalong/recent?days=90&limit=100')",js)
         self.assertIn('id="watchalongPastSearch"',html)
+        self.assertIn("watchalongPastSearch?.addEventListener('keydown'",js)
+        self.assertIn("if(event.key!=='Enter')return",js)
+        self.assertIn("watchalongPastSearch?.addEventListener('input'",js)
         self.assertIn("fetch('/data/watchalong/manifest.json'",js)
         self.assertIn("href:'/watchalong-viewer/?watchalong_event='",js)
 
