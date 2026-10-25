@@ -200,7 +200,7 @@
     </div>
     <label class="history-search-field" for="historySearch">
      <span class="sr-only">搜尋歷史直播</span>
-     <input id="historySearch" type="search" autocomplete="off" placeholder="搜尋這個月份的直播或頻道…">
+     <input id="historySearch" type="search" autocomplete="off" placeholder="搜尋直播、頻道或日期（例：10/15、9/10~10/15）…">
     </label>
    </div>
    <div id="history-search-intent" class="history-search-intent" hidden aria-live="polite"></div>
@@ -245,7 +245,11 @@
   <p id="watchalongStaticEmpty" class="empty-note">載入精選同時視聽中…</p>
  </section>
  <section class="section" id="watchalong-past">
-  <div class="section-head"><div><h2>過去直播</h2><p>瀏覽近期曾被辨識為同時視聽的直播；這裡是歷史資料，和上方已完成處理的精選內容分開。</p></div></div>
+  <div class="section-head"><div><h2>過去直播</h2><p>顯示 History 最近兩個已發布月份中符合同時視聽辨識規則的直播；和上方精選內容分開。</p></div></div>
+  <label class="history-search-field" for="watchalongPastSearch">
+   <span class="sr-only">搜尋過去同時視聽直播</span>
+   <input id="watchalongPastSearch" type="search" autocomplete="off" placeholder="搜尋直播或頻道…">
+  </label>
   <div id="watchalongPastGrid" class="watchalong-static-grid watchalong-history-grid"></div>
   <p id="watchalongPastEmpty" class="empty-note">讀取過去同時視聽直播中…</p>
  </section>

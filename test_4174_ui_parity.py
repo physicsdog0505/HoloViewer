@@ -150,7 +150,7 @@ class ParityContract(unittest.TestCase):
             'id="history-search-intent"',
             'id="history-pagination"',
             'id="historyMultiSelectBar"',
-            'placeholder="搜尋這個月份的直播或頻道…"',
+            'placeholder="搜尋直播、頻道或日期（例：10/15、9/10~10/15）…"',
         ):
             self.assertIn(snippet, html)
 
@@ -177,7 +177,7 @@ class ParityContract(unittest.TestCase):
             "label.textContent='已辨識成員：'",
             "優先顯示同時相關的結果",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
-            "const aliasesPromise=query?loadHistoryMemberAliases():Promise.resolve(null)",
+            "const aliasesPromise=query&&!dateIntent?loadHistoryMemberAliases():Promise.resolve(null)",
             "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
             "params.set('date',day)",
             "params.set('q',$('historySearch').value.trim())",
@@ -1455,19 +1455,43 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
-    def test_watchalong_landing_uses_stable_channel_id_batch_profiles(self):
+    def test_watchalong_past_uses_recent_history_months_without_touching_featured(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn('function watchalongProfileByChannel(channelId,fallback=null)',js)
-        self.assertIn('function watchalongChannelByVideo(todayRows,recentEvents)',js)
-        self.assertIn("String(host?.channel_id||'')",js)
-        self.assertIn('const channelByVideo=watchalongChannelByVideo(todayRows,recentEvents)',js)
-        self.assertIn('const watchalongChannelIds=[...new Set(channelByVideo.values())]',js)
-        self.assertIn('await loadCanonicalChannelProfiles(watchalongChannelIds)',js)
-        self.assertIn('canonicalChannelProfileCache.get(id)||fallback||null',js)
-        self.assertIn("const channelId=String(host.channel_id||channelByVideo.get(videoId)||'')",js)
-        self.assertIn("const channelId=String(row?.channel_id||channelByVideo.get(videoId)||'')",js)
-        self.assertNotIn('function watchalongProfile(label,rows=[])',js)
-        self.assertNotIn('name.includes(key)||key.includes(name)',js)
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+
+        self.assertIn('const recentMonths=published.slice(-2);',js)
+        self.assertIn('.filter(row=>watchalongCandidateTitle(row?.title));',js)
+        self.assertIn('watchalongPastRows=historyRows.map(row=>historyDisplayRow(row,canonical));',js)
+        self.assertIn('renderWatchalongPastRows(curatedHosts);',js)
+        self.assertNotIn("api('/v1/watchalong/recent?days=90&limit=100')",js)
+        self.assertIn('id="watchalongPastSearch"',html)
+        self.assertIn("fetch('/data/watchalong/manifest.json'",js)
+        self.assertIn("href:'/watchalong-viewer/?watchalong_event='",js)
+
+    def test_history_search_accepts_single_dates_and_bounded_cross_month_ranges(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        html=(ROOT/'site/index.html').read_text(encoding='utf-8')
+
+        self.assertIn('function parseHistoryDateIntent(raw,yearHint=\'\')',js)
+        self.assertIn("return {kind:'range',start,end,span};",js)
+        self.assertIn("if(span>62)return {kind:'range_too_large',start,end,span};",js)
+        self.assertIn('async function loadYoutubeHistoryRange(start,end)',js)
+        self.assertIn("historyMonthsBetween(start,end)",js)
+        self.assertIn("if(dateIntent?.kind==='day')",js)
+        self.assertIn("return loadHistory();",js)
+        self.assertIn("dateIntent?.kind==='range'",js)
+        self.assertIn('9/10~10/15',html)
+
+    def test_watchalong_landing_uses_history_channel_ids_for_canonical_profiles(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+
+        self.assertIn('const watchalongChannelIds=[...new Set(historyRows.map',js)
+        self.assertIn('const canonical=await loadCanonicalChannelProfiles(watchalongChannelIds);',js)
+        self.assertIn('watchalongPastRows=historyRows.map(row=>historyDisplayRow(row,canonical));',js)
+        self.assertIn("const channelId=String(row?.channel_id||'');",js)
+        self.assertNotIn('function watchalongChannelByVideo(todayRows,recentEvents)',js)
+        self.assertNotIn("api('/v1/watchalong/recent",js)
+
 
     def test_watchalong_landing_cards_expose_youtube_without_hijacking_primary_action(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
