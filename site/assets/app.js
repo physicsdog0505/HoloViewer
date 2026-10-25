@@ -2204,13 +2204,23 @@ function watchalongHostLabel(title){
  const jp=text.match(/【[^】]*\/([^/【】]+)】\s*$/);
  return jp?.[1]?.trim()||'Hololive';
 }
-function watchalongProfile(label,rows=[]){
- const key=String(label||'').toLocaleLowerCase();
- const matched=(Array.isArray(rows)?rows:[]).find(row=>{
-  const names=[row?.channel_name,row?.channel_title].map(x=>String(x||'').toLocaleLowerCase()).filter(Boolean);
-  return names.some(name=>name===key||name.includes(key)||key.includes(name));
- });
- return matched?{...matched,channel_name:matched.channel_name||matched.channel_title||label}:{channel_name:label};
+function watchalongProfileByChannel(channelId,fallback=null){
+ const id=String(channelId||'');
+ return canonicalChannelProfileCache.get(id)||fallback||null;
+}
+function watchalongChannelByVideo(todayRows,recentEvents){
+ const byVideo=new Map();
+ for(const row of Array.isArray(todayRows)?todayRows:[]){
+  const videoId=String(row?.video_id||''),channelId=String(row?.channel_id||'');
+  if(/^[A-Za-z0-9_-]{11}$/.test(videoId)&&/^UC[A-Za-z0-9_-]{22}$/.test(channelId))byVideo.set(videoId,channelId);
+ }
+ for(const event of Array.isArray(recentEvents)?recentEvents:[]){
+  for(const host of Array.isArray(event?.hosts)?event.hosts:[]){
+   const videoId=String(host?.video_id||''),channelId=String(host?.channel_id||'');
+   if(/^[A-Za-z0-9_-]{11}$/.test(videoId)&&/^UC[A-Za-z0-9_-]{22}$/.test(channelId))byVideo.set(videoId,channelId);
+  }
+ }
+ return byVideo;
 }
 function watchalongCardImage(videoId,title,badge=''){
  const thumb=document.createElement('div');thumb.className='watchalong-static-thumb';
@@ -2281,6 +2291,11 @@ async function loadWatchalongLanding(){
   const manifest=await manifestResponse.json();
   if(manifest?.schema_version!=='holoviewer-watchalong-manifest-v1'||!Array.isArray(manifest.events))throw new Error('manifest');
   const todayRows=Array.isArray(todayResult?.streams||todayResult?.items)?(todayResult.streams||todayResult.items):[];
+  const recentEvents=recentResult?.schema_version==='public-experience-v1'&&recentResult?.kind==='watchalong'&&Array.isArray(recentResult.events)
+   ?recentResult.events:[];
+  const channelByVideo=watchalongChannelByVideo(todayRows,recentEvents);
+  const watchalongChannelIds=[...new Set(channelByVideo.values())];
+  await loadCanonicalChannelProfiles(watchalongChannelIds);
   const curatedHosts=new Set();
   const events=manifest.events.slice().sort((a,b)=>String(b.session_day||'').localeCompare(String(a.session_day||'')));
   for(const entry of events){
@@ -2289,7 +2304,9 @@ async function loadWatchalongLanding(){
    if(!/^[A-Za-z0-9_-]{11}$/.test(eventId)||!/^[A-Za-z0-9_-]{11}$/.test(videoId))continue;
    curatedHosts.add(videoId);
    const hostLabel=watchalongHostLabel(entry.title);
-   const profile=watchalongProfile(hostLabel,todayRows);
+   const channelId=channelByVideo.get(videoId)||'';
+   const fallback=todayRows.find(row=>String(row?.channel_id||'')===channelId)||null;
+   const profile=watchalongProfileByChannel(channelId,fallback);
    const card=watchalongLandingCard({
     videoId,title:String(entry.title||eventId),day:String(entry.session_day||''),
     detail:String(entry.source_count||0)+' 集',hostLabel,profile,featured:true,badge:'HoloDocchi 精選',
@@ -2301,15 +2318,15 @@ async function loadWatchalongLanding(){
   watchalongStaticEmpty.hidden=watchalongStaticGrid.childElementCount>0;
   if(!watchalongStaticGrid.childElementCount)watchalongStaticEmpty.textContent='目前沒有可直接觀看的精選同時視聽。';
 
-  const recentEvents=recentResult?.schema_version==='public-experience-v1'&&recentResult?.kind==='watchalong'&&Array.isArray(recentResult.events)
-   ?recentResult.events:[];
   for(const event of recentEvents){
    const hosts=Array.isArray(event?.hosts)?event.hosts:[];
    const host=hosts.find(row=>/^[A-Za-z0-9_-]{11}$/.test(String(row?.video_id||'')));
    if(!host)continue;
    const videoId=String(host.video_id);
    const label=String(host.label||watchalongHostLabel(event.title)||'Hololive');
-   const profile=watchalongProfile(label,todayRows);
+   const channelId=String(host.channel_id||channelByVideo.get(videoId)||'');
+   const fallback=todayRows.find(row=>String(row?.channel_id||'')===channelId)||null;
+   const profile=watchalongProfileByChannel(channelId,fallback);
    const isCurated=curatedHosts.has(videoId);
    const pastCard=watchalongLandingCard({
     videoId,title:String(event.title||videoId),day:String(event.day||''),
@@ -2332,9 +2349,11 @@ async function loadWatchalongLanding(){
    const state=String(row?.lifecycle_state||'');
    const status=state==='live'?'直播中':(['upcoming','waiting'].includes(state)?'稍後':'今天');
    const label=String(row?.channel_name||row?.channel_title||'Hololive');
+   const channelId=String(row?.channel_id||channelByVideo.get(videoId)||'');
+   const profile=watchalongProfileByChannel(channelId,row);
    const card=watchalongLandingCard({
     videoId,title:String(row?.title||videoId),day:taipeiDay(),status,
-    hostLabel:label,profile:row,compact:true,action:'使用這場建立 →',onpick:()=>pickWatchalongHost(videoId)
+    hostLabel:label,profile,compact:true,action:'使用這場建立 →',onpick:()=>pickWatchalongHost(videoId)
    });
    if(card)watchalongTodayGrid?.append(card);
   }
