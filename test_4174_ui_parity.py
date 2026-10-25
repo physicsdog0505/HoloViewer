@@ -181,7 +181,7 @@ class ParityContract(unittest.TestCase):
             "label.textContent='已辨識成員：'",
             "優先顯示同時相關的結果",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
-            "const aliasesPromise=query&&!dateIntent?loadHistoryMemberAliases():Promise.resolve(null)",
+            "const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);",
             "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
             "params.set('date',day)",
             "params.set('q',$('historySearch').value.trim())",
@@ -1479,16 +1479,23 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("fetch('/data/watchalong/manifest.json'",js)
         self.assertIn("href:'/watchalong-viewer/?watchalong_event='",js)
 
-    def test_history_search_accepts_single_dates_and_bounded_cross_month_ranges(self):
+    def test_history_search_accepts_single_dates_unbounded_ranges_and_combined_terms(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
         html=(ROOT/'site/index.html').read_text(encoding='utf-8')
 
         self.assertIn('function parseHistoryDateIntent(raw,yearHint=\'\')',js)
+        self.assertIn('function parseHistoryCombinedIntent(raw,yearHint=\'\')',js)
+        self.assertIn("String(token||'').normalize('NFKC').trim()",js)
+        self.assertIn("String(raw||'').normalize('NFKC').trim()",js)
         self.assertIn("return {kind:'range',start,end,span};",js)
-        self.assertIn("if(span>62)return {kind:'range_too_large',start,end,span};",js)
+        self.assertNotIn("if(span>62)return {kind:'range_too_large',start,end,span};",js)
+        self.assertIn('while(cursor<=last){',js)
+        self.assertNotIn('months.length<3',js)
         self.assertIn('async function loadYoutubeHistoryRange(start,end)',js)
-        self.assertIn("historyMonthsBetween(start,end)",js)
-        self.assertIn("if(dateIntent?.kind==='day')",js)
+        self.assertIn("const dateIntent=combinedIntent.dateIntent,searchQuery=combinedIntent.query;",js)
+        self.assertIn("const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);",js)
+        self.assertIn("parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry);",js)
+        self.assertIn("if(pureDateIntent?.kind==='day')",js)
         self.assertIn("return loadHistory();",js)
         self.assertIn("dateIntent?.kind==='range'",js)
         self.assertIn('9/10~10/15',html)
