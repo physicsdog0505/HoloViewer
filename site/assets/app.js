@@ -135,7 +135,10 @@ function timeHubRecurringEvents(day){
  return events;
 }
 function timeHubProfileRow(channelId){
- return homeCatalogRows.find(row=>String(row?.channel_id||'')===String(channelId||''))||null;
+ const id=String(channelId||'');
+ return canonicalChannelProfileCache.get(id)
+  ||homeCatalogRows.find(row=>String(row?.channel_id||'')===id)
+  ||null;
 }
 function timeHubAvatar(event){
  const wrap=node('span',undefined,'time-hub-avatar');
@@ -199,6 +202,9 @@ function openTimeHub(){
  if(!$('timeHub')||$('page-title').disabled)return;
  timeHubMonth=taipeiDay().slice(0,7);timeHubSelected=taipeiDay();renderTimeHub();
  $('timeHub').showModal();
+ loadCanonicalChannelProfiles(TIME_HUB_MEMBERS.map(member=>member.channelId))
+  .then(()=>{if($('timeHub')?.open)renderTimeHub()})
+  .catch(()=>{});
 }
 
 function updateClientTopbar(routeName){
@@ -435,20 +441,78 @@ function homeDisplayMetadataByChannel(rows){
  }
  return byChannel;
 }
+const canonicalChannelProfileCache=new Map();
+let canonicalChannelProfilesBatchInFlight=null;
+function normalizeCanonicalChannelProfile(profile){
+ if(!profile||typeof profile!=='object')return null;
+ const channelId=String(profile.channel_id||'');
+ if(!/^UC[A-Za-z0-9_-]{22}$/.test(channelId))return null;
+ return {
+  channel_id:channelId,
+  channel_name:String(profile.channel_name||profile.display_name||''),
+  channel_title:String(profile.display_name||profile.channel_name||''),
+  avatar_url:String(profile.avatar_url||''),
+  group:String(profile.group||''),
+  member_accent:String(profile.member_accent||''),
+  member_accent_dual:Array.isArray(profile.member_accent_dual)?profile.member_accent_dual:[],
+  support_mode:String(profile.support_mode||''),
+  support_color_source:profile.support_color_source||null
+ };
+}
+async function loadCanonicalChannelProfiles(channelIds){
+ if(!config.apiBase)return new Map();
+ const ids=[...new Set((Array.isArray(channelIds)?channelIds:[]).map(String).filter(id=>/^UC[A-Za-z0-9_-]{22}$/.test(id)))];
+ const missing=ids.filter(id=>!canonicalChannelProfileCache.has(id));
+ if(missing.length){
+  if(canonicalChannelProfilesBatchInFlight)await canonicalChannelProfilesBatchInFlight;
+  const stillMissing=missing.filter(id=>!canonicalChannelProfileCache.has(id));
+  if(stillMissing.length){
+   const query=new URLSearchParams();
+   stillMissing.slice(0,100).forEach(id=>query.append('id',id));
+   canonicalChannelProfilesBatchInFlight=api('/v1/channels/profiles?'+query.toString())
+    .then(data=>{
+     for(const raw of Array.isArray(data?.profiles)?data.profiles:[]){
+      const profile=normalizeCanonicalChannelProfile(raw);
+      if(profile)canonicalChannelProfileCache.set(profile.channel_id,profile);
+     }
+    })
+    .catch(()=>{})
+    .finally(()=>{canonicalChannelProfilesBatchInFlight=null});
+   await canonicalChannelProfilesBatchInFlight;
+  }
+ }
+ const out=new Map();
+ for(const id of ids){
+  const profile=canonicalChannelProfileCache.get(id);
+  if(profile)out.set(id,profile);
+ }
+ return out;
+}
+async function historyDisplayMetadataByChannel(items,catalogRows){
+ const fallback=homeDisplayMetadataByChannel(catalogRows);
+ const ids=[...new Set((Array.isArray(items)?items:[]).map(item=>String(item?.channel_id||'')).filter(id=>/^UC[A-Za-z0-9_-]{22}$/.test(id)))];
+ const canonical=await loadCanonicalChannelProfiles(ids);
+ const byChannel=new Map();
+ for(const id of ids){
+  if(canonical.has(id))byChannel.set(id,canonical.get(id));
+  else if(fallback.has(id))byChannel.set(id,fallback.get(id));
+ }
+ return byChannel;
+}
 function historyDisplayRow(item,byChannel){
  const channelId=String(item?.channel_id||'');
  const profile=byChannel?.get(channelId);
  if(!profile)return item;
  return {
   ...item,
-  channel_name:item.channel_name||profile.channel_name||profile.channel_title||'',
-  channel_title:item.channel_title||profile.channel_title||profile.channel_name||'',
-  avatar_url:item.avatar_url||profile.avatar_url||'',
-  member_accent:item.member_accent||profile.member_accent||'',
-  member_accent_dual:Array.isArray(item.member_accent_dual)&&item.member_accent_dual.length?item.member_accent_dual:profile.member_accent_dual,
-  support_mode:item.support_mode||profile.support_mode||'',
-  support_color_source:item.support_color_source||profile.support_color_source||null,
-  group:item.group||profile.group||profile.channel_group||item.channel_group||'other'
+  channel_name:profile.channel_name||profile.channel_title||item.channel_name||'',
+  channel_title:profile.channel_title||profile.channel_name||item.channel_title||'',
+  avatar_url:profile.avatar_url||item.avatar_url||'',
+  member_accent:profile.member_accent||item.member_accent||'',
+  member_accent_dual:Array.isArray(profile.member_accent_dual)&&profile.member_accent_dual.length?profile.member_accent_dual:item.member_accent_dual,
+  support_mode:profile.support_mode||item.support_mode||'',
+  support_color_source:profile.support_color_source||item.support_color_source||null,
+  group:profile.group||profile.channel_group||item.group||item.channel_group||'other'
  };
 }
 
@@ -1201,7 +1265,7 @@ async function loadHistory(){
   if(manifest)applyHistoryAvailability(manifest,day);
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
   const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
-  const displayByChannel=homeDisplayMetadataByChannel(catalogRows);
+  const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows);
   let endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
   let parsedSearch=null,searchRows=[];
   if(query){
