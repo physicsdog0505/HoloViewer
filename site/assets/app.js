@@ -406,16 +406,16 @@ function applyHomeSupportStyle(el,item){
   el.dataset.supportMode=mode==='neutral'?'neutral':'solid';
  }
 }
-function homeStartLabel(item){
+function homeStartLabel(item,{includeYear=false}={}){
  const legacy=String(item?.start_label||item?.start_time_label||'').trim();
- if(legacy)return legacy;
+ if(legacy&&!includeYear)return legacy;
  const raw=String(item?.start_at||item?.actual_start||item?.scheduled_start||'').trim();
- if(!raw)return '時間未明';
+ if(!raw)return legacy||'時間未明';
  const date=new Date(raw);
- if(!Number.isFinite(date.getTime()))return '時間未明';
- const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
+ if(!Number.isFinite(date.getTime()))return legacy||'時間未明';
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
  const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
- return out.month+'/'+out.day+' '+out.hour+':'+out.minute;
+ return (includeYear?out.year+'/':'')+out.month+'/'+out.day+' '+out.hour+':'+out.minute;
 }
 function homeAvatarUrl(item){
  const raw=String(item.avatar_url||'');
@@ -621,7 +621,7 @@ function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={})
  const youTube=node('span','YouTube ↗','youtube-source-link');youTube.role='link';youTube.tabIndex=0;youTube.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;thumb.append(youTube);
  const overlay=node('div',undefined,'thumb-overlay');
  if(!history)overlay.append(node('span',status[0],'thumb-badge '+status[1]));
- const time=homeStartLabel(item);overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
+ const time=homeStartLabel(item,{includeYear:history});overlay.append(node('span',time,'thumb-time'));thumb.append(overlay);card.append(thumb);
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
