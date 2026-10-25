@@ -149,6 +149,7 @@ class ParityContract(unittest.TestCase):
             'id="history-availability"',
             'id="history-search-summary"',
             'id="history-search-intent"',
+            'id="history-channel-filters"',
             'id="history-pagination"',
             'id="historyMultiSelectBar"',
             'placeholder="搜尋直播、頻道或日期（例：10/15、9/10~10/15）…"',
@@ -162,6 +163,9 @@ class ParityContract(unittest.TestCase):
         self.assertIn('.history-search-field input{width:100%}', css)
         self.assertIn('.history-search-intent{display:flex', css)
         self.assertIn('.history-search-chip{display:inline-flex', css)
+        self.assertIn('.history-channel-filters{display:flex', css)
+        self.assertIn('.history-channel-filter{display:inline-flex', css)
+        self.assertIn('.history-channel-filter[aria-pressed="true"]', css)
 
         for snippet in (
             "historyDate').addEventListener('change'",
@@ -191,6 +195,16 @@ class ParityContract(unittest.TestCase):
         self.assertIn("let historyLoadGeneration=0;", js)
         self.assertIn("const generation=++historyLoadGeneration;", js)
         self.assertGreaterEqual(js.count("if(generation!==historyLoadGeneration)return;"), 3)
+
+        self.assertIn("const historyChannelSelection=new Set();", js)
+        self.assertIn("function historyChannelFacetEntries(rows)", js)
+        self.assertIn("if(!map.has(channelId))map.set(channelId,{channelId,count:0,row});", js)
+        self.assertIn("function renderHistoryChannelFacets(rows)", js)
+        self.assertIn("button.setAttribute('aria-pressed',String(historyChannelSelection.has(entry.channelId)))", js)
+        self.assertIn("if(historyChannelSelection.has(entry.channelId))historyChannelSelection.delete(entry.channelId);else historyChannelSelection.add(entry.channelId);", js)
+        self.assertIn("return historyChannelFacetRows.filter(row=>historyChannelSelection.has(String(row?.channel_id||'')));", js)
+        self.assertIn("clear.onclick=()=>{historyChannelSelection.clear();", js)
+        self.assertIn("historyChannelFacetRows=query?endedItems:[];", js)
 
         self.assertNotIn("已辨識多人搜尋：", js)
         self.assertNotIn("member_set", js[js.index("function parseHistorySearchQuery"):js.index("function historyMemberAliases")])
