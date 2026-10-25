@@ -196,6 +196,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const generation=++historyLoadGeneration;", js)
         self.assertGreaterEqual(js.count("if(generation!==historyLoadGeneration)return;"), 3)
 
+        self.assertIn("const HISTORY_CONTENT_ALIAS_GROUPS=[", js)
+        self.assertIn("['歌回','歌枠','歌配信','karaoke','singing','singingstream']", js)
+        self.assertIn("['minecraft','マイクラ','麥塊','麦块','我的世界']", js)
+        self.assertIn("['monsterhunter','モンスターハンター','モンハン','魔物獵人','魔物猎人']", js)
+        self.assertIn("['streetfighter6','sf6','ストリートファイター6','スト6','快打旋風6','快打旋风6']", js)
+        self.assertIn("function historyKeywordVariants(keyword)", js)
+        self.assertIn("return historyKeywordVariants(keyword).some(variant=>historyAliasMatchesText(text,variant));", js)
+
         self.assertIn("const historyChannelSelection=new Set();", js)
         self.assertIn("function historyChannelFacetEntries(rows)", js)
         self.assertIn("if(!map.has(channelId))map.set(channelId,{channelId,count:0,row});", js)
