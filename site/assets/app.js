@@ -1240,9 +1240,50 @@ function historyMemberMatched(item,member){
  const text=[item?.title,item?.channel_name,item?.channel_title].filter(Boolean).join(' ');
  return historyMemberAliases(member).some(alias=>historyAliasMatchesText(text,alias));
 }
+const HISTORY_CONTENT_ALIAS_GROUPS=[
+ ['歌回','歌枠','歌配信','karaoke','singing','singingstream'],
+ ['雜談','杂谈','雑談','zatsudan','chatting','freetalk'],
+ ['同時視聽','同时视听','同時視聴','watchalong','watch-along'],
+ ['生日','誕生日','birthday'],
+ ['周年','週年','anniversary'],
+ ['新衣裝','新衣装','新服裝','新服装','newoutfit','outfitreveal'],
+ ['重大告知','重要告知','announcement','bigannouncement'],
+ ['料理','cooking'],
+ ['耐久','endurance'],
+ ['凸待','凸待ち','callin'],
+ ['asmr'],
+ ['minecraft','マイクラ','麥塊','麦块','我的世界'],
+ ['apex','エーペックス','エペ'],
+ ['valorant','ヴァロラント','ヴァロ','特戰英豪','特战英豪'],
+ ['splatoon','スプラトゥーン','スプラ','漆彈','漆弹'],
+ ['mariokart','マリオカート','マリカ','瑪利歐賽車','玛利欧赛车'],
+ ['pokemon','pokémon','ポケモン','寶可夢','宝可梦'],
+ ['monsterhunter','モンスターハンター','モンハン','魔物獵人','魔物猎人'],
+ ['eldenring','エルデンリング','艾爾登法環','艾尔登法环'],
+ ['streetfighter6','sf6','ストリートファイター6','スト6','快打旋風6','快打旋风6'],
+ ['leagueoflegends','lol','リーグオブレジェンド','英雄聯盟','英雄联盟'],
+ ['fortnite','フォートナイト','要塞英雄'],
+ ['ark','アーク'],
+ ['gta','グラセフ','俠盜獵車手','侠盗猎车手'],
+ ['rust'],
+ ['overwatch','overwatch2','オーバーウォッチ','鬥陣特攻','斗阵特攻'],
+ ['supermariobros','マリオ','瑪利歐','玛利欧'],
+ ['zelda','ゼルダ','薩爾達','塞尔达'],
+ ['animalcrossing','あつ森','どうぶつの森','動物森友會','动物森友会']
+].map(group=>group.map(value=>normalizeHistorySearchText(value).replace(/ /g,'')));
+const HISTORY_CONTENT_ALIAS_INDEX=(()=>{
+ const index=new Map();
+ for(const group of HISTORY_CONTENT_ALIAS_GROUPS)for(const alias of group)index.set(alias,group);
+ return index;
+})();
+function historyKeywordVariants(keyword){
+ const normalized=normalizeHistorySearchText(keyword);
+ const compact=normalized.replace(/ /g,'');
+ return HISTORY_CONTENT_ALIAS_INDEX.get(compact)||[normalized];
+}
 function historyKeywordMatches(item,keyword){
  const text=[item?.title,item?.channel_name,item?.channel_title,item?.channel_id].filter(Boolean).join(' ');
- return historyAliasMatchesText(text,keyword);
+ return historyKeywordVariants(keyword).some(variant=>historyAliasMatchesText(text,variant));
 }
 function historySearchScore(item,parsed){
  const matched=parsed.members.filter(member=>historyMemberMatched(item,member)).length;
