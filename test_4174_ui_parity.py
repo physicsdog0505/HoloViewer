@@ -132,6 +132,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn('loadCanonicalChannelProfiles(TIME_HUB_MEMBERS.map(member=>member.channelId))',open_hub)
         self.assertIn("if($('timeHub')?.open)renderTimeHub()",open_hub)
         self.assertNotIn("/v1/channels/'+",open_hub)
+        self.assertIn("function timeHubMonthEvents(monthKey)", js)
+        self.assertIn("timeHubSelected='';renderTimeHub()", js)
+        self.assertIn("這個月沒有生日或出道週年。", js)
+        self.assertIn("dayLabel+' · '+event.label", js)
 
     def test_history_uses_direct_date_navigation_and_month_search(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
