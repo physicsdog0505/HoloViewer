@@ -27,7 +27,7 @@
 <button id="mobileNavButton" class="mobile-nav-button" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="開啟導覽">☰</button>
 <a class="mobile-top-brand" href="/">HoloDocchi</a>
 <button id="page-title" class="top-status top-date-trigger" type="button" aria-haspopup="dialog" aria-controls="timeHub">今日直播</button>
-<input id="historyTopDate" class="history-top-date-native" type="date" aria-label="選擇歷史直播日期" tabindex="-1">
+
 </header>
 <div id="mobileNav" class="mobile-nav" hidden> <a data-mobile-route="home" href="/" class="active">今日直播</a>
  <a data-mobile-route="history" href="/history" class="">歷史直播</a>
@@ -61,6 +61,35 @@
    <aside class="time-hub-agenda" aria-live="polite">
     <p id="timeHubSelectedLabel" class="time-hub-selected-label"></p>
     <div id="timeHubSpecials" class="time-hub-specials"></div>
+   </aside>
+  </div>
+ </div>
+</dialog>
+<dialog id="historyHub" class="time-hub history-hub" aria-labelledby="historyHubTitle">
+ <div class="time-hub-shell">
+  <header class="time-hub-head">
+   <div><p class="time-hub-kicker">HOLODOCCHI HISTORY</p><h2 id="historyHubTitle">歷史直播月曆</h2></div>
+   <div class="time-hub-head-actions">
+    <button id="historyHubLatest" type="button">最新</button>
+    <button id="historyHubClose" type="button" aria-label="關閉歷史直播月曆">×</button>
+   </div>
+  </header>
+  <div class="time-hub-toolbar">
+   <button id="historyHubPrev" type="button" aria-label="上個月">‹</button>
+   <strong id="historyHubMonth"></strong>
+   <button id="historyHubNext" type="button" aria-label="下個月">›</button>
+   <div class="time-hub-legend" aria-label="歷史直播月曆說明">
+    <span><i class="history-count"></i>直播數</span>
+   </div>
+  </div>
+  <div class="time-hub-body">
+   <section class="time-hub-calendar" aria-label="歷史直播月份總覽">
+    <div class="time-hub-weekdays" aria-hidden="true"><span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span></div>
+    <div id="historyHubGrid" class="time-hub-grid"></div>
+   </section>
+   <aside class="time-hub-agenda" aria-live="polite">
+    <p id="historyHubSelectedLabel" class="time-hub-selected-label"></p>
+    <div id="historyHubAgenda" class="history-hub-agenda"></div>
    </aside>
   </div>
  </div>
