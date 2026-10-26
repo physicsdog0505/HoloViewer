@@ -47,6 +47,7 @@ from .daily_static_assets_archive import (
     verify_http_readback,
 )
 from .r2_archive_export import export_archive
+from .monthly_catalog import MonthlyCatalogError, advance_verified_daily, digest_bytes
 
 CONFIG_SCHEMA="holoviewer-ptt-daily-history-runtime-config-v1"
 LIFECYCLE_V2_CUTOVER_DAY="2026-10-23"
@@ -997,6 +998,147 @@ def run_packaging_acceptance(
     }
 
 
+def _downstream_authorization(*, config: dict[str,Any], state_root: Path, day: str) -> dict[str,Any]:
+    raw=config.get("downstream_authorization_path")
+    if isinstance(raw,str) and raw:
+        path=Path(raw.replace("{day}",day)).expanduser()
+    else:
+        path=state_root/"collector-health"/f"{day}.json"
+    if not path.is_file():
+        return {"authorized":False,"path":str(path),"reason":"authorization-receipt-unavailable"}
+    body=_load_json(path)
+    if body.get("day")!=day:
+        return {"authorized":False,"path":str(path),"reason":"authorization-day-mismatch"}
+    authorized=(
+        body.get("health_gate_passed") is True
+        and body.get("downstream_authorized") is True
+    )
+    return {
+        "authorized":authorized,
+        "path":str(path),
+        "reason":None if authorized else str(body.get("downstream_status") or body.get("failure_code") or "downstream-not-authorized"),
+    }
+
+
+def _restore_catalog_file(path: Path, previous: bytes | None) -> None:
+    if previous is None:
+        if path.exists():
+            path.unlink()
+        return
+    tmp=path.with_suffix(path.suffix+".rollback")
+    tmp.parent.mkdir(parents=True,exist_ok=True)
+    tmp.write_bytes(previous)
+    os.replace(tmp,path)
+
+
+def _advance_monthly_catalog_after_verified_daily(
+    *,
+    config: dict[str,Any],
+    state_root: Path,
+    public: Path,
+    wrangler_config: Path,
+    day: str,
+    finalization: dict[str,Any],
+    package: dict[str,Any],
+    archive_job: dict[str,Any],
+) -> dict[str,Any]:
+    """Publish the stable monthly catalog only after verified daily readback.
+
+    This consumes a pre-existing Collector/finalization authorization receipt.
+    It never starts, restarts, stops, repairs, or rebaselines Collector/Publisher.
+    """
+    authorization=_downstream_authorization(config=config,state_root=state_root,day=day)
+    month=day[:7]
+    key=f"ptt/v1/manifests/monthly/{month}.json"
+    target=public/key
+    previous=target.read_bytes() if target.is_file() else None
+    if authorization["authorized"] is not True:
+        return {
+            "status":"HOLD_DOWNSTREAM_NOT_AUTHORIZED",
+            "day":day,"catalog_key":key,"changed":False,
+            "authorization_receipt":authorization["path"],
+            "reason":authorization["reason"],
+        }
+
+    manifest_key=str(package["manifest"]["key"])
+    manifest_path=public/manifest_key
+    if not manifest_path.is_file():
+        raise DailyHistoryRuntimeError("verified daily manifest missing from static root")
+    try:
+        candidate=advance_verified_daily(
+            month=month,
+            existing_catalog_raw=previous,
+            downstream_authorized=True,
+            finalization=finalization,
+            archive_job=archive_job,
+            base_url=str(config["base_url"]),
+            manifest_key=manifest_key,
+            manifest_raw=manifest_path.read_bytes(),
+            object_loader=lambda object_key:(public/object_key).read_bytes(),
+        )
+    except (MonthlyCatalogError,OSError) as exc:
+        raise DailyHistoryRuntimeError("monthly catalog candidate rejected") from exc
+
+    if candidate["changed"] is not True:
+        return {
+            "status":"MONTHLY_CATALOG_ALREADY_CURRENT",
+            "day":day,"catalog_key":key,"catalog_sha256":candidate["sha256"],
+            "changed":False,"authorization_receipt":authorization["path"],
+        }
+    if config.get("deploy") is not True:
+        return {
+            "status":"MONTHLY_CATALOG_READY",
+            "day":day,"catalog_key":key,"catalog_sha256":candidate["sha256"],
+            "changed":True,"published":False,
+            "authorization_receipt":authorization["path"],
+        }
+
+    target.parent.mkdir(parents=True,exist_ok=True)
+    tmp=target.with_suffix(target.suffix+".candidate")
+    tmp.write_bytes(candidate["raw"])
+    os.replace(tmp,target)
+
+    raw_wrangler=config.get("wrangler_command",["npx","wrangler"])
+    if not isinstance(raw_wrangler,list) or not raw_wrangler or not all(isinstance(x,str) for x in raw_wrangler):
+        _restore_catalog_file(target,previous)
+        raise DailyHistoryRuntimeError("wrangler_command must be a string array")
+
+    try:
+        deploy=_deploy_static_assets(
+            state_root=state_root,config_path=wrangler_config,
+            wrangler_command=raw_wrangler)
+        fetch=_http_fetcher(
+            str(config["base_url"]),
+            timeout=int(config.get("readback_timeout_seconds",20)),
+        )
+        remote=fetch(key)
+        if remote!=candidate["raw"] or digest_bytes(remote)!=candidate["sha256"]:
+            raise DailyHistoryRuntimeError("monthly catalog remote readback mismatch")
+    except Exception as exc:
+        _restore_catalog_file(target,previous)
+        # A failed/uncertain catalog publication must not become the durable
+        # local baseline. If the candidate deploy itself succeeded but readback
+        # did not verify, best-effort restore the previous catalog remotely.
+        try:
+            _deploy_static_assets(
+                state_root=state_root,config_path=wrangler_config,
+                wrangler_command=raw_wrangler)
+        except Exception:
+            pass
+        raise DailyHistoryRuntimeError("monthly catalog publication failed; previous catalog retained") from exc
+
+    receipt={
+        "schema_version":"holoviewer-ptt-monthly-catalog-publication-v1",
+        "day":day,"month":month,"catalog_key":key,
+        "catalog_sha256":candidate["sha256"],"changed":True,
+        "published":True,"remote_readback_verified":True,
+        "authorization_receipt":authorization["path"],
+        "version_id":deploy.get("version_id"),
+    }
+    _atomic_json(state_root/"archive"/day/"monthly-catalog.json",receipt)
+    return {"status":"MONTHLY_CATALOG_PUBLISHED",**receipt}
+
+
 def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any]:
     source: Path=config["_collector_path"]
     state_root: Path=config["_state_path"]
@@ -1066,12 +1208,16 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
             and isinstance(prior.get("manifest"),dict)
             and prior["manifest"].get("digest")==package["manifest"]["digest"]):
         _atomic_json(state_root/"latest-archive-job.json",prior)
+        monthly=_advance_monthly_catalog_after_verified_daily(
+            config=config,state_root=state_root,public=public,wrangler_config=wrangler_config,
+            day=target_day,finalization=finalization,package=package,archive_job=prior)
         return {
             "status":"ALREADY_VERIFIED",
             "day":target_day,
             "manifest_digest":package["manifest"]["digest"],
             "archive_deployed":False,
             "archive_job":str(prior_path),
+            "monthly_catalog":monthly,
         }
 
     previous_attempt=int(prior.get("attempt_count") or 0) if prior else 0
@@ -1105,6 +1251,9 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
             )
             _atomic_json(prior_path,recovered_evidence)
             _atomic_json(state_root/"latest-archive-job.json",recovered_evidence)
+            monthly=_advance_monthly_catalog_after_verified_daily(
+                config=config,state_root=state_root,public=public,wrangler_config=wrangler_config,
+                day=target_day,finalization=finalization,package=package,archive_job=recovered_evidence)
             return {
                 "status":"VERIFIED_COMPLETE_PUBLISHED",
                 "day":target_day,
@@ -1114,6 +1263,7 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
                 "archive_deployed":False,
                 "readback_recovered":True,
                 "archive_job":str(prior_path),
+                "monthly_catalog":monthly,
             }
 
     attempt_count=previous_attempt+1
@@ -1174,6 +1324,9 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
     _atomic_json(state_root/"latest-archive-job.json",evidence)
     if evidence.get("job_verified") is not True:
         raise DailyHistoryRuntimeError("Static Assets deploy readback did not verify")
+    monthly=_advance_monthly_catalog_after_verified_daily(
+        config=config,state_root=state_root,public=public,wrangler_config=wrangler_config,
+        day=target_day,finalization=finalization,package=package,archive_job=evidence)
     return {
         "status":"VERIFIED_COMPLETE_PUBLISHED",
         "day":target_day,
@@ -1183,6 +1336,7 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
         "archive_deployed":True,
         "version_id":deploy.get("version_id"),
         "archive_job":str(prior_path),
+        "monthly_catalog":monthly,
     }
 
 
