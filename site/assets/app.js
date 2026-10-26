@@ -1093,18 +1093,24 @@ function historyHubAgendaRows(rows){
   ||String(a.video_id||'').localeCompare(String(b.video_id||''))
  );
 }
-function historyHubMemberFilteredRows(rows,query,registry){
+function historyHubMemberFilterState(rows,query,memberRegistry,contentRegistry){
  const raw=String(query||'').trim();
- if(!raw)return rows;
- const parsed=parseHistorySearchQuery(raw,registry,null);
- if(parsed.members.length){
-  return rows.filter(item=>parsed.members.some(member=>historyMemberMatched(item,member)));
+ if(!raw)return {rows,members:[],parsed:null};
+ const parsed=parseHistorySearchQuery(raw,memberRegistry,contentRegistry);
+ const matched=historySearchRows(rows,parsed).map(row=>row.item);
+ return {rows:matched,members:parsed.members,parsed};
+}
+function historyHubFilteredDayAvatars(dayRows,members,displayByChannel){
+ if(members.length<1||members.length>3)return [];
+ const memberIds=new Set(members.map(member=>String(member?.channel_id||'')).filter(Boolean));
+ const seen=new Set(),out=[];
+ for(const raw of dayRows){
+  const item=historyDisplayRow(raw,displayByChannel);
+  const id=String(item?.channel_id||'');
+  if(!memberIds.has(id)||seen.has(id))continue;
+  seen.add(id);out.push(item);
  }
- const needle=normalizeHistorySearchText(raw);
- return rows.filter(item=>{
-  const text=normalizeHistorySearchText([item?.channel_name,item?.channel_title].filter(Boolean).join(' '));
-  return text.includes(needle);
- });
+ return out;
 }
 function historyHubGoDay(day){
  if(!historyDateValid(day))return;
@@ -1142,9 +1148,12 @@ async function renderHistoryHub(){
  const payloads=await youtubeHistoryPayloadsForTaipeiMonth(historyHubMonth);
  if(generation!==historyHubGeneration)return;
  const allRows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos));
- const aliasRegistry=historyHubMemberQuery?await loadHistoryMemberAliases():null;
+ const [aliasRegistry,contentAliasRegistry]=historyHubMemberQuery
+  ?await Promise.all([loadHistoryMemberAliases(),loadHistoryContentAliases()])
+  :[null,null];
  if(generation!==historyHubGeneration)return;
- const rows=historyHubMemberFilteredRows(allRows,historyHubMemberQuery,aliasRegistry);
+ const filtered=historyHubMemberFilterState(allRows,historyHubMemberQuery,aliasRegistry,contentAliasRegistry);
+ const rows=filtered.rows,resolvedMembers=filtered.members;
  const byDay=historyHubDayRows(rows,historyHubMonth);
  const displayByChannel=await historyDisplayMetadataByChannel(rows,homeCatalogRows);
  if(generation!==historyHubGeneration)return;
@@ -1164,6 +1173,17 @@ async function renderHistoryHub(){
   button.append(node('strong',String(number),'time-hub-day-number'));
   if(dayRows.length){
    button.append(node('small',dayRows.length+' 場','history-hub-count'));
+   const filteredAvatars=historyHubFilteredDayAvatars(byDay.get(day)||[],resolvedMembers,displayByChannel);
+   if(filteredAvatars.length){
+    const avatars=node('span',undefined,'history-hub-filter-avatars');
+    filteredAvatars.forEach(item=>{
+     const avatar=node('span',undefined,'history-hub-filter-avatar');
+     avatar.title=String(item?.channel_name||item?.channel_title||'Hololive');
+     avatar.append(homeAvatarChild(item,avatar.title));
+     avatars.append(avatar);
+    });
+    button.append(avatars);
+   }
    const labels=historyHubImportantLabels(dayRows);
    if(labels.length){
     const markers=node('span',undefined,'history-hub-markers');
