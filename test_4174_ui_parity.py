@@ -260,6 +260,10 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const matched=historySearchRows(rows,parsed).map(row=>row.item);", js)
         self.assertIn("await Promise.all([loadHistoryMemberAliases(),loadHistoryContentAliases()])", js)
         self.assertIn("function historyHubFilteredDayAvatars(dayRows,members,displayByChannel)", js)
+        self.assertIn("appearance:'own'", js)
+        self.assertIn("appearance:'guest'", js)
+        self.assertIn("出現在其他頻道直播", js)
+        self.assertIn(".history-hub-filter-avatar.is-guest", css)
         aliases = json.loads((Path(__file__).parent / "site/data/search/member-aliases.v1.json").read_text())
         ayame = next(member for member in aliases["members"] if member["channel_id"] == "UC7fk0CB07ly8oSl0aqKkqFg")
         ayame_aliases = {alias.get("value"): alias for alias in ayame.get("aliases", [])}
