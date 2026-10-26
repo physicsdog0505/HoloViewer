@@ -41,6 +41,30 @@ class UrlEpochAuthorityTests(unittest.TestCase):
         rows=[{"source_line":1,"ptt_date":"01/01","ptt_time":"00:01"}]
         self.assertEqual(reconstruct_events(board="C_Chat",aid="A1",url=url,pushes=rows,identity_verifier=self.verifier)[0]["day"],"2026-01-01")
 
+    def test_first_push_accepts_article_second_precision_in_same_minute(self):
+        url=url_at("2026-10-24T10:59:13Z")  # 18:59:13 Taipei
+        rows=[
+            {"source_line":214,"ptt_date":"10/24","ptt_time":"18:59"},
+            {"source_line":215,"ptt_date":"10/24","ptt_time":"18:59"},
+            {"source_line":216,"ptt_date":"10/24","ptt_time":"19:01"},
+        ]
+        got=reconstruct_events(
+            board="C_Chat",aid="A1",url=url,pushes=rows,
+            identity_verifier=self.verifier)
+        self.assertEqual(got[0]["occurred_at"],"2026-10-24T10:59:00Z")
+        self.assertEqual([row["source_line"] for row in got],[214,215,216])
+
+    def test_backwards_minute_after_first_push_still_fails_closed(self):
+        url=url_at("2026-10-24T10:59:13Z")
+        rows=[
+            {"source_line":214,"ptt_date":"10/24","ptt_time":"18:59"},
+            {"source_line":215,"ptt_date":"10/24","ptt_time":"18:58"},
+        ]
+        with self.assertRaisesRegex(ContractError,"regressive source chronology"):
+            reconstruct_events(
+                board="C_Chat",aid="A1",url=url,pushes=rows,
+                identity_verifier=self.verifier)
+
     def test_reject_malformed_url_or_board(self):
         for board,url in [
             ("C_Chat","http://invalid/M.123.A.ABC.html"),

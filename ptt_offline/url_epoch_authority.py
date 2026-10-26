@@ -74,15 +74,24 @@ def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict],
             event=datetime(previous.year,month,day,hour,minute,tzinfo=TAIPEI)
         except ValueError as exc:
             raise ContractError("invalid source PTT calendar date") from exc
-        # The only permitted rollover is observed Dec -> Jan, including first
-        # push after a December URL-epoch article. Other regression is rejected.
+        # The article URL has second precision while push text has only minute
+        # precision.  Therefore the first push may legitimately render a few
+        # seconds before the article anchor when both are in the same minute.
+        # After that first row, every backwards minute remains a hard failure.
+        same_minute=(event.year,event.month,event.day,event.hour,event.minute)==(
+            previous.year,previous.month,previous.day,previous.hour,previous.minute)
+        # The other permitted rollover is observed Dec -> Jan, including first
+        # push after a December URL-epoch article.
         if event < previous:
-            if previous.month != 12 or month != 1:
+            if not output and same_minute:
+                pass
+            elif previous.month != 12 or month != 1:
                 raise ContractError("unobserved or regressive source chronology")
-            try:
-                event=event.replace(year=previous.year+1)
-            except ValueError as exc:
-                raise ContractError("invalid year rollover") from exc
+            else:
+                try:
+                    event=event.replace(year=previous.year+1)
+                except ValueError as exc:
+                    raise ContractError("invalid year rollover") from exc
         if event < previous - timedelta(minutes=1):
             raise ContractError("push predates article or preceding push")
         if event - previous > timedelta(days=MAX_UNOBSERVED_DAYS):
