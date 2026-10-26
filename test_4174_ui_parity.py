@@ -262,7 +262,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn("function historyHubFilteredDayAvatars(dayRows,members,displayByChannel)", js)
         aliases = json.loads((Path(__file__).parent / "site/data/search/member-aliases.v1.json").read_text())
         ayame = next(member for member in aliases["members"] if member["channel_id"] == "UC7fk0CB07ly8oSl0aqKkqFg")
-        self.assertTrue(any(alias.get("value") == "百鬼" and alias.get("strength") == "strong" and alias.get("enabled") is not False for alias in ayame.get("aliases", [])))
+        ayame_aliases = {alias.get("value"): alias for alias in ayame.get("aliases", [])}
+        for value in ("百鬼", "大小姐", "お嬢", "Ojou", "余", "よ", "Yo"):
+            self.assertIn(value, ayame_aliases)
+            self.assertEqual(ayame_aliases[value].get("strength"), "strong")
+            self.assertIsNot(ayame_aliases[value].get("enabled"), False)
+        vivi = next(member for member in aliases["members"] if member["channel_id"] == "UCGzTVXqMQHa4AgJVJIVvtDQ")
+        vivi_aliases = {alias.get("value"): alias for alias in vivi.get("aliases", [])}
+        self.assertEqual(vivi_aliases["VV"].get("strength"), "strong")
         self.assertIn(".history-hub-filter-avatar{width:36px;height:36px;", css)
         self.assertIn("if(members.length<1||members.length>3)return [];", js)
         self.assertIn("const filteredAvatars=historyHubFilteredDayAvatars(byDay.get(day)||[],resolvedMembers,displayByChannel);", js)
