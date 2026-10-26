@@ -145,6 +145,8 @@ class ParityContract(unittest.TestCase):
             'id="historyHubPrev"',
             'id="historyHubNext"',
             'id="historyHubLatest"',
+            'id="historyHubMemberSearch"',
+            'id="historyHubSelectedAction"',
         ):
             self.assertIn(snippet, html)
         self.assertNotIn('id="historyTopDate"', html)
@@ -254,6 +256,13 @@ class ParityContract(unittest.TestCase):
         self.assertIn("function historyHubImportantLabels(rows)", js)
         self.assertIn("function historyHubAgendaRows(rows)", js)
         self.assertIn("function historyHubGoDay(day)", js)
+        self.assertIn("function historyHubMemberFilteredRows(rows,query,registry)", js)
+        self.assertIn("button.onclick=()=>{historyHubSelected=day;renderHistoryHub().catch(()=>{})}", js)
+        self.assertIn("button.ondblclick=event=>{event.preventDefault();historyHubGoDay(day)}", js)
+        self.assertIn("$('historyHubSelectedAction').onclick=()=>historyHubGoDay(historyHubSelected);", js)
+        self.assertIn("$('historyHubMemberSearch').addEventListener('keydown'", js)
+        self.assertIn("historyHubMemberQuery=String(event.target.value||'').trim();", js)
+        self.assertIn("historyHubMemberQuery='';", js)
         self.assertIn("button.onclick=()=>historyHubGoDay(day)", js)
         self.assertIn("if(selectedRows.length)selectedRows.forEach(item=>agenda.append(historyHubAgendaRow(item)))", js)
         self.assertNotIn("HISTORY_HUB_AGENDA_LIMIT", js)
