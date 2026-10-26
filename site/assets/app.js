@@ -227,10 +227,20 @@ function updateClientTopbar(routeName){
 }
 
 
+let activeRoute='';
 function route(r){
  // Hash query belongs to the session, not the route key.
  r=String(r||'').split('?')[0];
  if(!names[r])r='home';
+ const reenteringHistory=r==='history'&&activeRoute&&activeRoute!=='history';
+ if(reenteringHistory){
+  $('historySearch').value='';
+  $('historyDate').value=historyBounds().latest;
+  state.offset=0;
+  historyChannelSelection.clear();
+  historyChannelFacetContext='';
+ }
+ activeRoute=r;
  // A viewing route without mounted players must never display an empty workspace.
  if(r==='custom-session'&&!viewing.ids.length){
   const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
