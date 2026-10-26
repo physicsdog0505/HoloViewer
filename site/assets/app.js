@@ -1137,7 +1137,7 @@ async function renderHistoryHub(){
   grid.append(button);
  }
  const selectedRows=byDay.get(historyHubSelected)||[];
- const displayByChannel=await historyDisplayMetadataByChannel(selectedRows,homeCatalogRows);
+ const displayByChannel=await historyDisplayMetadataByChannel(rows,homeCatalogRows);
  if(generation!==historyHubGeneration)return;
  const displayRows=selectedRows.map(item=>historyDisplayRow(item,displayByChannel));
  // Refresh visible avatars with canonical profile data after the bounded batch read.
