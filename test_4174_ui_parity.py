@@ -234,6 +234,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("const reenteringHistory=r==='history'&&activeRoute&&activeRoute!=='history';", js)
         self.assertIn("if(reenteringHistory){", js)
         self.assertIn("$('historySearch').value='';", js)
+        self.assertIn("$('historyDate').value=historyBounds().latest;", js)
         self.assertIn("historyChannelSelection.clear();", js)
         self.assertIn("function historyChannelFacetEntries(rows)", js)
         self.assertIn("if(!map.has(channelId))map.set(channelId,{channelId,count:0,row});", js)
