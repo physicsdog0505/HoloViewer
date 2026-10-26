@@ -267,10 +267,12 @@ class ParityContract(unittest.TestCase):
         aliases = json.loads((Path(__file__).parent / "site/data/search/member-aliases.v1.json").read_text())
         ayame = next(member for member in aliases["members"] if member["channel_id"] == "UC7fk0CB07ly8oSl0aqKkqFg")
         ayame_aliases = {alias.get("value"): alias for alias in ayame.get("aliases", [])}
-        for value in ("百鬼", "大小姐", "お嬢", "Ojou", "余", "よ", "Yo"):
+        for value in ("百鬼", "大小姐", "お嬢", "Ojou", "余"):
             self.assertIn(value, ayame_aliases)
             self.assertEqual(ayame_aliases[value].get("strength"), "strong")
             self.assertIsNot(ayame_aliases[value].get("enabled"), False)
+        self.assertNotIn("よ", ayame_aliases)
+        self.assertNotIn("Yo", ayame_aliases)
         vivi = next(member for member in aliases["members"] if member["channel_id"] == "UCGzTVXqMQHa4AgJVJIVvtDQ")
         vivi_aliases = {alias.get("value"): alias for alias in vivi.get("aliases", [])}
         self.assertEqual(vivi_aliases["VV"].get("strength"), "strong")
