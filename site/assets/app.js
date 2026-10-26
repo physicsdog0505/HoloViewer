@@ -235,6 +235,7 @@ function route(r){
  const reenteringHistory=r==='history'&&activeRoute&&activeRoute!=='history';
  if(reenteringHistory){
   $('historySearch').value='';
+  $('historyDate').value=historyBounds().latest;
   state.offset=0;
   historyChannelSelection.clear();
   historyChannelFacetContext='';
