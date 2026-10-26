@@ -1102,13 +1102,18 @@ function historyHubMemberFilterState(rows,query,memberRegistry,contentRegistry){
 }
 function historyHubFilteredDayAvatars(dayRows,members,displayByChannel){
  if(members.length<1||members.length>3)return [];
- const memberIds=new Set(members.map(member=>String(member?.channel_id||'')).filter(Boolean));
- const seen=new Set(),out=[];
- for(const raw of dayRows){
-  const item=historyDisplayRow(raw,displayByChannel);
-  const id=String(item?.channel_id||'');
-  if(!memberIds.has(id)||seen.has(id))continue;
-  seen.add(id);out.push(item);
+ const out=[];
+ for(const member of members){
+  const id=String(member?.channel_id||'');
+  if(!id)continue;
+  const ownRaw=dayRows.find(item=>String(item?.channel_id||'')===id);
+  if(ownRaw){
+   out.push({item:historyDisplayRow(ownRaw,displayByChannel),appearance:'own'});
+   continue;
+  }
+  if(!dayRows.some(item=>historyMemberMatched(item,member)))continue;
+  const profile=displayByChannel?.get(id)||canonicalChannelProfileCache.get(id);
+  if(profile)out.push({item:profile,appearance:'guest'});
  }
  return out;
 }
@@ -1156,6 +1161,8 @@ async function renderHistoryHub(){
  const rows=filtered.rows,resolvedMembers=filtered.members;
  const byDay=historyHubDayRows(rows,historyHubMonth);
  const displayByChannel=await historyDisplayMetadataByChannel(rows,homeCatalogRows);
+ const resolvedMemberProfiles=await loadCanonicalChannelProfiles(resolvedMembers.map(member=>member.channel_id));
+ for(const [channelId,profile] of resolvedMemberProfiles)displayByChannel.set(channelId,profile);
  if(generation!==historyHubGeneration)return;
  const grid=$('historyHubGrid');grid.replaceChildren();
  const [year,month]=historyHubMonth.split('-').map(Number);
@@ -1176,10 +1183,12 @@ async function renderHistoryHub(){
    const filteredAvatars=historyHubFilteredDayAvatars(byDay.get(day)||[],resolvedMembers,displayByChannel);
    if(filteredAvatars.length){
     const avatars=node('span',undefined,'history-hub-filter-avatars');
-    filteredAvatars.forEach(item=>{
-     const avatar=node('span',undefined,'history-hub-filter-avatar');
-     avatar.title=String(item?.channel_name||item?.channel_title||'Hololive');
-     avatar.append(homeAvatarChild(item,avatar.title));
+    filteredAvatars.forEach(entry=>{
+     const item=entry.item;
+     const avatar=node('span',undefined,'history-hub-filter-avatar is-'+entry.appearance);
+     const name=String(item?.channel_name||item?.channel_title||'Hololive');
+     avatar.title=entry.appearance==='own'?name+' · 本人頻道直播':name+' · 出現在其他頻道直播';
+     avatar.append(homeAvatarChild(item,name));
      avatars.append(avatar);
     });
     button.append(avatars);

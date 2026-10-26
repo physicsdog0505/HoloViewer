@@ -650,8 +650,43 @@
         },
         {
           "value": "大小姐",
-          "type": "ambiguous_alias",
-          "strength": "weak",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "百鬼",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "お嬢",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Ojou",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "よ",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "Yo",
+          "type": "alias",
+          "strength": "strong",
           "source": "community_seed",
           "enabled": true
         }
@@ -3198,6 +3233,13 @@
         },
         {
           "value": "绮绮罗罗",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
+        },
+        {
+          "value": "VV",
           "type": "alias",
           "strength": "strong",
           "source": "community_seed",
