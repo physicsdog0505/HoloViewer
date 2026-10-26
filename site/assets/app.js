@@ -219,11 +219,6 @@ function updateClientTopbar(routeName){
  $('page-title').setAttribute('aria-label',
   routeName==='home'?'開啟月份行程':
   routeName==='history'?'選擇歷史直播日期':'目前頁面日期');
- const topDate=$('historyTopDate');
- if(topDate){
-  topDate.max=historyBounds().latest;
-  topDate.value=historyDay;
- }
 }
 
 
@@ -918,15 +913,8 @@ async function loadHome(){
 $('page-title').onclick=()=>{
  const routeName=$('page-title').dataset.topbarRoute||'';
  if(routeName==='home'){openTimeHub();return}
- if(routeName!=='history')return;
- const picker=$('historyTopDate');
- picker.max=historyBounds().latest;
- picker.value=$('historyDate').value||historyBounds().latest;
- if(typeof picker.showPicker==='function')picker.showPicker();else picker.click();
+ if(routeName==='history'){openHistoryHub();return}
 };
-$('historyTopDate').addEventListener('change',event=>{
- if(historyDateValid(event.target.value))historySetDay(event.target.value);
-});
 $('timeHubClose').onclick=()=>$('timeHub').close();
 $('timeHubToday').onclick=()=>{timeHubMonth=taipeiDay().slice(0,7);timeHubSelected=taipeiDay();renderTimeHub()};
 $('timeHubPrev').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,-1);if(!timeHubSelected.startsWith(timeHubMonth))timeHubSelected=timeHubMonth+'-01';renderTimeHub()};
@@ -1074,6 +1062,136 @@ function uniqueSortedHistoryRows(rows){
   .filter(row=>row&&!seen.has(row.video_id)&&seen.add(row.video_id))
   .sort((a,b)=>Date.parse(String(b.actual_start||b.scheduled_start||0))-Date.parse(String(a.actual_start||a.scheduled_start||0))||String(b.video_id).localeCompare(String(a.video_id)));
 }
+const HISTORY_HUB_AGENDA_LIMIT=12;
+let historyHubMonth='';
+let historyHubSelected='';
+let historyHubGeneration=0;
+function historyHubMonthAvailable(manifest,month){
+ return historyPublishedMonths(manifest).includes(month);
+}
+function historyHubDayRows(rows,month){
+ const byDay=new Map();
+ for(const row of rows){
+  const day=youtubeHistoryTaipeiDay(row);
+  if(!day.startsWith(month+'-'))continue;
+  if(!byDay.has(day))byDay.set(day,[]);
+  byDay.get(day).push(row);
+ }
+ return byDay;
+}
+function historyHubAgendaRow(item){
+ const row=node('button',undefined,'history-hub-agenda-row');row.type='button';
+ const name=String(item?.channel_name||item?.channel_title||'Hololive');
+ const ring=node('span',undefined,'channel-avatar-ring');ring.append(homeAvatarChild(item,name));
+ const copy=node('span',undefined,'history-hub-agenda-copy');
+ copy.append(node('strong',name),node('span',String(item?.title||item?.video_id||'')));
+ row.append(ring,copy);
+ row.onclick=()=>{ $('historyHub').close(); $('historySearch').value=''; state.offset=0; historyChannelSelection.clear(); historyChannelFacetContext=''; historySetDay(historyHubSelected); };
+ return row;
+}
+async function renderHistoryHub(){
+ const generation=++historyHubGeneration;
+ const manifest=await loadYoutubeHistoryManifest();
+ if(generation!==historyHubGeneration)return;
+ const published=historyPublishedMonths(manifest);
+ if(!published.length)throw new Error('沒有已發布的 History 月份');
+ if(!historyHubMonthAvailable(manifest,historyHubMonth)){
+  historyHubMonth=published[published.length-1];
+  historyHubSelected=historyBounds().latest.startsWith(historyHubMonth)?historyBounds().latest:historyHubMonth+'-01';
+ }
+ $('historyHubMonth').textContent=timeHubMonthLabel(historyHubMonth);
+ $('historyHubPrev').disabled=!published.some(month=>month<historyHubMonth);
+ $('historyHubNext').disabled=!published.some(month=>month>historyHubMonth);
+ const payloads=await youtubeHistoryPayloadsForTaipeiMonth(historyHubMonth);
+ if(generation!==historyHubGeneration)return;
+ const rows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos));
+ const byDay=historyHubDayRows(rows,historyHubMonth);
+ const grid=$('historyHubGrid');grid.replaceChildren();
+ const [year,month]=historyHubMonth.split('-').map(Number);
+ const first=new Date(Date.UTC(year,month-1,1,12)),start=first.getUTCDay();
+ const days=new Date(Date.UTC(year,month,0,12)).getUTCDate();
+ for(let slot=0;slot<42;slot++){
+  const number=slot-start+1;
+  if(number<1||number>days){grid.append(node('span',undefined,'time-hub-day is-empty'));continue}
+  const day=historyHubMonth+'-'+String(number).padStart(2,'0');
+  const dayRows=byDay.get(day)||[];
+  const button=node('button',undefined,'time-hub-day history-hub-day');button.type='button';button.dataset.day=day;
+  button.disabled=!historyDateValid(day);
+  button.classList.toggle('is-selected',day===historyHubSelected);
+  button.classList.toggle('is-today',day===taipeiDay());
+  button.append(node('strong',String(number),'time-hub-day-number'));
+  if(dayRows.length){
+   const people=node('span',undefined,'time-hub-day-people');
+   const seen=new Set(),profiles=[];
+   for(const item of dayRows){
+    const id=String(item?.channel_id||item?.channel_name||'');
+    if(!id||seen.has(id))continue;seen.add(id);profiles.push(item);
+   }
+   profiles.slice(0,3).forEach(item=>{
+    const avatar=node('span',undefined,'time-hub-avatar history-stream-avatar');
+    avatar.append(homeAvatarChild(item,String(item.channel_name||item.channel_title||'H')));
+    people.append(avatar);
+   });
+   button.append(people,node('small',dayRows.length+' 場','history-hub-count'));
+  }
+  button.onclick=()=>{historyHubSelected=day;renderHistoryHub()};
+  grid.append(button);
+ }
+ const selectedRows=byDay.get(historyHubSelected)||[];
+ const displayByChannel=await historyDisplayMetadataByChannel(rows,homeCatalogRows);
+ if(generation!==historyHubGeneration)return;
+ const displayRows=selectedRows.map(item=>historyDisplayRow(item,displayByChannel));
+ // Refresh visible avatars with canonical profile data after the bounded batch read.
+ for(const button of grid.querySelectorAll('.history-hub-day[data-day]')){
+  const dayRows=byDay.get(button.dataset.day)||[];
+  const people=button.querySelector('.time-hub-day-people');if(!people)continue;
+  people.replaceChildren();
+  const seen=new Set();
+  for(const raw of dayRows){
+   const item=historyDisplayRow(raw,displayByChannel);
+   const id=String(item?.channel_id||item?.channel_name||'');
+   if(!id||seen.has(id))continue;seen.add(id);
+   const avatar=node('span',undefined,'time-hub-avatar history-stream-avatar');
+   avatar.append(homeAvatarChild(item,String(item.channel_name||item.channel_title||'H')));
+   people.append(avatar);
+   if(seen.size>=3)break;
+  }
+ }
+ $('historyHubSelectedLabel').textContent=historyHubSelected.replaceAll('-','/')+' · '+displayRows.length+' 場直播';
+ const agenda=$('historyHubAgenda');agenda.replaceChildren();
+ if(displayRows.length){
+  displayRows.slice(0,HISTORY_HUB_AGENDA_LIMIT).forEach(item=>agenda.append(historyHubAgendaRow(item)));
+  if(displayRows.length>HISTORY_HUB_AGENDA_LIMIT)agenda.append(node('p','另有 '+(displayRows.length-HISTORY_HUB_AGENDA_LIMIT)+' 場，點日期查看完整列表。','history-hub-more-note'));
+ }else agenda.append(node('p','這一天沒有歷史直播。','time-hub-empty'));
+}
+async function openHistoryHub(){
+ if(!$('historyHub'))return;
+ const selected=$('historyDate').value||historyBounds().latest;
+ historyHubSelected=historyDateValid(selected)?selected:historyBounds().latest;
+ historyHubMonth=historyHubSelected.slice(0,7);
+ $('historyHub').showModal();
+ try{await renderHistoryHub()}catch(error){
+  $('historyHubAgenda').replaceChildren(node('p','歷史直播月曆暫時無法載入：'+error.message,'time-hub-empty'));
+ }
+}
+function historyHubMoveMonth(delta){
+ loadYoutubeHistoryManifest().then(manifest=>{
+  const published=historyPublishedMonths(manifest);
+  const index=published.indexOf(historyHubMonth);
+  if(index<0)return;
+  const next=published[index+delta];if(!next)return;
+  historyHubMonth=next;
+  const latest=historyBounds().latest;
+  historyHubSelected=latest.startsWith(next)?latest:next+'-01';
+  renderHistoryHub().catch(()=>{});
+ });
+}
+$('historyHubClose').onclick=()=>$('historyHub').close();
+$('historyHubLatest').onclick=()=>{historyHubSelected=historyBounds().latest;historyHubMonth=historyHubSelected.slice(0,7);renderHistoryHub().catch(()=>{})};
+$('historyHubPrev').onclick=()=>historyHubMoveMonth(-1);
+$('historyHubNext').onclick=()=>historyHubMoveMonth(1);
+$('historyHub').addEventListener('click',event=>{if(event.target===$('historyHub'))$('historyHub').close()});
+
 async function loadYoutubeHistoryDay(day,offset=0,limit=50){
  const payloads=await youtubeHistoryPayloadsForTaipeiMonth(String(day).slice(0,7));
  const rows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos).filter(row=>youtubeHistoryTaipeiDay(row)===day));

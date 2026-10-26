@@ -139,6 +139,17 @@ class ParityContract(unittest.TestCase):
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
 
         for snippet in (
+            'id="historyHub"',
+            'id="historyHubGrid"',
+            'id="historyHubAgenda"',
+            'id="historyHubPrev"',
+            'id="historyHubNext"',
+            'id="historyHubLatest"',
+        ):
+            self.assertIn(snippet, html)
+        self.assertNotIn('id="historyTopDate"', html)
+
+        for snippet in (
             'id="history-picker"',
             'id="historyDate"',
             'history-date-field-hidden',
@@ -236,6 +247,14 @@ class ParityContract(unittest.TestCase):
         self.assertIn("$('historySearch').value='';", js)
         self.assertIn("$('historyDate').value=historyBounds().latest;", js)
         self.assertIn("historyChannelSelection.clear();", js)
+        self.assertIn("function openHistoryHub()", js)
+        self.assertIn("function renderHistoryHub()", js)
+        self.assertIn("function historyHubDayRows(rows,month)", js)
+        self.assertIn("function historyHubMoveMonth(delta)", js)
+        self.assertIn("const displayByChannel=await historyDisplayMetadataByChannel(rows,homeCatalogRows);", js)
+        self.assertIn("historyHubSelected=historyBounds().latest", js)
+        self.assertIn("if(routeName==='history'){openHistoryHub();return}", js)
+        self.assertNotIn("historyTopDate", js)
         self.assertIn("function historyChannelFacetEntries(rows)", js)
         self.assertIn("if(!map.has(channelId))map.set(channelId,{channelId,count:0,row});", js)
         self.assertIn("function renderHistoryChannelFacets(rows)", js)
