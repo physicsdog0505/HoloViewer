@@ -654,6 +654,13 @@
           "strength": "weak",
           "source": "community_seed",
           "enabled": true
+        },
+        {
+          "value": "百鬼",
+          "type": "alias",
+          "strength": "strong",
+          "source": "community_seed",
+          "enabled": true
         }
       ],
       "needs_review": false
