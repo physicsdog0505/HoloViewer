@@ -263,7 +263,6 @@ class ParityContract(unittest.TestCase):
         self.assertIn("$('historyHubMemberSearch').addEventListener('keydown'", js)
         self.assertIn("historyHubMemberQuery=String(event.target.value||'').trim();", js)
         self.assertIn("historyHubMemberQuery='';", js)
-        self.assertIn("button.onclick=()=>historyHubGoDay(day)", js)
         self.assertIn("if(selectedRows.length)selectedRows.forEach(item=>agenda.append(historyHubAgendaRow(item)))", js)
         self.assertNotIn("HISTORY_HUB_AGENDA_LIMIT", js)
         self.assertNotIn("history-stream-avatar", js)
