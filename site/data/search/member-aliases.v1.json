@@ -642,13 +642,6 @@
           "enabled": true
         },
         {
-          "value": "余",
-          "type": "alias",
-          "strength": "strong",
-          "source": "community_seed",
-          "enabled": true
-        },
-        {
           "value": "大小姐",
           "type": "alias",
           "strength": "strong",
