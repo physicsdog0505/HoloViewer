@@ -1093,24 +1093,12 @@ function historyHubAgendaRows(rows){
   ||String(a.video_id||'').localeCompare(String(b.video_id||''))
  );
 }
-function historyHubMemberFilterState(rows,query,registry){
+function historyHubMemberFilterState(rows,query,memberRegistry,contentRegistry){
  const raw=String(query||'').trim();
- if(!raw)return {rows,members:[]};
- const parsed=parseHistorySearchQuery(raw,registry,null);
- if(parsed.members.length){
-  return {
-   rows:rows.filter(item=>parsed.members.some(member=>historyMemberMatched(item,member))),
-   members:parsed.members
-  };
- }
- const needle=normalizeHistorySearchText(raw);
- return {
-  rows:rows.filter(item=>{
-   const text=normalizeHistorySearchText([item?.channel_name,item?.channel_title].filter(Boolean).join(' '));
-   return text.includes(needle);
-  }),
-  members:[]
- };
+ if(!raw)return {rows,members:[],parsed:null};
+ const parsed=parseHistorySearchQuery(raw,memberRegistry,contentRegistry);
+ const matched=historySearchRows(rows,parsed).map(row=>row.item);
+ return {rows:matched,members:parsed.members,parsed};
 }
 function historyHubFilteredDayAvatars(dayRows,members,displayByChannel){
  if(members.length<1||members.length>3)return [];
@@ -1160,9 +1148,11 @@ async function renderHistoryHub(){
  const payloads=await youtubeHistoryPayloadsForTaipeiMonth(historyHubMonth);
  if(generation!==historyHubGeneration)return;
  const allRows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos));
- const aliasRegistry=historyHubMemberQuery?await loadHistoryMemberAliases():null;
+ const [aliasRegistry,contentAliasRegistry]=historyHubMemberQuery
+  ?await Promise.all([loadHistoryMemberAliases(),loadHistoryContentAliases()])
+  :[null,null];
  if(generation!==historyHubGeneration)return;
- const filtered=historyHubMemberFilterState(allRows,historyHubMemberQuery,aliasRegistry);
+ const filtered=historyHubMemberFilterState(allRows,historyHubMemberQuery,aliasRegistry,contentAliasRegistry);
  const rows=filtered.rows,resolvedMembers=filtered.members;
  const byDay=historyHubDayRows(rows,historyHubMonth);
  const displayByChannel=await historyDisplayMetadataByChannel(rows,homeCatalogRows);
