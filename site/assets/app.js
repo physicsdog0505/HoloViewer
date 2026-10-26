@@ -1446,7 +1446,9 @@ function parseHistorySearchQuery(raw,registry,contentRegistry){
  };
 }
 function historyMemberAliases(member){
- return (member?.aliases||[]).filter(alias=>alias?.enabled!==false&&alias?.strength==='strong').map(alias=>alias.value);
+ return (member?.aliases||[])
+  .filter(alias=>alias?.enabled!==false&&alias?.strength==='strong'&&alias?.match_scope!=='query_only')
+  .map(alias=>alias.value);
 }
 function historyMemberMatched(item,member){
  if(String(item?.channel_id||'')===String(member?.channel_id||''))return true;
