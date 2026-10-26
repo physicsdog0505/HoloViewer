@@ -139,6 +139,17 @@ class ParityContract(unittest.TestCase):
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
 
         for snippet in (
+            'id="historyHub"',
+            'id="historyHubGrid"',
+            'id="historyHubAgenda"',
+            'id="historyHubPrev"',
+            'id="historyHubNext"',
+            'id="historyHubLatest"',
+        ):
+            self.assertIn(snippet, html)
+        self.assertNotIn('id="historyTopDate"', html)
+
+        for snippet in (
             'id="history-picker"',
             'id="historyDate"',
             'history-date-field-hidden',
