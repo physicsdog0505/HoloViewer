@@ -1065,6 +1065,7 @@ function uniqueSortedHistoryRows(rows){
 let historyHubMonth='';
 let historyHubSelected='';
 let historyHubGeneration=0;
+let historyHubMemberQuery='';
 function historyHubMonthAvailable(manifest,month){
  return historyPublishedMonths(manifest).includes(month);
 }
@@ -1091,6 +1092,19 @@ function historyHubAgendaRows(rows){
   Date.parse(String(a.actual_start||a.scheduled_start||0))-Date.parse(String(b.actual_start||b.scheduled_start||0))
   ||String(a.video_id||'').localeCompare(String(b.video_id||''))
  );
+}
+function historyHubMemberFilteredRows(rows,query,registry){
+ const raw=String(query||'').trim();
+ if(!raw)return rows;
+ const parsed=parseHistorySearchQuery(raw,registry,null);
+ if(parsed.members.length){
+  return rows.filter(item=>parsed.members.some(member=>historyMemberMatched(item,member)));
+ }
+ const needle=normalizeHistorySearchText(raw);
+ return rows.filter(item=>{
+  const text=normalizeHistorySearchText([item?.channel_name,item?.channel_title].filter(Boolean).join(' '));
+  return text.includes(needle);
+ });
 }
 function historyHubGoDay(day){
  if(!historyDateValid(day))return;
@@ -1127,7 +1141,10 @@ async function renderHistoryHub(){
  $('historyHubNext').disabled=!published.some(month=>month>historyHubMonth);
  const payloads=await youtubeHistoryPayloadsForTaipeiMonth(historyHubMonth);
  if(generation!==historyHubGeneration)return;
- const rows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos));
+ const allRows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos));
+ const aliasRegistry=historyHubMemberQuery?await loadHistoryMemberAliases():null;
+ if(generation!==historyHubGeneration)return;
+ const rows=historyHubMemberFilteredRows(allRows,historyHubMemberQuery,aliasRegistry);
  const byDay=historyHubDayRows(rows,historyHubMonth);
  const displayByChannel=await historyDisplayMetadataByChannel(rows,homeCatalogRows);
  if(generation!==historyHubGeneration)return;
@@ -1154,11 +1171,13 @@ async function renderHistoryHub(){
     button.append(markers);
    }
   }
-  button.onclick=()=>historyHubGoDay(day);
+  button.onclick=()=>{historyHubSelected=day;renderHistoryHub().catch(()=>{})};
+  button.ondblclick=event=>{event.preventDefault();historyHubGoDay(day)};
   grid.append(button);
  }
  const selectedRows=historyHubAgendaRows((byDay.get(historyHubSelected)||[]).map(item=>historyDisplayRow(item,displayByChannel)));
- $('historyHubSelectedLabel').textContent=historyHubSelected.replaceAll('-','/')+' · '+selectedRows.length+' 場直播';
+ const memberSuffix=historyHubMemberQuery?' · '+historyHubMemberQuery:'';
+ $('historyHubSelectedLabel').textContent=historyHubSelected.replaceAll('-','/')+' · '+selectedRows.length+' 場直播'+memberSuffix;
  const agenda=$('historyHubAgenda');agenda.replaceChildren();
  if(selectedRows.length)selectedRows.forEach(item=>agenda.append(historyHubAgendaRow(item)));
  else agenda.append(node('p','這一天沒有歷史直播。','time-hub-empty'));
@@ -1189,6 +1208,18 @@ $('historyHubClose').onclick=()=>$('historyHub').close();
 $('historyHubLatest').onclick=()=>historyHubGoDay(historyBounds().latest);
 $('historyHubPrev').onclick=()=>historyHubMoveMonth(-1);
 $('historyHubNext').onclick=()=>historyHubMoveMonth(1);
+$('historyHubSelectedAction').onclick=()=>historyHubGoDay(historyHubSelected);
+$('historyHubMemberSearch').addEventListener('keydown',event=>{
+ if(event.key!=='Enter')return;
+ event.preventDefault();
+ historyHubMemberQuery=String(event.target.value||'').trim();
+ renderHistoryHub().catch(()=>{});
+});
+$('historyHubMemberSearch').addEventListener('input',event=>{
+ if(String(event.target.value||'').trim())return;
+ historyHubMemberQuery='';
+ renderHistoryHub().catch(()=>{});
+});
 $('historyHub').addEventListener('click',event=>{if(event.target===$('historyHub'))$('historyHub').close()});
 $('historyHubAgenda').addEventListener('wheel',event=>{
  const box=event.currentTarget;
