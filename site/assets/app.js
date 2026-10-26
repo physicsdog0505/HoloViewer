@@ -1062,6 +1062,7 @@ function uniqueSortedHistoryRows(rows){
   .filter(row=>row&&!seen.has(row.video_id)&&seen.add(row.video_id))
   .sort((a,b)=>Date.parse(String(b.actual_start||b.scheduled_start||0))-Date.parse(String(a.actual_start||a.scheduled_start||0))||String(b.video_id).localeCompare(String(a.video_id)));
 }
+const HISTORY_HUB_AGENDA_LIMIT=12;
 let historyHubMonth='';
 let historyHubSelected='';
 let historyHubGeneration=0;
@@ -1159,8 +1160,8 @@ async function renderHistoryHub(){
  $('historyHubSelectedLabel').textContent=historyHubSelected.replaceAll('-','/')+' · '+displayRows.length+' 場直播';
  const agenda=$('historyHubAgenda');agenda.replaceChildren();
  if(displayRows.length){
-  displayRows.slice(0,12).forEach(item=>agenda.append(historyHubAgendaRow(item)));
-  if(displayRows.length>12)agenda.append(node('p','另有 '+(displayRows.length-12)+' 場，點日期查看完整列表。','history-hub-more-note'));
+  displayRows.slice(0,HISTORY_HUB_AGENDA_LIMIT).forEach(item=>agenda.append(historyHubAgendaRow(item)));
+  if(displayRows.length>HISTORY_HUB_AGENDA_LIMIT)agenda.append(node('p','另有 '+(displayRows.length-HISTORY_HUB_AGENDA_LIMIT)+' 場，點日期查看完整列表。','history-hub-more-note'));
  }else agenda.append(node('p','這一天沒有歷史直播。','time-hub-empty'));
 }
 async function openHistoryHub(){
