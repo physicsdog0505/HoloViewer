@@ -74,10 +74,14 @@
     <button id="historyHubClose" type="button" aria-label="關閉歷史直播月曆">×</button>
    </div>
   </header>
-  <div class="time-hub-toolbar">
+  <div class="time-hub-toolbar history-hub-toolbar">
    <button id="historyHubPrev" type="button" aria-label="上個月">‹</button>
    <strong id="historyHubMonth"></strong>
    <button id="historyHubNext" type="button" aria-label="下個月">›</button>
+   <label class="history-hub-member-search">
+    <span class="sr-only">篩選成員</span>
+    <input id="historyHubMemberSearch" type="search" autocomplete="off" placeholder="搜尋成員（例：Pekora、兔田、百鬼）">
+   </label>
    <div class="time-hub-legend" aria-label="歷史直播月曆說明">
     <span><i class="history-count"></i>直播數</span>
    </div>
@@ -88,7 +92,9 @@
     <div id="historyHubGrid" class="time-hub-grid"></div>
    </section>
    <aside class="time-hub-agenda" aria-live="polite">
-    <p id="historyHubSelectedLabel" class="time-hub-selected-label"></p>
+    <button id="historyHubSelectedAction" class="time-hub-selected-label history-hub-selected-action" type="button" aria-label="進入選取日期的歷史直播">
+     <span id="historyHubSelectedLabel"></span><span aria-hidden="true">→</span>
+    </button>
     <div id="historyHubAgenda" class="history-hub-agenda"></div>
    </aside>
   </div>
