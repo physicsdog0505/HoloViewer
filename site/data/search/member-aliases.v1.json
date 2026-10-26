@@ -681,14 +681,16 @@
           "type": "alias",
           "strength": "strong",
           "source": "community_seed",
-          "enabled": true
+          "enabled": true,
+          "match_scope": "query_only"
         },
         {
           "value": "Yo",
           "type": "alias",
           "strength": "strong",
           "source": "community_seed",
-          "enabled": true
+          "enabled": true,
+          "match_scope": "query_only"
         }
       ],
       "needs_review": false
@@ -3243,7 +3245,8 @@
           "type": "alias",
           "strength": "strong",
           "source": "community_seed",
-          "enabled": true
+          "enabled": true,
+          "match_scope": "query_only"
         }
       ],
       "needs_review": false
