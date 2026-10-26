@@ -151,11 +151,36 @@ function timeHubAvatar(event){
  wrap.append(node('span',String(event?.name||'H').trim().slice(0,1).toUpperCase(),'time-hub-avatar-fallback'));
  return wrap;
 }
+function timeHubMonthEvents(monthKey){
+ const [year,month]=monthKey.split('-').map(Number);
+ const days=new Date(Date.UTC(year,month,0,12)).getUTCDate();
+ const events=[];
+ for(let number=1;number<=days;number++){
+  const day=monthKey+'-'+String(number).padStart(2,'0');
+  timeHubRecurringEvents(day).forEach(event=>events.push({...event,day}));
+ }
+ return events;
+}
 function renderTimeHubAgenda(){
+ const specials=$('timeHubSpecials');specials.replaceChildren();
+ if(!timeHubSelected){
+  $('timeHubSelectedLabel').textContent=timeHubMonthLabel(timeHubMonth);
+  const monthly=timeHubMonthEvents(timeHubMonth);
+  monthly.forEach(event=>{
+   const item=node('div',undefined,'time-hub-special '+event.type);
+   const avatar=timeHubAvatar(event);avatar.classList.add('is-'+event.type);
+   const copy=node('div',undefined,'time-hub-special-copy');
+   const date=new Date(event.day+'T12:00:00Z');
+   const dayLabel=new Intl.DateTimeFormat('en-US',{timeZone:'UTC',month:'short',day:'2-digit'}).format(date).toUpperCase();
+   copy.append(node('span',dayLabel+' · '+event.label,'time-hub-special-type'),node('strong',event.name));
+   item.append(avatar,copy);specials.append(item);
+  });
+  if(!monthly.length)specials.append(node('p','這個月沒有生日或出道週年。','time-hub-empty'));
+  return;
+ }
  const day=timeHubSelected;
  const date=new Date(day+'T12:00:00Z');
  $('timeHubSelectedLabel').textContent=new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'2-digit'}).format(date).toUpperCase();
- const specials=$('timeHubSpecials');specials.replaceChildren();
  const fixed=timeHubRecurringEvents(day);
  fixed.forEach(event=>{
   const item=node('div',undefined,'time-hub-special '+event.type);
@@ -917,8 +942,8 @@ $('page-title').onclick=()=>{
 };
 $('timeHubClose').onclick=()=>$('timeHub').close();
 $('timeHubToday').onclick=()=>{timeHubMonth=taipeiDay().slice(0,7);timeHubSelected=taipeiDay();renderTimeHub()};
-$('timeHubPrev').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,-1);if(!timeHubSelected.startsWith(timeHubMonth))timeHubSelected=timeHubMonth+'-01';renderTimeHub()};
-$('timeHubNext').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,1);if(!timeHubSelected.startsWith(timeHubMonth))timeHubSelected=timeHubMonth+'-01';renderTimeHub()};
+$('timeHubPrev').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,-1);timeHubSelected='';renderTimeHub()};
+$('timeHubNext').onclick=()=>{timeHubMonth=timeHubMonthShift(timeHubMonth,1);timeHubSelected='';renderTimeHub()};
 $('timeHub').addEventListener('click',event=>{if(event.target===$('timeHub'))$('timeHub').close()});
 
 function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const o=Object.fromEntries(p.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));return o.year+'-'+o.month+'-'+o.day}
