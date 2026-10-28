@@ -1385,7 +1385,10 @@ function pttRow(row){
  if(floor!==null)el.classList.add('has-floor');
  else floorEl.setAttribute('aria-hidden','true');
  const body=node('span',undefined,'ptt-body');
- body.append(node('span',String(row?.author||'unknown')+':','ptt-author'),node('span',String(row?.content||''),'ptt-content'));
+ const content=node('span',undefined,'ptt-content');
+ if(window.HOLOVIEWER_PTT_LINKS?.appendLinkedContent)window.HOLOVIEWER_PTT_LINKS.appendLinkedContent(content,row?.content);
+ else content.textContent=String(row?.content||'');
+ body.append(node('span',String(row?.author||'unknown')+':','ptt-author'),content);
  el.append(kindEl,time,floorEl,body);
  return el;
 }
