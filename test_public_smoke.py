@@ -165,6 +165,10 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("location.href='/viewer/?'+q.toString();", app)
         self.assertIn("function openStandaloneViewer(ids,options={})", app)
         self.assertIn("function collabEventMap(data,historyDay='')", app)
+        self.assertIn("function syncHomeCollabEntries()", app)
+        self.assertIn("if(homeCatalogRows.length)syncHomeCollabEntries();", app)
+        collab_loader = app[app.index("async function loadHomeCollab(){"):app.index("async function loadHome(){")]
+        self.assertNotIn("renderHomeRows(homeCatalogRows)", collab_loader)
         self.assertIn("collabEventMap(collabData,day)", app)
         self.assertIn("history:true", app)
         self.assertIn("function customLibraryFilter(){return homeFilter()}", app)
