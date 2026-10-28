@@ -928,7 +928,9 @@ function pttRow(row){
  const floor=document.createElement('span');floor.className='ptt-floor';floor.textContent=Number.isInteger(row?.floor)&&row.floor>0?row.floor+'樓':'';
  const body=document.createElement('span');body.className='ptt-body';
  const author=document.createElement('span');author.className='ptt-author';author.textContent=String(row?.author||'unknown')+':';
- const content=document.createElement('span');content.className='ptt-content';content.textContent=String(row?.content||'');
+ const content=document.createElement('span');content.className='ptt-content';
+ if(window.HOLOVIEWER_PTT_LINKS?.appendLinkedContent)window.HOLOVIEWER_PTT_LINKS.appendLinkedContent(content,row?.content);
+ else content.textContent=String(row?.content||'');
  body.append(author,content);el.append(kindEl,time,floor,body);el.dataset.pushId=pttKey(row);return el;
 }
 function setPttRows(rows){
