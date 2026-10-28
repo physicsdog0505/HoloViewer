@@ -662,7 +662,7 @@ function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={})
  const time=homeStartLabel(item,{includeYear:history});const duration=history?historyDurationLabel(item):'';overlay.append(node('span',time+(duration?' · '+duration:''),'thumb-time'));thumb.append(overlay);card.append(thumb);
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
- const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));meta.append(copy);card.append(meta);
+ const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));const viewers=Number(item.concurrent_viewers);if(lifecycleBucket==='live'&&Number.isInteger(viewers)&&viewers>0)copy.append(node('div',new Intl.NumberFormat('zh-TW').format(viewers)+' 人正在觀看','live-viewers'));meta.append(copy);card.append(meta);
  const collab=collabMap.get(id);const collabButton=collabEntry(collab);if(collabButton)card.append(collabButton);
  function toggleCardSelection(){
   if(selectedHomeVideos.has(id))selectedHomeVideos.delete(id);else selectedHomeVideos.add(id);
