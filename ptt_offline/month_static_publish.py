@@ -330,9 +330,12 @@ def build_month_package(spec: MonthSource, out_dir: Path) -> dict[str,Any]:
         start=datetime.fromisoformat(values[0]["occurred_at"].replace("Z","+00:00")).replace(
             minute=0,second=0,microsecond=0)
         status="PARTIAL" if any(row["coverage_status"]!="COMPLETE" for row in values) else "COMPLETE"
+        partition_start=start.isoformat(timespec="seconds").replace("+00:00","Z")
+        partition_end=(start+timedelta(hours=1)).isoformat(
+            timespec="seconds").replace("+00:00","Z")
         body={"schema_version":ARCHIVE_SCHEMA,"precision":"minute",
-              "bucket_start":start.isoformat(timespec="seconds").replace("+00:00","Z"),
-              "bucket_end":(start+timedelta(hours=1)).isoformat(timespec="seconds").replace("+00:00","Z"),
+              "bucket_start":partition_start,
+              "bucket_end":partition_end,
               "coverage_status":status,"finalized":status=="COMPLETE","pushes":values}
         raw_bytes=_canonical(body)
         target=public/key
@@ -340,6 +343,8 @@ def build_month_package(spec: MonthSource, out_dir: Path) -> dict[str,Any]:
         target.write_bytes(raw_bytes)
         objects.append({"key":key,"sha256":sha256(raw_bytes).hexdigest(),
                         "bytes":len(raw_bytes),"pushes":len(values),
+                        "partition_start":partition_start,
+                        "partition_end":partition_end,
                         "coverage_status":status,"finalized":status=="COMPLETE"})
 
     occurred_days=sorted({row["coverage_day"] for row in rows})
