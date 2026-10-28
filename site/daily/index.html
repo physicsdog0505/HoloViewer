@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>每日精選 · HoloDocchi</title>
+<link rel="stylesheet" href="/assets/shared-shell.css"><link rel="stylesheet" href="/assets/daily-digest.css"></head>
+<body>
+<aside class="client-rail" aria-label="主要功能">
+<a class="rail-brand" href="/" aria-label="HoloDocchi 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloDocchi</span></a>
+<nav class="rail-nav">
+<a href="/"><span class="rail-icon">今</span><span class="rail-label">今日直播</span></a>
+<a href="/history"><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
+<a href="/watchalong"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a>
+<a href="/daily/" class="active"><span class="rail-icon">報</span><span class="rail-label">每日精選</span></a>
+<a href="/ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a>
+</nav></aside>
+<nav class="mobile-bottom-dock" aria-label="手機主要功能">
+<a data-mobile-dock-route="home" href="/" aria-label="今日直播"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 10.5V20h13v-9.5M9.5 20v-5h5v5"/></svg></a>
+<a data-mobile-dock-route="history" href="/history" aria-label="歷史直播"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></a>
+<a data-mobile-dock-route="multi" href="/collab" aria-label="多人連動"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="2.7"/><circle cx="16" cy="8" r="2.7"/><path d="M3.5 19c.4-3 1.9-4.7 4.5-4.7s4.1 1.7 4.5 4.7M11.5 19c.4-3 1.9-4.7 4.5-4.7s4.1 1.7 4.5 4.7"/></svg></a>
+<a data-mobile-dock-route="ptt" href="/ptt-today/" aria-label="PTT 今日專串"><span>PTT</span></a>
+</nav>
+<header class="client-topbar"><a class="mobile-top-brand" href="/">HoloDocchi</a><span class="top-status">每日精選</span></header>
+<main class="client-main daily-digest-shell" id="daily-digest-page">
+<div class="page-head"><div><h1 id="daily-digest-date-label">每日精選</h1><p>Daily Digest · Asia/Taipei</p></div></div>
+<div class="daily-digest-toolbar" aria-label="日報日期">
+<button id="dailyDigestPrev" type="button">← 前一天</button>
+<label>日期 <input id="dailyDigestDate" type="date"></label>
+<button id="dailyDigestNext" type="button">下一天 →</button>
+<button id="dailyDigestToday" type="button">今天</button>
+</div>
+<p id="daily-digest-status" class="daily-digest-status" role="status" aria-live="polite">正在載入今日精選…</p>
+<div id="daily-digest-content"></div>
+</main>
+<script src="/assets/config.js"></script><script src="/assets/daily-digest.js"></script>
+</body></html>
