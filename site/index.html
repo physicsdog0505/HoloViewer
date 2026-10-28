@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant" class="home-preboot"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HoloDocchi</title><link rel="preconnect" href="https://holoviewer-public-api.singlebagel.workers.dev" crossorigin><link rel="stylesheet" href="assets/app.css"><link id="viewer-4174-css" rel="stylesheet" href="assets/viewer-4174.css" media="not all"><link id="viewer-4174-transplant-css" rel="stylesheet" href="assets/4174-shared-viewing-a144bb3.css" media="not all"></head>
+<html lang="zh-Hant" class="home-preboot"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HoloDocchi</title><link rel="preconnect" href="https://holoviewer-public-api.singlebagel.workers.dev" crossorigin><link rel="stylesheet" href="assets/app.css"><link rel="stylesheet" href="assets/daily-digest.css"><link id="viewer-4174-css" rel="stylesheet" href="assets/viewer-4174.css" media="not all"><link id="viewer-4174-transplant-css" rel="stylesheet" href="assets/4174-shared-viewing-a144bb3.css" media="not all"></head>
 <body>
 <aside class="client-rail" aria-label="主要功能">
 <a class="rail-brand" href="/" aria-label="HoloDocchi 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloDocchi</span></a>
@@ -114,6 +114,11 @@
   </div>
   <div id="home-announcements"></div>
   <div id="home-highlights"></div>
+  <section id="home-daily-digest" class="section daily-digest-home" hidden>
+   <div class="daily-digest-head"><div><h2>今日精選</h2><p><span id="home-daily-digest-day"></span> · Daily Digest</p></div><a class="daily-digest-more" href="/daily/">查看完整日報 →</a></div>
+   <p id="home-daily-digest-status" class="daily-digest-status" role="status" aria-live="polite">正在載入今日精選…</p>
+   <div id="home-daily-digest-content"></div>
+  </section>
   <section id="home-live-section" class="section" hidden><div class="section-head"><div><h2>現在直播中</h2><p>LIVE NOW</p></div></div><div id="home-live" class="client-grid"></div></section>
   <section id="home-upcoming-section" class="section" hidden><div class="section-head"><div><h2>即將開始</h2><p>UP NEXT</p></div></div><div id="home-upcoming" class="client-grid"></div></section>
   <section id="home-unknown-section" class="section" hidden><div class="section-head"><div><h2>狀態待更新</h2><p>已找到直播，但目前沒有足夠新的 lifecycle 證據。</p></div></div><div id="home-unknown" class="client-grid"></div></section>
@@ -337,4 +342,4 @@
  </section>
  </section>
  </main>
- <script src="assets/config.js"></script><script src="assets/video-metadata-resolver.js"></script><script src="assets/4174-shared-viewing-a144bb3-dom.js"></script><script src="assets/4174-shared-viewing-a144bb3.js"></script><script src="assets/app.js"></script></body></html>
+ <script src="assets/config.js"></script><script src="assets/daily-digest.js"></script><script src="assets/video-metadata-resolver.js"></script><script src="assets/4174-shared-viewing-a144bb3-dom.js"></script><script src="assets/4174-shared-viewing-a144bb3.js"></script><script src="assets/app.js"></script></body></html>
