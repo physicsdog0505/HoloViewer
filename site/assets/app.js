@@ -573,6 +573,17 @@ function setHomeCollabEvents(data){
  homeCollabEvents=events.filter(event=>collabEventStreams(event).length>1);
  homeCollabByVideo=collabEventMap(data);
 }
+function syncHomeCollabEntries(){
+ for(const item of homeCatalogRows){
+  const id=String(item?.video_id||'');
+  if(!/^[A-Za-z0-9_-]{11}$/.test(id))continue;
+  const card=$('stream-'+id);
+  if(!card)continue;
+  card.querySelector('.stream-collab-entry')?.remove();
+  const entry=collabEntry(homeCollabByVideo.get(id));
+  if(entry)card.append(entry);
+ }
+}
 function collabDetailUrl(event){
  const eventId=String(event?.event_id||'');if(!eventId||!config.apiBase)return '';
  return config.apiBase.replace(/\/$/,'')+'/v1/collab/events/'+encodeURIComponent(eventId);
@@ -910,7 +921,7 @@ async function loadHomeCollab(){
  try{
   const collabData=await api('/v1/collab/live');
   setHomeCollabEvents(collabData);
-  if(homeCatalogRows.length)renderHomeRows(homeCatalogRows);
+  if(homeCatalogRows.length)syncHomeCollabEntries();
  }catch{}
 }
 async function loadHome(){
