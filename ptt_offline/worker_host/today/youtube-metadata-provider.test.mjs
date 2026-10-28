@@ -20,7 +20,7 @@ function item(id,{state='live',count='12345',start='2026-10-28T12:00:00Z',end=nu
 test('normalizes positive live concurrentViewers and nulls invalid/non-live values',()=>{
   const now=new Date('2026-10-28T12:10:00Z');
   assert.equal(normalizeYoutubeVideoItem(item('abcdefghijk'),{now}).concurrent_viewers,12345);
-  for(const value of ['0','-1','bad','',null,undefined]){
+  for(const value of ['0','-1','bad','',null]){
     assert.equal(normalizeYoutubeVideoItem(item('abcdefghijk',{count:value}),{now}).concurrent_viewers,null);
   }
   assert.equal(normalizeYoutubeVideoItem(item('abcdefghijk',{state:'upcoming',start:null,count:'77'}),{now}).concurrent_viewers,null);
