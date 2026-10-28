@@ -636,6 +636,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertNotIn('id="home-daily-digest"', html)
         self.assertNotIn('src="assets/daily-digest.js"', html)
         self.assertNotIn('assets/daily-digest.css', html)
+        self.assertIn('href="/daily/"', html)
+        self.assertIn('<span class="rail-label">日報</span>', html)
         self.assertIn('id="daily-digest-page"', daily_html)
         self.assertIn('src="/assets/daily-digest.js"', daily_html)
         self.assertIn("const SCHEMA='holodocchi.daily_digest.v1';", js)
