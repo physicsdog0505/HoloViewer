@@ -21,24 +21,24 @@
       "source_sqlite_sha256": "0a19320c9dce7c0147affebbaddb2c2229601efb57cd9aaa9b3efeeb27274fd8",
       "source_audit_sha256": "d031b7a90e7144fa255d2b86a0a40f7c4b731fefa05a5a29ce3005266dc88593",
       "manifest_key": "ptt/v1/manifests/static-assets-full-2026-06.json",
-      "manifest_digest": "c63c94a107bd68ad81f8468069c4456d18e7c826745bfe3d1a172c9c83f6e36e",
-      "registration_identity": "69d5e8cd99c85373796f0e32cb9688c7faba6b13ff914a24db2d7b0ba7af1443",
+      "manifest_digest": "b7eddc70382d4c26707306912ee743eebc12471daa63d1d6b650679df30ac5b7",
+      "registration_identity": "e06f7935f0c97ac5c2f6fa59c5c8910a91f4e9affac93c43d751f6a0a295a21f",
       "article_set_sha256": "ff39c7a96309f293cf7f7bcbebe83f66cb1f052cfffcbf4d3f05d70c87bf9618",
       "articles": 60,
       "pushes": 125080,
-      "objects": 639
+      "objects": 31
     },
     {
       "month": "2026-07",
       "source_sqlite_sha256": "852a6f0e330f0531b218fd23fe1675f33b70dc29a21beab637b1b9409827d466",
       "source_audit_sha256": "e0382eb2d763461806d1e11650a4cee33a7f0710f60f268ec987e16dffdb7caf",
       "manifest_key": "ptt/v1/manifests/static-assets-full-2026-07.json",
-      "manifest_digest": "11402238e537ff51f204f8c958cc37ed46a89945f7d603560efcd75705fcf395",
-      "registration_identity": "2378dcaceacb6f4864986f74f98748ff4079ed86c574f7082c219c932a7731b9",
+      "manifest_digest": "9f7a49c182e5d10b68d6c1b1ac66b398cdded9d55644be5ae45001e2cc117973",
+      "registration_identity": "111fd9aa3aab09c228b6e3b3655d0b1829585bb61dc329108402b3ddb4dc76a0",
       "article_set_sha256": "401a468e3933035c7eb1933e95d75b5ca88372f6026d1392f9d2c08d5ece5818",
       "articles": 62,
       "pushes": 135671,
-      "objects": 665
+      "objects": 33
     }
   ]
 }

@@ -314,35 +314,35 @@ def build_month_package(spec: MonthSource, out_dir: Path) -> dict[str,Any]:
     (public/provenance_key).parent.mkdir(parents=True,exist_ok=True)
     (public/provenance_key).write_bytes(provenance_raw)
 
-    chunks=defaultdict(list)
+    partitions=defaultdict(list)
     identities=[]
     floors=[]
     for row in rows:
-        chunks[_chunk_key(row["occurred_at"],spec.month)].append(row)
+        partitions[row["coverage_day"]].append(row)
         identities.append(row["source_record_key"])
         floors.append((row["aid"],row["floor"]))
     if len(identities)!=len(set(identities)) or len(floors)!=len(set(floors)):
         raise MonthPublishError("duplicate canonical row identity")
     objects=[]
-    for key in sorted(chunks):
-        values=sorted(chunks[key],key=lambda row:(
+    for day in sorted(partitions):
+        key=f"ptt/v1/months/{spec.month}/days/{day}/day.json"
+        values=sorted(partitions[day],key=lambda row:(
             row["minute_epoch"],row["aid"],row["floor"],row["source_record_key"]))
-        start=datetime.fromisoformat(values[0]["occurred_at"].replace("Z","+00:00")).replace(
-            minute=0,second=0,microsecond=0)
+        start=datetime.fromisoformat(day).replace(tzinfo=TPE).astimezone(timezone.utc)
         status="PARTIAL" if any(row["coverage_status"]!="COMPLETE" for row in values) else "COMPLETE"
         partition_start=start.isoformat(timespec="seconds").replace("+00:00","Z")
-        partition_end=(start+timedelta(hours=1)).isoformat(
+        partition_end=(start+timedelta(days=1)).isoformat(
             timespec="seconds").replace("+00:00","Z")
         body={"schema_version":ARCHIVE_SCHEMA,"precision":"minute",
-              "bucket_start":partition_start,
-              "bucket_end":partition_end,
+              "partition_start":partition_start,
+              "partition_end":partition_end,
               "coverage_status":status,"finalized":status=="COMPLETE","pushes":values}
         raw_bytes=_canonical(body)
         target=public/key
         target.parent.mkdir(parents=True,exist_ok=True)
         target.write_bytes(raw_bytes)
         objects.append({"key":key,"sha256":sha256(raw_bytes).hexdigest(),
-                        "bytes":len(raw_bytes),"pushes":len(values),
+                        "bytes":len(raw_bytes),"push_count":len(values),
                         "partition_start":partition_start,
                         "partition_end":partition_end,
                         "coverage_status":status,"finalized":status=="COMPLETE"})
@@ -357,7 +357,7 @@ def build_month_package(spec: MonthSource, out_dir: Path) -> dict[str,Any]:
           for day in all_days]
     manifest={
         "schema_version":ARCHIVE_SCHEMA,"delivery_target":"workers-static-assets",
-        "precision":"minute","chunk_minutes":60,"timezone":"UTC","month":spec.month,
+        "precision":"minute","chunk_minutes":1440,"timezone":"UTC","month":spec.month,
         "from_day_taipei":all_days[0],"through_day_taipei":all_days[-1],
         "days":days,"total_pushes":len(rows),"total_objects":len(objects),
         "article_count":len(article_scope),"article_set_sha256":article_set_digest,
