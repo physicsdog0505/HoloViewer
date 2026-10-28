@@ -1795,6 +1795,13 @@ function archiveDayCoverageStatus(manifest,day){
  return ['COMPLETE','PARTIAL','MISSING','UNKNOWN'].includes(status)?status:'UNKNOWN';
 }
 async function resolveArchiveDaySlice(day,rangeStart,rangeEnd){
+ if(window.HoloViewerPttArchive?.resolveDaySlice){
+  return window.HoloViewerPttArchive.resolveDaySlice({
+   day,rangeStart,rangeEnd,
+   catalogBase:String(window.HOLOVIEWER_CONFIG?.pttArchiveCatalogBase||''),
+   legacyMonths:PTT_ARCHIVE_MONTHS
+  });
+ }
  const month=String(day||'').slice(0,7);
  const source=archiveSourceForMonth(month);
  if(!source)throw archiveUnavailableError('歷史 PTT 月份來源未設定：'+month);

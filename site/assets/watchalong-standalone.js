@@ -1080,6 +1080,13 @@ function archiveObjectPlan(source,manifest,startMs,endMs){
   .sort((a,b)=>a.range.startMs-b.range.startMs||a.range.endMs-b.range.endMs||String(a.item.key).localeCompare(String(b.item.key)));
 }
 async function resolveArchiveDaySlice(day,rangeStart,rangeEnd){
+ if(window.HoloViewerPttArchive?.resolveDaySlice){
+  return window.HoloViewerPttArchive.resolveDaySlice({
+   day,rangeStart,rangeEnd,
+   catalogBase:String(window.HOLOVIEWER_CONFIG?.pttArchiveCatalogBase||''),
+   legacyMonths:PTT_ARCHIVE_MONTHS
+  });
+ }
  const month=String(day||'').slice(0,7),source=archiveSourceForMonth(month);
  if(!source)throw archiveUnavailableError('歷史 PTT 月份來源未設定：'+month);
  let lastError=null;
