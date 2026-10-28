@@ -452,6 +452,24 @@ function playerDisplayLabel(stream){
  if(!label||label===videoId||/^[A-Za-z0-9_-]{11}$/.test(label))return '';
  return label;
 }
+function playerViewerCount(row){
+ const lifecycle=String(row?.lifecycle_state||'').toLowerCase();
+ const viewers=Number(row?.concurrent_viewers);
+ if(lifecycle!=='live'||row?.stale===true||!Number.isInteger(viewers)||viewers<=0)return '';
+ return new Intl.NumberFormat('zh-TW').format(viewers)+' 人正在觀看';
+}
+function updatePlayerCardMetadata(index,row){
+ const card=playerCards[index];
+ if(!card)return;
+ const label=card.querySelector('.player-label');
+ if(label)label.textContent=playerDisplayLabel(streams[index]);
+ const viewers=card.querySelector('.player-viewers');
+ if(viewers){
+  const text=playerViewerCount(row);
+  viewers.textContent=text;
+  viewers.hidden=!text;
+ }
+}
 function mobileSecondaryIndexes(){
  return playerCards.map((card,index)=>card&&viewingPovVisible(index)&&index!==primaryIndex?index:-1).filter(index=>index>=0);
 }
@@ -467,6 +485,7 @@ function createPlayerCard(index){
  const card=node('section',undefined,'player-card');
  card.dataset.index=String(index);
  const label=node('div',playerDisplayLabel(stream),'player-label');
+ const viewers=node('div','', 'player-viewers');viewers.hidden=true;
  const remove=node('button','×','player-remove');
  remove.type='button';
  remove.title='移除此直播';
@@ -486,7 +505,7 @@ function createPlayerCard(index){
  previous.addEventListener('click',event=>{event.stopPropagation();cycleMobileSecondary(-1)});
  next.addEventListener('click',event=>{event.stopPropagation();cycleMobileSecondary(1)});
  pager.append(previous,status,next);
- card.append(label,remove,host,pager);
+ card.append(label,viewers,remove,host,pager);
  playerCards[index]=card;
  return card;
 }
@@ -756,8 +775,7 @@ function commitSingleStream(row,id){
  }
  primaryIndex=0;
  audioMaster=0;
- const label=playerCards[0]?.querySelector('.player-label');
- if(label)label.textContent=playerDisplayLabel(streams[0]);
+ updatePlayerCardMetadata(0,row);
  renderControls();
  applyLayout();
  renderLiveRail(catalogRows);
@@ -1348,8 +1366,7 @@ async function loadCatalog(){
    stream.label=catalogName(row);
    stream.channelId=String(row.channel_id||'');
    stream.avatarUrl=safeAvatar(row.avatar_url);
-   const label=playerCards[index]?.querySelector('.player-label');
-   if(label)label.textContent=playerDisplayLabel(stream);
+   updatePlayerCardMetadata(index,row);
   });
   renderControls();
   renderLiveRail(rows);
