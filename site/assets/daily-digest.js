@@ -155,7 +155,7 @@ function normalizedSections(source){
 }
 function renderArtifact(target,artifact,{compact=false,home=false}={}){
   target.replaceChildren();
-  const source=home&&artifact.home&&typeof artifact.home==='object'?artifact.home:artifact;
+  const source=home?(artifact.home&&typeof artifact.home==='object'?artifact.home:null):artifact;
   const sections=normalizedSections(source);
   for(const section of sections){
     const wrap=el('section','daily-digest-group');
@@ -174,6 +174,7 @@ function setStatus(node,message,kind=''){
   node.hidden=!message;
 }
 async function initHome(){
+  if(location.pathname!=='/')return;
   const section=document.getElementById('home-daily-digest');
   const list=document.getElementById('home-daily-digest-content');
   const status=document.getElementById('home-daily-digest-status');
@@ -241,5 +242,5 @@ async function initDaily(){
 window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({
   schema:SCHEMA,taipeiDay,shiftDay,displayTime,fetchArtifact,renderArtifact
 });
-document.addEventListener('DOMContentLoaded',()=>{initHome();initDaily()},{once:true});
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()=>{initHome();initDaily()},{once:true});
 })();
