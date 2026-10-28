@@ -476,6 +476,7 @@ class ParityContract(unittest.TestCase):
         self.assertIn("pttArchiveMonths:",config)
         self.assertIn("holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",config)
         self.assertIn("holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev",config)
+        self.assertIn("static-assets-full-2026-06.json",config)
         self.assertIn("static-assets-full-2026-07.json",config)
         self.assertIn("static-assets-full-2026-08.json",config)
         self.assertIn("static-assets-full-2026-09.json",config)
@@ -550,6 +551,7 @@ class ParityContract(unittest.TestCase):
         visible_end=viewer.index("function setVodPttRows(rows){",visible_start)
         visible_helper=viewer[visible_start:visible_end]
         registry="""{
+          "2026-06": {"base":"https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev","manifest":"/ptt/v1/manifests/static-assets-full-2026-06.json"},
           "2026-07": {"base":"https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev","manifest":"/ptt/v1/manifests/static-assets-full-2026-07.json"},
           "2026-08": {"base":"https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev","manifest":"/ptt/v1/manifests/static-assets-full-2026-08.json"},
           "2026-09": {"base":"https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev","manifest":"/ptt/v1/manifests/static-assets-full-2026-09.json"},
@@ -572,9 +574,7 @@ const sep=archiveSourcesForWindow(Date.parse('2026-09-18T11:00:25Z'),Date.parse(
 const crossSources=archiveSourcesForWindow(Date.parse('2026-09-30T15:59:00Z'),Date.parse('2026-09-30T16:01:00Z'));
 const july=archiveSourcesForWindow(Date.parse('2026-07-01T00:00:00Z'),Date.parse('2026-07-31T15:59:59Z'));
 const julyAugust=archiveSourcesForWindow(Date.parse('2026-07-31T15:59:00Z'),Date.parse('2026-07-31T16:01:00Z'));
-let juneJulyError='';
-try{archiveSourcesForWindow(Date.parse('2026-06-30T15:59:00Z'),Date.parse('2026-06-30T16:01:00Z'))}
-catch(error){juneJulyError=String(error?.message||error)}
+const juneJuly=archiveSourcesForWindow(Date.parse('2026-06-30T15:59:00Z'),Date.parse('2026-06-30T16:01:00Z'));
 
 const hourlyObjects=Array.from({length:7},(_,i)=>({
  key:'ptt/v1/chunks/2026/09/18/'+String(1100+i*100).padStart(4,'0')+'.json',
@@ -633,7 +633,7 @@ const deduped=dedupeArchiveRows(rows);
 const visible=vodPttVisibleCountAt(deduped,Date.parse('2026-09-18T16:13:34Z'));
 
 process.stdout.write(JSON.stringify({
- crossSources,july,julyAugust,juneJulyError,
+ crossSources,july,julyAugust,juneJuly,
  hourlyPlan:hourlyPlan.map(x=>x.item.key),
  dailyPlan:dailyPlan.map(x=>x.item.key),
  crossDayPlan:crossDayPlan.map(x=>x.item.key),
@@ -650,7 +650,7 @@ process.stdout.write(JSON.stringify({
         self.assertEqual([x["month"] for x in payload["crossSources"]],["2026-09","2026-10"])
         self.assertEqual([x["month"] for x in payload["july"]],["2026-07"])
         self.assertEqual([x["month"] for x in payload["julyAugust"]],["2026-07","2026-08"])
-        self.assertIn("2026-06",payload["juneJulyError"])
+        self.assertEqual([x["month"] for x in payload["juneJuly"]],["2026-06","2026-07"])
         self.assertEqual(len(payload["hourlyPlan"]),6)
         self.assertEqual(payload["dailyPlan"],["ptt/v1/days/2026-10-21/day.json"])
         self.assertEqual(payload["crossDayPlan"],[
@@ -663,6 +663,7 @@ process.stdout.write(JSON.stringify({
         self.assertEqual(payload["deduped"],2019)
         self.assertEqual(payload["visible"],2019)
         self.assertIn('"2026-09": Object.freeze({',config)
+        self.assertIn('"2026-06": Object.freeze({',config)
         self.assertIn('"2026-07": Object.freeze({',config)
 
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs",viewer)
