@@ -3,7 +3,7 @@ window.HOLOVIEWER_CONFIG = Object.freeze({
   youtubeStaticBase: "https://holoviewer-youtube-static-assets.singlebagel.workers.dev",
   dailyDigest: Object.freeze({
     base: "",
-    pathTemplate: ""
+    pathTemplate: "/data/daily-digest/{date}.json"
   }),
   pttArchiveMonths: Object.freeze({
     "2026-08": Object.freeze({
