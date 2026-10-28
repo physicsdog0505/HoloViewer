@@ -104,7 +104,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertLess(home_source.index("renderHomeRows(rows);"), home_source.index("loadHomeCollab();"))
         self.assertIn("const [manifest,data,aliasRegistry,contentAliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,historyPromise,aliasesPromise,contentAliasesPromise,collabPromise,catalogPromise]);", js)
         self.assertIn("const manifestPromise=config.youtubeStaticBase?loadYoutubeHistoryManifest().catch(()=>null):Promise.resolve(null);", js)
-        self.assertIn("const aliasesPromise=query?loadHistoryMemberAliases():Promise.resolve(null);", js)
+        self.assertIn("const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);", js)
         self.assertIn("const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json';", js)
         self.assertIn('rel="preconnect" href="https://holoviewer-public-api.singlebagel.workers.dev"', (ROOT / "site/index.html").read_text())
         self.assertIn("textContent=", js)
