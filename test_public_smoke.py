@@ -11,7 +11,7 @@ import unittest
 from public_snapshot import load_snapshot
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/video-metadata-resolver.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/watchalong-viewer/index.html", "site/assets/watchalong-standalone.css", "site/assets/watchalong-standalone.js", "site/assets/watchalong-static-core.js", "site/assets/viewing-timeline-core.js", "site/assets/viewing-share-state.js", "site/assets/viewing-timeline-viewer-adapter.js", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "scripts/deploy_watchalong_event_owner_local.sh", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py", "site/data/watchalong/manifest.json", "site/data/watchalong/events/eFYByyw5AJc.json", "site/data/watchalong/events/U2o13h1Oib4.json", "site/data/watchalong/events/8pF4qHcshDc.json", "site/data/watchalong/events/t8q3XEmK0aM.json", "scripts/export_watchalong_assets.py", "test_watchalong_assets.py", "test_viewing_timeline_core.py", "test_viewing_timeline_viewer_integration.py", "docs/handoffs/WATCHALONG_PUBLIC_ASSET_HANDOFF_20261020.md", "docs/handoffs/ISSUE176_CUSTOM_DOMAIN_OWNER_ROLLOUT.md", "docs/YOUTUBE_STATIC_ASSETS_PREVIEW.md", "scripts/youtube_static_assets_preview.py", "scripts/run_youtube_static_assets_gate3_preview.sh", "test_youtube_static_assets_preview.py", "test_youtube_static_target_config.py", "test_history_search_aliases.py", "data/search/member_aliases.v1.json", "data/search/README.md", "site/data/search/member-aliases.v1.json", "scripts/run_alias_static_assets_release.sh", "test_alias_static_assets_release_gate.py", "site/assets/search/history-content-aliases.v1.json", "docs/ALIAS_STATIC_ASSETS_RELEASE.md", "site/data/search/aliases/v1/versions/ebd36f84fb5f0b507e54100d02e06e635f15a72e14396e57a613bf109252b9b2.json", "site/assets/ptt-links.css", "scripts/run_alias_static_assets_release.py", "test_public_frontend_release_gate.py", "site/data/search/aliases/v1/latest.json", "site/assets/ptt-links.js", "scripts/run_public_frontend_owner_release.sh", "scripts/run_public_frontend_owner_release.py", "scripts/alias_static_assets_release_gate.py"}
+EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/video-metadata-resolver.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/watchalong-viewer/index.html", "site/assets/watchalong-standalone.css", "site/assets/watchalong-standalone.js", "site/assets/watchalong-static-core.js", "site/assets/viewing-timeline-core.js", "site/assets/viewing-share-state.js", "site/assets/viewing-timeline-viewer-adapter.js", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "scripts/deploy_watchalong_event_owner_local.sh", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py", "site/data/watchalong/manifest.json", "site/data/watchalong/events/eFYByyw5AJc.json", "site/data/watchalong/events/U2o13h1Oib4.json", "site/data/watchalong/events/8pF4qHcshDc.json", "site/data/watchalong/events/t8q3XEmK0aM.json", "scripts/export_watchalong_assets.py", "test_watchalong_assets.py", "test_viewing_timeline_core.py", "test_viewing_timeline_viewer_integration.py", "docs/handoffs/WATCHALONG_PUBLIC_ASSET_HANDOFF_20261020.md", "docs/handoffs/ISSUE176_CUSTOM_DOMAIN_OWNER_ROLLOUT.md", "docs/YOUTUBE_STATIC_ASSETS_PREVIEW.md", "scripts/youtube_static_assets_preview.py", "scripts/run_youtube_static_assets_gate3_preview.sh", "test_youtube_static_assets_preview.py", "test_youtube_static_target_config.py", "test_history_search_aliases.py", "data/search/member_aliases.v1.json", "data/search/README.md", "site/data/search/member-aliases.v1.json", "scripts/run_alias_static_assets_release.sh", "test_alias_static_assets_release_gate.py", "site/assets/search/history-content-aliases.v1.json", "docs/ALIAS_STATIC_ASSETS_RELEASE.md", "site/data/search/aliases/v1/versions/ebd36f84fb5f0b507e54100d02e06e635f15a72e14396e57a613bf109252b9b2.json", "site/assets/ptt-links.css", "scripts/run_alias_static_assets_release.py", "test_public_frontend_release_gate.py", "site/data/search/aliases/v1/latest.json", "site/assets/ptt-links.js", "site/assets/daily-digest.js", "site/assets/daily-digest.css", "site/daily/index.html", "scripts/run_public_frontend_owner_release.sh", "scripts/run_public_frontend_owner_release.py", "scripts/alias_static_assets_release_gate.py"}
 
 class PublicSmokeTests(unittest.TestCase):
     def test_repository_file_allowlist(self):
@@ -626,6 +626,36 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("max-height:min(300px", styles)
         for js in (today_js, viewer_js, watchalong_js):
             self.assertIn("HOLOVIEWER_PTT_LINKS?.appendLinkedContent", js)
+
+    def test_daily_digest_frontend_contract(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        daily_html = (ROOT / "site/daily/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/daily-digest.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/daily-digest.css").read_text(encoding="utf-8")
+        config = (ROOT / "site/assets/config.js").read_text(encoding="utf-8")
+        self.assertIn('id="home-daily-digest"', html)
+        self.assertIn('href="/daily/"', html)
+        self.assertIn('src="assets/daily-digest.js"', html)
+        self.assertIn('id="daily-digest-page"', daily_html)
+        self.assertIn('src="/assets/daily-digest.js"', daily_html)
+        self.assertIn("const SCHEMA='holodocchi.daily_digest.v1';", js)
+        self.assertIn("const TAIPEI='Asia/Taipei';", js)
+        self.assertIn("if(!base||!template||!DATE_RE.test(day))return '';", js)
+        self.assertIn("if(response.status===404)return {state:'MISSING'", js)
+        self.assertIn("if(state!=='READY'&&state!=='PARTIAL')", js)
+        self.assertIn("section.items.forEach(item=>", js)
+        self.assertNotIn(".sort(", js)
+        self.assertNotIn("Gemini", js)
+        self.assertNotIn("fetch('https://www.googleapis.com", js)
+        self.assertNotIn("innerHTML", js)
+        self.assertIn("credentials:'omit'", js)
+        self.assertIn("cache:day===taipeiDay()?'no-cache':'force-cache'", js)
+        self.assertIn("item?.concurrent_viewers", js)
+        self.assertIn("itemState(item)==='live'", js)
+        self.assertIn("grid-template-columns:minmax(0,1fr)", css)
+        self.assertIn('dailyDigest: Object.freeze({', config)
+        self.assertIn('base: ""', config)
+        self.assertIn('pathTemplate: ""', config)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
