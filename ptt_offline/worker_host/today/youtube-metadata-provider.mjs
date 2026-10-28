@@ -7,6 +7,11 @@ function iso(value){
  if(Number.isNaN(d.getTime()))return null;
  return d.toISOString().replace(/\.\d{3}Z$/,'Z');
 }
+function positiveInt(value){
+ if(value==null||value==='')return null;
+ const n=Number(value);
+ return Number.isSafeInteger(n)&&n>0?n:null;
+}
 export function normalizeYoutubeVideoItem(item,{now=new Date()}={}){
  if(!item||!VIDEO.test(item.id??'')||!item.snippet||!CHANNEL.test(item.snippet.channelId??''))return null;
  const s=item.snippet,d=item.liveStreamingDetails??{};
@@ -20,6 +25,9 @@ export function normalizeYoutubeVideoItem(item,{now=new Date()}={}){
  else if(s.liveBroadcastContent==='upcoming'){
    lifecycle_state=scheduled_start&&Date.parse(scheduled_start)<=now.getTime()?'waiting':'upcoming';
  } else if(actual_start)lifecycle_state='live';
+ const concurrent_viewers=(lifecycle_state==='live'&&actual_end==null)
+   ? positiveInt(d.concurrentViewers)
+   : null;
  return {
    video_id:item.id,
    channel_id:s.channelId,
@@ -29,6 +37,7 @@ export function normalizeYoutubeVideoItem(item,{now=new Date()}={}){
    scheduled_start,
    actual_start,
    actual_end,
+   concurrent_viewers,
    is_livestream:Boolean(has_live_streaming_details||actual_start||actual_end||scheduled_start||s.liveBroadcastContent==='live'||s.liveBroadcastContent==='upcoming')
  };
 }

@@ -28,6 +28,7 @@ function evidenceFor(base,v,observed_at){
     scheduled_start:v.scheduled_start??null,
     actual_start:v.actual_start??null,
     actual_end:v.actual_end??null,
+    concurrent_viewers:v.concurrent_viewers??null,
     source_label:YOUTUBE_LIVE_SOURCE
   };
 }
@@ -186,9 +187,16 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
 
   const mutations=[...missUpserts];
   if(unchangedIds.length){
+    const viewerCases=unchangedIds.map(()=> 'WHEN ? THEN ?').join(' ');
+    const viewerBinds=unchangedIds.flatMap(id=>[
+      id,
+      byId.get(id)?.concurrent_viewers??null
+    ]);
     mutations.push(env.DB.prepare(`UPDATE public_today_canonical
-      SET checked_at=?
-      WHERE video_id IN (${placeholders(unchangedIds)})`).bind(observed_at,...unchangedIds));
+      SET checked_at=?,
+          concurrent_viewers=CASE video_id ${viewerCases} ELSE NULL END
+      WHERE video_id IN (${placeholders(unchangedIds)})`)
+      .bind(observed_at,...viewerBinds,...unchangedIds));
   }
   if(retireLive.size){
     const retire=[...retireLive];
