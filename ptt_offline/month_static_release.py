@@ -6,6 +6,7 @@ no Cloudflare client, credential lookup, subprocess call, or deploy action.
 from __future__ import annotations
 
 import argparse
+import calendar
 import json
 import shutil
 from hashlib import sha256
@@ -83,9 +84,23 @@ def _baseline_files(public: Path, expected: dict[str,Any]) -> tuple[list[str],di
     return keys+[key],manifest
 
 
-def stage_release(*, spec_path: Path, month_package: Path,
-                  baseline_public: list[Path], out_dir: Path) -> dict[str,Any]:
-    """Create an exact union of reviewed baselines and one new month package."""
+def _candidate_specs(spec: dict[str,Any]) -> list[dict[str,Any]]:
+    values=spec.get("candidates")
+    if values is None and isinstance(spec.get("candidate"),dict):
+        values=[spec["candidate"]]
+    if (not isinstance(values,list) or not values or
+            any(not isinstance(value,dict) for value in values)):
+        raise MonthPublishError("release candidates are missing")
+    months=[value.get("month") for value in values]
+    if len(months)!=len(set(months)):
+        raise MonthPublishError("release candidate months are duplicated")
+    return values
+
+
+def stage_release(*, spec_path: Path, baseline_public: list[Path], out_dir: Path,
+                  month_package: Path|None=None,
+                  month_packages: list[Path]|None=None) -> dict[str,Any]:
+    """Create an exact union of reviewed baselines and new month packages."""
     if out_dir.exists():
         raise MonthPublishError("release output already exists")
     spec=_load_json(spec_path,"release specification")
@@ -95,25 +110,28 @@ def stage_release(*, spec_path: Path, month_package: Path,
     if not isinstance(baselines,list) or len(baselines)!=len(baseline_public):
         raise MonthPublishError("baseline directory count differs from release specification")
 
-    receipt=_load_json(month_package/"build-receipt.json","month build receipt")
-    candidate=spec.get("candidate")
-    if not isinstance(candidate,dict):
-        raise MonthPublishError("release candidate is missing")
-    exact={
-        "month":receipt.get("month"),
-        "source_sqlite_sha256":receipt.get("source_sqlite_sha256"),
-        "source_audit_sha256":receipt.get("source_audit_sha256"),
-        "manifest_key":receipt.get("manifest_key"),
-        "manifest_digest":receipt.get("manifest_digest"),
-        "registration_identity":receipt.get("registration_identity"),
-        "article_set_sha256":receipt.get("article_set_sha256"),
-        "articles":receipt.get("articles"),
-        "pushes":receipt.get("pushes"),
-        "objects":receipt.get("objects"),
-    }
-    if exact!=candidate:
-        raise MonthPublishError("month package identity differs from release specification")
-    candidate_files=_package_files(month_package,receipt)
+    packages=list(month_packages or ([] if month_package is None else [month_package]))
+    candidates=_candidate_specs(spec)
+    if len(packages)!=len(candidates):
+        raise MonthPublishError("month package count differs from release specification")
+    candidate_inputs=[]
+    for package,candidate in zip(packages,candidates):
+        receipt=_load_json(package/"build-receipt.json","month build receipt")
+        exact={
+            "month":receipt.get("month"),
+            "source_sqlite_sha256":receipt.get("source_sqlite_sha256"),
+            "source_audit_sha256":receipt.get("source_audit_sha256"),
+            "manifest_key":receipt.get("manifest_key"),
+            "manifest_digest":receipt.get("manifest_digest"),
+            "registration_identity":receipt.get("registration_identity"),
+            "article_set_sha256":receipt.get("article_set_sha256"),
+            "articles":receipt.get("articles"),
+            "pushes":receipt.get("pushes"),
+            "objects":receipt.get("objects"),
+        }
+        if exact!=candidate:
+            raise MonthPublishError("month package identity differs from release specification")
+        candidate_inputs.append((package,_package_files(package,receipt)))
 
     public=out_dir/"public"
     copied=noops=0
@@ -134,10 +152,11 @@ def stage_release(*, spec_path: Path, month_package: Path,
 
     # Candidate _headers is the reviewed union policy.  Baseline helper files and
     # old _headers are intentionally excluded from the deployable directory.
-    for key in candidate_files:
-        result=_copy_exact(month_package/"public"/key,public/key,key)
-        copied+=result=="copied"; noops+=result=="noop"
-        all_keys.add(key)
+    for package,candidate_files in candidate_inputs:
+        for key in candidate_files:
+            result=_copy_exact(package/"public"/key,public/key,key)
+            copied+=result=="copied"; noops+=result=="noop"
+            all_keys.add(key)
 
     target=spec.get("target")
     if not isinstance(target,dict) or not target.get("worker_name"):
@@ -153,7 +172,7 @@ def stage_release(*, spec_path: Path, month_package: Path,
     largest_key=max(sizes,key=sizes.get)
     release={
         "schema_version":RELEASE_SCHEMA,"status":"PASS",
-        "target":target,"baselines":baseline_receipts,"candidate":candidate,
+        "target":target,"baselines":baseline_receipts,"candidates":candidates,
         "deployable_files":len(all_keys),"copied_files":copied,"noop_files":noops,
         "deployable_bytes":sum(sizes.values()),"largest_asset_key":largest_key,
         "largest_asset_bytes":sizes[largest_key],
@@ -176,9 +195,9 @@ def verify_release_http(*, spec_path: Path, observed_at: str) -> dict[str,Any]:
     if spec.get("schema_version")!=RELEASE_SCHEMA:
         raise MonthPublishError("release specification schema mismatch")
     target=spec.get("target")
-    candidate=spec.get("candidate")
+    candidates=_candidate_specs(spec)
     baselines=spec.get("baselines")
-    if not isinstance(target,dict) or not isinstance(candidate,dict) or not isinstance(baselines,list):
+    if not isinstance(target,dict) or not isinstance(baselines,list):
         raise MonthPublishError("release specification is incomplete")
     base_url=target.get("base_url")
     if not isinstance(base_url,str) or not base_url.startswith("https://"):
@@ -205,54 +224,58 @@ def verify_release_http(*, spec_path: Path, observed_at: str) -> dict[str,Any]:
         preserved.append({"manifest_key":key,"sha256":expected["sha256"],
                           "objects_verified":verified})
 
-    readback=readback_http(
-        base_url=base_url,registration_key=f"ptt/v1/registrations/{candidate['month']}.json",
-        job_id=f"production-{candidate['month']}-{candidate['registration_identity'][:16]}",
-        observed_at=observed_at,target_identity=target["worker_name"],
-        expected_registration_identity=candidate["registration_identity"])
-    if not readback.get("job_verified"):
-        raise MonthPublishError("production candidate full readback failed")
-
-    manifest_raw=_http_bytes(base_url,candidate["manifest_key"])
-    if sha256(manifest_raw).hexdigest()!=candidate["manifest_digest"]:
-        raise MonthPublishError("production candidate manifest digest mismatch")
-    manifest=json.loads(manifest_raw)
+    candidate_readbacks=[]
     representative=[]
-    wanted={f"{candidate['month']}-01",f"{candidate['month']}-15",
-            f"{candidate['month']}-31"}
-    for item in manifest["objects"]:
-        if not wanted:
-            break
-        raw=_http_bytes(base_url,item["key"])
-        body=json.loads(raw)
-        days={row.get("coverage_day") for row in body.get("pushes",[])}
-        for day in sorted(wanted&days):
-            representative.append({"day":day,"key":item["key"],
-                                   "sha256":item["sha256"]})
-            wanted.remove(day)
-    if wanted:
-        raise MonthPublishError("early/mid/late production samples are incomplete")
+    for candidate in candidates:
+        readback=readback_http(
+            base_url=base_url,
+            registration_key=f"ptt/v1/registrations/{candidate['month']}.json",
+            job_id=f"production-{candidate['month']}-{candidate['registration_identity'][:16]}",
+            observed_at=observed_at,target_identity=target["worker_name"],
+            expected_registration_identity=candidate["registration_identity"])
+        if not readback.get("job_verified"):
+            raise MonthPublishError("production candidate full readback failed")
+        candidate_readbacks.append(readback)
 
-    first_key=manifest["objects"][0]["key"]
-    header_contracts=(
-        (candidate["manifest_key"],"application/json","no-cache"),
-        (first_key,"application/json","public, max-age=0, must-revalidate"),
-    )
-    for key,expected_type,expected_cache in header_contracts:
-        url=base_url.rstrip("/")+"/"+quote(_safe_key(key),safe="/")
-        with urlopen(url,timeout=10) as response:
-            if expected_type not in response.headers.get("Content-Type",""):
-                raise MonthPublishError(f"production content type mismatch: {key}")
-            if response.headers.get("Access-Control-Allow-Origin")!="*":
-                raise MonthPublishError(f"production CORS header mismatch: {key}")
-            if response.headers.get("Cache-Control")!=expected_cache:
-                raise MonthPublishError(f"production cache header mismatch: {key}")
-            if response.headers.get("X-Content-Type-Options")!="nosniff":
-                raise MonthPublishError(f"production nosniff header mismatch: {key}")
-            # The reviewed baseline has no CSP header on immutable JSON assets;
-            # introducing one here could block the existing cross-origin reader.
-            if response.headers.get("Content-Security-Policy") is not None:
-                raise MonthPublishError(f"production CSP baseline changed: {key}")
+        manifest_raw=_http_bytes(base_url,candidate["manifest_key"])
+        if sha256(manifest_raw).hexdigest()!=candidate["manifest_digest"]:
+            raise MonthPublishError("production candidate manifest digest mismatch")
+        manifest=json.loads(manifest_raw)
+        year,month=map(int,candidate["month"].split("-"))
+        last=calendar.monthrange(year,month)[1]
+        wanted={f"{candidate['month']}-01",f"{candidate['month']}-15",
+                f"{candidate['month']}-{last:02d}"}
+        for item in manifest["objects"]:
+            if not wanted:
+                break
+            raw=_http_bytes(base_url,item["key"])
+            body=json.loads(raw)
+            days={row.get("coverage_day") for row in body.get("pushes",[])}
+            for day in sorted(wanted&days):
+                representative.append({"day":day,"key":item["key"],
+                                       "sha256":item["sha256"]})
+                wanted.remove(day)
+        if wanted:
+            raise MonthPublishError("early/mid/late production samples are incomplete")
+
+        first_key=manifest["objects"][0]["key"]
+        header_contracts=(
+            (candidate["manifest_key"],"application/json","no-cache"),
+            (first_key,"application/json","public, max-age=0, must-revalidate"),
+        )
+        for key,expected_type,expected_cache in header_contracts:
+            url=base_url.rstrip("/")+"/"+quote(_safe_key(key),safe="/")
+            with urlopen(url,timeout=10) as response:
+                if expected_type not in response.headers.get("Content-Type",""):
+                    raise MonthPublishError(f"production content type mismatch: {key}")
+                if response.headers.get("Access-Control-Allow-Origin")!="*":
+                    raise MonthPublishError(f"production CORS header mismatch: {key}")
+                if response.headers.get("Cache-Control")!=expected_cache:
+                    raise MonthPublishError(f"production cache header mismatch: {key}")
+                if response.headers.get("X-Content-Type-Options")!="nosniff":
+                    raise MonthPublishError(f"production nosniff header mismatch: {key}")
+                if response.headers.get("Content-Security-Policy") is not None:
+                    raise MonthPublishError(f"production CSP baseline changed: {key}")
     missing_url=base_url.rstrip("/")+"/ptt/v1/manifests/static-assets-full-1900-01.json"
     try:
         urlopen(missing_url,timeout=10)
@@ -263,8 +286,9 @@ def verify_release_http(*, spec_path: Path, observed_at: str) -> dict[str,Any]:
         raise MonthPublishError("production missing-object response is not 404")
 
     return {"schema_version":RELEASE_SCHEMA,"status":"PASS","observed_at":observed_at,
-            "target":target,"baselines":preserved,"candidate":candidate,
-            "candidate_readback":readback,"representative_days":representative,
+            "target":target,"baselines":preserved,"candidates":candidates,
+            "candidate_readbacks":candidate_readbacks,
+            "representative_days":representative,
             "cors_verified":True,"content_type_verified":True,"missing_object_404":True,
             "production_execution":False}
 
@@ -274,7 +298,7 @@ def main(argv: list[str]|None=None) -> int:
     sub=parser.add_subparsers(dest="command",required=True)
     stage=sub.add_parser("stage")
     stage.add_argument("--spec",required=True,type=Path)
-    stage.add_argument("--month-package",required=True,type=Path)
+    stage.add_argument("--month-package",required=True,type=Path,action="append")
     stage.add_argument("--baseline-public",required=True,type=Path,action="append")
     stage.add_argument("--out",required=True,type=Path)
     verify=sub.add_parser("verify-http")
@@ -283,7 +307,7 @@ def main(argv: list[str]|None=None) -> int:
     verify.add_argument("--receipt",type=Path)
     args=parser.parse_args(argv)
     if args.command=="stage":
-        result=stage_release(spec_path=args.spec,month_package=args.month_package,
+        result=stage_release(spec_path=args.spec,month_packages=args.month_package,
                              baseline_public=args.baseline_public,out_dir=args.out)
     else:
         result=verify_release_http(spec_path=args.spec,observed_at=args.observed_at)

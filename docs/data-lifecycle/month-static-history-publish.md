@@ -124,15 +124,23 @@ object before copying and rejects any same-key/different-byte collision.
 The staging receipt also records total deployable bytes and the largest asset,
 so the owner can review capacity before authorizing the Static Assets deploy.
 
+The same release may contain multiple reviewed candidates. The combined
+2026-06/07 specification is
+`ptt_offline/fixtures/history/2026-06-07-production-release.json`; each repeated
+`--month-package` is positionally bound to one exact candidate identity. This
+keeps one replacement-style Static Assets deploy from dropping either newly
+accepted month or the reviewed 08/10 baseline.
+
 Owner-local staging (no network mutation):
 
 ```text
 python3 -B -m ptt_offline.month_static_release stage \
-  --spec ptt_offline/fixtures/history/2026-07-production-release.json \
-  --month-package /private/tmp/issue160-202607-package-readback-v3 \
+  --spec ptt_offline/fixtures/history/2026-06-07-production-release.json \
+  --month-package /private/tmp/issue160-202606-package-readback-v1 \
+  --month-package /private/tmp/issue160-202607-package-v4 \
   --baseline-public /owner/reviewed-2026-08-package/public \
   --baseline-public /owner/reviewed-2026-10-package/public \
-  --out /private/tmp/issue160-202607-production-release
+  --out /private/tmp/issue160-20260607-production-release
 ```
 
 After reviewing `release-receipt.json`, the owner-only production command is
@@ -149,9 +157,9 @@ HTTP gate is:
 
 ```text
 python3 -B -m ptt_offline.month_static_release verify-http \
-  --spec ptt_offline/fixtures/history/2026-07-production-release.json \
+  --spec ptt_offline/fixtures/history/2026-06-07-production-release.json \
   --observed-at OWNER_SUPPLIED_UTC_TIMESTAMP \
-  --receipt /private/tmp/issue160-202607-production-readback.json
+  --receipt /private/tmp/issue160-20260607-production-readback.json
 ```
 
 That gate rereads and hashes all 665 July objects, all preserved 08/10 objects,
