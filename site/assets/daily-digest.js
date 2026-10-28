@@ -209,22 +209,66 @@ function setDailyUrl(day){
   if(day===taipeiDay())url.searchParams.delete('date');else url.searchParams.set('date',day);
   location.href=url.pathname+url.search;
 }
+function monthKey(day){return DATE_RE.test(day)?day.slice(0,7):taipeiDay().slice(0,7)}
+function shiftMonth(key,delta){
+  const [year,month]=key.split('-').map(Number);
+  const date=new Date(Date.UTC(year,month-1+delta,1,12));
+  return date.getUTCFullYear()+'-'+String(date.getUTCMonth()+1).padStart(2,'0');
+}
+function monthLabel(key){
+  const [year,month]=key.split('-').map(Number);
+  return new Intl.DateTimeFormat('zh-TW',{timeZone:'UTC',year:'numeric',month:'long'}).format(new Date(Date.UTC(year,month-1,1,12)));
+}
+function initDailyDateHub(day,today){
+  const dialog=document.getElementById('dailyDigestDateHub');
+  const trigger=document.getElementById('dailyDigestDateTrigger');
+  const grid=document.getElementById('dailyDigestDateGrid');
+  const label=document.getElementById('dailyDigestMonthLabel');
+  const prev=document.getElementById('dailyDigestMonthPrev');
+  const next=document.getElementById('dailyDigestMonthNext');
+  const todayButton=document.getElementById('dailyDigestDateToday');
+  const close=document.getElementById('dailyDigestDateClose');
+  if(!dialog||!trigger||!grid||!label)return;
+  let month=monthKey(day);
+  trigger.textContent=displayDay(day);
+  function render(){
+    label.textContent=monthLabel(month);
+    grid.replaceChildren();
+    const [year,monthNumber]=month.split('-').map(Number);
+    const first=new Date(Date.UTC(year,monthNumber-1,1,12));
+    const start=first.getUTCDay();
+    const days=new Date(Date.UTC(year,monthNumber,0,12)).getUTCDate();
+    for(let slot=0;slot<42;slot++){
+      const number=slot-start+1;
+      if(number<1||number>days){grid.append(el('span','daily-date-hub-day is-empty'));continue}
+      const value=month+'-'+String(number).padStart(2,'0');
+      const button=el('button','daily-date-hub-day');
+      button.type='button';
+      button.append(el('strong','daily-date-hub-day-number',number));
+      if(value===day)button.classList.add('is-selected');
+      if(value===today)button.classList.add('is-today');
+      if(value>today){button.disabled=true;button.classList.add('is-future')}
+      else button.addEventListener('click',()=>setDailyUrl(value));
+      grid.append(button);
+    }
+    next.disabled=month>=monthKey(today);
+  }
+  trigger.addEventListener('click',()=>{month=monthKey(day);render();dialog.showModal()});
+  prev.addEventListener('click',()=>{month=shiftMonth(month,-1);render()});
+  next.addEventListener('click',()=>{if(month<monthKey(today)){month=shiftMonth(month,1);render()}});
+  todayButton.addEventListener('click',()=>setDailyUrl(today));
+  close.addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
+}
 async function initDaily(){
   const root=document.getElementById('daily-digest-page');
   if(!root)return;
   const content=document.getElementById('daily-digest-content');
   const status=document.getElementById('daily-digest-status');
   const title=document.getElementById('daily-digest-date-label');
-  const input=document.getElementById('dailyDigestDate');
-  const prev=document.getElementById('dailyDigestPrev');
-  const next=document.getElementById('dailyDigestNext');
-  const todayButton=document.getElementById('dailyDigestToday');
   const day=selectedDay(),today=taipeiDay();
   if(title)title.textContent=displayDay(day)+' 日報';
-  if(input){input.value=day;input.max=today;input.addEventListener('change',()=>{if(DATE_RE.test(input.value))setDailyUrl(input.value)})}
-  if(prev)prev.addEventListener('click',()=>setDailyUrl(shiftDay(day,-1)));
-  if(next){next.disabled=day>=today;next.addEventListener('click',()=>{if(day<today)setDailyUrl(shiftDay(day,1))})}
-  if(todayButton)todayButton.addEventListener('click',()=>setDailyUrl(today));
+  initDailyDateHub(day,today);
 
   setStatus(status,'正在載入今日精選…','loading');
   content.replaceChildren();
