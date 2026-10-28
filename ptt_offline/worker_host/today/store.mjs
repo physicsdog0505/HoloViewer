@@ -18,6 +18,7 @@ export function verifiedChannelAvatar(value){
  }catch{return null}
 }
 function validTime(x) {return typeof x==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(x) && !Number.isNaN(Date.parse(x));}
+function positiveInt(x){return Number.isSafeInteger(x)&&x>0?x:null;}
 function taipeiDay(value){
  const d=new Date(value);
  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
@@ -29,6 +30,7 @@ export function validateEvidence(r) {
       !validTime(r.observed_at) || typeof r.title!=='string' ||
       typeof r.source_label!=='string' || !r.source_label) throw Error('invalid Today evidence');
   for (const k of ['scheduled_start','actual_start','actual_end']) if (r[k]!=null && !validTime(r[k])) throw Error('invalid evidence time');
+  if (r.concurrent_viewers!=null && positiveInt(r.concurrent_viewers)==null) throw Error('invalid concurrent viewers');
   if (r.actual_start && r.actual_start>r.observed_at || r.actual_end && r.actual_end>r.observed_at) throw Error('future actual evidence');
   if (r.actual_start && r.actual_end && r.actual_end<r.actual_start) throw Error('invalid lifecycle ordering');
   if (r.lifecycle_state==='ended' && !r.actual_end) throw Error('end requires positive evidence');
@@ -75,18 +77,20 @@ export async function writeEvidence(db, evidence, options={}) {
   if (canSelect) {
     const sql=`INSERT INTO public_today_canonical
       (video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,
-       lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,concurrent_viewers,source_label,source_checksum)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(video_id) DO UPDATE SET
       roster_version=excluded.roster_version,channel_group=excluded.channel_group,title=excluded.title,channel_name=excluded.channel_name,
       lifecycle_state=excluded.lifecycle_state,lifecycle_observed_at=excluded.lifecycle_observed_at,
       checked_at=excluded.checked_at,scheduled_start=excluded.scheduled_start,actual_start=excluded.actual_start,
-      actual_end=excluded.actual_end,source_label=excluded.source_label,source_checksum=excluded.source_checksum
+      actual_end=excluded.actual_end,concurrent_viewers=excluded.concurrent_viewers,
+      source_label=excluded.source_label,source_checksum=excluded.source_checksum
       WHERE excluded.lifecycle_observed_at>public_today_canonical.lifecycle_observed_at
         AND (public_today_canonical.lifecycle_state!='ended' OR excluded.lifecycle_state='ended')
         AND public_today_canonical.publisher_channel_id=excluded.publisher_channel_id`;
     mutations.push(db.prepare(sql).bind(r.video_id,r.channel_id,r.roster_version,r.group,r.title,r.channel_name??'',
-      r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,r.source_label,hash));
+      r.lifecycle_state,r.observed_at,r.observed_at,r.scheduled_start??null,r.actual_start??null,r.actual_end??null,
+      positiveInt(r.concurrent_viewers),r.source_label,hash));
     if(projectHistory&&r.lifecycle_state==='ended'&&r.source_label===YOUTUBE_LIVE_SOURCE&&r.actual_start&&r.actual_end){
       const catalogAvatar=hasPreloadedCatalogAvatar
         ? {avatar_url:options.preloadedCatalogAvatar}
@@ -175,6 +179,7 @@ function consumerRow(row,nowStamp,supportColors){
  const lifecycle_state=state==='upcoming'?
   (consumerTime(row.scheduled_start)&&row.scheduled_start<=nowStamp?'waiting':'upcoming'):state;
  const stale=state==='live'&&!fresh;
+ const concurrent_viewers=state==='live'&&fresh?positiveInt(row.concurrent_viewers):null;
  return {video_id,title:consumerText(row.title),channel_id,channel_name:consumerText(row.channel_name),
   group:groups.has(row.channel_group)?row.channel_group:'other',lifecycle_state,observed_at:observed,
   start_at:actual_start??consumerTime(row.scheduled_start),
@@ -183,7 +188,7 @@ function consumerRow(row,nowStamp,supportColors){
   avatar_url:verifiedChannelAvatar(row.trusted_channel_avatar),
   member_accent:color.member_accent,member_accent_dual:color.member_accent_dual,
   support_mode:color.support_mode,support_color_source:color.support_color_source,
-  source_label,stale};
+  source_label,stale,concurrent_viewers};
 }
 export async function readToday(db,{day,limit=200,offset=0,now=new Date(),profileTableEnabled=false,supportColors=null}={}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day||'') || new Date(day+'T00:00:00Z').toISOString().slice(0,10)!==day)
