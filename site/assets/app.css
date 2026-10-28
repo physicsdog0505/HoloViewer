@@ -239,7 +239,7 @@ body.home-wide .section-head{margin-bottom:9px}
 .channel-avatar-img{display:block;object-fit:cover;background:var(--surface-2)}
 .channel-avatar-fallback{display:grid;place-items:center;background:color-mix(in srgb,var(--member-accent,#6faec9) 12%,white);color:var(--member-accent,#4f7f93);font-size:12px;font-weight:800}
 .yt-copy{min-width:0}.stream-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:42px;max-height:42px;margin:0 0 5px!important;font-size:15px!important;line-height:1.45!important}
-.channel-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:color-mix(in srgb,var(--member-accent,var(--muted)) 62%,#25232a);font-size:12.5px;font-weight:750}
+.channel-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:color-mix(in srgb,var(--member-accent,var(--muted)) 62%,#25232a);font-size:12.5px;font-weight:750}.live-viewers{margin-top:2px;color:var(--muted);font-size:11.5px;font-weight:650;line-height:1.35;font-variant-numeric:tabular-nums}
 @media(max-width:1040px){.client-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:26px 18px}}
 @media(max-width:620px){.client-grid{grid-template-columns:1fr;gap:24px}.yt-meta{grid-template-columns:40px minmax(0,1fr)}}
 .stream-filter{display:flex;align-items:center;gap:8px;margin:2px 0 6px}
