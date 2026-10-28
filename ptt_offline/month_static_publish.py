@@ -384,6 +384,9 @@ def build_month_package(spec: MonthSource, out_dir: Path) -> dict[str,Any]:
     (public/registration_key).parent.mkdir(parents=True,exist_ok=True)
     (public/registration_key).write_bytes(registration_raw)
     (public/"_headers").write_text(
+        "/ptt/v1/chunks/*\n  Content-Type: application/json\n"
+        "  Cache-Control: public, max-age=0, must-revalidate\n"
+        "  Access-Control-Allow-Origin: *\n  X-Content-Type-Options: nosniff\n\n"
         "/ptt/v1/months/*\n  Content-Type: application/json\n"
         "  Cache-Control: public, max-age=0, must-revalidate\n"
         "  Access-Control-Allow-Origin: *\n  X-Content-Type-Options: nosniff\n\n"
@@ -391,6 +394,9 @@ def build_month_package(spec: MonthSource, out_dir: Path) -> dict[str,Any]:
         "  Cache-Control: no-cache\n  Access-Control-Allow-Origin: *\n"
         "  X-Content-Type-Options: nosniff\n\n"
         "/ptt/v1/registrations/*\n  Content-Type: application/json; charset=utf-8\n"
+        "  Cache-Control: no-cache\n  Access-Control-Allow-Origin: *\n"
+        "  X-Content-Type-Options: nosniff\n\n"
+        "/ptt/v1/provenance/*\n  Content-Type: application/json; charset=utf-8\n"
         "  Cache-Control: no-cache\n  Access-Control-Allow-Origin: *\n"
         "  X-Content-Type-Options: nosniff\n",encoding="utf-8")
     _write_json(out_dir/"wrangler.jsonc",{
@@ -619,6 +625,19 @@ def run_owner_local(*, spec: MonthSource, package_dir: Path, target_root: Path,
     finally:
         server.shutdown(); thread.join(); server.server_close()
     manifest=json.loads((package_dir/"public"/build["manifest_key"]).read_text())
+    source_audit=json.loads(spec.audit_path.read_text(encoding="utf-8"))
+    accepted_set=source_audit.get("accepted_set")
+    expected_aid={"status":"VERIFIED_COMPLETE","contract_gaps":[]}
+    if isinstance(accepted_set,dict):
+        expected_aid.update({
+            "authority":"per-aid-accepted-set-v1",
+            "accepted_set_sha256":accepted_set.get("sha256"),
+            "article_count":accepted_set.get("article_count"),
+            "high_risk_raw":accepted_set.get("high_risk_raw"),
+            "low_risk_web":accepted_set.get("low_risk_web"),
+        })
+    else:
+        expected_aid["authority"]="exact-sha-consolidated-month-audit"
     scope={"from_day":manifest["from_day_taipei"],
            "through_day":manifest["through_day_taipei"],
            "object_count":manifest["total_objects"],
@@ -635,8 +654,7 @@ def run_owner_local(*, spec: MonthSource, package_dir: Path, target_root: Path,
         uploaded_count=delivery["uploaded_count"],
         independently_verified_count=readback["objects_verified"],
         readback_receipt=readback,coverage_days=manifest["days"],job_status="succeeded",
-        expected_aid_completeness={"status":"VERIFIED_COMPLETE",
-            "authority":"exact-sha-consolidated-month-audit","contract_gaps":[]})
+        expected_aid_completeness=expected_aid)
     _write_json(package_dir/"delivery-receipt.json",delivery)
     _write_json(package_dir/"readback-receipt.json",readback)
     _write_json(package_dir/"archive-job-evidence.json",evidence)

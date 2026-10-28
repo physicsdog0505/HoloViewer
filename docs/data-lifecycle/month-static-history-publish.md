@@ -25,6 +25,38 @@ The stages remain separate:
 A failed or missing delivery never changes source COMPLETE. A successful
 delivery never implies source completeness without the accepted source audit.
 
+## Per-AID accepted-set build
+
+`accepted_month_build.py` is the required pre-stage when one historical month
+must be assembled from more than one durable source.  Its input is an explicit,
+reviewed accepted-set JSON.  It SHA-pins every source file and binds exactly one
+accepted source to every AID; merely finding an article in a database is never
+enough to ingest it.
+
+For the 2026/07 production candidate, the accepted set is
+`ptt_offline/fixtures/history/2026-07-accepted-set.json` and enforces:
+
+- 62 unique accepted AIDs, with no missing or extra output AID;
+- 42 AIDs at or above 1,400 pushes, all from final-complete Collector Raw;
+- Raw source lines exactly `1..last_source_line`, every screen page present,
+  continuous screen coverage through the final line, and push/source identity;
+- 20 AIDs below 1,400 pushes from the verified Web mirror, with
+  declared = parsed = stored and floors exactly `1..declared`;
+- the rejected legacy July artifact SHA is evidence only and is not an input.
+
+The fresh consolidated SQLite retains Raw source lines/screens and Web body
+evidence, then emits an exact audit accepted by the existing Static Assets
+packager.  A typical owner-local build is:
+
+```text
+python3 -B -m ptt_offline.accepted_month_build \
+  --accepted-set ptt_offline/fixtures/history/2026-07-accepted-set.json \
+  --source-root /owner/history/source-batches/2025-2026 \
+  --web-sqlite /owner/web-pilot/web_week_pilot_2026.sqlite3 \
+  --out-sqlite /private/tmp/issue160-202607-authoritative.sqlite3 \
+  --out-audit /private/tmp/issue160-202607-authoritative.audit.json
+```
+
 ## Identity and immutable layout
 
 Registration key:
@@ -81,6 +113,52 @@ delivery, readback and archive-job receipts. It contains no Cloudflare client,
 credential lookup or Production target implementation.
 
 ## Production gate and rollback boundary
+
+The shared Full Offline worker already serves the reviewed 2026-08 and 2026-10
+packages. A Cloudflare Static Assets deploy replaces the asset set, so a July-
+only directory is not a valid production input. `month_static_release.py`
+creates a fail-closed union instead. The checked-in July release specification
+pins the exact production 08/10 manifest bytes and the exact July source,
+manifest, article-set and registration identities. It verifies every baseline
+object before copying and rejects any same-key/different-byte collision.
+The staging receipt also records total deployable bytes and the largest asset,
+so the owner can review capacity before authorizing the Static Assets deploy.
+
+Owner-local staging (no network mutation):
+
+```text
+python3 -B -m ptt_offline.month_static_release stage \
+  --spec ptt_offline/fixtures/history/2026-07-production-release.json \
+  --month-package /private/tmp/issue160-202607-package-readback-v3 \
+  --baseline-public /owner/reviewed-2026-08-package/public \
+  --baseline-public /owner/reviewed-2026-10-package/public \
+  --out /private/tmp/issue160-202607-production-release
+```
+
+After reviewing `release-receipt.json`, the owner-only production command is
+the `owner_command` recorded in that receipt. It explicitly records the local,
+non-CI execution boundary. For the path above it is:
+
+```text
+OWNER_LOCAL=YES GITHUB_ACTIONS=NO CI_DEPLOY=NO npx wrangler deploy \
+  --config /private/tmp/issue160-202607-production-release/wrangler.jsonc
+```
+
+The implementation never runs this command. After an owner deploys, the real
+HTTP gate is:
+
+```text
+python3 -B -m ptt_offline.month_static_release verify-http \
+  --spec ptt_offline/fixtures/history/2026-07-production-release.json \
+  --observed-at OWNER_SUPPLIED_UTC_TIMESTAMP \
+  --receipt /private/tmp/issue160-202607-production-readback.json
+```
+
+That gate rereads and hashes all 665 July objects, all preserved 08/10 objects,
+the July registration/manifest/provenance identity, early/mid/late July
+samples, CORS and content types, plus a negative 404. Only a PASS receipt may
+be used to claim Production Published. The 2026-09 Pilot target is separate
+and is neither staged nor mutated by this release.
 
 Production remains blocked until #45 reviews and explicitly approves the exact
 registration identities, Static Assets capacity/deploy process, public reader

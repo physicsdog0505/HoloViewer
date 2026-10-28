@@ -1,0 +1,30 @@
+{
+  "schema_version": "holoviewer-ptt-static-assets-release-v1",
+  "compatibility_date": "2026-10-18",
+  "target": {
+    "worker_name": "holoviewer-ptt-static-assets-full-offline",
+    "base_url": "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev"
+  },
+  "baselines": [
+    {
+      "manifest_key": "ptt/v1/manifests/static-assets-full-2026-08.json",
+      "sha256": "73f7cf73ad8798e8e1590e87f727d020efbd1b23a40092a624896fd3ea7a9ccd"
+    },
+    {
+      "manifest_key": "ptt/v1/manifests/static-assets-full-2026-10.json",
+      "sha256": "4bc9dc9d91b36ab38046267663b40a1e1ecb1eb9447bcd15aa8ecf413ba93470"
+    }
+  ],
+  "candidate": {
+    "month": "2026-07",
+    "source_sqlite_sha256": "852a6f0e330f0531b218fd23fe1675f33b70dc29a21beab637b1b9409827d466",
+    "source_audit_sha256": "e0382eb2d763461806d1e11650a4cee33a7f0710f60f268ec987e16dffdb7caf",
+    "manifest_key": "ptt/v1/manifests/static-assets-full-2026-07.json",
+    "manifest_digest": "d65e07295bc01c1cb61f295725e19d85a88a7693a361782c68daac95892e9346",
+    "registration_identity": "a98207022e262b2cdc353bd12fc37d5d3315b247becb0b19c886741f582932b8",
+    "article_set_sha256": "401a468e3933035c7eb1933e95d75b5ca88372f6026d1392f9d2c08d5ece5818",
+    "articles": 62,
+    "pushes": 135671,
+    "objects": 665
+  }
+}

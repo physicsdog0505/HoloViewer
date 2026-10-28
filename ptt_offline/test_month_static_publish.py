@@ -17,6 +17,7 @@ from ptt_offline.month_static_publish import (
     readback_http,
     run_owner_local,
 )
+from ptt_offline.month_static_release import RELEASE_SCHEMA, stage_release
 
 
 class _Handler(SimpleHTTPRequestHandler):
@@ -106,6 +107,33 @@ class MonthStaticPublishTests(unittest.TestCase):
         thread.start()
         return server,thread
 
+    def baseline(self,root: Path, *, key="ptt/v1/chunks/2026/05/01/0000.json",
+                 body=b'{"old":true}') -> tuple[Path,dict]:
+        public=root/"public"
+        path=public/key
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_bytes(body)
+        manifest={"schema_version":"ptt-r2-archive-v1","total_objects":1,
+                  "total_pushes":1,"objects":[{"key":key,
+                  "sha256":self.digest(path),"bytes_json":len(body)}]}
+        manifest_key="ptt/v1/manifests/static-assets-full-2026-05.json"
+        manifest_path=public/manifest_key
+        manifest_path.parent.mkdir(parents=True,exist_ok=True)
+        manifest_path.write_text(json.dumps(manifest,sort_keys=True),encoding="utf-8")
+        return public,{"manifest_key":manifest_key,"sha256":self.digest(manifest_path)}
+
+    def release_spec(self,root: Path,build: dict,baselines: list[dict]) -> Path:
+        candidate={key:build[key] for key in (
+            "month","source_sqlite_sha256","source_audit_sha256","manifest_key",
+            "manifest_digest","registration_identity","article_set_sha256","articles",
+            "pushes","objects")}
+        spec={"schema_version":RELEASE_SCHEMA,"target":{"worker_name":"history-test",
+              "base_url":"https://example.invalid"},"baselines":baselines,
+              "candidate":candidate}
+        path=root/"release-spec.json"
+        path.write_text(json.dumps(spec),encoding="utf-8")
+        return path
+
     def test_exact_sha_complete_source_builds_canonical_package(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td); spec=self.fixture(root); before=self.digest(spec.sqlite_path)
@@ -120,6 +148,11 @@ class MonthStaticPublishTests(unittest.TestCase):
             self.assertEqual(manifest["delivery_target"],"workers-static-assets")
             self.assertTrue(all(item["key"].startswith(
                 "ptt/v1/months/2026-06/chunks/") for item in manifest["objects"]))
+            headers=(root/"package/public/_headers").read_text()
+            for route in ("/ptt/v1/chunks/*","/ptt/v1/months/*",
+                          "/ptt/v1/manifests/*","/ptt/v1/registrations/*",
+                          "/ptt/v1/provenance/*"):
+                self.assertIn(route,headers)
 
     def test_sqlite_sha_mismatch_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
@@ -203,6 +236,50 @@ class MonthStaticPublishTests(unittest.TestCase):
             with self.assertRaisesRegex(MonthPublishError,"object SHA"):
                 publish_local_immutable(package_dir=package,target_root=target)
             self.assertFalse(target.exists())
+
+    def test_release_stage_preserves_baseline_and_adds_candidate(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); spec=self.fixture(root); package=root/"package"
+            build=build_month_package(spec,package)
+            baseline,expected=self.baseline(root/"baseline")
+            release=root/"release"
+            result=stage_release(spec_path=self.release_spec(root,build,[expected]),
+                                 month_package=package,baseline_public=[baseline],
+                                 out_dir=release)
+            self.assertEqual(result["status"],"PASS")
+            self.assertFalse(result["production_execution"])
+            self.assertGreater(result["deployable_bytes"],0)
+            self.assertGreater(result["largest_asset_bytes"],0)
+            self.assertEqual(self.digest(release/"public"/expected["manifest_key"]),
+                             expected["sha256"])
+            self.assertTrue((release/"public"/build["manifest_key"]).is_file())
+            self.assertEqual(json.loads((release/"wrangler.jsonc").read_text())["name"],
+                             "history-test")
+            self.assertIn("OWNER_LOCAL=YES GITHUB_ACTIONS=NO CI_DEPLOY=NO",
+                          result["owner_command"])
+
+    def test_release_stage_rejects_tampered_baseline_and_key_collision(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); spec=self.fixture(root); package=root/"package"
+            build=build_month_package(spec,package)
+            baseline,expected=self.baseline(root/"baseline")
+            (baseline/"ptt/v1/chunks/2026/05/01/0000.json").write_bytes(b"tampered")
+            with self.assertRaisesRegex(MonthPublishError,"baseline object SHA"):
+                stage_release(spec_path=self.release_spec(root,build,[expected]),
+                              month_package=package,baseline_public=[baseline],
+                              out_dir=root/"release-tampered")
+
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); spec=self.fixture(root); package=root/"package"
+            build=build_month_package(spec,package)
+            manifest=json.loads((package/"public"/build["manifest_key"]).read_text())
+            candidate_key=manifest["objects"][0]["key"]
+            baseline,expected=self.baseline(root/"baseline",key=candidate_key,
+                                            body=b'{"different":true}')
+            with self.assertRaisesRegex(MonthPublishError,"release key collision"):
+                stage_release(spec_path=self.release_spec(root,build,[expected]),
+                              month_package=package,baseline_public=[baseline],
+                              out_dir=root/"release-collision")
 
     def test_delivery_failure_keeps_source_complete(self):
         with tempfile.TemporaryDirectory() as td:
