@@ -78,7 +78,10 @@ function pttRow(row){
  if(floorValue===null)floorEl.setAttribute('aria-hidden','true');
  const body=node('div',undefined,'ptt-push-body');
  body.append(node('span',String(row.author||'unknown')+':','ptt-push-author'));
- body.append(node('span',String(row.content||''),'ptt-push-content'));
+ const content=node('span',undefined,'ptt-push-content');
+ if(window.HOLOVIEWER_PTT_LINKS?.appendLinkedContent)window.HOLOVIEWER_PTT_LINKS.appendLinkedContent(content,row.content);
+ else content.textContent=String(row.content||'');
+ body.append(content);
  push.append(kindEl,timeEl,floorEl,body);
  if(row.source_url){
   push.title='點兩下開啟 PTT 原文';
