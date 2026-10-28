@@ -598,6 +598,32 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("if(destination==='ptt')", app)
         self.assertIn("allow", app)
 
+    def test_ptt_linkify_and_image_preview_contract(self):
+        helper = (ROOT / "site/assets/ptt-links.js").read_text(encoding="utf-8")
+        styles = (ROOT / "site/assets/ptt-links.css").read_text(encoding="utf-8")
+        today_js = (ROOT / "site/assets/ptt-today.js").read_text(encoding="utf-8")
+        viewer_js = (ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        watchalong_js = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
+        for page in ("site/ptt-today/index.html", "site/viewer/index.html", "site/watchalong-viewer/index.html"):
+            html = (ROOT / page).read_text(encoding="utf-8")
+            self.assertIn('/assets/ptt-links.css', html)
+            self.assertIn('/assets/ptt-links.js', html)
+        self.assertIn("target='_blank'", helper)
+        self.assertIn("link.rel='noopener noreferrer'", helper)
+        self.assertIn("link.referrerPolicy='no-referrer'", helper)
+        self.assertIn("previewImage.referrerPolicy='no-referrer'", helper)
+        self.assertIn("window.setTimeout(()=>", helper)
+        self.assertIn("},250);", helper)
+        self.assertIn("matchMedia('(hover:hover) and (pointer:fine)')", helper)
+        self.assertIn("IMAGE_EXT", helper)
+        self.assertIn("NON_IMAGE_HOSTS", helper)
+        self.assertNotIn("innerHTML", helper)
+        self.assertIn(".ptt-link-preview", styles)
+        self.assertIn("max-width:min(380px", styles)
+        self.assertIn("max-height:min(300px", styles)
+        for js in (today_js, viewer_js, watchalong_js):
+            self.assertIn("HOLOVIEWER_PTT_LINKS?.appendLinkedContent", js)
+
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
