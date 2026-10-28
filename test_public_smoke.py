@@ -190,6 +190,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("function archiveSourcesForWindow(startMs,endMs)", js)
         self.assertIn("function archiveObjectPlan(archives,startMs,endMs)", js)
         self.assertIn("function archiveObjectRange(item)", js)
+        self.assertIn("chunks\\/(\\d{4})\\/(\\d{2})\\/(\\d{2})\\/(\\d{2})00\\.json", js)
+        self.assertIn("Date.UTC(Number(year),Number(month)-1,Number(day),Number(hour),0,0)", js)
         self.assertIn("crypto.subtle.digest('SHA-256',buffer)", js)
         self.assertIn("const fetchStartMs=vodPttFetchStartMs(context)??startMs", js)
         self.assertIn("occurred>=rangeStart&&occurred<rangeEnd", js)
