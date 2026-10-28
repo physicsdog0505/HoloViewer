@@ -1,10 +1,10 @@
 (()=>{
 'use strict';
 
-const SCHEMA='holodocchi.daily_digest.v1';
+const SCHEMA_VERSION=1;
+const KIND='holodocchi.daily_digest';
 const TAIPEI='Asia/Taipei';
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
-const ROLES=new Set(['hero','featured','standard','compact']);
 
 function el(tag,className,text){
   const node=document.createElement(tag);
@@ -13,242 +13,206 @@ function el(tag,className,text){
   return node;
 }
 function text(value){return value===undefined||value===null?'':String(value).trim()}
-function positiveInt(value){
-  const n=Number(value);
-  return Number.isInteger(n)&&n>0?n:null;
-}
 function taipeiDay(now=new Date()){
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:TAIPEI,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);
   const map=Object.fromEntries(parts.map(part=>[part.type,part.value]));
   return map.year+'-'+map.month+'-'+map.day;
 }
-function shiftDay(day,delta){
-  if(!DATE_RE.test(day))return '';
-  const [y,m,d]=day.split('-').map(Number);
-  const date=new Date(Date.UTC(y,m-1,d+delta));
-  return date.toISOString().slice(0,10);
-}
-function displayDay(day){return DATE_RE.test(day)?day.replaceAll('-','/') : day}
-function displayTime(value){
-  const raw=text(value);
-  if(!raw)return '';
-  const date=new Date(raw);
-  if(Number.isNaN(date.getTime()))return '';
-  return new Intl.DateTimeFormat('zh-TW',{timeZone:TAIPEI,hour:'2-digit',minute:'2-digit',hour12:false}).format(date);
-}
-function config(){
-  const cfg=window.HOLOVIEWER_CONFIG?.dailyDigest;
-  return cfg&&typeof cfg==='object'?cfg:{};
-}
+function displayDay(day){return DATE_RE.test(day)?day.replaceAll('-','/'):day}
+function config(){const cfg=window.HOLOVIEWER_CONFIG?.dailyDigest;return cfg&&typeof cfg==='object'?cfg:{}}
 function artifactUrl(day){
   const cfg=config();
   const base=text(cfg.base).replace(/\/$/,'');
   const template=text(cfg.pathTemplate);
-  if(!base||!template||!DATE_RE.test(day))return '';
+  if(!template||!DATE_RE.test(day))return '';
   const path=template.replaceAll('{date}',encodeURIComponent(day));
   if(!path.startsWith('/'))return '';
-  return base+path;
+  return base?base+path:path;
+}
+function verificationLabel(status){
+  return {
+    verified_content:'已驗證',
+    metadata_only:'僅基本資料',
+    unverified:'未驗證',
+    missing:'缺少資料'
+  }[text(status)]||'';
+}
+function streamMap(artifact){
+  return new Map((Array.isArray(artifact?.streams)?artifact.streams:[]).map(row=>[String(row?.video_id||''),row]));
+}
+function youtubeUrl(videoId){return /^[A-Za-z0-9_-]{11}$/.test(String(videoId||''))?'https://www.youtube.com/watch?v='+videoId:''}
+function thumbnailUrl(videoId){return /^[A-Za-z0-9_-]{11}$/.test(String(videoId||''))?'https://i.ytimg.com/vi/'+videoId+'/mqdefault.jpg':''}
+function streamReference(videoId,byId){
+  const row=byId.get(videoId);
+  const card=el('a','daily-stream-ref');
+  const href=text(row?.youtube_url)||youtubeUrl(videoId);
+  if(href){card.href=href;card.target='_blank';card.rel='noopener noreferrer'}
+  const thumb=thumbnailUrl(videoId);
+  if(thumb){
+    const img=el('img');img.src=thumb;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';card.append(img);
+  }
+  const copy=el('span','daily-stream-ref-copy');
+  copy.append(el('strong','',text(row?.channel_name)||videoId));
+  copy.append(el('span','',text(row?.title)||videoId));
+  const status=text(row?.verification_status);
+  if(status)copy.append(el('em','daily-verify daily-verify-'+status,verificationLabel(status)));
+  card.append(copy);
+  return card;
+}
+function appendReferences(parent,ids,byId){
+  const valid=(Array.isArray(ids)?ids:[]).map(String).filter(id=>byId.has(id));
+  if(!valid.length)return;
+  const refs=el('div','daily-stream-refs');
+  valid.forEach(id=>refs.append(streamReference(id,byId)));
+  parent.append(refs);
+}
+function section(title,className=''){
+  const wrap=el('section','daily-v1-section'+(className?' '+className:''));
+  wrap.append(el('h2','daily-v1-section-title',title));
+  return wrap;
+}
+function renderCoverage(target,artifact){
+  const c=artifact?.coverage;
+  if(!c||typeof c!=='object')return;
+  const bar=el('div','daily-coverage');
+  bar.append(el('span','',String(c.total_streams||0)+' 場直播'));
+  bar.append(el('span','daily-verify daily-verify-verified_content',String(c.verified_content||0)+' 已驗證'));
+  if(Number(c.metadata_only)>0)bar.append(el('span','daily-verify daily-verify-metadata_only',String(c.metadata_only)+' 僅基本資料'));
+  if(Number(c.unverified)>0)bar.append(el('span','daily-verify daily-verify-unverified',String(c.unverified)+' 未驗證'));
+  if(Number(c.missing)>0)bar.append(el('span','daily-verify daily-verify-missing',String(c.missing)+' 缺少'));
+  target.append(bar);
+}
+function renderOverview(target,artifact){
+  const overview=artifact?.overview||{};
+  const wrap=section('今日總覽','daily-overview');
+  if(text(overview.summary))wrap.append(el('p','daily-overview-summary',overview.summary));
+  const highlights=Array.isArray(overview.highlights)?overview.highlights.filter(Boolean):[];
+  if(highlights.length){
+    const list=el('ol','daily-highlight-list');
+    highlights.forEach(item=>list.append(el('li','',item)));
+    wrap.append(list);
+  }
+  target.append(wrap);
+}
+function renderStories(target,artifact,byId){
+  const stories=Array.isArray(artifact?.stories)?artifact.stories:[];
+  if(!stories.length)return;
+  const wrap=section('今日主題','daily-stories'),list=el('div','daily-story-list');
+  stories.forEach(story=>{
+    const card=el('article','daily-story-card'),meta=el('div','daily-story-meta');
+    meta.append(el('span','daily-story-rank','#'+String(story.rank||'')));
+    const role=text(story?.editorial_signals?.recommended_role);
+    if(role)meta.append(el('span','daily-story-role',role==='lead_candidate'?'主題候選':role==='secondary_candidate'?'次要主題':'一般'));
+    card.append(meta);
+    if(text(story.title))card.append(el('h3','daily-story-title',story.title));
+    if(text(story.summary))card.append(el('p','daily-story-summary',story.summary));
+    const subs=Array.isArray(story.sub_events)?story.sub_events:[];
+    if(subs.length){
+      const subWrap=el('div','daily-sub-events');
+      subs.forEach(sub=>{
+        const item=el('article','daily-sub-event');
+        if(text(sub.title))item.append(el('h4','',sub.title));
+        if(text(sub.summary))item.append(el('p','',sub.summary));
+        appendReferences(item,sub.video_ids,byId);
+        subWrap.append(item);
+      });
+      card.append(subWrap);
+    }
+    appendReferences(card,story.video_ids,byId);
+    list.append(card);
+  });
+  wrap.append(list);target.append(wrap);
+}
+function renderAnnouncements(target,artifact,byId){
+  const rows=Array.isArray(artifact?.announcements)?artifact.announcements:[];
+  if(!rows.length)return;
+  const wrap=section('公告與預告','daily-announcements'),grid=el('div','daily-announcement-grid');
+  rows.forEach(row=>{
+    const card=el('article','daily-announcement-card'),meta=el('div','daily-announcement-meta');
+    if(text(row.type))meta.append(el('span','',row.type));
+    if(text(row.event_date_text))meta.append(el('span','',row.event_date_text));
+    if(meta.childElementCount)card.append(meta);
+    if(text(row.title))card.append(el('h3','',row.title));
+    if(text(row.summary))card.append(el('p','',row.summary));
+    appendReferences(card,row.video_ids,byId);
+    grid.append(card);
+  });
+  wrap.append(grid);target.append(wrap);
+}
+function renderCategories(target,artifact,byId){
+  const rows=Array.isArray(artifact?.categories)?artifact.categories:[];
+  if(!rows.length)return;
+  const wrap=section('分類','daily-categories');
+  rows.forEach(row=>{
+    const group=el('details','daily-category');
+    group.append(el('summary','',text(row.label)||text(row.key)||'分類'));
+    appendReferences(group,row.video_ids,byId);
+    wrap.append(group);
+  });
+  target.append(wrap);
+}
+function renderUnverified(target,artifact,byId){
+  const rows=Array.isArray(artifact?.unverified)?artifact.unverified:[];
+  if(!rows.length)return;
+  const wrap=section('未驗證項目','daily-unverified');
+  wrap.append(el('p','daily-unverified-note','以下內容未取得足以核實直播內容的資料，不視為已驗證資訊。'));
+  rows.forEach(row=>{
+    const item=el('article','daily-unverified-item'),stream=byId.get(String(row.video_id||''));
+    item.append(el('span','daily-verify daily-verify-unverified','未驗證'));
+    item.append(el('strong','',text(stream?.channel_name)||String(row.video_id||'')));
+    if(text(stream?.title))item.append(el('span','',stream.title));
+    if(text(row.reason))item.append(el('p','',row.reason));
+    appendReferences(item,[row.video_id],byId);
+    wrap.append(item);
+  });
+  target.append(wrap);
+}
+function renderArtifact(target,artifact){
+  target.replaceChildren();
+  const byId=streamMap(artifact);
+  renderCoverage(target,artifact);
+  renderOverview(target,artifact);
+  renderStories(target,artifact,byId);
+  renderAnnouncements(target,artifact,byId);
+  renderCategories(target,artifact,byId);
+  renderUnverified(target,artifact,byId);
+  return target.childElementCount>0;
 }
 async function fetchArtifact(day){
   const url=artifactUrl(day);
   if(!url)return {state:'MISSING',artifact:null,reason:'unconfigured'};
   let response;
-  try{
-    response=await fetch(url,{credentials:'omit',cache:day===taipeiDay()?'no-cache':'force-cache'});
-  }catch(_error){
-    return {state:'ERROR',artifact:null,reason:'network'};
-  }
+  try{response=await fetch(url,{credentials:'omit',cache:day===taipeiDay()?'no-cache':'force-cache'})}
+  catch{return {state:'ERROR',artifact:null,reason:'network'}}
   if(response.status===404)return {state:'MISSING',artifact:null,reason:'not_found'};
   if(!response.ok)return {state:'ERROR',artifact:null,reason:'http_'+response.status};
   let artifact;
-  try{artifact=await response.json()}catch(_error){return {state:'ERROR',artifact:null,reason:'invalid_json'}}
-  if(!artifact||artifact.schema_version!==SCHEMA)return {state:'ERROR',artifact:null,reason:'schema'};
-  const artifactDay=text(artifact.day||artifact.date);
-  if(artifactDay!==day)return {state:'ERROR',artifact:null,reason:'day_mismatch'};
-  const state=text(artifact.status).toUpperCase();
-  if(state==='MISSING')return {state:'MISSING',artifact,reason:'artifact_missing'};
-  if(state!=='READY'&&state!=='PARTIAL')return {state:'ERROR',artifact:null,reason:'status'};
-  return {state,artifact,reason:''};
+  try{artifact=await response.json()}catch{return {state:'ERROR',artifact:null,reason:'invalid_json'}}
+  if(!artifact||artifact.schema_version!==SCHEMA_VERSION||artifact.kind!==KIND)return {state:'ERROR',artifact:null,reason:'schema'};
+  if(text(artifact.target_day)!==day||artifact.timezone!==TAIPEI)return {state:'ERROR',artifact:null,reason:'day_mismatch'};
+  return {state:artifact?.coverage?.complete===true?'READY':'PARTIAL',artifact,reason:''};
 }
-function itemRole(item){
-  const role=text(item?.display_role||item?.layout_role||item?.layout).toLowerCase();
-  return ROLES.has(role)?role:'standard';
-}
-function itemLink(item){
-  const candidates=[item?.internal_url,item?.viewer_url,item?.youtube_url,item?.url];
-  for(const candidate of candidates){
-    const value=text(candidate);
-    if(value.startsWith('/')||value.startsWith('https://www.youtube.com/')||value.startsWith('https://youtu.be/'))return value;
-  }
-  return '';
-}
-function itemTitle(item){return text(item?.title)||'未命名直播'}
-function itemChannel(item){return text(item?.channel_name||item?.channel||item?.talent||item?.member)}
-function itemSummary(item){return text(item?.summary)}
-function itemReason(item){return text(item?.recommendation_reason||item?.recommendation||item?.highlight_reason)}
-function itemState(item){return text(item?.lifecycle_state||item?.state).toLowerCase()}
-function itemStart(item){return text(item?.actual_start||item?.actual_start_at||item?.scheduled_start||item?.scheduled_start_at)}
-function itemThumbnail(item){return text(item?.thumbnail_url||item?.thumbnail)}
-function itemTags(item){
-  const raw=Array.isArray(item?.tags)?item.tags:(item?.category?[item.category]:[]);
-  return raw.map(text).filter(Boolean);
-}
-function stateLabel(state){
-  return {live:'直播中',upcoming:'即將開始',waiting:'等待中',ended:'已結束'}[state]||'';
-}
-function createItem(item,{compact=false}={}){
-  const card=el('article','daily-digest-card daily-digest-'+itemRole(item));
-  const href=itemLink(item);
-  const thumb=itemThumbnail(item);
-  if(thumb){
-    const media=href?el('a','daily-digest-media'):el('div','daily-digest-media');
-    if(href){media.href=href;if(href.startsWith('http')){media.target='_blank';media.rel='noopener noreferrer'}}
-    const img=el('img');
-    img.src=thumb; img.alt=''; img.loading='lazy'; img.referrerPolicy='no-referrer';
-    img.addEventListener('error',()=>media.remove());
-    media.append(img); card.append(media);
-  }
-  const body=el('div','daily-digest-card-body');
-  const meta=el('div','daily-digest-meta');
-  const state=stateLabel(itemState(item));
-  const clock=displayTime(itemStart(item));
-  const channel=itemChannel(item);
-  [state,clock,channel].filter(Boolean).forEach(value=>meta.append(el('span','',value)));
-  if(meta.childElementCount)body.append(meta);
-
-  const title=itemTitle(item);
-  if(href){
-    const titleLink=el('a','daily-digest-title',title); titleLink.href=href;
-    if(href.startsWith('http')){titleLink.target='_blank';titleLink.rel='noopener noreferrer'}
-    body.append(titleLink);
-  }else body.append(el('h3','daily-digest-title',title));
-
-  const reason=itemReason(item);
-  if(reason)body.append(el('p','daily-digest-reason',reason));
-  if(!compact){
-    const summary=itemSummary(item);
-    if(summary)body.append(el('p','daily-digest-summary',summary));
-  }
-  const tags=itemTags(item);
-  if(tags.length){
-    const tagRow=el('div','daily-digest-tags');
-    tags.forEach(tag=>tagRow.append(el('span','',tag)));
-    body.append(tagRow);
-  }
-  const viewers=positiveInt(item?.concurrent_viewers);
-  if(viewers&&itemState(item)==='live')body.append(el('p','daily-digest-viewers','👁 '+new Intl.NumberFormat('zh-TW').format(viewers)+' 人正在觀看'));
-  card.append(body);
-  return card;
-}
-function normalizedSections(source){
-  if(!source||typeof source!=='object')return [];
-  if(Array.isArray(source.sections)){
-    return source.sections.map((section,index)=>({
-      title:text(section?.title||section?.label),
-      role:text(section?.layout||section?.display_role||section?.role),
-      items:Array.isArray(section?.items)?section.items:[],
-      index
-    }));
-  }
-  if(Array.isArray(source.items))return [{title:'',role:text(source.layout||source.display_role),items:source.items,index:0}];
-  return [];
-}
-function renderArtifact(target,artifact,{compact=false,home=false}={}){
-  target.replaceChildren();
-  const source=home?(artifact.home&&typeof artifact.home==='object'?artifact.home:null):artifact;
-  const sections=normalizedSections(source);
-  for(const section of sections){
-    const wrap=el('section','daily-digest-group');
-    if(section.role)wrap.dataset.layout=section.role;
-    if(section.title)wrap.append(el('h3','daily-digest-group-title',section.title));
-    const grid=el('div','daily-digest-grid');
-    section.items.forEach(item=>{if(item&&typeof item==='object')grid.append(createItem(item,{compact}))});
-    if(grid.childElementCount){wrap.append(grid);target.append(wrap)}
-  }
-  return target.childElementCount>0;
-}
-function setStatus(node,message,kind=''){
-  if(!node)return;
-  node.textContent=message;
-  node.dataset.state=kind;
-  node.hidden=!message;
-}
-async function initHome(){
-  if(location.pathname!=='/')return;
-  const section=document.getElementById('home-daily-digest');
-  const list=document.getElementById('home-daily-digest-content');
-  const status=document.getElementById('home-daily-digest-status');
-  const dayLabel=document.getElementById('home-daily-digest-day');
-  if(!section||!list)return;
-  const day=taipeiDay();
-  if(dayLabel)dayLabel.textContent=displayDay(day);
-  setStatus(status,'正在載入今日精選…','loading');
-  const result=await fetchArtifact(day);
-  if(result.state==='READY'||result.state==='PARTIAL'){
-    const rendered=renderArtifact(list,result.artifact,{compact:true,home:true});
-    section.hidden=false;
-    if(rendered)setStatus(status,result.state==='PARTIAL'?'今日精選部分內容尚未完整。':'',result.state);
-    else setStatus(status,'今日精選已產生，查看完整日報。',result.state);
-    return;
-  }
-  list.replaceChildren();
-  if(result.state==='ERROR'){
-    section.hidden=false;
-    setStatus(status,'今日精選暫時無法載入','ERROR');
-  }else{
-    section.hidden=true;
-    setStatus(status,'','MISSING');
-  }
-}
-function selectedDay(){
-  const query=new URLSearchParams(location.search).get('date')||'';
-  return DATE_RE.test(query)?query:taipeiDay();
-}
-function setDailyUrl(day){
-  const url=new URL(location.href);
-  if(day===taipeiDay())url.searchParams.delete('date');else url.searchParams.set('date',day);
-  location.href=url.pathname+url.search;
-}
+function setStatus(node,message,kind=''){if(!node)return;node.textContent=message;node.dataset.state=kind;node.hidden=!message}
+function selectedDay(){const query=new URLSearchParams(location.search).get('date')||'';return DATE_RE.test(query)?query:taipeiDay()}
+function setDailyUrl(day){const url=new URL(location.href);url.searchParams.set('date',day);location.href=url.pathname+url.search}
 function monthKey(day){return DATE_RE.test(day)?day.slice(0,7):taipeiDay().slice(0,7)}
-function shiftMonth(key,delta){
-  const [year,month]=key.split('-').map(Number);
-  const date=new Date(Date.UTC(year,month-1+delta,1,12));
-  return date.getUTCFullYear()+'-'+String(date.getUTCMonth()+1).padStart(2,'0');
-}
-function monthLabel(key){
-  const [year,month]=key.split('-').map(Number);
-  return new Intl.DateTimeFormat('zh-TW',{timeZone:'UTC',year:'numeric',month:'long'}).format(new Date(Date.UTC(year,month-1,1,12)));
-}
+function shiftMonth(key,delta){const [year,month]=key.split('-').map(Number);const date=new Date(Date.UTC(year,month-1+delta,1,12));return date.getUTCFullYear()+'-'+String(date.getUTCMonth()+1).padStart(2,'0')}
+function monthLabel(key){const [year,month]=key.split('-').map(Number);return new Intl.DateTimeFormat('zh-TW',{timeZone:'UTC',year:'numeric',month:'long'}).format(new Date(Date.UTC(year,month-1,1,12)))}
 function initDailyDateHub(day,today){
-  const dialog=document.getElementById('dailyDigestDateHub');
-  const trigger=document.getElementById('dailyDigestDateTrigger');
-  const grid=document.getElementById('dailyDigestDateGrid');
-  const label=document.getElementById('dailyDigestMonthLabel');
-  const prev=document.getElementById('dailyDigestMonthPrev');
-  const next=document.getElementById('dailyDigestMonthNext');
-  const todayButton=document.getElementById('dailyDigestDateToday');
-  const close=document.getElementById('dailyDigestDateClose');
+  const dialog=document.getElementById('dailyDigestDateHub'),trigger=document.getElementById('dailyDigestDateTrigger'),grid=document.getElementById('dailyDigestDateGrid'),label=document.getElementById('dailyDigestMonthLabel'),prev=document.getElementById('dailyDigestMonthPrev'),next=document.getElementById('dailyDigestMonthNext'),todayButton=document.getElementById('dailyDigestDateToday'),close=document.getElementById('dailyDigestDateClose');
   if(!dialog||!trigger||!grid||!label)return;
-  let month=monthKey(day);
-  trigger.textContent=displayDay(day);
+  let month=monthKey(day);trigger.textContent=displayDay(day);
   function render(){
-    label.textContent=monthLabel(month);
-    grid.replaceChildren();
-    const [year,monthNumber]=month.split('-').map(Number);
-    const first=new Date(Date.UTC(year,monthNumber-1,1,12));
-    const start=first.getUTCDay();
-    const days=new Date(Date.UTC(year,monthNumber,0,12)).getUTCDate();
+    label.textContent=monthLabel(month);grid.replaceChildren();
+    const [year,monthNumber]=month.split('-').map(Number),first=new Date(Date.UTC(year,monthNumber-1,1,12)),start=first.getUTCDay(),days=new Date(Date.UTC(year,monthNumber,0,12)).getUTCDate();
     for(let slot=0;slot<42;slot++){
       const number=slot-start+1;
       if(number<1||number>days){grid.append(el('span','daily-date-hub-day is-empty'));continue}
-      const value=month+'-'+String(number).padStart(2,'0');
-      const button=el('button','daily-date-hub-day');
-      button.type='button';
-      button.append(el('strong','daily-date-hub-day-number',number));
+      const value=month+'-'+String(number).padStart(2,'0'),button=el('button','daily-date-hub-day');
+      button.type='button';button.append(el('strong','daily-date-hub-day-number',number));
       if(value===day)button.classList.add('is-selected');
       if(value===today)button.classList.add('is-today');
-      if(value>today){button.disabled=true;button.classList.add('is-future')}
-      else button.addEventListener('click',()=>setDailyUrl(value));
+      if(value>today){button.disabled=true;button.classList.add('is-future')}else button.addEventListener('click',()=>setDailyUrl(value));
       grid.append(button);
     }
     next.disabled=month>=monthKey(today);
@@ -261,30 +225,20 @@ function initDailyDateHub(day,today){
   dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
 }
 async function initDaily(){
-  const root=document.getElementById('daily-digest-page');
-  if(!root)return;
-  const content=document.getElementById('daily-digest-content');
-  const status=document.getElementById('daily-digest-status');
-  const title=document.getElementById('daily-digest-date-label');
+  const root=document.getElementById('daily-digest-page');if(!root)return;
+  const content=document.getElementById('daily-digest-content'),status=document.getElementById('daily-digest-status'),title=document.getElementById('daily-digest-date-label');
   const day=selectedDay(),today=taipeiDay();
   if(title)title.textContent=displayDay(day)+' 日報';
   initDailyDateHub(day,today);
-
-  setStatus(status,'正在載入今日精選…','loading');
-  content.replaceChildren();
+  setStatus(status,'正在載入日報…','loading');content.replaceChildren();
   const result=await fetchArtifact(day);
   if(result.state==='READY'||result.state==='PARTIAL'){
-    const rendered=renderArtifact(content,result.artifact,{compact:false,home:false});
-    if(rendered)setStatus(status,result.state==='PARTIAL'?'本日資料為 PARTIAL，以下顯示目前可用內容。':'',result.state);
-    else setStatus(status,'本日 Daily Digest 沒有可顯示項目。',result.state);
-  }else if(result.state==='MISSING'){
-    setStatus(status,day===today?'今日精選尚未產生':displayDay(day)+' 日報尚未產生','MISSING');
-  }else{
-    setStatus(status,'今日精選暫時無法載入','ERROR');
-  }
+    const rendered=renderArtifact(content,result.artifact);
+    if(rendered)setStatus(status,result.state==='PARTIAL'?'本日資料尚未完整，未驗證項目不會視為已驗證內容。':'',result.state);
+    else setStatus(status,'本日 Daily Digest 沒有可顯示內容。',result.state);
+  }else if(result.state==='MISSING')setStatus(status,displayDay(day)+' 日報尚未產生','MISSING');
+  else setStatus(status,'日報暫時無法載入','ERROR');
 }
-window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({
-  schema:SCHEMA,taipeiDay,shiftDay,displayTime,fetchArtifact,renderArtifact
-});
-if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()=>{initHome();initDaily()},{once:true});
+window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({schemaVersion:SCHEMA_VERSION,kind:KIND,taipeiDay,fetchArtifact,renderArtifact});
+if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',initDaily,{once:true});
 })();
