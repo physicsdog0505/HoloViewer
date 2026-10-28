@@ -5,6 +5,7 @@ import {fetchYoutubeVideoItems} from './youtube-metadata-provider.mjs';
 const ID=/^[A-Za-z0-9_-]{11}$/;
 const CHANNEL=/^UC[A-Za-z0-9_-]{22}$/;
 export const PROVIDER_MISS_RETIRE_THRESHOLD=3;
+export const UNCHANGED_VIEWER_UPDATE_CHUNK=30;
 
 function iso(x){return x?new Date(x).toISOString().replace(/\.\d{3}Z$/,'Z'):null;}
 function recentTaipeiCutoff(now){
@@ -13,6 +14,12 @@ function recentTaipeiCutoff(now){
 }
 
 function placeholders(values){return values.map(()=>'?').join(',');}
+export function chunkValues(values,size=UNCHANGED_VIEWER_UPDATE_CHUNK){
+  if(!Array.isArray(values)||!Number.isInteger(size)||size<1)throw Error('invalid chunk input');
+  const out=[];
+  for(let i=0;i<values.length;i+=size)out.push(values.slice(i,i+size));
+  return out;
+}
 function same(a,b){return (a??null)===(b??null);}
 function evidenceFor(base,v,observed_at){
   const lifecycle=v.lifecycle_state==='waiting'?'upcoming':v.lifecycle_state;
@@ -187,16 +194,18 @@ export async function refreshKnownTodayLifecycle(env,{fetchImpl=fetch,now=new Da
 
   const mutations=[...missUpserts];
   if(unchangedIds.length){
-    const viewerCases=unchangedIds.map(()=> 'WHEN ? THEN ?').join(' ');
-    const viewerBinds=unchangedIds.flatMap(id=>[
-      id,
-      byId.get(id)?.concurrent_viewers??null
-    ]);
-    mutations.push(env.DB.prepare(`UPDATE public_today_canonical
-      SET checked_at=?,
-          concurrent_viewers=CASE video_id ${viewerCases} ELSE NULL END
-      WHERE video_id IN (${placeholders(unchangedIds)})`)
-      .bind(observed_at,...viewerBinds,...unchangedIds));
+    for(const chunk of chunkValues(unchangedIds)){
+      const viewerCases=chunk.map(()=> 'WHEN ? THEN ?').join(' ');
+      const viewerBinds=chunk.flatMap(id=>[
+        id,
+        byId.get(id)?.concurrent_viewers??null
+      ]);
+      mutations.push(env.DB.prepare(`UPDATE public_today_canonical
+        SET checked_at=?,
+            concurrent_viewers=CASE video_id ${viewerCases} ELSE NULL END
+        WHERE video_id IN (${placeholders(chunk)})`)
+        .bind(observed_at,...viewerBinds,...chunk));
+    }
   }
   if(retireLive.size){
     const retire=[...retireLive];
