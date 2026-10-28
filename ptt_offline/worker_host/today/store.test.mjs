@@ -16,6 +16,7 @@ function fixture({id=V,state='live',observed='2026-10-15T11:59:00Z',end=null,gro
 function db() {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('./0002_today_canonical.sql',import.meta.url),'utf8'));
+  sqlite.exec(readFileSync(new URL('./0006_today_concurrent_viewers.sql',import.meta.url),'utf8'));
   sqlite.exec('CREATE TABLE public_catalog(video_id TEXT,channel_id TEXT,avatar_url TEXT,actual_start TEXT,scheduled_start TEXT)');
   sqlite.exec(`CREATE TABLE public_history(
     video_id TEXT PRIMARY KEY NOT NULL,taipei_day TEXT NOT NULL,title TEXT NOT NULL,
@@ -67,6 +68,30 @@ test('create/replay/update/read and durable END',async()=>{
   assert.equal(d.raw.prepare('SELECT COUNT(*) n FROM public_today_evidence').get().n,3);
   d.close();
 });
+test('fresh live exposes positive concurrent viewers while stale/upcoming/ended do not',async()=>{
+  const d=db();
+  await writeEvidence(d,{...fixture({id:'viewerlive1'}),concurrent_viewers:12345});
+  await writeEvidence(d,{...fixture({id:'viewerupcom',state:'upcoming'}),actual_start:null,concurrent_viewers:null});
+  await writeEvidence(d,{...fixture({id:'viewerended',state:'ended',end:'2026-10-15T11:50:00Z'}),concurrent_viewers:null});
+  await setCoverage(d,{roster_version:'fixture-v1',last_success_at:'2026-10-15T12:00:00Z',
+    expected_channels:1,scanned_channels:1,gap:true,approved_channels:[{id:C,group:'hololive'}]});
+  const fresh=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:10:00Z')});
+  const freshById=new Map(fresh.streams.map(x=>[x.video_id,x]));
+  assert.equal(freshById.get('viewerlive1').concurrent_viewers,12345);
+  assert.equal(freshById.get('viewerupcom').concurrent_viewers,null);
+  assert.equal(freshById.get('viewerended').concurrent_viewers,null);
+  const stale=await readToday(d,{day:'2026-10-15',now:new Date('2026-10-15T12:30:00Z')});
+  assert.equal(stale.streams.find(x=>x.video_id==='viewerlive1').concurrent_viewers,null);
+  d.close();
+});
+test('invalid or non-positive concurrent viewers are rejected rather than synthesized as zero',async()=>{
+  for(const value of [0,-1,1.5,'12']){
+    const d=db();
+    await assert.rejects(()=>writeEvidence(d,{...fixture(),concurrent_viewers:value}),/concurrent viewers/);
+    d.close();
+  }
+});
+
 test('same observation key cannot introduce contradictory facts',async()=>{
   const d=db();await writeEvidence(d,fixture());
   await assert.rejects(()=>writeEvidence(d,{...fixture(),title:'Contradiction'}),/contradictory/);
