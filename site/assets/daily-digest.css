@@ -1,0 +1,45 @@
+.daily-digest-home{margin:22px 0 10px}
+.daily-digest-home[hidden]{display:none!important}
+.daily-digest-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:12px}
+.daily-digest-head h2,.daily-digest-head p{margin:0}
+.daily-digest-head p{color:var(--muted,#687078);font-size:13px}
+.daily-digest-more{font-weight:700;text-decoration:none}
+.daily-digest-status{margin:10px 0;color:var(--muted,#687078)}
+.daily-digest-status[data-state="ERROR"]{color:#a32626}
+.daily-digest-shell{max-width:1240px;margin:0 auto;padding:28px 24px 72px}
+.daily-digest-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:18px 0 24px}
+.daily-digest-toolbar input,.daily-digest-toolbar button{min-height:40px}
+.daily-digest-toolbar input{padding:0 10px}
+.daily-digest-toolbar button{padding:0 12px;border:1px solid var(--line,#d7d3cb);border-radius:10px;background:var(--surface,#fff);cursor:pointer}
+.daily-digest-toolbar button:disabled{opacity:.45;cursor:not-allowed}
+.daily-digest-group{margin:0 0 28px}
+.daily-digest-group-title{margin:0 0 12px;font-size:18px}
+.daily-digest-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.daily-digest-group[data-layout="hero"] .daily-digest-grid,.daily-digest-group[data-layout="featured"] .daily-digest-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.daily-digest-card{min-width:0;overflow:hidden;border:1px solid var(--line,#dedad2);border-radius:16px;background:var(--surface,#fff);box-shadow:0 4px 18px rgba(35,31,28,.05)}
+.daily-digest-card.daily-digest-hero{grid-column:1/-1}
+.daily-digest-media{display:block;aspect-ratio:16/9;background:#ece9e3;overflow:hidden}
+.daily-digest-media img{display:block;width:100%;height:100%;object-fit:cover}
+.daily-digest-card-body{padding:14px}
+.daily-digest-meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted,#687078);font-size:12px;margin-bottom:6px}
+.daily-digest-title{display:block;margin:0;color:inherit;font-size:16px;font-weight:800;line-height:1.45;text-decoration:none;overflow-wrap:anywhere}
+h3.daily-digest-title{margin:0}
+.daily-digest-reason{margin:9px 0 0;font-weight:700;line-height:1.55}
+.daily-digest-summary{margin:9px 0 0;line-height:1.65;color:var(--muted,#5f666c);display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.daily-digest-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.daily-digest-tags span{padding:3px 7px;border-radius:999px;background:#f0eee9;font-size:12px}
+.daily-digest-viewers{margin:10px 0 0;font-size:13px;font-weight:700}
+#home-daily-digest .daily-digest-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+#home-daily-digest .daily-digest-summary{display:none}
+#home-daily-digest .daily-digest-card-body{padding:12px}
+@media(max-width:900px){
+ .daily-digest-grid,#home-daily-digest .daily-digest-grid,.daily-digest-group[data-layout="hero"] .daily-digest-grid,.daily-digest-group[data-layout="featured"] .daily-digest-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ .daily-digest-shell{padding:18px 16px 92px;max-width:100%;overflow-x:hidden}
+ .daily-digest-head{align-items:start}
+ .daily-digest-grid,#home-daily-digest .daily-digest-grid,.daily-digest-group[data-layout="hero"] .daily-digest-grid,.daily-digest-group[data-layout="featured"] .daily-digest-grid{grid-template-columns:minmax(0,1fr)}
+ .daily-digest-card.daily-digest-hero{grid-column:auto}
+ .daily-digest-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+ .daily-digest-summary{-webkit-line-clamp:3}
+}
