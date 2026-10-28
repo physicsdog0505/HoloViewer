@@ -1715,8 +1715,18 @@ function archiveSourcesForWindow(startMs,endMs){
  return months.map(month=>archiveSourceForMonth(month));
 }
 function archiveObjectRange(item){
- const startRaw=item?.partition_start??item?.range_start??item?.bucket_start;
- const endRaw=item?.partition_end??item?.range_end??item?.bucket_end;
+ let startRaw=item?.partition_start??item?.range_start??item?.bucket_start;
+ let endRaw=item?.partition_end??item?.range_end??item?.bucket_end;
+ if((!startRaw||!endRaw)&&typeof item?.key==='string'){
+  const match=item.key.match(/(?:^|\/)chunks\/(\d{4})\/(\d{2})\/(\d{2})\/(\d{2})00\.json$/);
+  if(match){
+   const [,year,month,day,hour]=match;
+   const start=new Date(Date.UTC(Number(year),Number(month)-1,Number(day),Number(hour),0,0));
+   const end=new Date(start.getTime()+3600000);
+   startRaw=start.toISOString().replace('.000Z','Z');
+   endRaw=end.toISOString().replace('.000Z','Z');
+  }
+ }
  const startMs=Date.parse(String(startRaw||'')),endMs=Date.parse(String(endRaw||''));
  if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return null;
  return {startMs,endMs,start:String(startRaw),end:String(endRaw)};
