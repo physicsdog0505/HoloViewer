@@ -608,6 +608,7 @@ class PublicSmokeTests(unittest.TestCase):
             html = (ROOT / page).read_text(encoding="utf-8")
             self.assertIn('/assets/ptt-links.css', html)
             self.assertIn('/assets/ptt-links.js', html)
+            self.assertNotIn('\\n', html)
         self.assertIn("target='_blank'", helper)
         self.assertIn("link.rel='noopener noreferrer'", helper)
         self.assertIn("link.referrerPolicy='no-referrer'", helper)
