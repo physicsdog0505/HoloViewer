@@ -69,6 +69,31 @@
       <button type="button" data-subtitle-mode="danmaku" class="active" aria-pressed="true">彈幕</button>
       <button type="button" data-subtitle-mode="off" aria-pressed="false">關閉</button>
     </div>
+    <details id="localSubtitlePanel" class="local-subtitle-panel">
+      <summary>字幕 A/B</summary>
+      <div class="local-subtitle-body">
+        <div class="local-subtitle-source" role="group" aria-label="字幕來源">
+          <button type="button" data-local-subtitle-mode="holodocchi" class="active" aria-pressed="true">Holodocchi</button>
+          <button type="button" data-local-subtitle-mode="A" aria-pressed="false" disabled>A</button>
+          <button type="button" data-local-subtitle-mode="B" aria-pressed="false" disabled>B</button>
+          <button type="button" data-local-subtitle-mode="A-B" aria-pressed="false" disabled>A-B</button>
+        </div>
+        <div class="local-subtitle-slot">
+          <strong>A</strong>
+          <label class="local-subtitle-file-button">載入檔案<input id="localSubtitleFileA" type="file" accept=".srt,.vtt,.json,text/vtt,application/json" hidden></label>
+          <span id="localSubtitleNameA">未載入</span>
+          <button id="localSubtitleClearA" type="button" disabled>清除</button>
+        </div>
+        <div class="local-subtitle-slot">
+          <strong>B</strong>
+          <label class="local-subtitle-file-button">載入檔案<input id="localSubtitleFileB" type="file" accept=".srt,.vtt,.json,text/vtt,application/json" hidden></label>
+          <span id="localSubtitleNameB">未載入</span>
+          <button id="localSubtitleClearB" type="button" disabled>清除</button>
+        </div>
+        <output id="localSubtitleStatus" class="local-subtitle-status" aria-live="polite"></output>
+        <small>本機字幕只在目前瀏覽器頁面使用，不上傳、不保存。</small>
+      </div>
+    </details>
     <div class="watchalong-actions">
       <output id="resumeStatus" class="resume-status" aria-live="polite"></output>
       <a href="/watchalong" class="watchalong-link">返回選擇</a>
@@ -92,6 +117,10 @@
         </div>
         <div id="subtitleOverlay" class="subtitle-overlay" hidden>
           <div id="subtitleTranslation" class="subtitle-line translation"></div>
+          <div id="subtitleComparison" class="subtitle-comparison" hidden>
+            <div><strong>A</strong><span id="subtitleTranslationA"></span></div>
+            <div><strong>B</strong><span id="subtitleTranslationB"></span></div>
+          </div>
         </div>
         <aside id="pttPanel" class="watchalong-ptt ptt-floor-hidden">
           <div class="ptt-heading">
@@ -119,6 +148,10 @@
           </div>
           <div id="sourceSubtitleOverlay" class="source-subtitle-overlay" hidden>
             <div id="sourceSubtitleTranslation" class="subtitle-line translation"></div>
+            <div id="sourceSubtitleComparison" class="subtitle-comparison" hidden>
+              <div><strong>A</strong><span id="sourceSubtitleTranslationA"></span></div>
+              <div><strong>B</strong><span id="sourceSubtitleTranslationB"></span></div>
+            </div>
           </div>
           <div id="danmakuLayer" class="danmaku-layer" aria-live="off"></div>
         </article>
@@ -132,6 +165,7 @@
 <script src="/assets/ptt-links.js"></script>
 <script src="/assets/video-metadata-resolver.js"></script>
 <script src="/assets/watchalong-static-core.js"></script>
+<script src="/assets/local-subtitle-core.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="/assets/watchalong-standalone.js" defer></script>
 </body>
