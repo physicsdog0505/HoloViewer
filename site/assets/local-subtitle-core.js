@@ -93,7 +93,8 @@
    const row=payload.segments[i];
    if(!row||typeof row!=='object'||Array.isArray(row))fail('benchmark JSON 第 '+(i+1)+' 段格式無效');
    if(!('id' in row))fail('benchmark JSON 第 '+(i+1)+' 段缺少 id');
-   const id=String(row.id);
+   if(typeof row.id!=='string'&&typeof row.id!=='number')fail('benchmark JSON 第 '+(i+1)+' 段 id 無效');
+   const id=String(row.id).trim();
    if(!id||ids.has(id))fail('benchmark JSON segment id 重複或無效：'+id);
    ids.add(id);
    if(!Number.isInteger(row.start_ms)||!Number.isInteger(row.end_ms)||row.start_ms<0||row.end_ms<=row.start_ms)
