@@ -71,6 +71,8 @@ const localSubtitleNameB=document.getElementById('localSubtitleNameB');
 const localSubtitleClearA=document.getElementById('localSubtitleClearA');
 const localSubtitleClearB=document.getElementById('localSubtitleClearB');
 const localSubtitleStatus=document.getElementById('localSubtitleStatus');
+const localSubtitleFontSize=document.getElementById('localSubtitleFontSize');
+const localSubtitleFontValue=document.getElementById('localSubtitleFontValue');
 const danmakuLayer=document.getElementById('danmakuLayer');
 
 let hostPlayer=null;
@@ -390,6 +392,19 @@ function persistSubtitleMode(){
   localStorage.setItem('holoviewer-watchalong-subtitle-danmaku',danmakuEnabled?'1':'0');
  }catch{}
 }
+function setWatchalongSubtitleFontSize(value,{persist=true}={}){
+ const size=Math.max(18,Math.min(40,Math.round(Number(value)||28)));
+ document.documentElement.style.setProperty('--watchalong-subtitle-font-size',size+'px');
+ if(localSubtitleFontSize)localSubtitleFontSize.value=String(size);
+ if(localSubtitleFontValue)localSubtitleFontValue.textContent=size+'px';
+ if(persist){try{localStorage.setItem('holoviewer-subtitle-font-size',String(size))}catch{}}
+ return size;
+}
+function readWatchalongSubtitleFontSize(){
+ let value=28;
+ try{value=Number(localStorage.getItem('holoviewer-subtitle-font-size'))||28}catch{}
+ setWatchalongSubtitleFontSize(value,{persist:false});
+}
 function setSubtitleDisplay(mode,{persist=true}={}){
  if(mode==='standard')subtitleEnabled=!subtitleEnabled;
  else if(mode==='danmaku')danmakuEnabled=!danmakuEnabled;
@@ -406,6 +421,8 @@ localSubtitleFileA?.addEventListener('change',async()=>{const file=localSubtitle
 localSubtitleFileB?.addEventListener('change',async()=>{const file=localSubtitleFileB.files?.[0];await loadLocalSubtitle('B',file);localSubtitleFileB.value=''});
 localSubtitleClearA?.addEventListener('click',()=>clearLocalSubtitle('A'));
 localSubtitleClearB?.addEventListener('click',()=>clearLocalSubtitle('B'));
+localSubtitleFontSize?.addEventListener('input',()=>setWatchalongSubtitleFontSize(localSubtitleFontSize.value));
+readWatchalongSubtitleFontSize();
 refreshLocalSubtitleUi();
 try{
  const standard=localStorage.getItem('holoviewer-watchalong-subtitle-standard');
