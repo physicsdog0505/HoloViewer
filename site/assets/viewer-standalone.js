@@ -49,6 +49,13 @@ const persistentPlaybackControls=document.getElementById('persistentPlaybackCont
 const settingsButton=document.getElementById('viewerSettings');
 const callModeButton=document.getElementById('viewerCallMode');
 const fullscreenButton=document.getElementById('viewerFullscreen');
+const viewerLocalSubtitleFileA=document.getElementById('viewerLocalSubtitleFileA');
+const viewerLocalSubtitleFileB=document.getElementById('viewerLocalSubtitleFileB');
+const viewerLocalSubtitleNameA=document.getElementById('viewerLocalSubtitleNameA');
+const viewerLocalSubtitleNameB=document.getElementById('viewerLocalSubtitleNameB');
+const viewerLocalSubtitleClearA=document.getElementById('viewerLocalSubtitleClearA');
+const viewerLocalSubtitleClearB=document.getElementById('viewerLocalSubtitleClearB');
+const viewerLocalSubtitleStatus=document.getElementById('viewerLocalSubtitleStatus');
 const multiModeSwitch=document.getElementById('multiModeSwitch');
 const focusChoices=document.getElementById('focusChoices');
 const focusCarouselStatus=document.getElementById('focusCarouselStatus');
@@ -71,6 +78,9 @@ const pttFontValue=document.getElementById('pttFontValue');
 
 const players=[];
 const playerCards=[];
+const viewerLocalSubtitleSlots={A:null,B:null};
+let viewerLocalSubtitleMode='holodocchi';
+let viewerLocalSubtitleTimer=null;
 let catalogRows=[];
 const syncExpected=new WeakMap();
 const timelineGapPovs=new Set();
@@ -477,6 +487,19 @@ function createPlayerCard(index){
  });
  const host=node('div',undefined,'player-host');
  host.id=playerHostId(stream);
+ const subtitleOverlay=node('div',undefined,'viewer-local-subtitle-overlay');
+ subtitleOverlay.hidden=true;
+ const single=node('div',undefined,'viewer-local-subtitle-single');
+ const comparison=node('div',undefined,'viewer-local-subtitle-comparison');
+ comparison.hidden=true;
+ const aRow=node('div');
+ const aLabel=node('strong','A');
+ const aText=node('span');
+ const bRow=node('div');
+ const bLabel=node('strong','B');
+ const bText=node('span');
+ aRow.append(aLabel,aText);bRow.append(bLabel,bText);comparison.append(aRow,bRow);
+ subtitleOverlay.append(single,comparison);
  const pager=node('div',undefined,'mobile-secondary-pager');
  const previous=node('button','‹','mobile-secondary-prev');
  previous.type='button';previous.setAttribute('aria-label','上一個副視角');
@@ -486,7 +509,7 @@ function createPlayerCard(index){
  previous.addEventListener('click',event=>{event.stopPropagation();cycleMobileSecondary(-1)});
  next.addEventListener('click',event=>{event.stopPropagation();cycleMobileSecondary(1)});
  pager.append(previous,status,next);
- card.append(label,remove,host,pager);
+ card.append(label,remove,host,subtitleOverlay,pager);
  playerCards[index]=card;
  return card;
 }
@@ -2062,6 +2085,121 @@ function startCarousel(){
   },ms);
  }
 }
+function viewerPrimaryVideoId(){
+ return String(streams[primaryIndex]?.videoId||'');
+}
+function viewerPrimaryCurrentSeconds(){
+ try{
+  const value=players[primaryIndex]?.getCurrentTime?.();
+  return Number.isFinite(value)?value:null;
+ }catch{return null}
+}
+function viewerLocalSubtitleCue(slot,current){
+ if(!slot||!window.HoloViewerLocalSubtitles)return null;
+ return HoloViewerLocalSubtitles.cueAt(slot.cues,current);
+}
+function viewerLocalSubtitleOverlay(){
+ return playerCards[primaryIndex]?.querySelector('.viewer-local-subtitle-overlay')||null;
+}
+function clearViewerLocalSubtitleOverlays(){
+ playerCards.forEach(card=>{
+  const overlay=card?.querySelector('.viewer-local-subtitle-overlay');
+  if(overlay)overlay.hidden=true;
+ });
+}
+function refreshViewerLocalSubtitleUi(){
+ const a=viewerLocalSubtitleSlots.A,b=viewerLocalSubtitleSlots.B;
+ if(viewerLocalSubtitleNameA)viewerLocalSubtitleNameA.textContent=a?a.filename:'未載入';
+ if(viewerLocalSubtitleNameB)viewerLocalSubtitleNameB.textContent=b?b.filename:'未載入';
+ if(viewerLocalSubtitleClearA)viewerLocalSubtitleClearA.disabled=!a;
+ if(viewerLocalSubtitleClearB)viewerLocalSubtitleClearB.disabled=!b;
+ document.querySelectorAll('[data-viewer-local-subtitle-mode]').forEach(button=>{
+  const mode=button.dataset.viewerLocalSubtitleMode;
+  const available=mode==='holodocchi'||mode==='A'&&Boolean(a)||mode==='B'&&Boolean(b)||mode==='A-B'&&Boolean(a&&b&&a.videoId===b.videoId);
+  button.disabled=!available;
+  const active=mode===viewerLocalSubtitleMode;
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-pressed',String(active));
+ });
+}
+function setViewerLocalSubtitleStatus(message,{error=false}={}){
+ if(!viewerLocalSubtitleStatus)return;
+ viewerLocalSubtitleStatus.textContent=message||'';
+ viewerLocalSubtitleStatus.dataset.state=error?'error':'ok';
+}
+function setViewerLocalSubtitleMode(mode){
+ const a=viewerLocalSubtitleSlots.A,b=viewerLocalSubtitleSlots.B;
+ if(mode==='A'&&!a)return false;
+ if(mode==='B'&&!b)return false;
+ if(mode==='A-B'&&(!a||!b||a.videoId!==b.videoId))return false;
+ viewerLocalSubtitleMode=mode;
+ clearViewerLocalSubtitleOverlays();
+ refreshViewerLocalSubtitleUi();
+ return true;
+}
+async function loadViewerLocalSubtitle(slotName,file){
+ if(!file)return;
+ try{
+  if(!window.HoloViewerLocalSubtitles)throw new Error('本機字幕 parser 尚未載入');
+  const videoId=viewerPrimaryVideoId();
+  if(!/^[A-Za-z0-9_-]{11}$/.test(videoId))throw new Error('目前主視角影片 ID 尚未就緒');
+  const body=await file.text();
+  const parsed=HoloViewerLocalSubtitles.parseLocalSubtitleFile(file.name,body,{expectedVideoId:videoId});
+  const other=viewerLocalSubtitleSlots[slotName==='A'?'B':'A'];
+  if(other&&other.videoId!==videoId)throw new Error('A/B 必須是同一支影片');
+  viewerLocalSubtitleSlots[slotName]={filename:file.name,format:parsed.format,cues:parsed.cues,videoId};
+  setViewerLocalSubtitleMode(slotName);
+  setViewerLocalSubtitleStatus(slotName+' 已載入：'+file.name+' · '+parsed.cues.length+' 段');
+ }catch(error){
+  setViewerLocalSubtitleStatus(String(error?.message||error),{error:true});
+ }
+}
+function clearViewerLocalSubtitle(slotName){
+ viewerLocalSubtitleSlots[slotName]=null;
+ if(viewerLocalSubtitleMode===slotName||viewerLocalSubtitleMode==='A-B')viewerLocalSubtitleMode='holodocchi';
+ clearViewerLocalSubtitleOverlays();
+ setViewerLocalSubtitleStatus(slotName+' 已清除');
+ refreshViewerLocalSubtitleUi();
+}
+function renderViewerLocalSubtitle(){
+ clearViewerLocalSubtitleOverlays();
+ if(viewerLocalSubtitleMode==='holodocchi')return;
+ const videoId=viewerPrimaryVideoId(),current=viewerPrimaryCurrentSeconds(),overlay=viewerLocalSubtitleOverlay();
+ if(!overlay||!Number.isFinite(current))return;
+ const single=overlay.querySelector('.viewer-local-subtitle-single');
+ const comparison=overlay.querySelector('.viewer-local-subtitle-comparison');
+ if(viewerLocalSubtitleMode==='A-B'){
+  const a=viewerLocalSubtitleSlots.A,b=viewerLocalSubtitleSlots.B;
+  if(!a||!b||a.videoId!==videoId||b.videoId!==videoId)return;
+  const aCue=viewerLocalSubtitleCue(a,current),bCue=viewerLocalSubtitleCue(b,current);
+  const rows=comparison?.querySelectorAll('span')||[];
+  if(single)single.hidden=true;
+  if(comparison)comparison.hidden=false;
+  if(rows[0])rows[0].textContent=String(aCue?.translation||'—');
+  if(rows[1])rows[1].textContent=String(bCue?.translation||'—');
+  overlay.hidden=!(aCue||bCue);
+  return;
+ }
+ const slot=viewerLocalSubtitleSlots[viewerLocalSubtitleMode];
+ if(!slot||slot.videoId!==videoId)return;
+ const cue=viewerLocalSubtitleCue(slot,current);
+ if(single){single.hidden=false;single.textContent=String(cue?.translation||'')}
+ if(comparison)comparison.hidden=true;
+ overlay.hidden=!cue;
+}
+function startViewerLocalSubtitleLoop(){
+ if(viewerLocalSubtitleTimer)return;
+ viewerLocalSubtitleTimer=setInterval(renderViewerLocalSubtitle,200);
+}
+document.querySelectorAll('[data-viewer-local-subtitle-mode]').forEach(button=>{
+ button.addEventListener('click',()=>setViewerLocalSubtitleMode(button.dataset.viewerLocalSubtitleMode));
+});
+viewerLocalSubtitleFileA?.addEventListener('change',async()=>{const file=viewerLocalSubtitleFileA.files?.[0];await loadViewerLocalSubtitle('A',file);viewerLocalSubtitleFileA.value=''});
+viewerLocalSubtitleFileB?.addEventListener('change',async()=>{const file=viewerLocalSubtitleFileB.files?.[0];await loadViewerLocalSubtitle('B',file);viewerLocalSubtitleFileB.value=''});
+viewerLocalSubtitleClearA?.addEventListener('click',()=>clearViewerLocalSubtitle('A'));
+viewerLocalSubtitleClearB?.addEventListener('click',()=>clearViewerLocalSubtitle('B'));
+refreshViewerLocalSubtitleUi();
+
 function readSettings(){
  try{
   const font=Math.max(12,Math.min(26,Number(localStorage.getItem('holoviewer-viewer-ptt-font'))||14));
@@ -2191,7 +2329,7 @@ document.addEventListener('visibilitychange',()=>{
  if(!document.hidden&&pttContext.mode==='live')loadPtt();
 });
 window.addEventListener('pagehide',()=>{
- clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(viewingTimer);clearInterval(pttVodPollTimer);clearInterval(pttPollTimer);
+ clearInterval(collabPollTimer);clearInterval(collabVodTimer);clearInterval(viewingTimer);clearInterval(pttVodPollTimer);clearInterval(pttPollTimer);clearInterval(viewerLocalSubtitleTimer);
  clearTimeout(pttLayoutRepinTimer);cancelAnimationFrame(pttResizeFrame);
  pttResizeObserver?.disconnect();
 });
@@ -2211,6 +2349,7 @@ carousel.checked=currentLayoutPreset()!=='equal';
 renderShell();
 applyModeClass();
 startCarousel();
+startViewerLocalSubtitleLoop();
 
 let viewerReadyForPlayers=false;
 function tryMountPlayers(){
