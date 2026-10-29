@@ -345,7 +345,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("holoviewer-subtitle-font-size", js)
         self.assertIn("function setViewerSubtitleFontSize(value,{persist=true}={})", js)
         self.assertIn("var(--viewer-subtitle-font-size,28px)", css)
-        self.assertIn("-webkit-text-stroke:2px #000", css)
+        self.assertIn("-webkit-text-stroke:3px var(--subtitle-stroke-color", css)
         for script in ("site/assets/local-subtitle-core.js", "site/assets/viewer-standalone.js"):
             subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
 
@@ -623,7 +623,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("holoviewer-subtitle-font-size", js)
         self.assertIn("function setWatchalongSubtitleFontSize(value,{persist=true}={})", js)
         self.assertIn("var(--watchalong-subtitle-font-size,28px)", css)
-        self.assertIn("-webkit-text-stroke:2px #000", css)
+        self.assertIn("-webkit-text-stroke:3px var(--subtitle-stroke-color", css)
         for script in ("site/assets/local-subtitle-core.js", "site/assets/watchalong-standalone.js"):
             subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
         result = subprocess.run(
