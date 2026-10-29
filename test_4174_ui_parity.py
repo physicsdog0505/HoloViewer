@@ -476,6 +476,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("pttArchiveMonths:",config)
         self.assertIn("holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",config)
         self.assertIn("holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev",config)
+        self.assertIn("static-assets-full-2026-04.json",config)
+        self.assertIn("static-assets-full-2026-05.json",config)
         self.assertIn("static-assets-full-2026-06.json",config)
         self.assertIn("static-assets-full-2026-07.json",config)
         self.assertIn("static-assets-full-2026-08.json",config)
@@ -663,6 +665,8 @@ process.stdout.write(JSON.stringify({
         self.assertEqual(payload["deduped"],2019)
         self.assertEqual(payload["visible"],2019)
         self.assertIn('"2026-09": Object.freeze({',config)
+        self.assertIn('"2026-04": Object.freeze({',config)
+        self.assertIn('"2026-05": Object.freeze({',config)
         self.assertIn('"2026-06": Object.freeze({',config)
         self.assertIn('"2026-07": Object.freeze({',config)
 
