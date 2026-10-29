@@ -41,7 +41,7 @@ assert.equal(vtt.cues[1].end,4.25);
 const json=local.parseLocalSubtitleFile('bench.json',JSON.stringify({
  video_id:'QDlEA7aPSmI',
  segments:[
-  {id:0,start_ms:1234,end_ms:5678,ja:'日本語原文',zh_tw:'繁體中文翻譯'},
+  {id:0,start_ms:1234,end_ms:5678,ja:'日本語原文',zh_tw:'繁體中文翻譯',speaker:'Roboco',speaker_id:'roboco',speaker_key:'roboco',speaker_accent:'#d85a8a'},
   {id:1,start_ms:6000,end_ms:7000,ja:'次',zh_tw:'第二段'}
  ]
 }),{expectedVideoId:'QDlEA7aPSmI'});
@@ -49,6 +49,10 @@ assert.equal(json.format,'json');
 assert.equal(json.videoId,'QDlEA7aPSmI');
 assert.equal(json.cues[0].start,1.234);
 assert.equal(json.cues[0].translation,'繁體中文翻譯');
+assert.equal(json.cues[0].speaker,'Roboco');
+assert.equal(json.cues[0].speakerId,'roboco');
+assert.equal(json.cues[0].speakerKey,'roboco');
+assert.equal(json.cues[0].speakerAccent,'#d85a8a');
 assert.equal(local.cueAt(json.cues,1.5).id,'0');
 assert.equal(local.cueAt(json.cues,5.9),null);
 
