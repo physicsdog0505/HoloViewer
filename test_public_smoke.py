@@ -575,6 +575,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("字幕時間順序錯誤", core)
         self.assertIn(".local-subtitle-panel{", css)
         self.assertIn(".subtitle-comparison{", css)
+        for script in ("site/assets/local-subtitle-core.js", "site/assets/watchalong-standalone.js"):
+            subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
         result = subprocess.run(
             ["node", str(ROOT / "test_local_subtitle_core.js")],
             cwd=ROOT, check=True, capture_output=True, text=True,
