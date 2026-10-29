@@ -202,3 +202,27 @@ body.immersive .immersive-toolbar-trigger{
  .watchalong-workspace.mobile-primary-source .source-card .mobile-swap-button,
  .watchalong-workspace.mobile-primary-host .host-card .mobile-swap-button{display:none}
 }
+
+.local-subtitle-panel{position:relative;flex:0 0 auto}
+.local-subtitle-panel>summary{list-style:none;cursor:pointer;min-height:32px;padding:0 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);display:flex;align-items:center;font-size:12px;font-weight:800}
+.local-subtitle-panel>summary::-webkit-details-marker{display:none}
+.local-subtitle-panel[open]>summary{background:#242321;color:#fff}
+.local-subtitle-body{position:absolute;z-index:40;right:0;top:calc(100% + 8px);width:min(520px,calc(100vw - 24px));padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface,#fff);box-shadow:0 16px 42px rgba(35,31,28,.18);display:grid;gap:10px}
+.local-subtitle-source{display:flex;gap:4px;flex-wrap:wrap}
+.local-subtitle-source button,.local-subtitle-slot button,.local-subtitle-file-button{min-height:30px;padding:0 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);font:inherit;font-size:12px;font-weight:800;display:inline-flex;align-items:center;cursor:pointer}
+.local-subtitle-source button.active{background:#242321;color:#fff}
+.local-subtitle-source button:disabled,.local-subtitle-slot button:disabled{opacity:.42;cursor:not-allowed}
+.local-subtitle-slot{display:grid;grid-template-columns:22px auto minmax(0,1fr) auto;gap:8px;align-items:center}
+.local-subtitle-slot>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--muted)}
+.local-subtitle-status{min-height:18px;font-size:12px;color:var(--muted)}
+.local-subtitle-status[data-state="error"]{color:#a32626;font-weight:800}
+.local-subtitle-body small{color:var(--muted);line-height:1.45}
+.subtitle-comparison{display:grid;gap:4px;width:100%}
+.subtitle-comparison[hidden]{display:none}
+.subtitle-comparison>div{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start}
+.subtitle-comparison strong{font-size:12px;line-height:1.8;opacity:.72}
+.subtitle-comparison span{font-size:clamp(18px,1.35vw,24px);line-height:1.45}
+@media(max-width:760px){
+ .local-subtitle-panel{display:none}
+ .subtitle-comparison span{font-size:17px}
+}
