@@ -56,6 +56,8 @@ const viewerLocalSubtitleNameB=document.getElementById('viewerLocalSubtitleNameB
 const viewerLocalSubtitleClearA=document.getElementById('viewerLocalSubtitleClearA');
 const viewerLocalSubtitleClearB=document.getElementById('viewerLocalSubtitleClearB');
 const viewerLocalSubtitleStatus=document.getElementById('viewerLocalSubtitleStatus');
+const viewerLocalSubtitleFontSize=document.getElementById('viewerLocalSubtitleFontSize');
+const viewerLocalSubtitleFontValue=document.getElementById('viewerLocalSubtitleFontValue');
 const multiModeSwitch=document.getElementById('multiModeSwitch');
 const focusChoices=document.getElementById('focusChoices');
 const focusCarouselStatus=document.getElementById('focusCarouselStatus');
@@ -2155,6 +2157,19 @@ function clearViewerLocalSubtitleOverlays(){
   if(overlay)overlay.hidden=true;
  });
 }
+function setViewerSubtitleFontSize(value,{persist=true}={}){
+ const size=Math.max(18,Math.min(40,Math.round(Number(value)||28)));
+ document.documentElement.style.setProperty('--viewer-subtitle-font-size',size+'px');
+ if(viewerLocalSubtitleFontSize)viewerLocalSubtitleFontSize.value=String(size);
+ if(viewerLocalSubtitleFontValue)viewerLocalSubtitleFontValue.textContent=size+'px';
+ if(persist){try{localStorage.setItem('holoviewer-subtitle-font-size',String(size))}catch{}}
+ return size;
+}
+function readViewerSubtitleFontSize(){
+ let value=28;
+ try{value=Number(localStorage.getItem('holoviewer-subtitle-font-size'))||28}catch{}
+ setViewerSubtitleFontSize(value,{persist:false});
+}
 function refreshViewerLocalSubtitleUi(){
  const a=viewerLocalSubtitleSlots.A,b=viewerLocalSubtitleSlots.B;
  if(viewerLocalSubtitleNameA)viewerLocalSubtitleNameA.textContent=a?a.filename:'未載入';
@@ -2246,6 +2261,8 @@ viewerLocalSubtitleFileA?.addEventListener('change',async()=>{const file=viewerL
 viewerLocalSubtitleFileB?.addEventListener('change',async()=>{const file=viewerLocalSubtitleFileB.files?.[0];await loadViewerLocalSubtitle('B',file);viewerLocalSubtitleFileB.value=''});
 viewerLocalSubtitleClearA?.addEventListener('click',()=>clearViewerLocalSubtitle('A'));
 viewerLocalSubtitleClearB?.addEventListener('click',()=>clearViewerLocalSubtitle('B'));
+viewerLocalSubtitleFontSize?.addEventListener('input',()=>setViewerSubtitleFontSize(viewerLocalSubtitleFontSize.value));
+readViewerSubtitleFontSize();
 refreshViewerLocalSubtitleUi();
 
 function readSettings(){
