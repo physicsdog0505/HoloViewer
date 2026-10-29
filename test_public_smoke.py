@@ -311,6 +311,33 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("dataset.mobileDockRoute===activeNav", app_js)
 
 
+    def test_viewer_local_subtitle_ab_contract(self):
+        html = (ROOT / "site/viewer/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/viewer-standalone.css").read_text(encoding="utf-8")
+        self.assertIn('src="/assets/local-subtitle-core.js"', html)
+        self.assertIn('id="viewerLocalSubtitleFileA"', html)
+        self.assertIn('id="viewerLocalSubtitleFileB"', html)
+        self.assertIn('data-viewer-local-subtitle-mode="holodocchi"', html)
+        self.assertIn('data-viewer-local-subtitle-mode="A-B"', html)
+        self.assertIn("const viewerLocalSubtitleSlots={A:null,B:null};", js)
+        self.assertIn("let viewerLocalSubtitleMode='holodocchi';", js)
+        self.assertIn("const body=await file.text();", js)
+        self.assertIn("parseLocalSubtitleFile(file.name,body,{expectedVideoId:videoId})", js)
+        self.assertIn("function renderViewerLocalSubtitle()", js)
+        self.assertIn("players[primaryIndex]?.getCurrentTime?.()", js)
+        self.assertIn("viewerLocalSubtitleTimer=setInterval(renderViewerLocalSubtitle,200);", js)
+        mode = js[js.index("function setViewerLocalSubtitleMode(mode)"):js.index("async function loadViewerLocalSubtitle", js.index("function setViewerLocalSubtitleMode(mode)"))]
+        self.assertNotIn("seekTo", mode)
+        self.assertNotIn("loadVideoById", mode)
+        self.assertNotIn("cueVideoById", mode)
+        self.assertNotIn("fetch(", mode)
+        self.assertNotIn("localStorage", mode)
+        self.assertIn(".viewer-local-subtitle-panel{", css)
+        self.assertIn(".viewer-local-subtitle-overlay{", css)
+        for script in ("site/assets/local-subtitle-core.js", "site/assets/viewer-standalone.js"):
+            subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
+
     def test_standalone_watchalong_contract(self):
         html = (ROOT / "site/watchalong-viewer/index.html").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/watchalong-standalone.js").read_text(encoding="utf-8")
