@@ -102,7 +102,11 @@
    if(typeof row.ja!=='string'||typeof row.zh_tw!=='string')fail('benchmark JSON 第 '+(i+1)+' 段缺少 ja / zh_tw');
    cues.push({
     id,index:i,start:row.start_ms/1000,end:row.end_ms/1000,
-    original:row.ja,translation:row.zh_tw
+    original:row.ja,translation:row.zh_tw,
+    speaker:String(row.speaker??''),
+    speakerId:String(row.speaker_id??''),
+    speakerKey:String(row.speaker_key??''),
+    speakerAccent:/^#[0-9a-fA-F]{6}$/.test(String(row.speaker_accent||''))?String(row.speaker_accent):''
    });
   }
   validateCueOrder(cues);

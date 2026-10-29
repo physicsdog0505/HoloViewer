@@ -165,6 +165,21 @@ function watchalongHostAccent(row){
 function applyWatchalongHostAccent(row){
  document.documentElement.style.setProperty('--watchalong-host-accent',watchalongHostAccent(row));
 }
+function watchalongSubtitleSpeaker(row){
+ return String(row?.speakerKey||row?.speakerId||row?.speaker||'').trim();
+}
+function watchalongSubtitleColor(row){
+ const explicit=String(row?.speakerAccent||'');
+ if(/^#[0-9a-fA-F]{6}$/.test(explicit))return explicit;
+ const speaker=watchalongSubtitleSpeaker(row);
+ if(speaker){
+  const upper=speaker.toUpperCase();
+  for(const [needles,accent] of WATCHALONG_MEMBER_ACCENTS){
+   if(needles.some(word=>upper.includes(word.toUpperCase())))return accent;
+  }
+ }
+ return 'var(--watchalong-host-accent,#4b97c8)';
+}
 function refreshHostVolumeUi(){
  let volume=Number(hostVolume?.value)||0,muted=false;
  try{
@@ -830,8 +845,10 @@ function renderSubtitleCue(row){
  if(subtitleEnabled){
   const text=row?.translation||'';
   subtitleTranslation.textContent=text;
+  subtitleTranslation.style.color=watchalongSubtitleColor(row);
   subtitleOverlay.hidden=!text;
   sourceSubtitleTranslation.textContent=text;
+  sourceSubtitleTranslation.style.color=watchalongSubtitleColor(row);
   sourceSubtitleOverlay.hidden=danmakuEnabled||!text;
  }else{
   subtitleOverlay.hidden=true;
@@ -857,10 +874,10 @@ function renderSubtitlePair(a,b){
  if(sourceSubtitleTranslation)sourceSubtitleTranslation.hidden=true;
  if(subtitleComparison)subtitleComparison.hidden=false;
  if(sourceSubtitleComparison)sourceSubtitleComparison.hidden=false;
- if(subtitleTranslationA)subtitleTranslationA.textContent=aText||'—';
- if(subtitleTranslationB)subtitleTranslationB.textContent=bText||'—';
- if(sourceSubtitleTranslationA)sourceSubtitleTranslationA.textContent=aText||'—';
- if(sourceSubtitleTranslationB)sourceSubtitleTranslationB.textContent=bText||'—';
+ if(subtitleTranslationA){subtitleTranslationA.textContent=aText||'—';subtitleTranslationA.style.color=watchalongSubtitleColor(a)}
+ if(subtitleTranslationB){subtitleTranslationB.textContent=bText||'—';subtitleTranslationB.style.color=watchalongSubtitleColor(b)}
+ if(sourceSubtitleTranslationA){sourceSubtitleTranslationA.textContent=aText||'—';sourceSubtitleTranslationA.style.color=watchalongSubtitleColor(a)}
+ if(sourceSubtitleTranslationB){sourceSubtitleTranslationB.textContent=bText||'—';sourceSubtitleTranslationB.style.color=watchalongSubtitleColor(b)}
  subtitleOverlay.hidden=!subtitleEnabled||!hasText;
  sourceSubtitleOverlay.hidden=!subtitleEnabled||danmakuEnabled||!hasText;
  clearDanmaku();
@@ -906,7 +923,9 @@ function normalizeSubtitles(payload){
   id:String(item?.cue_id||item?.id||index),
   index,
   start:Number(item?.start??item?.start_seconds),end:Number(item?.end??item?.end_seconds),
-  original:String(item?.original||item?.text||''),translation:String(item?.translation||item?.translated||'')
+  original:String(item?.original||item?.text||''),translation:String(item?.translation||item?.translated||''),
+  speaker:String(item?.speaker||''),speakerId:String(item?.speaker_id||''),speakerKey:String(item?.speaker_key||''),
+  speakerAccent:/^#[0-9a-fA-F]{6}$/.test(String(item?.speaker_accent||''))?String(item.speaker_accent):''
  })).filter(item=>Number.isFinite(item.start)&&Number.isFinite(item.end)&&item.end>item.start):[];
 }
 function renderSegments(){
@@ -981,7 +1000,9 @@ function normalizeStaticSubtitles(payload){
   start:Number(item.start_ms)/1000,
   end:Number(item.end_ms)/1000,
   original:String(item.original||''),
-  translation:String(item.translation||'')
+  translation:String(item.translation||''),
+  speaker:String(item.speaker||''),speakerId:String(item.speaker_id||''),speakerKey:String(item.speaker_key||''),
+  speakerAccent:/^#[0-9a-fA-F]{6}$/.test(String(item.speaker_accent||''))?String(item.speaker_accent):''
  }));
 }
 function segmentIndexForHost(hostSeconds){

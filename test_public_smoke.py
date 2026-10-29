@@ -335,6 +335,11 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertNotIn("localStorage", mode)
         self.assertIn(".viewer-local-subtitle-panel{", css)
         self.assertIn(".viewer-local-subtitle-overlay{", css)
+        self.assertIn("background:transparent", css)
+        self.assertIn("function viewerSubtitleColorForCue(cue)", js)
+        self.assertIn("getVideoData?.()?.author", js)
+        self.assertIn("speakerAccent", js)
+        self.assertIn("speakerKey", js)
         for script in ("site/assets/local-subtitle-core.js", "site/assets/viewer-standalone.js"):
             subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
 
@@ -600,8 +605,13 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("function parseBenchmarkJson(body,{expectedVideoId=''}={})", core)
         self.assertIn("字幕 video_id 不符", core)
         self.assertIn("字幕時間順序錯誤", core)
+        self.assertIn("speakerAccent", core)
+        self.assertIn("speakerKey", core)
         self.assertIn(".local-subtitle-panel{", css)
         self.assertIn(".subtitle-comparison{", css)
+        self.assertIn("function watchalongSubtitleColor(row)", js)
+        self.assertIn("speakerAccent", js)
+        self.assertIn("speakerKey", js)
         for script in ("site/assets/local-subtitle-core.js", "site/assets/watchalong-standalone.js"):
             subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
         result = subprocess.run(

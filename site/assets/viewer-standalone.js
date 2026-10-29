@@ -181,6 +181,54 @@ function accentFor(row){
  const audited=String(row?.member_accent||'');
  return /^#[0-9a-fA-F]{6}$/.test(audited)?audited:'#9ab8c4';
 }
+const VIEWER_MEMBER_ACCENTS=[
+ [['ロボ子','ROBOCO'],'#d85a8a'],
+ [['ときのそら','TOKINO SORA'],'#397fc4'],
+ [['AZKI'],'#c94a52'],
+ [['さくらみこ','SAKURA MIKO'],'#dc6f9f'],
+ [['アキ・ローゼンタール','AKI ROSENTHAL'],'#69a56f'],
+ [['白上フブキ','SHIRAKAMI FUBUKI'],'#4b97c8'],
+ [['夏色まつり','NATSUIRO MATSURI'],'#d87932'],
+ [['百鬼あやめ','NAKIRI AYAME'],'#c84b55'],
+ [['癒月ちょこ','YUZUKI CHOCO','CHOCO CH.'],'#d85a8a'],
+ [['大空スバル','OOZORA SUBARU'],'#a68118'],
+ [['大神ミオ','OOKAMI MIO'],'#69a56f'],
+ [['兎田ぺこら','USADA PEKORA','PEKORA CH.'],'#4b97c8'],
+ [['不知火フレア','SHIRANUI FLARE'],'#d87932'],
+ [['白銀ノエル','SHIROGANE NOEL'],'#7d7d7d'],
+ [['宝鐘マリン','HOUSHOU MARINE'],'#c84b55'],
+ [['天音かなた','AMANE KANATA'],'#4b97c8'],
+ [['常闇トワ','TOKOYAMI TOWA'],'#7751a8'],
+ [['雪花ラミィ','YUKIHANA LAMY'],'#4b97c8'],
+ [['獅白ぼたん','SHISHIRO BOTAN'],'#7d7d7d'],
+ [['尾丸ポルカ','OMARU POLKA'],'#c84b55']
+];
+function viewerMemberAccent(value){
+ const text=String(value||'').toUpperCase();
+ for(const [needles,accent] of VIEWER_MEMBER_ACCENTS){
+  if(needles.some(word=>text.includes(word.toUpperCase())))return accent;
+ }
+ return '';
+}
+function viewerSubtitleSpeaker(cue){
+ return String(cue?.speakerKey||cue?.speakerId||cue?.speaker||'').trim();
+}
+function viewerPrimaryAuthor(){
+ try{return String(players[primaryIndex]?.getVideoData?.()?.author||'')}catch{return ''}
+}
+function viewerSubtitleColorForCue(cue){
+ const explicit=String(cue?.speakerAccent||'');
+ if(/^#[0-9a-fA-F]{6}$/.test(explicit))return explicit;
+ const speaker=viewerSubtitleSpeaker(cue);
+ if(speaker){
+  const speakerAccent=viewerMemberAccent(speaker);
+  if(speakerAccent)return speakerAccent;
+ }
+ const stream=streams[primaryIndex];
+ const catalogAccent=stream?accentFor(streamCatalogRow(stream)||{}):'';
+ if(catalogAccent&&catalogAccent!=='#9ab8c4')return catalogAccent;
+ return viewerMemberAccent(viewerPrimaryAuthor())||'#ffffff';
+}
 function streamCatalogRow(stream){
  return catalogRows.find(row=>String(row?.video_id||'')===String(stream?.videoId||''))||null;
 }
@@ -2175,15 +2223,15 @@ function renderViewerLocalSubtitle(){
   const rows=comparison?.querySelectorAll('span')||[];
   if(single)single.hidden=true;
   if(comparison)comparison.hidden=false;
-  if(rows[0])rows[0].textContent=String(aCue?.translation||'—');
-  if(rows[1])rows[1].textContent=String(bCue?.translation||'—');
+  if(rows[0]){rows[0].textContent=String(aCue?.translation||'—');rows[0].style.color=viewerSubtitleColorForCue(aCue)}
+  if(rows[1]){rows[1].textContent=String(bCue?.translation||'—');rows[1].style.color=viewerSubtitleColorForCue(bCue)}
   overlay.hidden=!(aCue||bCue);
   return;
  }
  const slot=viewerLocalSubtitleSlots[viewerLocalSubtitleMode];
  if(!slot||slot.videoId!==videoId)return;
  const cue=viewerLocalSubtitleCue(slot,current);
- if(single){single.hidden=false;single.textContent=String(cue?.translation||'')}
+ if(single){single.hidden=false;single.textContent=String(cue?.translation||'');single.style.color=viewerSubtitleColorForCue(cue)}
  if(comparison)comparison.hidden=true;
  overlay.hidden=!cue;
 }
