@@ -340,6 +340,12 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("getVideoData?.()?.author", js)
         self.assertIn("speakerAccent", js)
         self.assertIn("speakerKey", js)
+        self.assertIn('id="viewerLocalSubtitleFontSize"', html)
+        self.assertIn('min="18" max="40" step="1" value="28"', html)
+        self.assertIn("holoviewer-subtitle-font-size", js)
+        self.assertIn("function setViewerSubtitleFontSize(value,{persist=true}={})", js)
+        self.assertIn("var(--viewer-subtitle-font-size,28px)", css)
+        self.assertIn("-webkit-text-stroke:3px var(--subtitle-stroke-color", css)
         for script in ("site/assets/local-subtitle-core.js", "site/assets/viewer-standalone.js"):
             subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
 
@@ -532,7 +538,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".source-standby[hidden]{display:none}", css)
         self.assertIn(".danmaku-layer{", css)
         self.assertIn("height:48%", css)
-        self.assertIn(".subtitle-line.translation{font-size:clamp(20px,1.55vw,28px)}", css)
+        self.assertIn(".subtitle-line.translation{font-size:var(--watchalong-subtitle-font-size,28px)}", css)
         self.assertIn(".subtitle-overlay{", css)
         self.assertIn("background:transparent;border:0", css)
         self.assertIn("color:var(--watchalong-host-accent,#4b97c8)", css)
@@ -612,6 +618,12 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("function watchalongSubtitleColor(row)", js)
         self.assertIn("speakerAccent", js)
         self.assertIn("speakerKey", js)
+        self.assertIn('id="localSubtitleFontSize"', html)
+        self.assertIn('min="18" max="40" step="1" value="28"', html)
+        self.assertIn("holoviewer-subtitle-font-size", js)
+        self.assertIn("function setWatchalongSubtitleFontSize(value,{persist=true}={})", js)
+        self.assertIn("var(--watchalong-subtitle-font-size,28px)", css)
+        self.assertIn("-webkit-text-stroke:3px var(--subtitle-stroke-color", css)
         for script in ("site/assets/local-subtitle-core.js", "site/assets/watchalong-standalone.js"):
             subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
         result = subprocess.run(

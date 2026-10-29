@@ -101,6 +101,10 @@
             <span id="viewerLocalSubtitleNameB">未載入</span>
             <button id="viewerLocalSubtitleClearB" type="button" disabled>清除</button>
           </div>
+          <label class="viewer-local-subtitle-size">字幕大小
+            <input id="viewerLocalSubtitleFontSize" type="range" min="18" max="40" step="1" value="28" aria-label="字幕大小">
+            <output id="viewerLocalSubtitleFontValue" for="viewerLocalSubtitleFontSize">28px</output>
+          </label>
           <output id="viewerLocalSubtitleStatus" class="viewer-local-subtitle-status" aria-live="polite"></output>
           <small>只套用目前主視角；字幕檔只在目前頁面使用，不上傳、不保存。</small>
         </div>
