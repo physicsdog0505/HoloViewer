@@ -80,6 +80,31 @@
     </section>
 
     <div class="viewer-watch-actions">
+      <details id="viewerLocalSubtitlePanel" class="viewer-local-subtitle-panel">
+        <summary>字幕 A/B</summary>
+        <div class="viewer-local-subtitle-body">
+          <div class="viewer-local-subtitle-source" role="group" aria-label="字幕來源">
+            <button type="button" data-viewer-local-subtitle-mode="holodocchi" class="active" aria-pressed="true">Holodocchi</button>
+            <button type="button" data-viewer-local-subtitle-mode="A" aria-pressed="false" disabled>A</button>
+            <button type="button" data-viewer-local-subtitle-mode="B" aria-pressed="false" disabled>B</button>
+            <button type="button" data-viewer-local-subtitle-mode="A-B" aria-pressed="false" disabled>A-B</button>
+          </div>
+          <div class="viewer-local-subtitle-slot">
+            <strong>A</strong>
+            <label class="viewer-local-subtitle-file">載入檔案<input id="viewerLocalSubtitleFileA" type="file" accept=".srt,.vtt,.json,text/vtt,application/json" hidden></label>
+            <span id="viewerLocalSubtitleNameA">未載入</span>
+            <button id="viewerLocalSubtitleClearA" type="button" disabled>清除</button>
+          </div>
+          <div class="viewer-local-subtitle-slot">
+            <strong>B</strong>
+            <label class="viewer-local-subtitle-file">載入檔案<input id="viewerLocalSubtitleFileB" type="file" accept=".srt,.vtt,.json,text/vtt,application/json" hidden></label>
+            <span id="viewerLocalSubtitleNameB">未載入</span>
+            <button id="viewerLocalSubtitleClearB" type="button" disabled>清除</button>
+          </div>
+          <output id="viewerLocalSubtitleStatus" class="viewer-local-subtitle-status" aria-live="polite"></output>
+          <small>只套用目前主視角；字幕檔只在目前頁面使用，不上傳、不保存。</small>
+        </div>
+      </details>
       <button id="viewerCallMode" type="button" aria-pressed="false" title="關閉打 Call 模式" hidden>Call ✓</button>
       <button id="viewerSettings" type="button" aria-expanded="false">觀看設定</button>
       <button id="viewerFullscreen" type="button">沉浸模式</button>
@@ -113,6 +138,7 @@
 </div>
 
 <script src="/assets/config.js"></script>
+<script src="/assets/local-subtitle-core.js"></script>
 <script src="/assets/ptt-links.js"></script>
 <script src="/assets/video-metadata-resolver.js"></script>
 <script src="/assets/viewing-timeline-core.js"></script>
