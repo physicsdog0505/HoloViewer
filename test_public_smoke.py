@@ -538,7 +538,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".source-standby[hidden]{display:none}", css)
         self.assertIn(".danmaku-layer{", css)
         self.assertIn("height:48%", css)
-        self.assertIn(".subtitle-line.translation{font-size:clamp(20px,1.55vw,28px)}", css)
+        self.assertIn(".subtitle-line.translation{font-size:var(--watchalong-subtitle-font-size,28px)}", css)
         self.assertIn(".subtitle-overlay{", css)
         self.assertIn("background:transparent;border:0", css)
         self.assertIn("color:var(--watchalong-host-accent,#4b97c8)", css)
