@@ -1325,16 +1325,23 @@ function historyNormalizeDateToken(token,yearHint=''){
  if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day)return '';
  return String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
 }
+function historyNormalizeRangeEnd(day){
+ const latest=historyBounds().latest,today=taipeiDay();
+ if(day===today)return latest;
+ return day;
+}
 function parseHistoryDateIntent(raw,yearHint=''){
  const value=String(raw||'').normalize('NFKC').trim();
  if(!value)return null;
- const range=value.match(/^\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*[~～]\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*$/);
+ const range=value.match(/^\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*[~～]\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)?\s*$/);
  if(range){
-  const start=historyNormalizeDateToken(range[1],yearHint),end=historyNormalizeDateToken(range[2],start.slice(0,4)||yearHint);
-  if(!start||!end||start>end)return {kind:'invalid_range'};
+  const start=historyNormalizeDateToken(range[1],yearHint);
+  const requestedEnd=range[2]?historyNormalizeDateToken(range[2],start.slice(0,4)||yearHint):historyBounds().latest;
+  const end=historyNormalizeRangeEnd(requestedEnd);
+  if(!start||!requestedEnd||!end||start>end)return {kind:'invalid_range'};
   const span=Math.floor((Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000)+1;
   if(!historyDateValid(start)||!historyDateValid(end))return {kind:'invalid_range'};
-  return {kind:'range',start,end,span};
+  return {kind:'range',start,end,span,openEnded:!range[2],clampedToLatest:requestedEnd!==end};
  }
  const single=value.match(/^\s*\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?\s*$/);
  if(single){
@@ -1346,7 +1353,7 @@ function parseHistoryDateIntent(raw,yearHint=''){
 function parseHistoryCombinedIntent(raw,yearHint=''){
  const value=String(raw||'').normalize('NFKC').trim();
  if(!value)return {dateIntent:null,query:''};
- const range=value.match(/(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*[~～]\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)/);
+ const range=value.match(/(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)\s*[~～]\s*(\d{1,4}[\/.\-]\d{1,2}(?:[\/.\-]\d{1,2})?)?/);
  if(range){
   const dateIntent=parseHistoryDateIntent(range[0],yearHint);
   return {dateIntent,query:value.replace(range[0],' ').replace(/\s+/g,' ').trim()};
