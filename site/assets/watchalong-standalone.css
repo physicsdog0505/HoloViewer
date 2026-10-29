@@ -75,8 +75,8 @@ button,input,select,output{font:inherit}
 .subtitle-overlay[hidden]{display:none}
 .subtitle-line{
  width:100%;padding:0;color:#fff;font-weight:850;line-height:1.35;
- text-shadow:1px 0 1px #000,-1px 0 1px #000,0 1px 1px #000,0 -1px 1px #000,1px 1px 1px #000,-1px 1px 1px #000,1px -1px 1px #000,-1px -1px 1px #000,0 2px 4px rgba(0,0,0,.95);
- -webkit-text-stroke:4px var(--subtitle-stroke-color,var(--watchalong-host-accent,#4b97c8));paint-order:stroke fill;overflow-wrap:anywhere
+ text-shadow:none;
+ -webkit-text-stroke:5px var(--subtitle-stroke-color,var(--watchalong-host-accent,#4b97c8));paint-order:stroke fill;overflow-wrap:anywhere
 }
 .subtitle-line.translation{font-size:var(--watchalong-subtitle-font-size,28px)}
 .source-subtitle-overlay{
@@ -225,7 +225,7 @@ body.immersive .immersive-toolbar-trigger{
 .subtitle-comparison[hidden]{display:none}
 .subtitle-comparison>div{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start}
 .subtitle-comparison strong{font-size:12px;line-height:1.8;opacity:.72;-webkit-text-stroke:0}
-.subtitle-comparison span{font-size:var(--watchalong-subtitle-font-size,28px);line-height:1.35;font-weight:850;color:#fff;-webkit-text-stroke:4px var(--subtitle-stroke-color,var(--watchalong-host-accent,#4b97c8));paint-order:stroke fill}
+.subtitle-comparison span{font-size:var(--watchalong-subtitle-font-size,28px);line-height:1.35;font-weight:850;color:#fff;-webkit-text-stroke:5px var(--subtitle-stroke-color,var(--watchalong-host-accent,#4b97c8));paint-order:stroke fill}
 @media(max-width:760px){
  .local-subtitle-panel{display:none}
 }

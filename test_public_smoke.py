@@ -336,6 +336,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".viewer-local-subtitle-panel{", css)
         self.assertIn(".viewer-local-subtitle-overlay{", css)
         self.assertIn("background:transparent", css)
+        self.assertIn("text-shadow:none", css)
         self.assertIn("function viewerSubtitleColorForCue(cue)", js)
         self.assertIn("getVideoData?.()?.author", js)
         self.assertIn("speakerAccent", js)
@@ -345,7 +346,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("holoviewer-subtitle-font-size", js)
         self.assertIn("function setViewerSubtitleFontSize(value,{persist=true}={})", js)
         self.assertIn("var(--viewer-subtitle-font-size,28px)", css)
-        self.assertIn("-webkit-text-stroke:4px var(--subtitle-stroke-color", css)
+        self.assertIn("-webkit-text-stroke:5px var(--subtitle-stroke-color", css)
         for script in ("site/assets/local-subtitle-core.js", "site/assets/viewer-standalone.js"):
             subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
 
@@ -623,7 +624,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("holoviewer-subtitle-font-size", js)
         self.assertIn("function setWatchalongSubtitleFontSize(value,{persist=true}={})", js)
         self.assertIn("var(--watchalong-subtitle-font-size,28px)", css)
-        self.assertIn("-webkit-text-stroke:4px var(--subtitle-stroke-color", css)
+        self.assertIn("-webkit-text-stroke:5px var(--subtitle-stroke-color", css)
         for script in ("site/assets/local-subtitle-core.js", "site/assets/watchalong-standalone.js"):
             subprocess.run(["node", "--check", str(ROOT / script)], cwd=ROOT, check=True)
         result = subprocess.run(
