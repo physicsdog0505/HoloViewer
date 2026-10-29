@@ -58,6 +58,19 @@ const subtitleOverlay=document.getElementById('subtitleOverlay');
 const subtitleTranslation=document.getElementById('subtitleTranslation');
 const sourceSubtitleOverlay=document.getElementById('sourceSubtitleOverlay');
 const sourceSubtitleTranslation=document.getElementById('sourceSubtitleTranslation');
+const subtitleComparison=document.getElementById('subtitleComparison');
+const subtitleTranslationA=document.getElementById('subtitleTranslationA');
+const subtitleTranslationB=document.getElementById('subtitleTranslationB');
+const sourceSubtitleComparison=document.getElementById('sourceSubtitleComparison');
+const sourceSubtitleTranslationA=document.getElementById('sourceSubtitleTranslationA');
+const sourceSubtitleTranslationB=document.getElementById('sourceSubtitleTranslationB');
+const localSubtitleFileA=document.getElementById('localSubtitleFileA');
+const localSubtitleFileB=document.getElementById('localSubtitleFileB');
+const localSubtitleNameA=document.getElementById('localSubtitleNameA');
+const localSubtitleNameB=document.getElementById('localSubtitleNameB');
+const localSubtitleClearA=document.getElementById('localSubtitleClearA');
+const localSubtitleClearB=document.getElementById('localSubtitleClearB');
+const localSubtitleStatus=document.getElementById('localSubtitleStatus');
 const danmakuLayer=document.getElementById('danmakuLayer');
 
 let hostPlayer=null;
@@ -80,6 +93,8 @@ let pttUserScrollIntentUntil=0;
 const archiveManifestCache=new Map();
 let segments=[];
 let subtitles=[];
+const localSubtitleSlots={A:null,B:null};
+let localSubtitleMode='holodocchi';
 let activeSegmentIndex=-1;
 let activeSourceVideoId=sourceVideoId||'';
 let sourceStandbyActive=false;
@@ -369,6 +384,14 @@ function setSubtitleDisplay(mode,{persist=true}={}){
  if(persist)persistSubtitleMode();
  refreshSubtitleModeUi();
 }
+document.querySelectorAll('[data-local-subtitle-mode]').forEach(button=>{
+ button.addEventListener('click',()=>setLocalSubtitleMode(button.dataset.localSubtitleMode));
+});
+localSubtitleFileA?.addEventListener('change',async()=>{const file=localSubtitleFileA.files?.[0];await loadLocalSubtitle('A',file);localSubtitleFileA.value=''});
+localSubtitleFileB?.addEventListener('change',async()=>{const file=localSubtitleFileB.files?.[0];await loadLocalSubtitle('B',file);localSubtitleFileB.value=''});
+localSubtitleClearA?.addEventListener('click',()=>clearLocalSubtitle('A'));
+localSubtitleClearB?.addEventListener('click',()=>clearLocalSubtitle('B'));
+refreshLocalSubtitleUi();
 try{
  const standard=localStorage.getItem('holoviewer-watchalong-subtitle-standard');
  const danmaku=localStorage.getItem('holoviewer-watchalong-subtitle-danmaku');
@@ -705,6 +728,80 @@ function subtitleCueAt(current){
  const row=subtitles[Math.max(0,low-1)];
  return row&&current>=row.start&&current<row.end?row:null;
 }
+function localSubtitleTarget(){
+ const timeline=subtitleTimeline==='host'?'host':'source';
+ const videoId=timeline==='host'?hostVideoId:(activeSourceVideoId||sourceVideoId);
+ return {timeline,videoId:validVideoId(videoId)};
+}
+function localSubtitleCurrentSeconds(timeline){
+ try{
+  const value=timeline==='host'?hostPlayer?.getCurrentTime?.():sourcePlayer?.getCurrentTime?.();
+  return Number.isFinite(value)?value:null;
+ }catch{return null}
+}
+function localSubtitleCue(slot,current){
+ if(!slot||!window.HoloViewerLocalSubtitles)return null;
+ return HoloViewerLocalSubtitles.cueAt(slot.cues,current);
+}
+function refreshLocalSubtitleUi(){
+ const a=localSubtitleSlots.A,b=localSubtitleSlots.B;
+ if(localSubtitleNameA)localSubtitleNameA.textContent=a?a.filename:'未載入';
+ if(localSubtitleNameB)localSubtitleNameB.textContent=b?b.filename:'未載入';
+ if(localSubtitleClearA)localSubtitleClearA.disabled=!a;
+ if(localSubtitleClearB)localSubtitleClearB.disabled=!b;
+ document.querySelectorAll('[data-local-subtitle-mode]').forEach(button=>{
+  const mode=button.dataset.localSubtitleMode;
+  const available=mode==='holodocchi'||mode==='A'&&Boolean(a)||mode==='B'&&Boolean(b)||mode==='A-B'&&Boolean(a&&b&&a.videoId===b.videoId&&a.timeline===b.timeline);
+  button.disabled=!available;
+  const active=mode===localSubtitleMode;
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-pressed',String(active));
+ });
+}
+function setLocalSubtitleStatus(message,{error=false}={}){
+ if(!localSubtitleStatus)return;
+ localSubtitleStatus.textContent=message||'';
+ localSubtitleStatus.dataset.state=error?'error':'ok';
+}
+function setLocalSubtitleMode(mode){
+ const a=localSubtitleSlots.A,b=localSubtitleSlots.B;
+ if(mode==='A'&&!a)return false;
+ if(mode==='B'&&!b)return false;
+ if(mode==='A-B'&&(!a||!b||a.videoId!==b.videoId||a.timeline!==b.timeline))return false;
+ localSubtitleMode=mode;
+ activeSubtitleCueId='';
+ lastDanmakuCueId='';
+ clearDanmaku();
+ refreshLocalSubtitleUi();
+ return true;
+}
+async function loadLocalSubtitle(slotName,file){
+ if(!file)return;
+ try{
+  if(!window.HoloViewerLocalSubtitles)throw new Error('本機字幕 parser 尚未載入');
+  const target=localSubtitleTarget();
+  if(!target.videoId)throw new Error('目前影片 ID 尚未就緒');
+  const body=await file.text();
+  const parsed=HoloViewerLocalSubtitles.parseLocalSubtitleFile(file.name,body,{expectedVideoId:target.videoId});
+  if(parsed.videoId&&parsed.videoId!==target.videoId)throw new Error('字幕 video_id 與目前影片不符');
+  const other=localSubtitleSlots[slotName==='A'?'B':'A'];
+  if(other&&(other.videoId!==target.videoId||other.timeline!==target.timeline))
+   throw new Error('A/B 必須是同一支影片與同一時間軸');
+  localSubtitleSlots[slotName]={filename:file.name,format:parsed.format,cues:parsed.cues,videoId:target.videoId,timeline:target.timeline};
+  setLocalSubtitleMode(slotName);
+  setLocalSubtitleStatus(slotName+' 已載入：'+file.name+' · '+parsed.cues.length+' 段');
+ }catch(error){
+  setLocalSubtitleStatus(String(error?.message||error),{error:true});
+ }
+}
+function clearLocalSubtitle(slotName){
+ localSubtitleSlots[slotName]=null;
+ if(localSubtitleMode===slotName||localSubtitleMode==='A-B')localSubtitleMode='holodocchi';
+ activeSubtitleCueId='';lastDanmakuCueId='';clearDanmaku();
+ setLocalSubtitleStatus(slotName+' 已清除');
+ refreshLocalSubtitleUi();
+}
+
 function spawnDanmaku(row){
  if(!danmakuLayer||!row)return;
  const cueId=String(row.id||row.index||row.start);
@@ -726,6 +823,10 @@ function spawnDanmaku(row){
 }
 function renderSubtitleCue(row){
  const cueId=row?String(row.id||row.index||row.start):'';
+ if(subtitleTranslation)subtitleTranslation.hidden=false;
+ if(sourceSubtitleTranslation)sourceSubtitleTranslation.hidden=false;
+ if(subtitleComparison)subtitleComparison.hidden=true;
+ if(sourceSubtitleComparison)sourceSubtitleComparison.hidden=true;
  if(subtitleEnabled){
   const text=row?.translation||'';
   subtitleTranslation.textContent=text;
@@ -749,13 +850,43 @@ function renderSubtitleCue(row){
   activeSubtitleCueId=cueId;
  }
 }
+function renderSubtitlePair(a,b){
+ const aText=String(a?.translation||'').trim(),bText=String(b?.translation||'').trim();
+ const hasText=Boolean(aText||bText);
+ if(subtitleTranslation)subtitleTranslation.hidden=true;
+ if(sourceSubtitleTranslation)sourceSubtitleTranslation.hidden=true;
+ if(subtitleComparison)subtitleComparison.hidden=false;
+ if(sourceSubtitleComparison)sourceSubtitleComparison.hidden=false;
+ if(subtitleTranslationA)subtitleTranslationA.textContent=aText||'—';
+ if(subtitleTranslationB)subtitleTranslationB.textContent=bText||'—';
+ if(sourceSubtitleTranslationA)sourceSubtitleTranslationA.textContent=aText||'—';
+ if(sourceSubtitleTranslationB)sourceSubtitleTranslationB.textContent=bText||'—';
+ subtitleOverlay.hidden=!subtitleEnabled||!hasText;
+ sourceSubtitleOverlay.hidden=!subtitleEnabled||danmakuEnabled||!hasText;
+ clearDanmaku();
+ activeSubtitleCueId=(a?String(a.id||a.index||a.start):'')+'|'+(b?String(b.id||b.index||b.start):'');
+}
 function startSubtitleLoop(){
  if(subtitleTimer)return;
  subtitleTimer=setInterval(()=>{
-  let current=null;
-  try{current=subtitleTimeline==='host'?hostPlayer?.getCurrentTime?.():sourcePlayer?.getCurrentTime?.()}catch{}
-  if(!Number.isFinite(current)||!subtitles.length){renderSubtitleCue(null);return}
-  renderSubtitleCue(subtitleCueAt(current));
+  if(localSubtitleMode==='holodocchi'){
+   let current=null;
+   try{current=subtitleTimeline==='host'?hostPlayer?.getCurrentTime?.():sourcePlayer?.getCurrentTime?.()}catch{}
+   if(!Number.isFinite(current)||!subtitles.length){renderSubtitleCue(null);return}
+   renderSubtitleCue(subtitleCueAt(current));
+   return;
+  }
+  if(localSubtitleMode==='A-B'){
+   const a=localSubtitleSlots.A,b=localSubtitleSlots.B;
+   const current=localSubtitleCurrentSeconds(a?.timeline);
+   if(!Number.isFinite(current)||!a||!b){renderSubtitlePair(null,null);return}
+   renderSubtitlePair(localSubtitleCue(a,current),localSubtitleCue(b,current));
+   return;
+  }
+  const slot=localSubtitleSlots[localSubtitleMode];
+  const current=localSubtitleCurrentSeconds(slot?.timeline);
+  if(!Number.isFinite(current)||!slot){renderSubtitleCue(null);return}
+  renderSubtitleCue(localSubtitleCue(slot,current));
  },200);
 }
 
