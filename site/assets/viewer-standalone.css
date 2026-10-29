@@ -705,14 +705,14 @@ body.immersive .viewer-workspace.workspace-focus.layout-primary{
 .viewer-local-subtitle-size{display:grid;grid-template-columns:auto minmax(120px,1fr) 44px;gap:8px;align-items:center;font-size:12px;font-weight:800;color:var(--text)}
 .viewer-local-subtitle-size input{width:100%;accent-color:#242321}
 .viewer-local-subtitle-size output{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
-.viewer-local-subtitle-overlay{position:absolute;left:4%;right:4%;bottom:6%;z-index:5;padding:0 10px;background:transparent;color:#fff;text-align:center;pointer-events:none;text-shadow:0 1px 2px #000,0 0 6px rgba(0,0,0,.88);-webkit-text-stroke:2px #000;paint-order:stroke fill}
+.viewer-local-subtitle-overlay{position:absolute;left:4%;right:4%;bottom:6%;z-index:5;padding:0 10px;background:transparent;color:#fff;text-align:center;pointer-events:none;text-shadow:0 1px 2px #000,0 0 5px #000,1px 1px 2px #000,-1px -1px 2px #000}
 .viewer-local-subtitle-overlay[hidden]{display:none}
-.viewer-local-subtitle-single{font-size:var(--viewer-subtitle-font-size,28px);line-height:1.4;font-weight:850}
+.viewer-local-subtitle-single{font-size:var(--viewer-subtitle-font-size,28px);line-height:1.4;font-weight:850;color:#fff;-webkit-text-stroke:3px var(--subtitle-stroke-color,#9ab8c4);paint-order:stroke fill}
 .viewer-local-subtitle-comparison{display:grid;gap:4px}
 .viewer-local-subtitle-comparison[hidden]{display:none}
 .viewer-local-subtitle-comparison>div{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;text-align:left}
 .viewer-local-subtitle-comparison strong{font-size:12px;line-height:1.8;opacity:.72;-webkit-text-stroke:0}
-.viewer-local-subtitle-comparison span{font-size:var(--viewer-subtitle-font-size,28px);line-height:1.35;font-weight:850}
+.viewer-local-subtitle-comparison span{font-size:var(--viewer-subtitle-font-size,28px);line-height:1.35;font-weight:850;color:#fff;-webkit-text-stroke:3px var(--subtitle-stroke-color,#9ab8c4);paint-order:stroke fill}
 @media(max-width:760px){
  .viewer-local-subtitle-panel{display:none}
 }
