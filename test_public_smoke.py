@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -574,6 +575,11 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("字幕時間順序錯誤", core)
         self.assertIn(".local-subtitle-panel{", css)
         self.assertIn(".subtitle-comparison{", css)
+        result = subprocess.run(
+            ["node", str(ROOT / "test_local_subtitle_core.js")],
+            cwd=ROOT, check=True, capture_output=True, text=True,
+        )
+        self.assertIn("LOCAL_SUBTITLE_CORE=PASS", result.stdout)
 
     def test_watchalong_static_assets_integrity(self):
         manifest = json.loads((ROOT / "site/data/watchalong/manifest.json").read_text(encoding="utf-8"))
