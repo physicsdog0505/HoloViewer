@@ -862,10 +862,12 @@ function renderSubtitleCue(row){
  if(subtitleEnabled){
   const text=row?.translation||'';
   subtitleTranslation.textContent=text;
-  subtitleTranslation.style.color=watchalongSubtitleColor(row);
+  subtitleTranslation.style.color='#fff';
+  subtitleTranslation.style.setProperty('--subtitle-stroke-color',watchalongSubtitleColor(row));
   subtitleOverlay.hidden=!text;
   sourceSubtitleTranslation.textContent=text;
-  sourceSubtitleTranslation.style.color=watchalongSubtitleColor(row);
+  sourceSubtitleTranslation.style.color='#fff';
+  sourceSubtitleTranslation.style.setProperty('--subtitle-stroke-color',watchalongSubtitleColor(row));
   sourceSubtitleOverlay.hidden=danmakuEnabled||!text;
  }else{
   subtitleOverlay.hidden=true;
@@ -891,10 +893,10 @@ function renderSubtitlePair(a,b){
  if(sourceSubtitleTranslation)sourceSubtitleTranslation.hidden=true;
  if(subtitleComparison)subtitleComparison.hidden=false;
  if(sourceSubtitleComparison)sourceSubtitleComparison.hidden=false;
- if(subtitleTranslationA){subtitleTranslationA.textContent=aText||'—';subtitleTranslationA.style.color=watchalongSubtitleColor(a)}
- if(subtitleTranslationB){subtitleTranslationB.textContent=bText||'—';subtitleTranslationB.style.color=watchalongSubtitleColor(b)}
- if(sourceSubtitleTranslationA){sourceSubtitleTranslationA.textContent=aText||'—';sourceSubtitleTranslationA.style.color=watchalongSubtitleColor(a)}
- if(sourceSubtitleTranslationB){sourceSubtitleTranslationB.textContent=bText||'—';sourceSubtitleTranslationB.style.color=watchalongSubtitleColor(b)}
+ if(subtitleTranslationA){subtitleTranslationA.textContent=aText||'—';subtitleTranslationA.style.color='#fff';subtitleTranslationA.style.setProperty('--subtitle-stroke-color',watchalongSubtitleColor(a))}
+ if(subtitleTranslationB){subtitleTranslationB.textContent=bText||'—';subtitleTranslationB.style.color='#fff';subtitleTranslationB.style.setProperty('--subtitle-stroke-color',watchalongSubtitleColor(b))}
+ if(sourceSubtitleTranslationA){sourceSubtitleTranslationA.textContent=aText||'—';sourceSubtitleTranslationA.style.color='#fff';sourceSubtitleTranslationA.style.setProperty('--subtitle-stroke-color',watchalongSubtitleColor(a))}
+ if(sourceSubtitleTranslationB){sourceSubtitleTranslationB.textContent=bText||'—';sourceSubtitleTranslationB.style.color='#fff';sourceSubtitleTranslationB.style.setProperty('--subtitle-stroke-color',watchalongSubtitleColor(b))}
  subtitleOverlay.hidden=!subtitleEnabled||!hasText;
  sourceSubtitleOverlay.hidden=!subtitleEnabled||danmakuEnabled||!hasText;
  clearDanmaku();
