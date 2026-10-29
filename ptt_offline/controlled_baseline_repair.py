@@ -18,6 +18,7 @@ from pathlib import Path
 from .audit_baseline_gap import _collect_source_lines, _norm_aid
 from .collector_source_preview import open_source
 from .live_capture_publisher import inspect_latest_article, OUTPUT_KEYS
+from .historical_baseline_authority import inspect_historical_article
 from .owner_publisher_once import sign_time_proof
 from .owner_http_transport import owner_signed_http_executor
 from .resumable_publisher import new_checkpoint, make_batch
@@ -45,7 +46,9 @@ def validate_approved_batch(*,source,aid,plan_json,remote_json,batch_no,approved
     if type(batch_no) is not int or batch_no<1:
         raise ContractError("positive repair batch number required")
     plan=json.loads(Path(plan_json).read_text(encoding="utf-8"))
-    if plan.get("status")!="READ_ONLY_REPAIR_PLAN" or _norm_aid(plan.get("aid"))!=_norm_aid(aid):
+    plan_status=plan.get("status")
+    if (plan_status not in ("READ_ONLY_REPAIR_PLAN","READ_ONLY_HISTORICAL_REPAIR_PLAN") or
+        _norm_aid(plan.get("aid"))!=_norm_aid(aid)):
         raise ContractError("repair plan scope mismatch")
     batches=plan.get("batches")
     if not isinstance(batches,list) or batch_no>len(batches):
@@ -57,7 +60,9 @@ def validate_approved_batch(*,source,aid,plan_json,remote_json,batch_no,approved
     if not isinstance(planned,list) or not 1<=len(planned)<=10:
         raise ContractError("invalid approved bounded repair batch")
 
-    remote=_remote_records(remote_json)
+    wanted=_norm_aid(aid)
+    remote=[r for r in _remote_records(remote_json)
+            if r.get("aid") is None or _norm_aid(r.get("aid"))==wanted]
     remote_by_line={r.get("source_line"):r for r in remote if type(r.get("source_line")) is int}
     remote_by_key={r.get("source_record_key"):r for r in remote if isinstance(r.get("source_record_key"),str)}
     for row in planned:
@@ -75,7 +80,6 @@ def validate_approved_batch(*,source,aid,plan_json,remote_json,batch_no,approved
                 raise ContractError("remote source-record identity conflict")
             raise ContractError("approved repair source record already exists remotely")
 
-    wanted=_norm_aid(aid)
     with open_source(source) as db:
         article=None
         for raw in db.execute(
@@ -86,7 +90,12 @@ def validate_approved_batch(*,source,aid,plan_json,remote_json,batch_no,approved
                 break
         if article is None:
             raise ContractError("AID not found in Collector source")
-        current=inspect_latest_article(db,article_id=article[0])
+        if plan_status=="READ_ONLY_HISTORICAL_REPAIR_PLAN":
+            if plan.get("authority")!="verified_url_epoch_full_article_v1":
+                raise ContractError("historical repair authority mismatch")
+            current=inspect_historical_article(db,article_id=article[0])
+        else:
+            current=inspect_latest_article(db,article_id=article[0])
     if current.get("source_identity")!=plan.get("source_identity"):
         raise ContractError("source identity changed since repair plan")
     ready={row["source_line"]:row for row in current.get("candidate_rows",[])}
