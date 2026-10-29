@@ -2238,15 +2238,15 @@ function renderViewerLocalSubtitle(){
   const rows=comparison?.querySelectorAll('span')||[];
   if(single)single.hidden=true;
   if(comparison)comparison.hidden=false;
-  if(rows[0]){rows[0].textContent=String(aCue?.translation||'—');rows[0].style.color=viewerSubtitleColorForCue(aCue)}
-  if(rows[1]){rows[1].textContent=String(bCue?.translation||'—');rows[1].style.color=viewerSubtitleColorForCue(bCue)}
+  if(rows[0]){rows[0].textContent=String(aCue?.translation||'—');rows[0].style.color='#fff';rows[0].style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(aCue))}
+  if(rows[1]){rows[1].textContent=String(bCue?.translation||'—');rows[1].style.color='#fff';rows[1].style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(bCue))}
   overlay.hidden=!(aCue||bCue);
   return;
  }
  const slot=viewerLocalSubtitleSlots[viewerLocalSubtitleMode];
  if(!slot||slot.videoId!==videoId)return;
  const cue=viewerLocalSubtitleCue(slot,current);
- if(single){single.hidden=false;single.textContent=String(cue?.translation||'');single.style.color=viewerSubtitleColorForCue(cue)}
+ if(single){single.hidden=false;single.textContent=String(cue?.translation||'');single.style.color='#fff';single.style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(cue))}
  if(comparison)comparison.hidden=true;
  overlay.hidden=!cue;
 }
