@@ -17,8 +17,8 @@ CUSTOM_ORIGIN = "https://holodocchi.com"
 WORKERS_ORIGIN = "https://holoviewer-public.singlebagel.workers.dev"
 WORKER_NAME = "holoviewer-public"
 WRANGLER_CONFIG = "cloudflare/wrangler.json"
-FOREIGN_PREFIXES = ("youtube/v1/", "ptt/v1/")
-PROTECTED_RUNTIME_PREFIXES = ("data/search/aliases/", "data/watchalong/")
+FOREIGN_PREFIXES = ("youtube/v1/", "ptt/v1/", "data/watchalong/")
+PROTECTED_RUNTIME_PREFIXES = ("data/search/aliases/",)
 SKIP_REMOTE = {"_headers", "_redirects"}
 
 
@@ -178,8 +178,6 @@ def ownership_gate(repo: Path) -> dict:
                 forbidden.append(rel)
     if forbidden:
         raise ReleaseBlocked("foreign-owner assets in candidate: " + ", ".join(forbidden[:20]))
-    if not (repo / "site/data/watchalong/manifest.json").is_file():
-        raise ReleaseBlocked("Watchalong manifest missing")
     return {"forbidden_count": 0, "status": "PASS"}
 
 
@@ -242,34 +240,6 @@ def reconcile_runtime(repo: Path, base: str, head: str) -> dict:
     changed = diff_site(repo, base, head)
     candidate = repo / "site"
     protected = []
-
-    # Current Production Watchalong inventory is manifest-declared.
-    manifest_rel = "data/watchalong/manifest.json"
-    raw = fetch(CUSTOM_ORIGIN, "/" + manifest_rel)
-    raw_workers = fetch(WORKERS_ORIGIN, "/" + manifest_rel)
-    if raw != raw_workers:
-        raise ReleaseBlocked("Watchalong manifest differs between Production origins")
-    if raw:
-        try:
-            obj = json.loads(raw)
-        except ValueError as exc:
-            raise ReleaseBlocked("Production Watchalong manifest invalid") from exc
-        paths = [manifest_rel]
-        for event in obj.get("events", []):
-            p = str(event.get("path") or "").lstrip("/")
-            if p:
-                paths.append(p)
-        for rel in paths:
-            repo_path = "site/" + rel
-            if changed.get(repo_path, "").startswith("D"):
-                continue
-            local = candidate / rel
-            if not local.is_file():
-                raise ReleaseBlocked(f"current Production Watchalong asset missing from candidate: /{rel}")
-            prod = fetch(CUSTOM_ORIGIN, "/" + rel)
-            if repo_path not in changed and local.read_bytes() != prod:
-                raise ReleaseBlocked(f"unreviewed Watchalong drift at /{rel}")
-            protected.append(rel)
 
     # Current Production Alias immutable must not disappear from a generic frontend release.
     alias_latest_rel = "data/search/aliases/v1/latest.json"
