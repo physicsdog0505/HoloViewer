@@ -209,7 +209,7 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
 
 
     def test_wrangler_local_cache_does_not_dirty_release_worktree(self):
-        gitignore=(ROOT / ".gitignore").read_text(encoding="utf-8") if (ROOT := Path(__file__).resolve().parent) else ""
+        gitignore=(Path(__file__).resolve().parent / ".gitignore").read_text(encoding="utf-8")
         self.assertIn(".wrangler/",gitignore)
 
         with tempfile.TemporaryDirectory() as td:
