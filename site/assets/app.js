@@ -1617,6 +1617,37 @@ function historyChannelFacetEntries(rows){
  }
  return [...map.values()].sort((a,b)=>b.count-a.count||String(a.row?.channel_name||a.row?.channel_title||a.channelId).localeCompare(String(b.row?.channel_name||b.row?.channel_title||b.channelId)));
 }
+const HISTORY_SEARCH_BATCH_SIZE=200;
+let historySearchRenderLimit=HISTORY_SEARCH_BATCH_SIZE;
+let historySearchLoadMoreObserver=null;
+let historySearchSummaryState=null;
+function resetHistorySearchRenderLimit(){
+ historySearchRenderLimit=HISTORY_SEARCH_BATCH_SIZE;
+ if(historySearchLoadMoreObserver){historySearchLoadMoreObserver.disconnect();historySearchLoadMoreObserver=null}
+}
+function updateHistorySearchSummary(facetResult){
+ const state=historySearchSummaryState;if(!state)return;
+ const filtered=historyChannelSelection.size?facetResult.filteredCount:state.resultCount;
+ const progress=filtered>facetResult.renderedCount?' · 已顯示 '+facetResult.renderedCount+' 筆':'';
+ const facetLabel=historyChannelSelection.size?' · 篩選後 '+facetResult.filteredCount+' 筆':'';
+ if(state.dateIntent?.kind==='range'){
+  const searchLabel=state.searchQuery?' · 搜尋：'+state.searchQuery:'';
+  $('history-search-summary').textContent=state.dateIntent.start+' ～ '+state.dateIntent.end+searchLabel+' · 找到 '+state.resultCount+' 筆'+facetLabel+progress;
+  return;
+ }
+ const resolved=state.parsedSearch?.members?.map(member=>member.canonical_name).join(' + ')||'';
+ const intent=state.parsedSearch?.intent==='member_set'?' · 多人/連動意圖':state.parsedSearch?.intent==='member'?' · 成員搜尋':'';
+ const prefix=resolved?'辨識：'+resolved+intent+' · ':'';
+ $('history-search-summary').textContent=prefix+'找到 '+state.resultCount+' 筆'+facetLabel+progress;
+}
+function armHistorySearchLoadMore(button){
+ if(historySearchLoadMoreObserver){historySearchLoadMoreObserver.disconnect();historySearchLoadMoreObserver=null}
+ if(!button||!('IntersectionObserver' in window))return;
+ historySearchLoadMoreObserver=new IntersectionObserver(entries=>{
+  if(entries.some(entry=>entry.isIntersecting))button.click();
+ },{rootMargin:'600px 0px'});
+ historySearchLoadMoreObserver.observe(button);
+}
 function renderHistoryChannelFacets(rows){
  const box=$('history-channel-filters');if(!box)return;
  box.replaceChildren();
@@ -1634,6 +1665,7 @@ function renderHistoryChannelFacets(rows){
   button.append(ring,node('span',String(item.channel_name||item.channel_title||entry.channelId),'history-channel-filter-name'),node('span',String(entry.count),'history-channel-filter-count'));
   button.onclick=()=>{
    if(historyChannelSelection.has(entry.channelId))historyChannelSelection.delete(entry.channelId);else historyChannelSelection.add(entry.channelId);
+   resetHistorySearchRenderLimit();
    renderHistoryChannelFacets(historyChannelFacetRows);
    renderHistoryFacetCards();
   };
@@ -1641,7 +1673,7 @@ function renderHistoryChannelFacets(rows){
  }
  if(historyChannelSelection.size){
   const clear=node('button','清除篩選','history-channel-filter-clear');clear.type='button';
-  clear.onclick=()=>{historyChannelSelection.clear();renderHistoryChannelFacets(historyChannelFacetRows);renderHistoryFacetCards()};
+  clear.onclick=()=>{historyChannelSelection.clear();resetHistorySearchRenderLimit();renderHistoryChannelFacets(historyChannelFacetRows);renderHistoryFacetCards()};
   box.append(clear);
  }
 }
@@ -1652,15 +1684,31 @@ function historyFacetFilteredRows(){
 function renderHistoryFacetCards(){
  const list=$('history-list');list.replaceChildren();historyVodWindows.clear();
  const rows=historyFacetFilteredRows();
- const rendered=rows.slice(0,200);
+ const rendered=rows.slice(0,historySearchRenderLimit);
  rendered.forEach(item=>homeCard(item,list,{collabMap:historyChannelFacetCollabMap,history:true}));
  const ids=new Set(rendered.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
  $('history-empty').hidden=Boolean(rendered.length);
- return {filteredCount:rows.length,renderedCount:rendered.length};
+ const pagination=$('history-pagination');pagination.replaceChildren();
+ if(rendered.length<rows.length){
+  const more=node('button','載入更多（'+rendered.length+' / '+rows.length+'）','subtle-action');
+  more.type='button';
+  more.onclick=()=>{
+   historySearchRenderLimit=Math.min(rows.length,historySearchRenderLimit+HISTORY_SEARCH_BATCH_SIZE);
+   renderHistoryFacetCards();
+  };
+  pagination.append(more);
+  armHistorySearchLoadMore(more);
+ }else if(historySearchLoadMoreObserver){
+  historySearchLoadMoreObserver.disconnect();historySearchLoadMoreObserver=null;
+ }
+ const result={filteredCount:rows.length,renderedCount:rendered.length};
+ updateHistorySearchSummary(result);
+ return result;
 }
 let historyLoadGeneration=0;
 async function loadHistory(){
  const generation=++historyLoadGeneration;
+ resetHistorySearchRenderLimit();historySearchSummaryState=null;
  historyChrome();const day=$('historyDate').value,query=historyQuery(),error=$('history-error');error.hidden=true;error.textContent='';
  const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';const intentBox=$('history-search-intent');if(intentBox){intentBox.replaceChildren();intentBox.hidden=true}const channelFilters=$('history-channel-filters');if(channelFilters){channelFilters.replaceChildren();channelFilters.hidden=true}
  if(!config.youtubeStaticBase&&!config.apiBase){error.textContent='History 資料來源尚未設定。';error.hidden=false;return}
@@ -1708,24 +1756,18 @@ async function loadHistory(){
   if(historyChannelFacetContext!==facetContext){historyChannelSelection.clear();historyChannelFacetContext=facetContext}
   historyChannelFacetRows=query?endedItems:[];
   historyChannelFacetCollabMap=historyCollabByVideo;
+  historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount}:null;
   if(query)renderHistoryChannelFacets(historyChannelFacetRows);
   const facetResult=query?renderHistoryFacetCards():(()=>{historyVodWindows.clear();endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();$('history-empty').hidden=Boolean(endedItems.length);return {filteredCount:endedItems.length,renderedCount:endedItems.length}})();
-  const renderedItems=query?historyFacetFilteredRows().slice(0,200):endedItems;
+  const renderedItems=query?historyFacetFilteredRows().slice(0,historySearchRenderLimit):endedItems;
   const total=Number(data.total||0);
   if(query){
    if(dateIntent?.kind==='range'){
     $('history-empty').textContent=searchQuery?'這個日期區間沒有符合搜尋條件的已結束直播。':'這個日期區間沒有可顯示的已結束直播。';
-    const searchLabel=searchQuery?' · 搜尋：'+searchQuery:'';
-    const facetLabel=historyChannelSelection.size?' · 篩選後 '+facetResult.filteredCount+' 筆':'';
-    $('history-search-summary').textContent=dateIntent.start+' ～ '+dateIntent.end+searchLabel+' · '+(resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆':'找到 '+resultCount+' 筆')+facetLabel;
    }else{
     $('history-empty').textContent='這個月份沒有符合搜尋條件的已結束直播。';
-    const resolved=parsedSearch?.members?.map(member=>member.canonical_name).join(' + ')||'';
-    const intent=parsedSearch?.intent==='member_set'?' · 多人/連動意圖':parsedSearch?.intent==='member'?' · 成員搜尋':'';
-    const prefix=resolved?'辨識：'+resolved+intent+' · ':'';
-    const facetLabel=historyChannelSelection.size?' · 篩選後 '+facetResult.filteredCount+' 筆':'';
-    $('history-search-summary').textContent=prefix+(resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆':'找到 '+resultCount+' 筆')+facetLabel;
    }
+   updateHistorySearchSummary(facetResult);
   }else{
    $('history-empty').textContent='這一天沒有可顯示的已結束直播，或歷史資料尚未接入。';
   }
