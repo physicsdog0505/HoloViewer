@@ -7,7 +7,10 @@ Authoritative ownership:
 ```text
 holoviewer-public
   -> frontend-owned site assets
-  -> explicitly owned frontend data such as data/watchalong/** and data/search/aliases/v1/**
+  -> frontend-owned runtime data such as data/search/aliases/v1/**
+
+holoviewer-watchalong-static-assets
+  -> data/watchalong/** from watchalong-static/data/watchalong/**
 
 holoviewer-youtube-static-assets
   -> youtube/v1/**
@@ -16,7 +19,7 @@ holoviewer-ptt-static-assets
   -> ptt/v1/**
 ```
 
-The frontend release must never stage or preserve `youtube/v1/**` or `ptt/v1/**`.
+The frontend release must never stage or preserve `data/watchalong/**`, `youtube/v1/**`, or `ptt/v1/**`.
 
 ## Deployment authority
 
@@ -46,7 +49,7 @@ Default behavior is PREPARE_ONLY. It verifies:
 - frontend consumers point to dedicated YouTube/PTT Static Assets targets;
 - dedicated YouTube/PTT manifests are healthy;
 - every unchanged frontend-owned file from the accepted Production source matches both `holodocchi.com` and workers.dev byte-for-byte;
-- current Production Watchalong manifest/event inventory is preserved unless an exact reviewed delta changes or deletes it;
+- the dedicated Watchalong Static Assets manifest and all declared event hashes are healthy;
 - current Production Alias immutable object is preserved across generic frontend releases;
 - the first-run legacy foreign-owner inventory is surfaced in PREPARE evidence;
 - current active Worker version can be read.
@@ -76,7 +79,7 @@ EXECUTE repeats all gates and refuses deployment if the active Worker version ch
 After deploy, PASS is not declared until:
 
 - every candidate frontend-owned asset is read back byte-for-byte from both `holodocchi.com` and workers.dev;
-- Watchalong/Alias candidate assets are therefore included in the dual-origin verification;
+- frontend-owned candidate assets are included in dual-origin verification; dedicated Watchalong data is checked on its own origin;
 - dedicated YouTube/PTT target health is rechecked;
 - a new active Worker version is observed.
 
