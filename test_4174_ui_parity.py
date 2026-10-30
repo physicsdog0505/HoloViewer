@@ -203,7 +203,9 @@ class ParityContract(unittest.TestCase):
             "優先顯示同時相關的結果",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
             "const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);",
-            "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
+            "const HISTORY_SEARCH_BATCH_SIZE=200;",
+            "const rendered=rows.slice(0,historySearchRenderLimit);",
+            "已顯示 '+facetResult.renderedCount+' 筆",
             "params.set('date',day)",
             "params.set('q',$('historySearch').value.trim())",
         ):
@@ -1624,7 +1626,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('function parseHistoryCombinedIntent(raw,yearHint=\'\')',js)
         self.assertIn("String(token||'').normalize('NFKC').trim()",js)
         self.assertIn("String(raw||'').normalize('NFKC').trim()",js)
-        self.assertIn("return {kind:'range',start,end,span};",js)
+        self.assertIn("return {kind:'range',start,end,span,openEnded:!range[2],clampedToLatest:requestedEnd!==end};",js)
         self.assertNotIn("if(span>62)return {kind:'range_too_large',start,end,span};",js)
         self.assertIn('while(cursor<=last){',js)
         self.assertNotIn('months.length<3',js)
@@ -1988,6 +1990,28 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("@media(max-width:760px){",css)
         self.assertNotIn("@media(max-width:980px){\n .sync-controls,.subtitle-mode-controls{display:none}",css)
 
+
+
+    def test_history_search_progressively_reveals_full_filtered_result_set(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("const HISTORY_SEARCH_BATCH_SIZE=200;",js)
+        self.assertIn("const rendered=rows.slice(0,historySearchRenderLimit);",js)
+        self.assertIn("historySearchRenderLimit=Math.min(rows.length,historySearchRenderLimit+HISTORY_SEARCH_BATCH_SIZE);",js)
+        self.assertIn("new IntersectionObserver(entries=>",js)
+        self.assertIn("載入更多（'+rendered.length+' / '+rows.length+'）",js)
+        self.assertIn("historyChannelFacetRows=query?endedItems:[];",js)
+        self.assertNotIn("const rendered=rows.slice(0,200);",js)
+        self.assertNotIn("顯示前 200 筆",js)
+
+    def test_ptt_archive_q1_2026_months_are_routed_to_full_offline_static_worker(self):
+        config=(ROOT/'site/assets/config.js').read_text(encoding='utf-8')
+        base='https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev'
+        for month in ('01','02','03'):
+            self.assertIn(f'"2026-{month}": Object.freeze({{',config)
+            self.assertIn(f'manifest: "/ptt/v1/manifests/static-assets-full-2026-{month}.json"',config)
+        self.assertGreaterEqual(config.count(f'base: "{base}"'),9)
+        self.assertIn('"2026-09": Object.freeze({',config)
+        self.assertIn('base: "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev"',config)
 
 
 if __name__ == "__main__":

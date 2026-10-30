@@ -6,6 +6,18 @@ window.HOLOVIEWER_CONFIG = Object.freeze({
     pathTemplate: ""
   }),
   pttArchiveMonths: Object.freeze({
+    "2026-01": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2026-01.json"
+    }),
+    "2026-02": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2026-02.json"
+    }),
+    "2026-03": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2026-03.json"
+    }),
     "2026-04": Object.freeze({
       base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
       manifest: "/ptt/v1/manifests/static-assets-full-2026-04.json"
