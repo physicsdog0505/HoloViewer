@@ -52,6 +52,36 @@ function shortHeadline(value,max=42){
   const candidate=parts[0]&&parts[0].length>=8?parts[0]:raw;
   return clampText(candidate,max);
 }
+function paragraphChunks(value,{min=2,max=3}={}){
+  const raw=publicText(value);
+  if(!raw)return [];
+  const sentences=raw.match(/[^。！？!?]+[。！？!?]?/g)?.map(item=>item.trim()).filter(Boolean)||[raw];
+  if(sentences.length<=1)return [raw];
+  const target=Math.min(max,Math.max(min,Math.ceil(raw.length/150)));
+  const size=Math.ceil(sentences.length/target);
+  const chunks=[];
+  for(let i=0;i<sentences.length;i+=size)chunks.push(sentences.slice(i,i+size).join(''));
+  return chunks.slice(0,max);
+}
+function appendParagraphs(parent,value,className){
+  const chunks=paragraphChunks(value);
+  chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
+}
+function storyVisual(videoIds,byId){
+  const ids=[...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,3);
+  if(!ids.length)return null;
+  const visual=el('div','daily-story-visual');
+  ids.forEach((id,index)=>{
+    const figure=el('figure','daily-story-visual-item');
+    figure.dataset.slot=String(index+1);
+    const img=el('img');img.src=thumbnailUrl(id);img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';
+    figure.append(img);
+    const row=byId.get(id),name=publicText(row?.channel_name);
+    if(name)figure.append(el('figcaption','',name));
+    visual.append(figure);
+  });
+  return visual;
+}
 function publicLayout(source,fallback){
   const requested=text(source?.layout_template||source?.display_template||source?.layout).toLowerCase();
   return PUBLIC_LAYOUTS.has(requested)?requested:fallback;
@@ -137,7 +167,7 @@ function renderOverview(target,artifact){
   if(intro){
     const cleaned=intro.replace(/^.*?共計\s*\d+\s*場[^。]*。\s*/,'');
     const first=cleaned.split('。').filter(Boolean).slice(0,2).join('。');
-    if(first)wrap.append(el('p','daily-overview-summary',first+'。'));
+    if(first)appendParagraphs(wrap,first+'。','daily-overview-summary');
   }
   if(highlights.length){
     const grid=el('div','daily-highlight-grid');
@@ -182,28 +212,54 @@ function renderStories(target,artifact,byId){
     if(headline)card.append(el('h3','daily-story-title',headline));
 
     const summary=publicText(story.public_summary||story.summary);
-    if(summary)card.append(el('p','daily-story-summary',summary));
+    if(summary){
+      const copy=el('div','daily-story-summary-block');
+      appendParagraphs(copy,summary,'daily-story-summary');
+      card.append(copy);
+    }
+    const visual=storyVisual(story.video_ids,byId);
+    if(visual)card.append(visual);
 
     const subs=Array.isArray(story.sub_events)?story.sub_events:[];
     if(subs.length){
       const subWrap=el('div','daily-sub-events');
       const visible=layout==='lead'?3:2;
       subs.slice(0,visible).forEach(sub=>{
-        const item=el('article','daily-sub-event');
-        if(publicText(sub.title))item.append(el('h4','',shortHeadline(sub.short_title||sub.title,38)));
-        if(publicText(sub.summary))item.append(el('p','',publicText(sub.summary)));
-        appendReferences(item,sub.video_ids,byId,{label:'相關直播'});
+        const item=el('details','daily-sub-event');
+        const head=el('summary','daily-sub-event-head');
+        const firstVideo=(Array.isArray(sub.video_ids)?sub.video_ids:[]).find(id=>byId.has(String(id)));
+        if(firstVideo){
+          const img=el('img');img.src=thumbnailUrl(String(firstVideo));img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';head.append(img);
+        }
+        const headCopy=el('span','daily-sub-event-head-copy');
+        if(publicText(sub.title))headCopy.append(el('h4','',shortHeadline(sub.short_title||sub.title,38)));
+        if(publicText(sub.summary))headCopy.append(el('p','',clampText(sub.summary,120)));
+        head.append(headCopy);
+        item.append(head);
+        const detail=el('div','daily-sub-event-detail');
+        if(publicText(sub.summary))appendParagraphs(detail,sub.summary,'');
+        appendReferences(detail,sub.video_ids,byId,{label:'相關直播'});
+        item.append(detail);
         subWrap.append(item);
       });
       if(subs.length>visible){
         const more=el('details','daily-sub-more');
         more.append(el('summary','','展開更多整理（'+String(subs.length-visible)+'）'));
         subs.slice(visible).forEach(sub=>{
-          const item=el('article','daily-sub-event');
-          if(publicText(sub.title))item.append(el('h4','',shortHeadline(sub.title,38)));
-          if(publicText(sub.summary))item.append(el('p','',publicText(sub.summary)));
-          appendReferences(item,sub.video_ids,byId,{label:'相關直播'});
-          more.append(item);
+          const item=el('details','daily-sub-event');
+          const head=el('summary','daily-sub-event-head');
+          const firstVideo=(Array.isArray(sub.video_ids)?sub.video_ids:[]).find(id=>byId.has(String(id)));
+          if(firstVideo){
+            const img=el('img');img.src=thumbnailUrl(String(firstVideo));img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';head.append(img);
+          }
+          const headCopy=el('span','daily-sub-event-head-copy');
+          if(publicText(sub.title))headCopy.append(el('h4','',shortHeadline(sub.title,38)));
+          if(publicText(sub.summary))headCopy.append(el('p','',clampText(sub.summary,120)));
+          head.append(headCopy);item.append(head);
+          const detail=el('div','daily-sub-event-detail');
+          if(publicText(sub.summary))appendParagraphs(detail,sub.summary,'');
+          appendReferences(detail,sub.video_ids,byId,{label:'相關直播'});
+          item.append(detail);more.append(item);
         });
         subWrap.append(more);
       }
