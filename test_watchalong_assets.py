@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 import textwrap
 import unittest
 
@@ -14,13 +15,6 @@ DATA = ROOT / "site/data/watchalong"
 OLD_MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc", "t8q3XEmK0aM")
 NEW_MASTERS = ("jqJb0qnueDo", "x7bMoyNWaEE")
 MASTERS = OLD_MASTERS + NEW_MASTERS
-OLD_EVENT_HASHES = {
-    "eFYByyw5AJc": "3d591074387770afcff50265220ff89fd25f0467582c686867eff71d071cee43",
-    "U2o13h1Oib4": "874f6a3a722a2af5cd21ba6d1dc4a13147de35470445122291e5dc134c091ba4",
-    "8pF4qHcshDc": "f92fc25f2935fbd2cc1291431bea2f84c3e557c046d05492322efdb10efa9d83",
-    "t8q3XEmK0aM": "895f9150c2c292da3f1c1269b3dc6a6d417bd165c10f1d2c107f0d6e0e38c230",
-}
-
 
 class WatchalongAssetTests(unittest.TestCase):
     @classmethod
@@ -66,10 +60,22 @@ class WatchalongAssetTests(unittest.TestCase):
             self.assertTrue(all(row["source_start_ms"] == 0 for row in event["segments"]))
             self.assertEqual([row["source_video_id"] for row in event["segments"]], event["source_video_ids"])
 
-    def test_old_four_events_are_byte_for_byte_preserved(self):
-        for master, expected_hash in OLD_EVENT_HASHES.items():
-            raw = (DATA / "events" / f"{master}.json").read_bytes()
-            self.assertEqual(hashlib.sha256(raw).hexdigest(), expected_hash)
+    def test_all_events_report_selected_approved_sync_provenance(self):
+        expected = {
+            "eFYByyw5AJc": ("versions/eFYByyw5AJc/0002-4a60373e6effbf01155e387e6b25da81ed94fe12627d720585eec424c352d299.json", "4a60373e6effbf01155e387e6b25da81ed94fe12627d720585eec424c352d299", 2),
+            "U2o13h1Oib4": ("versions/U2o13h1Oib4/0001-c0916636566d71df339e1142a3120d59e7a87fda343216f0f8347d0111302e0c.json", "c0916636566d71df339e1142a3120d59e7a87fda343216f0f8347d0111302e0c", 1),
+            "8pF4qHcshDc": ("versions/8pF4qHcshDc/0001-e36399bd59ce9ad3012635a4e1115f40ba007a6f53ae98582d7f633d90d76447.json", "e36399bd59ce9ad3012635a4e1115f40ba007a6f53ae98582d7f633d90d76447", 1),
+            "t8q3XEmK0aM": ("versions/t8q3XEmK0aM/0001-24307203be86af339fd60303b6edc1aa5d5486987e1cd03a652d555c886a58e1.json", "24307203be86af339fd60303b6edc1aa5d5486987e1cd03a652d555c886a58e1", 1),
+            "jqJb0qnueDo": ("versions/jqJb0qnueDo/0001-1707920de9336b32d05554fb41b3172204eef9735f866486af22dd9cd8e5e9c9.json", "1707920de9336b32d05554fb41b3172204eef9735f866486af22dd9cd8e5e9c9", 1),
+            "x7bMoyNWaEE": ("versions/x7bMoyNWaEE/0001-0c2437fe31448d6852fc905557718f226a8cf2aec60ad1518ff5cb6eacd9114a.json", "0c2437fe31448d6852fc905557718f226a8cf2aec60ad1518ff5cb6eacd9114a", 1),
+        }
+        for master, (relative_path, approved_sync_id, approval_version) in expected.items():
+            event = json.loads((DATA / "events" / f"{master}.json").read_text(encoding="utf-8"))
+            sync = event["artifacts"]["sync"]
+            self.assertEqual(sync["approved_sync_id"], approved_sync_id)
+            self.assertEqual(sync["approval_version"], approval_version)
+            self.assertEqual(sync["source"], f"watchalong_approved_sync/{relative_path}")
+            self.assertNotIn("watchalong_archive.sqlite3#watchalong_source_mappings", sync["source"])
 
     def test_new_quality_v2_identities_are_exact(self):
         expected = {
@@ -104,6 +110,20 @@ class WatchalongAssetTests(unittest.TestCase):
         jq = (DATA / "events/jqJb0qnueDo.json").read_text(encoding="utf-8")
         self.assertNotIn(wrong_local_consumers_identity, jq)
         self.assertNotEqual(len(json.loads(jq)["subtitles"]), 437)
+
+    def test_x7_exports_all_four_approved_sources_without_prefix_truncation(self):
+        event = json.loads((DATA / "events/x7bMoyNWaEE.json").read_text(encoding="utf-8"))
+        self.assertEqual(event["source_video_ids"], [
+            "3YW0UD_dFU8", "kMXGZL0Hjlc", "XB_ubSVh1jY", "1t-3kxtZyMM",
+        ])
+        self.assertEqual(
+            [row["host_start_ms"] for row in event["segments"]],
+            [124840, 1620240, 3066119, 4552520],
+        )
+        self.assertEqual(
+            [row["source_start_ms"] for row in event["segments"]],
+            [0, 0, 0, 0],
+        )
 
     def test_october_15_is_complete_not_missing(self):
         event = json.loads((DATA / "events/8pF4qHcshDc.json").read_text(encoding="utf-8"))
@@ -252,13 +272,70 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertIn('.event_count == 6', source)
         self.assertIn('(.subtitles | length) == 449', source)
         self.assertIn('(.subtitles | length) == 888', source)
+        self.assertIn('(.source_video_ids | length) == 4', source)
+        self.assertIn('.source_count == 3', source)
+        self.assertIn('ff12e04eea458f096558a033ed5d2d44646ddd1e49c78ea067028553eef28db8', source)
+        self.assertIn("live-events.tsv", source)
+        self.assertIn("baseline-events.tsv", source)
+        self.assertIn("production event hash mismatch: $event_id", source)
+        self.assertIn("Production baseline event hash mismatch: $event_id", source)
         self.assertIn('npx --yes wrangler deploy --config cloudflare/wrangler.json --name holoviewer-public', source)
 
     def test_exporter_has_no_network_or_provider_write_path(self):
         source = (ROOT / "scripts/export_watchalong_assets.py").read_text(encoding="utf-8")
         for forbidden in ("requests", "urllib", "google.genai", "GeminiTranslationProvider", "INSERT ", "UPDATE ", "DELETE "):
             self.assertNotIn(forbidden, source)
-        self.assertIn("mode=ro&immutable=1", source)
+        self.assertNotIn("import sqlite3", source)
+        self.assertIn("APPROVED_SYNC_SELECTIONS_SCHEMA", source)
+        self.assertIn("approved_sync_root", source)
+
+    def test_exporter_sessions_do_not_own_sources_or_breakpoints(self):
+        from scripts.export_watchalong_assets import SESSIONS
+
+        for session in SESSIONS:
+            self.assertNotIn("sources", session)
+            self.assertNotIn("starts_ms", session)
+            self.assertNotIn("playlist_start", session)
+            self.assertNotIn("playlist_id", session)
+
+    def test_exporter_fails_closed_on_approved_sync_cardinality_mismatch(self):
+        from scripts.export_watchalong_assets import (
+            APPROVED_SYNC_SCHEMA,
+            APPROVED_SYNC_SELECTIONS_SCHEMA,
+            canonical_bytes,
+            load_approved_sync,
+            sha256,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            relative = "versions/x7bMoyNWaEE/0001-fixture.json"
+            payload = {
+                "schema_version": APPROVED_SYNC_SCHEMA,
+                "approval_version": 1,
+                "master_video_id": "x7bMoyNWaEE",
+                "transcript_id": "1" * 64,
+                "transcript_hash": "2" * 64,
+                "playlist_id": "PLfixture",
+                "playlist_start_index": 2,
+                "source_video_ids": ["source00001", "source00002", "source00003", "source00004"],
+                "host_start_ms": [1000, 2000, 3000],
+                "source_start_ms": [0, 0, 0, 0],
+                "status": "PRESENT",
+                "provenance": {"kind": "fixture"},
+                "note": "fixture",
+                "approved_at_utc": "2026-10-30T00:00:00+00:00",
+            }
+            payload["approved_sync_id"] = sha256(canonical_bytes(payload))
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            path.write_bytes(canonical_bytes(payload))
+            (root / "selections.json").write_bytes(canonical_bytes({
+                "schema_version": APPROVED_SYNC_SELECTIONS_SCHEMA,
+                "selections": {"x7bMoyNWaEE": relative},
+            }))
+            with self.assertRaisesRegex(ValueError, "cardinality"):
+                load_approved_sync(root, "x7bMoyNWaEE")
 
 
 if __name__ == "__main__":

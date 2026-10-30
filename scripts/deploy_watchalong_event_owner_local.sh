@@ -48,6 +48,14 @@ readback() {
   curl -fsS --max-time 30 "${LIVE_ORIGIN}/watchalong-viewer/?watchalong_event=${VIDEO_ONE_ID}&pekora-watchalong=${nonce}" -o "$live_viewer"
 
   [ "$(sha256_file "$live_manifest")" = "$expected_manifest_sha" ] || fail "production manifest hash mismatch"
+  live_events_tsv="$temporary_dir/live-events.tsv"
+  jq -r '.events[] | [.event_id, .sha256] | @tsv' "$live_manifest" >"$live_events_tsv"
+  while IFS="$(printf '\t')" read -r event_id event_sha; do
+    require_hex "$event_sha" 64 "manifest event SHA-256"
+    live_event_path="$temporary_dir/live-${event_id}.json"
+    curl -fsS --max-time 30 "${LIVE_ORIGIN}/data/watchalong/events/${event_id}.json?pekora-watchalong=${nonce}" -o "$live_event_path"
+    [ "$(sha256_file "$live_event_path")" = "$event_sha" ] || fail "production event hash mismatch: $event_id"
+  done <"$live_events_tsv"
   [ "$(sha256_file "$live_event_one")" = "$expected_event_one_sha" ] || fail "production first event hash mismatch"
   [ "$(sha256_file "$live_event_two")" = "$expected_event_two_sha" ] || fail "production second event hash mismatch"
   jq -e --arg first "$VIDEO_ONE_ID" --arg second "$VIDEO_TWO_ID" '
@@ -72,8 +80,8 @@ readback() {
     .schema_version == "holoviewer-watchalong-event-v1" and
     .event_id == $video and .master_video_id == $video and
     .playlist_start_index == 2 and
-    (.source_video_ids | length) == 3 and
-    (.segments | map(.host_start_ms)) == [124840,3066119,4552520] and
+    (.source_video_ids | length) == 4 and
+    (.segments | map(.host_start_ms)) == [124840,1620240,3066119,4552520] and
     (.subtitles | length) == 888 and
     .artifacts.transcript.transcript_id == "8bef48719c6fdeb9fda78bed0a56f58a6dc4fd7d144c40f1fea010d758488e17" and
     .artifacts.transcript.content_hash == "450573590110d9563829c85cc04fa0b488c71c5ee2969c48982f293fbad1c2dd" and
@@ -132,11 +140,28 @@ python3 -B -m unittest -v test_watchalong_assets test_public_smoke
 
 temporary_dir="$(mktemp -d /private/tmp/holoviewer-pekora-watchalong-preflight.XXXXXX)"
 baseline_manifest="$temporary_dir/manifest.json"
+baseline_event_one="$temporary_dir/${VIDEO_ONE_ID}.json"
+baseline_event_two="$temporary_dir/${VIDEO_TWO_ID}.json"
 deployment_status="$temporary_dir/deployment-status.txt"
 curl -fsS --max-time 30 "${LIVE_ORIGIN}/data/watchalong/manifest.json?pekora-watchalong=baseline-${expected_head}" -o "$baseline_manifest"
 [ "$(sha256_file "$baseline_manifest")" = "$expected_baseline_manifest_sha" ] || fail "production manifest changed since packet preparation"
+baseline_events_tsv="$temporary_dir/baseline-events.tsv"
+jq -r '.events[] | [.event_id, .sha256] | @tsv' "$baseline_manifest" >"$baseline_events_tsv"
+while IFS="$(printf '\t')" read -r event_id event_sha; do
+  require_hex "$event_sha" 64 "baseline manifest event SHA-256"
+  baseline_event_path="$temporary_dir/baseline-${event_id}.json"
+  curl -fsS --max-time 30 "${LIVE_ORIGIN}/data/watchalong/events/${event_id}.json?pekora-watchalong=baseline-${expected_head}" -o "$baseline_event_path"
+  [ "$(sha256_file "$baseline_event_path")" = "$event_sha" ] || fail "Production baseline event hash mismatch: $event_id"
+done <"$baseline_events_tsv"
 jq -e --arg first "$VIDEO_ONE_ID" --arg second "$VIDEO_TWO_ID" \
-  'all(.events[]; .event_id != $first and .event_id != $second)' "$baseline_manifest" >/dev/null || fail "a target video is already registered in Production"
+  '.event_count == 6 and
+   any(.events[]; .event_id == $first and .cue_count == 449 and .source_count == 2 and .sha256 == "d3b030036931ac8ce95435bafa721d33f57323bb61e33db2b694377cbe7f182a") and
+   any(.events[]; .event_id == $second and .cue_count == 888 and .source_count == 3 and .sha256 == "ff12e04eea458f096558a033ed5d2d44646ddd1e49c78ea067028553eef28db8")' \
+  "$baseline_manifest" >/dev/null || fail "Production target baseline identity mismatch"
+curl -fsS --max-time 30 "${LIVE_ORIGIN}/data/watchalong/events/${VIDEO_ONE_ID}.json?pekora-watchalong=baseline-${expected_head}" -o "$baseline_event_one"
+curl -fsS --max-time 30 "${LIVE_ORIGIN}/data/watchalong/events/${VIDEO_TWO_ID}.json?pekora-watchalong=baseline-${expected_head}" -o "$baseline_event_two"
+[ "$(sha256_file "$baseline_event_one")" = "d3b030036931ac8ce95435bafa721d33f57323bb61e33db2b694377cbe7f182a" ] || fail "Production first event baseline hash mismatch"
+[ "$(sha256_file "$baseline_event_two")" = "ff12e04eea458f096558a033ed5d2d44646ddd1e49c78ea067028553eef28db8" ] || fail "Production second event baseline hash mismatch"
 
 npx --yes wrangler deployments status --config cloudflare/wrangler.json --name holoviewer-public >"$deployment_status"
 baseline_version="$(awk '/Version\(s\):/{print $3; exit}' "$deployment_status")"
@@ -146,12 +171,10 @@ backup_root="/Users/hsuhsunshun/Downloads/HoloViewer-deploy-backups"
 backup_dir="$backup_root/pekora-watchalong-$(date -u +%Y%m%dT%H%M%SZ)-$baseline_version"
 mkdir -p "$backup_dir"
 cp "$baseline_manifest" "$backup_dir/manifest.json"
+cp "$baseline_event_one" "$backup_dir/${VIDEO_ONE_ID}.json"
+cp "$baseline_event_two" "$backup_dir/${VIDEO_TWO_ID}.json"
 cp "$deployment_status" "$backup_dir/deployment-status.txt"
 cp cloudflare/wrangler.json "$backup_dir/wrangler.json"
-printf 'ABSENT from the authoritative Production manifest before Pekora Watchalong deployment\n' \
-  >"$backup_dir/${VIDEO_ONE_ID}.absent"
-printf 'ABSENT from the authoritative Production manifest before Pekora Watchalong deployment\n' \
-  >"$backup_dir/${VIDEO_TWO_ID}.absent"
 printf 'candidate_head=%s\nevent_one_sha256=%s\nevent_two_sha256=%s\nmanifest_sha256=%s\nbaseline_version=%s\nbaseline_manifest_sha256=%s\n' \
   "$expected_head" "$expected_event_one_sha" "$expected_event_two_sha" "$expected_manifest_sha" "$baseline_version" "$expected_baseline_manifest_sha" \
   >"$backup_dir/packet.txt"
@@ -165,7 +188,7 @@ post_version="$(awk '/Version\(s\):/{print $3; exit}' "$post_status")"
 [ -n "$post_version" ] || fail "unable to read deployed Worker version"
 [ "$post_version" != "$baseline_version" ] || fail "Cloudflare did not activate a new static-assets version"
 
-printf 'WATCHALONG_SMOKE=PASS video_ids=%s,%s cue_counts=449,888 source_counts=2,3\n' "$VIDEO_ONE_ID" "$VIDEO_TWO_ID"
+printf 'WATCHALONG_SMOKE=PASS video_ids=%s,%s cue_counts=449,888 source_counts=2,4\n' "$VIDEO_ONE_ID" "$VIDEO_TWO_ID"
 printf 'BACKUP_DIR=%s\n' "$backup_dir"
 printf 'ROLLBACK_TARGET=%s\n' "$baseline_version"
 printf 'ROLLBACK_COMMAND=cd %s && npx --yes wrangler rollback %s --config cloudflare/wrangler.json --name holoviewer-public\n' \
