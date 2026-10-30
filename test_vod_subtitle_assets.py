@@ -38,6 +38,24 @@ class VodSubtitleAssetsTests(unittest.TestCase):
         self.assertIn("catch{", js)
         self.assertIn("return null;", js)
 
+    def test_configured_origin_is_allowed_by_production_connect_src(self):
+        origin = "https://holoviewer-vod-subtitles-static-assets.singlebagel.workers.dev"
+        config = (ROOT / "site/assets/config.js").read_text()
+        headers = (ROOT / "site/_headers").read_text()
+        self.assertIn(f'vodSubtitleStaticBase: "{origin}"', config)
+        csp = next(
+            line.strip().removeprefix("Content-Security-Policy: ")
+            for line in headers.splitlines()
+            if line.strip().startswith("Content-Security-Policy: ")
+        )
+        connect_src = next(
+            directive.strip().split()
+            for directive in csp.split(";")
+            if directive.strip().startswith("connect-src ")
+        )
+        self.assertEqual(connect_src[0], "connect-src")
+        self.assertIn(origin, connect_src[1:])
+
     def test_javascript_contract(self):
         result = subprocess.run(
             ["node", "test_vod_subtitle_core.js"],
