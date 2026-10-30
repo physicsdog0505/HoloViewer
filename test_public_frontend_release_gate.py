@@ -84,24 +84,9 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "protected runtime data changes"):
                 frontend_release_scope_gate(root, base, head)
 
-    def test_frontend_release_scope_gate_blocks_watchalong_change(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.DEVNULL)
-            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
-            target = root / "site/data/watchalong/manifest.json"
-            target.parent.mkdir(parents=True)
-            target.write_text('{"events":[]}')
-            subprocess.run(["git", "add", "."], cwd=root, check=True)
-            subprocess.run(["git", "commit", "-m", "base"], cwd=root, check=True, stdout=subprocess.DEVNULL)
-            base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
-            target.write_text('{"events":[{"id":"x"}]}')
-            subprocess.run(["git", "add", "."], cwd=root, check=True)
-            subprocess.run(["git", "commit", "-m", "watchalong"], cwd=root, check=True, stdout=subprocess.DEVNULL)
-            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
-            with self.assertRaisesRegex(Exception, "protected runtime data changes"):
-                frontend_release_scope_gate(root, base, head)
+    def test_frontend_release_scope_gate_does_not_own_watchalong_data(self):
+        self.assertFalse(is_protected_runtime_rel("data/watchalong/manifest.json"))
+        self.assertTrue(is_foreign_rel("data/watchalong/manifest.json"))
 
     def test_frontend_release_scope_gate_allows_frontend_asset_change(self):
         with tempfile.TemporaryDirectory() as td:
