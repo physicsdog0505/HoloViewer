@@ -11,7 +11,15 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "site/data/watchalong"
-MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc", "t8q3XEmK0aM")
+OLD_MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc", "t8q3XEmK0aM")
+NEW_MASTERS = ("jqJb0qnueDo", "x7bMoyNWaEE")
+MASTERS = OLD_MASTERS + NEW_MASTERS
+OLD_EVENT_HASHES = {
+    "eFYByyw5AJc": "3d591074387770afcff50265220ff89fd25f0467582c686867eff71d071cee43",
+    "U2o13h1Oib4": "874f6a3a722a2af5cd21ba6d1dc4a13147de35470445122291e5dc134c091ba4",
+    "8pF4qHcshDc": "f92fc25f2935fbd2cc1291431bea2f84c3e557c046d05492322efdb10efa9d83",
+    "t8q3XEmK0aM": "895f9150c2c292da3f1c1269b3dc6a6d417bd165c10f1d2c107f0d6e0e38c230",
+}
 
 
 class WatchalongAssetTests(unittest.TestCase):
@@ -19,9 +27,9 @@ class WatchalongAssetTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.manifest = json.loads((DATA / "manifest.json").read_text(encoding="utf-8"))
 
-    def test_manifest_exports_exactly_four_intended_sessions(self):
+    def test_manifest_exports_exactly_six_intended_sessions(self):
         self.assertEqual(self.manifest["schema_version"], "holoviewer-watchalong-manifest-v1")
-        self.assertEqual(self.manifest["event_count"], 4)
+        self.assertEqual(self.manifest["event_count"], 6)
         self.assertEqual(tuple(row["event_id"] for row in self.manifest["events"]), MASTERS)
         self.assertEqual({path.stem for path in (DATA / "events").glob("*.json")}, set(MASTERS))
 
@@ -57,6 +65,45 @@ class WatchalongAssetTests(unittest.TestCase):
             self.assertEqual(starts, sorted(starts))
             self.assertTrue(all(row["source_start_ms"] == 0 for row in event["segments"]))
             self.assertEqual([row["source_video_id"] for row in event["segments"]], event["source_video_ids"])
+
+    def test_old_four_events_are_byte_for_byte_preserved(self):
+        for master, expected_hash in OLD_EVENT_HASHES.items():
+            raw = (DATA / "events" / f"{master}.json").read_bytes()
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), expected_hash)
+
+    def test_new_quality_v2_identities_are_exact(self):
+        expected = {
+            "jqJb0qnueDo": {
+                "transcript_id": "800774361d14746957549eb2d885fe1eee6f40b15e467307b6f0aea852be25dd",
+                "content_hash": "d4321ddc1bcac20aa8c6bc04759c8ca461ffc0ac05dbee26ea88496365e0dae6",
+                "artifact_id": "141898ea22cd37595160c64d3899f8202916e1126f066c5193b8dd0681e7b6c5",
+                "cue_count": 449,
+            },
+            "x7bMoyNWaEE": {
+                "transcript_id": "8bef48719c6fdeb9fda78bed0a56f58a6dc4fd7d144c40f1fea010d758488e17",
+                "content_hash": "450573590110d9563829c85cc04fa0b488c71c5ee2969c48982f293fbad1c2dd",
+                "artifact_id": "9868c1c078edecd96e487fd914fb8e7842de38838dc2000ebee8e16f13741360",
+                "cue_count": 888,
+            },
+        }
+        for master, identity in expected.items():
+            event = json.loads((DATA / "events" / f"{master}.json").read_text(encoding="utf-8"))
+            transcript = event["artifacts"]["transcript"]
+            translation = event["artifacts"]["translation"]
+            self.assertEqual(event["event_id"], master)
+            self.assertEqual(event["master_video_id"], master)
+            self.assertEqual(transcript["transcript_id"], identity["transcript_id"])
+            self.assertEqual(transcript["content_hash"], identity["content_hash"])
+            self.assertEqual(transcript["cue_count"], identity["cue_count"])
+            self.assertEqual(translation["artifact_id"], identity["artifact_id"])
+            self.assertEqual(translation["transcript_hash"], identity["content_hash"])
+            self.assertEqual(translation["translated_cues"], identity["cue_count"])
+            self.assertEqual(len(event["subtitles"]), identity["cue_count"])
+
+        wrong_local_consumers_identity = "0badbda"
+        jq = (DATA / "events/jqJb0qnueDo.json").read_text(encoding="utf-8")
+        self.assertNotIn(wrong_local_consumers_identity, jq)
+        self.assertNotEqual(len(json.loads(jq)["subtitles"]), 437)
 
     def test_october_15_is_complete_not_missing(self):
         event = json.loads((DATA / "events/8pF4qHcshDc.json").read_text(encoding="utf-8"))
@@ -197,6 +244,15 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         source = player.read_text(encoding="utf-8")
         self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", source)
         self.assertIn("STATIC_EVENT_MODE", source)
+
+    def test_owner_local_deploy_packet_targets_both_new_events(self):
+        source = (ROOT / "scripts/deploy_watchalong_event_owner_local.sh").read_text(encoding="utf-8")
+        self.assertIn('VIDEO_ONE_ID="jqJb0qnueDo"', source)
+        self.assertIn('VIDEO_TWO_ID="x7bMoyNWaEE"', source)
+        self.assertIn('.event_count == 6', source)
+        self.assertIn('(.subtitles | length) == 449', source)
+        self.assertIn('(.subtitles | length) == 888', source)
+        self.assertIn('npx --yes wrangler deploy --config cloudflare/wrangler.json --name holoviewer-public', source)
 
     def test_exporter_has_no_network_or_provider_write_path(self):
         source = (ROOT / "scripts/export_watchalong_assets.py").read_text(encoding="utf-8")

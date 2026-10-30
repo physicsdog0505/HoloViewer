@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export the three approved 8501 Watchalong records as static Public assets.
+"""Export the approved 8501 Watchalong records as static Public assets.
 
 The exporter is deliberately read-only with respect to the private source.  It
 validates every pinned identity before writing browser-facing JSON and never
@@ -16,13 +16,15 @@ import sys
 from typing import Any
 
 
-PLAYLIST_ID = "PL12UaAf_xzfozU6PKHlOwbskdUTFKnGrK"
+SEASON_ONE_PLAYLIST_ID = "PL12UaAf_xzfozU6PKHlOwbskdUTFKnGrK"
+SEASON_TWO_PLAYLIST_ID = "PL12UaAf_xzfoHafXDU3s3QbiDhKzs3QK0"
 SCHEMA = "holoviewer-watchalong-event-v1"
 MANIFEST_SCHEMA = "holoviewer-watchalong-manifest-v1"
 
 SESSIONS: tuple[dict[str, Any], ...] = (
     {
         "master": "eFYByyw5AJc",
+        "playlist_id": SEASON_ONE_PLAYLIST_ID,
         "day": "2026-10-01",
         "title": "【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
         "playlist_start": 1,
@@ -40,6 +42,7 @@ SESSIONS: tuple[dict[str, Any], ...] = (
     },
     {
         "master": "U2o13h1Oib4",
+        "playlist_id": SEASON_ONE_PLAYLIST_ID,
         "day": "2026-10-08",
         "title": "#2【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
         "playlist_start": 7,
@@ -57,6 +60,7 @@ SESSIONS: tuple[dict[str, Any], ...] = (
     },
     {
         "master": "8pF4qHcshDc",
+        "playlist_id": SEASON_ONE_PLAYLIST_ID,
         "day": "2026-10-15",
         "title": "#3【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
         "playlist_start": 13,
@@ -74,6 +78,7 @@ SESSIONS: tuple[dict[str, Any], ...] = (
     },
     {
         "master": "t8q3XEmK0aM",
+        "playlist_id": SEASON_ONE_PLAYLIST_ID,
         "day": "2026-10-22",
         "title": "#4【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
         "playlist_start": 19,
@@ -88,6 +93,42 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_quality": "quality-v2-complete",
         "breakpoint_status": "PRESENT",
         "breakpoint_note": "Six high-confidence starts from the selected 8501 public-caption transcript; the reference URL t=8610 is not a synchronization cue.",
+    },
+    {
+        "master": "jqJb0qnueDo",
+        "playlist_id": SEASON_TWO_PLAYLIST_ID,
+        "day": "2026-10-29",
+        "title": "#1【初見】『無職転生 Ⅱ ~異世界行ったら本気だす~』2期 同時視聴【ホロライブ/兎田ぺこら】",
+        "playlist_start": 1,
+        "sources": ("YEUMzpnTuzQ", "3YW0UD_dFU8"),
+        "starts_ms": (586760, 2073480),
+        "transcript_id": "800774361d14746957549eb2d885fe1eee6f40b15e467307b6f0aea852be25dd",
+        "transcript_hash": "d4321ddc1bcac20aa8c6bc04759c8ca461ffc0ac05dbee26ea88496365e0dae6",
+        "cue_count": 449,
+        "translation_kind": "corpus-artifact",
+        "translation_id": "141898ea22cd37595160c64d3899f8202916e1126f066c5193b8dd0681e7b6c5",
+        "translation_rel": "data/watchalong/transcripts/youtube/jqJb0qnueDo/translations/141898ea22cd37595160c64d3899f8202916e1126f066c5193b8dd0681e7b6c5.json",
+        "translation_quality": "quality-v2-complete",
+        "breakpoint_status": "PRESENT",
+        "breakpoint_note": "Two high-confidence starts from the canonical Quality-v2 transcript countdown cues.",
+    },
+    {
+        "master": "x7bMoyNWaEE",
+        "playlist_id": SEASON_TWO_PLAYLIST_ID,
+        "day": "2026-10-29",
+        "title": "#1【初見】『無職転生 Ⅱ ~異世界行ったら本気だす~』2期 同時視聴【ホロライブ/兎田ぺこら】",
+        "playlist_start": 2,
+        "sources": ("3YW0UD_dFU8", "kMXGZL0Hjlc", "XB_ubSVh1jY"),
+        "starts_ms": (124840, 3066119, 4552520),
+        "transcript_id": "8bef48719c6fdeb9fda78bed0a56f58a6dc4fd7d144c40f1fea010d758488e17",
+        "transcript_hash": "450573590110d9563829c85cc04fa0b488c71c5ee2969c48982f293fbad1c2dd",
+        "cue_count": 888,
+        "translation_kind": "corpus-artifact",
+        "translation_id": "9868c1c078edecd96e487fd914fb8e7842de38838dc2000ebee8e16f13741360",
+        "translation_rel": "data/watchalong/transcripts/youtube/x7bMoyNWaEE/translations/9868c1c078edecd96e487fd914fb8e7842de38838dc2000ebee8e16f13741360.json",
+        "translation_quality": "quality-v2-complete",
+        "breakpoint_status": "PRESENT",
+        "breakpoint_note": "Three high-confidence starts after the reconnect restarted episode 2 from zero; episode 5 was not watched in this event.",
     },
 )
 
@@ -213,7 +254,7 @@ def build_event(source_root: Path, session: dict[str, Any], mapping: dict[str, A
     validate_segments(session, metadata, rows)
     translations = load_translations(source_root, session, rows)
 
-    if mapping["start"] != session["playlist_start"] or not str(mapping["playlist"]).endswith(PLAYLIST_ID):
+    if mapping["start"] != session["playlist_start"] or not str(mapping["playlist"]).endswith(session["playlist_id"]):
         raise ValueError(f"{session['master']} source mapping mismatch")
     if mapping["sources"][: len(session["sources"])] != session["sources"]:
         raise ValueError(f"{session['master']} source sequence mismatch")
@@ -252,7 +293,7 @@ def build_event(source_root: Path, session: dict[str, Any], mapping: dict[str, A
         "session_day": session["day"],
         "title": session["title"],
         "master_video_id": session["master"],
-        "playlist_id": PLAYLIST_ID,
+        "playlist_id": session["playlist_id"],
         "playlist_start_index": session["playlist_start"],
         "source_video_ids": list(session["sources"]),
         "subtitle_timeline": "host",
