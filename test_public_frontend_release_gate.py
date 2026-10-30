@@ -208,5 +208,28 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
         self.assertNotEqual(normalized, base)
 
 
+    def test_wrangler_local_cache_does_not_dirty_release_worktree(self):
+        gitignore=(ROOT / ".gitignore").read_text(encoding="utf-8") if (ROOT := Path(__file__).resolve().parent) else ""
+        self.assertIn(".wrangler/",gitignore)
+
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            subprocess.run(["git","init"],cwd=root,check=True,stdout=subprocess.DEVNULL)
+            subprocess.run(["git","config","user.email","test@example.com"],cwd=root,check=True)
+            subprocess.run(["git","config","user.name","Test"],cwd=root,check=True)
+            (root/".gitignore").write_text(gitignore,encoding="utf-8")
+            (root/"tracked.txt").write_text("ok",encoding="utf-8")
+            subprocess.run(["git","add","."],cwd=root,check=True)
+            subprocess.run(["git","commit","-m","base"],cwd=root,check=True,stdout=subprocess.DEVNULL)
+            cache=root/".wrangler/cache/wrangler-account.json"
+            cache.parent.mkdir(parents=True)
+            cache.write_text('{"account":"generated"}',encoding="utf-8")
+            status=subprocess.check_output(
+                ["git","status","--porcelain","--untracked-files=all"],
+                cwd=root,text=True
+            ).strip()
+            self.assertEqual(status,"")
+
+
 if __name__ == "__main__":
     unittest.main()
