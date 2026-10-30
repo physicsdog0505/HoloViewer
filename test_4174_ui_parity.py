@@ -1990,5 +1990,27 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
 
 
 
+    def test_history_search_progressively_reveals_full_filtered_result_set(self):
+        js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
+        self.assertIn("const HISTORY_SEARCH_BATCH_SIZE=200;",js)
+        self.assertIn("const rendered=rows.slice(0,historySearchRenderLimit);",js)
+        self.assertIn("historySearchRenderLimit=Math.min(rows.length,historySearchRenderLimit+HISTORY_SEARCH_BATCH_SIZE);",js)
+        self.assertIn("new IntersectionObserver(entries=>",js)
+        self.assertIn("載入更多（'+rendered.length+' / '+rows.length+'）",js)
+        self.assertIn("historyChannelFacetRows=query?endedItems:[];",js)
+        self.assertNotIn("const rendered=rows.slice(0,200);",js)
+        self.assertNotIn("顯示前 200 筆",js)
+
+    def test_ptt_archive_q1_2026_months_are_routed_to_full_offline_static_worker(self):
+        config=(ROOT/'site/assets/config.js').read_text(encoding='utf-8')
+        base='https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev'
+        for month in ('01','02','03'):
+            self.assertIn(f'"2026-{month}": Object.freeze({{',config)
+            self.assertIn(f'manifest: "/ptt/v1/manifests/static-assets-full-2026-{month}.json"',config)
+        self.assertGreaterEqual(config.count(f'base: "{base}"'),9)
+        self.assertIn('"2026-09": Object.freeze({',config)
+        self.assertIn('base: "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev"',config)
+
+
 if __name__ == "__main__":
     unittest.main()
