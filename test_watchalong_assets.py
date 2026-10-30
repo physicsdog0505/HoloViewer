@@ -11,7 +11,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "site/data/watchalong"
+DATA = ROOT / "watchalong-static/data/watchalong"
 OLD_MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc", "t8q3XEmK0aM")
 NEW_MASTERS = ("jqJb0qnueDo", "x7bMoyNWaEE")
 MASTERS = OLD_MASTERS + NEW_MASTERS
@@ -29,7 +29,7 @@ class WatchalongAssetTests(unittest.TestCase):
 
     def test_manifest_hashes_and_complete_coverage(self):
         for entry in self.manifest["events"]:
-            path = ROOT / "site" / entry["path"].lstrip("/")
+            path = ROOT / "watchalong-static" / entry["path"].lstrip("/")
             raw = path.read_bytes()
             self.assertEqual(hashlib.sha256(raw).hexdigest(), entry["sha256"])
             event = json.loads(raw)
@@ -262,7 +262,7 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertTrue(player.exists())
         self.assertTrue(viewer.exists())
         source = player.read_text(encoding="utf-8")
-        self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", source)
+        self.assertIn("const WATCHALONG_MANIFEST_PATH=WATCHALONG_STATIC_BASE+'/data/watchalong/manifest.json';", source)
         self.assertIn("STATIC_EVENT_MODE", source)
 
     def test_owner_local_deploy_packet_targets_both_new_events(self):
