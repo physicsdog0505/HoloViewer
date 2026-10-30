@@ -262,7 +262,7 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertTrue(player.exists())
         self.assertTrue(viewer.exists())
         source = player.read_text(encoding="utf-8")
-        self.assertIn("const WATCHALONG_MANIFEST_PATH=WATCHALONG_STATIC_BASE+'/data/watchalong/manifest.json';", source)
+        self.assertIn("const WATCHALONG_MANIFEST_PATH=watchalongStaticUrl('/data/watchalong/manifest.json');", source)
         self.assertIn("STATIC_EVENT_MODE", source)
 
     def test_owner_local_deploy_targets_dedicated_static_worker(self):
