@@ -21,17 +21,25 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
     def test_foreign_prefixes_reject_youtube_and_ptt(self):
         self.assertTrue(is_foreign_rel("youtube/v1/manifest.json"))
         self.assertTrue(is_foreign_rel("ptt/v1/manifests/x.json"))
-        self.assertFalse(is_foreign_rel("data/watchalong/manifest.json"))
+        self.assertTrue(is_foreign_rel("data/watchalong/manifest.json"))
         self.assertFalse(is_foreign_rel("data/search/aliases/v1/latest.json"))
 
-    def test_ownership_gate_accepts_frontend_owned_runtime_data(self):
+    def test_ownership_gate_accepts_frontend_without_watchalong_data(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            (root / "site/data/watchalong").mkdir(parents=True)
-            (root / "site/data/watchalong/manifest.json").write_text("{}")
+            (root / "site").mkdir(parents=True)
             result = ownership_gate(root)
             self.assertEqual(result["status"], "PASS")
             self.assertEqual(result["forbidden_count"], 0)
+
+    def test_ownership_gate_rejects_watchalong_tree(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "site/data/watchalong/manifest.json"
+            target.parent.mkdir(parents=True)
+            target.write_text("{}")
+            with self.assertRaisesRegex(Exception, "foreign-owner assets"):
+                ownership_gate(root)
 
     def test_ownership_gate_rejects_foreign_tree(self):
         with tempfile.TemporaryDirectory() as td:
@@ -45,16 +53,16 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
                 ownership_gate(root)
 
     def test_foreign_prefix_contract_is_explicit(self):
-        self.assertEqual(FOREIGN_PREFIXES, ("youtube/v1/", "ptt/v1/"))
+        self.assertEqual(FOREIGN_PREFIXES, ("youtube/v1/", "ptt/v1/", "data/watchalong/"))
 
 
     def test_protected_runtime_prefix_contract_is_explicit(self):
         self.assertEqual(
             PROTECTED_RUNTIME_PREFIXES,
-            ("data/search/aliases/", "data/watchalong/"),
+            ("data/search/aliases/",),
         )
         self.assertTrue(is_protected_runtime_rel("data/search/aliases/v1/latest.json"))
-        self.assertTrue(is_protected_runtime_rel("data/watchalong/manifest.json"))
+        self.assertFalse(is_protected_runtime_rel("data/watchalong/manifest.json"))
         self.assertFalse(is_protected_runtime_rel("assets/app.js"))
 
     def test_frontend_release_scope_gate_blocks_alias_change(self):
@@ -126,7 +134,7 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
         original_parse=release.parse_frontend_config
         try:
             release.fetch=lambda origin,path,allow_404=False: b'<!doctype html><html><body>app</body></html>' if path=='/youtube/v1/manifest.json' else None
-            release.parse_frontend_config=lambda repo: ('https://holoviewer-youtube-static-assets.singlebagel.workers.dev',[])
+            release.parse_frontend_config=lambda repo: ('https://holoviewer-youtube-static-assets.singlebagel.workers.dev','https://holoviewer-watchalong-static-assets.singlebagel.workers.dev',[])
             result=release.enumerate_first_run_foreign(Path('.'))
             self.assertEqual(result['youtube_count'],0)
             self.assertEqual(result['youtube_paths'],[])
