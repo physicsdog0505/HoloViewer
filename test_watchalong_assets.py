@@ -68,10 +68,22 @@ class WatchalongAssetTests(unittest.TestCase):
             self.assertTrue(all(row["source_start_ms"] == 0 for row in event["segments"]))
             self.assertEqual([row["source_video_id"] for row in event["segments"]], event["source_video_ids"])
 
-    def test_five_unchanged_events_are_byte_for_byte_preserved(self):
-        for master, expected_hash in PRESERVED_EVENT_HASHES.items():
-            raw = (DATA / "events" / f"{master}.json").read_bytes()
-            self.assertEqual(hashlib.sha256(raw).hexdigest(), expected_hash)
+    def test_all_events_report_selected_approved_sync_provenance(self):
+        expected = {
+            "eFYByyw5AJc": ("versions/eFYByyw5AJc/0002-4a60373e6effbf01155e387e6b25da81ed94fe12627d720585eec424c352d299.json", "4a60373e6effbf01155e387e6b25da81ed94fe12627d720585eec424c352d299", 2),
+            "U2o13h1Oib4": ("versions/U2o13h1Oib4/0001-c0916636566d71df339e1142a3120d59e7a87fda343216f0f8347d0111302e0c.json", "c0916636566d71df339e1142a3120d59e7a87fda343216f0f8347d0111302e0c", 1),
+            "8pF4qHcshDc": ("versions/8pF4qHcshDc/0001-e36399bd59ce9ad3012635a4e1115f40ba007a6f53ae98582d7f633d90d76447.json", "e36399bd59ce9ad3012635a4e1115f40ba007a6f53ae98582d7f633d90d76447", 1),
+            "t8q3XEmK0aM": ("versions/t8q3XEmK0aM/0001-24307203be86af339fd60303b6edc1aa5d5486987e1cd03a652d555c886a58e1.json", "24307203be86af339fd60303b6edc1aa5d5486987e1cd03a652d555c886a58e1", 1),
+            "jqJb0qnueDo": ("versions/jqJb0qnueDo/0001-1707920de9336b32d05554fb41b3172204eef9735f866486af22dd9cd8e5e9c9.json", "1707920de9336b32d05554fb41b3172204eef9735f866486af22dd9cd8e5e9c9", 1),
+            "x7bMoyNWaEE": ("versions/x7bMoyNWaEE/0001-0c2437fe31448d6852fc905557718f226a8cf2aec60ad1518ff5cb6eacd9114a.json", "0c2437fe31448d6852fc905557718f226a8cf2aec60ad1518ff5cb6eacd9114a", 1),
+        }
+        for master, (relative_path, approved_sync_id, approval_version) in expected.items():
+            event = json.loads((DATA / "events" / f"{master}.json").read_text(encoding="utf-8"))
+            sync = event["artifacts"]["sync"]
+            self.assertEqual(sync["approved_sync_id"], approved_sync_id)
+            self.assertEqual(sync["approval_version"], approval_version)
+            self.assertEqual(sync["source"], f"watchalong_approved_sync/{relative_path}")
+            self.assertNotIn("watchalong_archive.sqlite3#watchalong_source_mappings", sync["source"])
 
     def test_new_quality_v2_identities_are_exact(self):
         expected = {
