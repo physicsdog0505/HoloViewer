@@ -203,7 +203,9 @@ class ParityContract(unittest.TestCase):
             "優先顯示同時相關的結果",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
             "const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);",
-            "resultCount>200?'找到 '+resultCount+' 筆 · 顯示前 200 筆'",
+            "const HISTORY_SEARCH_BATCH_SIZE=200;",
+            "const rendered=rows.slice(0,historySearchRenderLimit);",
+            "已顯示 '+facetResult.renderedCount+' 筆",
             "params.set('date',day)",
             "params.set('q',$('historySearch').value.trim())",
         ):
@@ -1624,7 +1626,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn('function parseHistoryCombinedIntent(raw,yearHint=\'\')',js)
         self.assertIn("String(token||'').normalize('NFKC').trim()",js)
         self.assertIn("String(raw||'').normalize('NFKC').trim()",js)
-        self.assertIn("return {kind:'range',start,end,span};",js)
+        self.assertIn("return {kind:'range',start,end,span,openEnded:!range[2],clampedToLatest:requestedEnd!==end};",js)
         self.assertNotIn("if(span>62)return {kind:'range_too_large',start,end,span};",js)
         self.assertIn('while(cursor<=last){',js)
         self.assertNotIn('months.length<3',js)
