@@ -11,25 +11,20 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-import sqlite3
 import sys
 from typing import Any
 
 
-SEASON_ONE_PLAYLIST_ID = "PL12UaAf_xzfozU6PKHlOwbskdUTFKnGrK"
-SEASON_TWO_PLAYLIST_ID = "PL12UaAf_xzfoHafXDU3s3QbiDhKzs3QK0"
 SCHEMA = "holoviewer-watchalong-event-v1"
 MANIFEST_SCHEMA = "holoviewer-watchalong-manifest-v1"
+APPROVED_SYNC_SCHEMA = "holoviewer-watchalong-approved-sync-v1"
+APPROVED_SYNC_SELECTIONS_SCHEMA = "holoviewer-watchalong-approved-sync-selections-v1"
 
 SESSIONS: tuple[dict[str, Any], ...] = (
     {
         "master": "eFYByyw5AJc",
-        "playlist_id": SEASON_ONE_PLAYLIST_ID,
         "day": "2026-10-01",
         "title": "【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
-        "playlist_start": 1,
-        "sources": ("qwL78s9afLk", "vqzPu11Haa4", "J-mcCv64_CA", "V-99ULU904Q", "IglYIVE5XhI", "EKFVL38awRc"),
-        "starts_ms": (608767, 2095935, 3568000, 5025000, 6488000, 8028500),
         "transcript_id": "5b5424cd70f9cc99561e768222fe501b746d7f0572765eba5b958f02583d298d",
         "transcript_hash": "f67ce6dd021ed9bddd9af2fcadddddab029dbafdb9d3763e4abeb71d8aded456",
         "cue_count": 1568,
@@ -37,17 +32,11 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_id": "db98d96002931734b6336c01732b6d981fbee3ed71a5304352c37f7ec4a92168",
         "translation_rel": "data/watchalong/transcripts/youtube/eFYByyw5AJc/translations/db98d96002931734b6336c01732b6d981fbee3ed71a5304352c37f7ec4a92168.json",
         "translation_quality": "quality-v2-complete",
-        "breakpoint_status": "REPAIRED",
-        "breakpoint_note": "Excluded the adjacent session's repeated episode-7 source and one 79-second false-positive cue; retained the six cadence-consistent source starts.",
     },
     {
         "master": "U2o13h1Oib4",
-        "playlist_id": SEASON_ONE_PLAYLIST_ID,
         "day": "2026-10-08",
         "title": "#2【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
-        "playlist_start": 7,
-        "sources": ("Vr0pc63j7jw", "vPuCpo-Fnec", "WEGsI-c1MW0", "0vzm32_8d1A", "hlX2iIyswnE", "4Gdgruo7pAk"),
-        "starts_ms": (728920, 2205800, 3689039, 5141960, 6606639, 8088040),
         "transcript_id": "834768fb940b919369e2dc666e29f718dca12323f11e23de3670197e77de4323",
         "transcript_hash": "747b93b56889947242869a3b049c89560dc1e2f9028e9e255c8167c01ae72023",
         "cue_count": 1438,
@@ -55,17 +44,11 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_id": "e99ab40eac7c633a8d658854ef6e506e2f2d48ca9dcddd808b73c059bc29574b",
         "translation_rel": "data/watchalong/transcripts/youtube/U2o13h1Oib4/translations/e99ab40eac7c633a8d658854ef6e506e2f2d48ca9dcddd808b73c059bc29574b.json",
         "translation_quality": "quality-v2-complete",
-        "breakpoint_status": "PRESENT",
-        "breakpoint_note": "Six high-confidence starts from the accepted 8501 transcript cue pipeline.",
     },
     {
         "master": "8pF4qHcshDc",
-        "playlist_id": SEASON_ONE_PLAYLIST_ID,
         "day": "2026-10-15",
         "title": "#3【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
-        "playlist_start": 13,
-        "sources": ("hyeZXJuE-gk", "C8QHUmB9y-8", "Kv_z05UQXbs", "tcYAfUkrvJ8", "UOsw-ih3CMw", "oJiaPS91-9U"),
-        "starts_ms": (737920, 2208560, 3689720, 5156239, 6612880, 8150599),
         "transcript_id": "b6d2a1b14817e07fb4fca4d21ca2911392c652e23ee8235b116432af32205cd2",
         "transcript_hash": "c7a36360c63c0fb9122bbb12a9684f90cf018682dfd0df89771e8c859ce049d0",
         "cue_count": 1461,
@@ -73,17 +56,11 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_id": "5084c85ae7ab6ff37a9e586252f8efc365be85bf723c5fb5d6a3ddb3b01a112f",
         "translation_rel": "data/watchalong/transcripts/youtube/8pF4qHcshDc/translations/5084c85ae7ab6ff37a9e586252f8efc365be85bf723c5fb5d6a3ddb3b01a112f.json",
         "translation_quality": "quality-v2-complete",
-        "breakpoint_status": "PRESENT",
-        "breakpoint_note": "Six high-confidence starts from the selected 8501 public-caption transcript.",
     },
     {
         "master": "t8q3XEmK0aM",
-        "playlist_id": SEASON_ONE_PLAYLIST_ID,
         "day": "2026-10-22",
         "title": "#4【初見】『無職転生~異世界行ったら本気だす~』同時視聴【ホロライブ/兎田ぺこら】",
-        "playlist_start": 19,
-        "sources": ("O4V1jClR7PY", "ybW0na9NNms", "aFmPLs4JkbQ", "sD2ql0Nfptg", "v_9mDEhKv1g", "1PRbROChRAw"),
-        "starts_ms": (727000, 2195000, 3683000, 5170000, 6691000, 8233000),
         "transcript_id": "178aae1474d868fb3800c451eb75ce29de0b26dd8d7f32bf66a62c99f59b108a",
         "transcript_hash": "c71004b6d0d4b888b841f97862d5e0856035c7c09fe039ac4c0844109c72f06d",
         "cue_count": 1367,
@@ -91,17 +68,11 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_id": "a9376309a49b753a1d57326b818d9ec13e12ab3caaf57aaf3d63b4005676b2c6",
         "translation_rel": "data/watchalong/transcripts/youtube/t8q3XEmK0aM/translations/a9376309a49b753a1d57326b818d9ec13e12ab3caaf57aaf3d63b4005676b2c6.json",
         "translation_quality": "quality-v2-complete",
-        "breakpoint_status": "PRESENT",
-        "breakpoint_note": "Six high-confidence starts from the selected 8501 public-caption transcript; the reference URL t=8610 is not a synchronization cue.",
     },
     {
         "master": "jqJb0qnueDo",
-        "playlist_id": SEASON_TWO_PLAYLIST_ID,
         "day": "2026-10-29",
         "title": "#1【初見】『無職転生 Ⅱ ~異世界行ったら本気だす~』2期 同時視聴【ホロライブ/兎田ぺこら】",
-        "playlist_start": 1,
-        "sources": ("YEUMzpnTuzQ", "3YW0UD_dFU8"),
-        "starts_ms": (586760, 2073480),
         "transcript_id": "800774361d14746957549eb2d885fe1eee6f40b15e467307b6f0aea852be25dd",
         "transcript_hash": "d4321ddc1bcac20aa8c6bc04759c8ca461ffc0ac05dbee26ea88496365e0dae6",
         "cue_count": 449,
@@ -109,17 +80,11 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_id": "141898ea22cd37595160c64d3899f8202916e1126f066c5193b8dd0681e7b6c5",
         "translation_rel": "data/watchalong/transcripts/youtube/jqJb0qnueDo/translations/141898ea22cd37595160c64d3899f8202916e1126f066c5193b8dd0681e7b6c5.json",
         "translation_quality": "quality-v2-complete",
-        "breakpoint_status": "PRESENT",
-        "breakpoint_note": "Two high-confidence starts from the canonical Quality-v2 transcript countdown cues.",
     },
     {
         "master": "x7bMoyNWaEE",
-        "playlist_id": SEASON_TWO_PLAYLIST_ID,
         "day": "2026-10-29",
         "title": "#1【初見】『無職転生 Ⅱ ~異世界行ったら本気だす~』2期 同時視聴【ホロライブ/兎田ぺこら】",
-        "playlist_start": 2,
-        "sources": ("3YW0UD_dFU8", "kMXGZL0Hjlc", "XB_ubSVh1jY"),
-        "starts_ms": (124840, 3066119, 4552520),
         "transcript_id": "8bef48719c6fdeb9fda78bed0a56f58a6dc4fd7d144c40f1fea010d758488e17",
         "transcript_hash": "450573590110d9563829c85cc04fa0b488c71c5ee2969c48982f293fbad1c2dd",
         "cue_count": 888,
@@ -127,8 +92,6 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_id": "9868c1c078edecd96e487fd914fb8e7842de38838dc2000ebee8e16f13741360",
         "translation_rel": "data/watchalong/transcripts/youtube/x7bMoyNWaEE/translations/9868c1c078edecd96e487fd914fb8e7842de38838dc2000ebee8e16f13741360.json",
         "translation_quality": "quality-v2-complete",
-        "breakpoint_status": "PRESENT",
-        "breakpoint_note": "Three high-confidence starts after the reconnect restarted episode 2 from zero; episode 5 was not watched in this event.",
     },
 )
 
@@ -145,32 +108,40 @@ def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_mapping(source_root: Path) -> dict[str, dict[str, Any]]:
-    db = source_root / "data/watchalong/watchalong_archive.sqlite3"
-    connection = sqlite3.connect(f"file:{db}?mode=ro&immutable=1", uri=True)
-    try:
-        rows = connection.execute(
-            "SELECT master_identity, playlist_url, playlist_start_index, source_urls_json "
-            "FROM watchalong_source_mappings"
-        ).fetchall()
-    finally:
-        connection.close()
-    result: dict[str, dict[str, Any]] = {}
-    for master, playlist, start, sources_json in rows:
-        result[str(master)] = {
-            "playlist": str(playlist),
-            "start": int(start),
-            "sources": tuple(_youtube_id(value) for value in json.loads(sources_json)),
-        }
-    return result
-
-
-def _youtube_id(value: str) -> str:
-    for marker in ("v=", "youtu.be/"):
-        if marker in value:
-            value = value.split(marker, 1)[1]
-            break
-    return value.split("&", 1)[0].split("?", 1)[0].split("/", 1)[0]
+def load_approved_sync(approved_root: Path, master: str) -> dict[str, Any]:
+    selections = read_json(approved_root / "selections.json")
+    if not isinstance(selections, dict) or selections.get("schema_version") != APPROVED_SYNC_SELECTIONS_SCHEMA:
+        raise ValueError("approved sync selections schema mismatch")
+    selected = selections.get("selections")
+    if not isinstance(selected, dict) or master not in selected:
+        raise ValueError(f"{master} has no selected approved sync")
+    relative = selected[master]
+    if not isinstance(relative, str) or not relative.startswith("versions/") or ".." in Path(relative).parts:
+        raise ValueError(f"{master} approved sync selection path is invalid")
+    artifact = read_json(approved_root / relative)
+    if not isinstance(artifact, dict) or artifact.get("schema_version") != APPROVED_SYNC_SCHEMA:
+        raise ValueError(f"{master} approved sync artifact is malformed")
+    identity = artifact.get("approved_sync_id")
+    identity_payload = {key: value for key, value in artifact.items() if key != "approved_sync_id"}
+    if not isinstance(identity, str) or sha256(canonical_bytes(identity_payload)) != identity:
+        raise ValueError(f"{master} approved sync identity mismatch")
+    if artifact.get("master_video_id") != master:
+        raise ValueError(f"{master} approved sync master mismatch")
+    sources = artifact.get("source_video_ids")
+    host_starts = artifact.get("host_start_ms")
+    source_starts = artifact.get("source_start_ms")
+    if not isinstance(sources, list) or not isinstance(host_starts, list) or not isinstance(source_starts, list):
+        raise ValueError(f"{master} approved sync lists are missing")
+    if not sources or len(sources) != len(host_starts) or len(sources) != len(source_starts):
+        raise ValueError(f"{master} approved source/start cardinality mismatch")
+    if len(set(sources)) != len(sources):
+        raise ValueError(f"{master} approved sources are not unique")
+    if any(not isinstance(value, int) or value < 0 for value in host_starts + source_starts):
+        raise ValueError(f"{master} approved sync timing is invalid")
+    if host_starts != sorted(host_starts) or len(set(host_starts)) != len(host_starts):
+        raise ValueError(f"{master} approved host starts are not strictly increasing")
+    artifact["_relative_path"] = relative
+    return artifact
 
 
 def transcript_paths(source_root: Path, session: dict[str, Any]) -> tuple[Path, Path]:
@@ -246,22 +217,28 @@ def load_translations(source_root: Path, session: dict[str, Any], rows: list[dic
     return [value.strip() for value in translations]
 
 
-def build_event(source_root: Path, session: dict[str, Any], mapping: dict[str, Any]) -> dict[str, Any]:
+def build_event(source_root: Path, session: dict[str, Any], approved: dict[str, Any]) -> dict[str, Any]:
     metadata_path, segments_path = transcript_paths(source_root, session)
     metadata, rows = read_json(metadata_path), read_json(segments_path)
     if not isinstance(metadata, dict) or not isinstance(rows, list):
         raise ValueError(f"{session['master']} malformed transcript files")
     validate_segments(session, metadata, rows)
     translations = load_translations(source_root, session, rows)
-
-    if mapping["start"] != session["playlist_start"] or not str(mapping["playlist"]).endswith(session["playlist_id"]):
-        raise ValueError(f"{session['master']} source mapping mismatch")
-    if mapping["sources"][: len(session["sources"])] != session["sources"]:
-        raise ValueError(f"{session['master']} source sequence mismatch")
-    if session["master"] == "eFYByyw5AJc" and mapping["sources"][6:] != ("Vr0pc63j7jw",):
-        raise ValueError("eFYByyw5AJc repaired boundary evidence changed")
-    if len(session["sources"]) != len(session["starts_ms"]):
-        raise ValueError(f"{session['master']} breakpoint/source cardinality mismatch")
+    if approved.get("transcript_id") != session["transcript_id"]:
+        raise ValueError(f"{session['master']} approved sync transcript id mismatch")
+    if approved.get("transcript_hash") != session["transcript_hash"]:
+        raise ValueError(f"{session['master']} approved sync transcript hash mismatch")
+    playlist_id = str(approved.get("playlist_id", "")).strip()
+    playlist_start = approved.get("playlist_start_index")
+    status = str(approved.get("status", ""))
+    note = str(approved.get("note", "")).strip()
+    if not playlist_id or not isinstance(playlist_start, int) or playlist_start < 1:
+        raise ValueError(f"{session['master']} approved playlist identity is invalid")
+    if status not in {"PRESENT", "REPAIRED"}:
+        raise ValueError(f"{session['master']} approved sync status is invalid")
+    sources = approved["source_video_ids"]
+    host_starts = approved["host_start_ms"]
+    source_starts = approved["source_start_ms"]
 
     subtitles = [
         {
@@ -278,14 +255,16 @@ def build_event(source_root: Path, session: dict[str, Any], mapping: dict[str, A
     sync_payload = [
         {
             "segment_id": f"episode-{index + 1:02d}",
-            "label": f"第 {session['playlist_start'] + index} 集",
-            "host_start_ms": start,
-            "host_start_seconds": start / 1000,
-            "source_start_ms": 0,
-            "source_start_seconds": 0,
+            "label": f"第 {playlist_start + index} 集",
+            "host_start_ms": host_start,
+            "host_start_seconds": host_start / 1000,
+            "source_start_ms": source_start,
+            "source_start_seconds": 0 if source_start == 0 else source_start / 1000,
             "source_video_id": source,
         }
-        for index, (source, start) in enumerate(zip(session["sources"], session["starts_ms"], strict=True))
+        for index, (source, host_start, source_start) in enumerate(
+            zip(sources, host_starts, source_starts, strict=True)
+        )
     ]
     return {
         "schema_version": SCHEMA,
@@ -293,9 +272,9 @@ def build_event(source_root: Path, session: dict[str, Any], mapping: dict[str, A
         "session_day": session["day"],
         "title": session["title"],
         "master_video_id": session["master"],
-        "playlist_id": session["playlist_id"],
-        "playlist_start_index": session["playlist_start"],
-        "source_video_ids": list(session["sources"]),
+        "playlist_id": playlist_id,
+        "playlist_start_index": playlist_start,
+        "source_video_ids": list(sources),
         "subtitle_timeline": "host",
         "segments": sync_payload,
         "subtitles": subtitles,
@@ -316,28 +295,26 @@ def build_event(source_root: Path, session: dict[str, Any], mapping: dict[str, A
             },
             "sync": {
                 "identity": sha256(canonical_bytes(sync_payload)),
-                "status": session["breakpoint_status"],
-                "note": session["breakpoint_note"],
+                "status": status,
+                "note": note,
                 "source": "data/watchalong/watchalong_archive.sqlite3#watchalong_source_mappings",
             },
         },
         "completeness": {
             "transcript": "COMPLETE",
             "translation": "COMPLETE",
-            "sync": session["breakpoint_status"],
+            "sync": status,
         },
     }
 
 
-def export(source_root: Path, output_root: Path, *, check: bool) -> None:
-    mappings = load_mapping(source_root)
-    if set(item["master"] for item in SESSIONS) - set(mappings):
-        raise ValueError("one or more pinned source mappings are unavailable")
+def export(source_root: Path, approved_sync_root: Path, output_root: Path, *, check: bool) -> None:
     event_dir = output_root / "events"
     outputs: dict[Path, bytes] = {}
     manifest_events: list[dict[str, Any]] = []
     for session in SESSIONS:
-        event = build_event(source_root, session, mappings[session["master"]])
+        approved = load_approved_sync(approved_sync_root, session["master"])
+        event = build_event(source_root, session, approved)
         data = canonical_bytes(event)
         relative = Path("events") / f"{session['master']}.json"
         outputs[output_root / relative] = data
@@ -346,8 +323,8 @@ def export(source_root: Path, output_root: Path, *, check: bool) -> None:
             "session_day": session["day"],
             "title": session["title"],
             "master_video_id": session["master"],
-            "source_video_id": session["sources"][0],
-            "source_count": len(session["sources"]),
+            "source_video_id": event["source_video_ids"][0],
+            "source_count": len(event["source_video_ids"]),
             "cue_count": session["cue_count"],
             "transcript_hash": session["transcript_hash"],
             "translation_artifact_id": session["translation_id"],
@@ -381,12 +358,19 @@ def export(source_root: Path, output_root: Path, *, check: bool) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", required=True, type=Path)
+    parser.add_argument("--approved-sync-root", type=Path)
     parser.add_argument("--output-root", type=Path, default=Path("site/data/watchalong"))
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     try:
-        export(args.source_root.resolve(), args.output_root.resolve(), check=args.check)
-    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError, sqlite3.Error) as exc:
+        source_root = args.source_root.resolve()
+        approved_sync_root = (
+            args.approved_sync_root.resolve()
+            if args.approved_sync_root is not None
+            else source_root / "watchalong_approved_sync"
+        )
+        export(source_root, approved_sync_root, args.output_root.resolve(), check=args.check)
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         print(f"watchalong export failed: {exc}", file=sys.stderr)
         return 1
     return 0
