@@ -48,6 +48,14 @@ readback() {
   curl -fsS --max-time 30 "${LIVE_ORIGIN}/watchalong-viewer/?watchalong_event=${VIDEO_ONE_ID}&pekora-watchalong=${nonce}" -o "$live_viewer"
 
   [ "$(sha256_file "$live_manifest")" = "$expected_manifest_sha" ] || fail "production manifest hash mismatch"
+  live_events_tsv="$temporary_dir/live-events.tsv"
+  jq -r '.events[] | [.event_id, .sha256] | @tsv' "$live_manifest" >"$live_events_tsv"
+  while IFS="$(printf '\t')" read -r event_id event_sha; do
+    require_hex "$event_sha" 64 "manifest event SHA-256"
+    live_event_path="$temporary_dir/live-${event_id}.json"
+    curl -fsS --max-time 30 "${LIVE_ORIGIN}/data/watchalong/events/${event_id}.json?pekora-watchalong=${nonce}" -o "$live_event_path"
+    [ "$(sha256_file "$live_event_path")" = "$event_sha" ] || fail "production event hash mismatch: $event_id"
+  done <"$live_events_tsv"
   [ "$(sha256_file "$live_event_one")" = "$expected_event_one_sha" ] || fail "production first event hash mismatch"
   [ "$(sha256_file "$live_event_two")" = "$expected_event_two_sha" ] || fail "production second event hash mismatch"
   jq -e --arg first "$VIDEO_ONE_ID" --arg second "$VIDEO_TWO_ID" '
@@ -137,6 +145,14 @@ baseline_event_two="$temporary_dir/${VIDEO_TWO_ID}.json"
 deployment_status="$temporary_dir/deployment-status.txt"
 curl -fsS --max-time 30 "${LIVE_ORIGIN}/data/watchalong/manifest.json?pekora-watchalong=baseline-${expected_head}" -o "$baseline_manifest"
 [ "$(sha256_file "$baseline_manifest")" = "$expected_baseline_manifest_sha" ] || fail "production manifest changed since packet preparation"
+baseline_events_tsv="$temporary_dir/baseline-events.tsv"
+jq -r '.events[] | [.event_id, .sha256] | @tsv' "$baseline_manifest" >"$baseline_events_tsv"
+while IFS="$(printf '\t')" read -r event_id event_sha; do
+  require_hex "$event_sha" 64 "baseline manifest event SHA-256"
+  baseline_event_path="$temporary_dir/baseline-${event_id}.json"
+  curl -fsS --max-time 30 "${LIVE_ORIGIN}/data/watchalong/events/${event_id}.json?pekora-watchalong=baseline-${expected_head}" -o "$baseline_event_path"
+  [ "$(sha256_file "$baseline_event_path")" = "$event_sha" ] || fail "Production baseline event hash mismatch: $event_id"
+done <"$baseline_events_tsv"
 jq -e --arg first "$VIDEO_ONE_ID" --arg second "$VIDEO_TWO_ID" \
   '.event_count == 6 and
    any(.events[]; .event_id == $first and .cue_count == 449 and .source_count == 2 and .sha256 == "d3b030036931ac8ce95435bafa721d33f57323bb61e33db2b694377cbe7f182a") and
