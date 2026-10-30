@@ -279,6 +279,10 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertIn("baseline-events.tsv", source)
         self.assertIn("production event hash mismatch: $event_id", source)
         self.assertIn("Production baseline event hash mismatch: $event_id", source)
+        self.assertIn('APPROVED_SYNC_ROOT="${APPROVED_SYNC_ROOT:-}"', source)
+        self.assertIn('APPROVED_SYNC_ROOT must point to an exact reviewed authority checkout', source)
+        self.assertIn('--approved-sync-root "$APPROVED_SYNC_ROOT"', source)
+        self.assertIn('cp "$temporary_dir/baseline-${event_id}.json" "$backup_dir/${event_id}.json"', source)
         self.assertIn('npx --yes wrangler deploy --config cloudflare/wrangler.json --name holoviewer-public', source)
 
     def test_exporter_has_no_network_or_provider_write_path(self):

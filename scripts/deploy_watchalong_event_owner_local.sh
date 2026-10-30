@@ -4,6 +4,8 @@ set -eu
 VIDEO_ONE_ID="jqJb0qnueDo"
 VIDEO_TWO_ID="x7bMoyNWaEE"
 LIVE_ORIGIN="https://holodocchi.com"
+SOURCE_ROOT="${SOURCE_ROOT:-/Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer}"
+APPROVED_SYNC_ROOT="${APPROVED_SYNC_ROOT:-}"
 EVENT_ONE_REL="site/data/watchalong/events/${VIDEO_ONE_ID}.json"
 EVENT_TWO_REL="site/data/watchalong/events/${VIDEO_TWO_ID}.json"
 MANIFEST_REL="site/data/watchalong/manifest.json"
@@ -132,8 +134,12 @@ cd "$repo_root"
 [ "$(sha256_file "$EVENT_TWO_REL")" = "$expected_event_two_sha" ] || fail "candidate second event hash mismatch"
 [ "$(sha256_file "$MANIFEST_REL")" = "$expected_manifest_sha" ] || fail "candidate manifest hash mismatch"
 
+[ -d "$SOURCE_ROOT" ] || fail "SOURCE_ROOT does not exist"
+[ -n "$APPROVED_SYNC_ROOT" ] || fail "APPROVED_SYNC_ROOT must point to an exact reviewed authority checkout"
+[ -d "$APPROVED_SYNC_ROOT" ] || fail "APPROVED_SYNC_ROOT does not exist"
 python3 scripts/export_watchalong_assets.py \
-  --source-root /Users/hsuhsunshun/Downloads/Hololive-PTT-Viewer \
+  --source-root "$SOURCE_ROOT" \
+  --approved-sync-root "$APPROVED_SYNC_ROOT" \
   --output-root site/data/watchalong \
   --check
 python3 -B -m unittest -v test_watchalong_assets test_public_smoke
@@ -173,6 +179,9 @@ mkdir -p "$backup_dir"
 cp "$baseline_manifest" "$backup_dir/manifest.json"
 cp "$baseline_event_one" "$backup_dir/${VIDEO_ONE_ID}.json"
 cp "$baseline_event_two" "$backup_dir/${VIDEO_TWO_ID}.json"
+while IFS="$(printf '\t')" read -r event_id event_sha; do
+  cp "$temporary_dir/baseline-${event_id}.json" "$backup_dir/${event_id}.json"
+done <"$baseline_events_tsv"
 cp "$deployment_status" "$backup_dir/deployment-status.txt"
 cp cloudflare/wrangler.json "$backup_dir/wrangler.json"
 printf 'candidate_head=%s\nevent_one_sha256=%s\nevent_two_sha256=%s\nmanifest_sha256=%s\nbaseline_version=%s\nbaseline_manifest_sha256=%s\n' \
