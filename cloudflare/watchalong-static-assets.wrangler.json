@@ -1,0 +1,8 @@
+{
+  "name": "holoviewer-watchalong-static-assets",
+  "compatibility_date": "2026-10-16",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../watchalong-static"
+  }
+}

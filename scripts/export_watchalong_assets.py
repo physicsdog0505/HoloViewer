@@ -364,7 +364,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", required=True, type=Path)
     parser.add_argument("--approved-sync-root", type=Path)
-    parser.add_argument("--output-root", type=Path, default=Path("site/data/watchalong"))
+    parser.add_argument("--output-root", type=Path, default=Path("watchalong-static/data/watchalong"))
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     try:

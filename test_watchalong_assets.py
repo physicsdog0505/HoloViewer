@@ -11,7 +11,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "site/data/watchalong"
+DATA = ROOT / "watchalong-static/data/watchalong"
 OLD_MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc", "t8q3XEmK0aM")
 NEW_MASTERS = ("jqJb0qnueDo", "x7bMoyNWaEE")
 MASTERS = OLD_MASTERS + NEW_MASTERS
@@ -29,7 +29,7 @@ class WatchalongAssetTests(unittest.TestCase):
 
     def test_manifest_hashes_and_complete_coverage(self):
         for entry in self.manifest["events"]:
-            path = ROOT / "site" / entry["path"].lstrip("/")
+            path = ROOT / "watchalong-static" / entry["path"].lstrip("/")
             raw = path.read_bytes()
             self.assertEqual(hashlib.sha256(raw).hexdigest(), entry["sha256"])
             event = json.loads(raw)
@@ -262,28 +262,22 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertTrue(player.exists())
         self.assertTrue(viewer.exists())
         source = player.read_text(encoding="utf-8")
-        self.assertIn("const WATCHALONG_MANIFEST_PATH='/data/watchalong/manifest.json';", source)
+        self.assertIn("const WATCHALONG_MANIFEST_PATH=watchalongStaticUrl('/data/watchalong/manifest.json');", source)
         self.assertIn("STATIC_EVENT_MODE", source)
 
-    def test_owner_local_deploy_packet_targets_both_new_events(self):
-        source = (ROOT / "scripts/deploy_watchalong_event_owner_local.sh").read_text(encoding="utf-8")
-        self.assertIn('VIDEO_ONE_ID="jqJb0qnueDo"', source)
-        self.assertIn('VIDEO_TWO_ID="x7bMoyNWaEE"', source)
-        self.assertIn('.event_count == 6', source)
-        self.assertIn('(.subtitles | length) == 449', source)
-        self.assertIn('(.subtitles | length) == 888', source)
-        self.assertIn('(.source_video_ids | length) == 4', source)
-        self.assertIn('.source_count == 3', source)
-        self.assertIn('ff12e04eea458f096558a033ed5d2d44646ddd1e49c78ea067028553eef28db8', source)
-        self.assertIn("live-events.tsv", source)
-        self.assertIn("baseline-events.tsv", source)
-        self.assertIn("production event hash mismatch: $event_id", source)
-        self.assertIn("Production baseline event hash mismatch: $event_id", source)
-        self.assertIn('APPROVED_SYNC_ROOT="${APPROVED_SYNC_ROOT:-}"', source)
-        self.assertIn('APPROVED_SYNC_ROOT must point to an exact reviewed authority checkout', source)
+    def test_owner_local_deploy_targets_dedicated_static_worker(self):
+        source = (ROOT / "scripts/deploy_watchalong_static_assets_owner_local.sh").read_text(encoding="utf-8")
+        retired = (ROOT / "scripts/deploy_watchalong_event_owner_local.sh").read_text(encoding="utf-8")
+        self.assertIn('WORKER_NAME="holoviewer-watchalong-static-assets"', source)
+        self.assertIn('WRANGLER_CONFIG="cloudflare/watchalong-static-assets.wrangler.json"', source)
+        self.assertIn('ASSET_ROOT="watchalong-static"', source)
+        self.assertIn('APPROVED_SYNC_ROOT must point to exact reviewed authority checkout', source)
         self.assertIn('--approved-sync-root "$APPROVED_SYNC_ROOT"', source)
-        self.assertIn('cp "$temporary_dir/baseline-${event_id}.json" "$backup_dir/${event_id}.json"', source)
-        self.assertIn('npx --yes wrangler deploy --config cloudflare/wrangler.json --name holoviewer-public', source)
+        self.assertIn('npx --yes wrangler deploy --config "$WRANGLER_CONFIG" --name "$WORKER_NAME"', source)
+        self.assertNotIn('--name holoviewer-public', source)
+        self.assertNotIn('cloudflare/wrangler.json', source)
+        self.assertIn("retired", retired)
+        self.assertNotIn("wrangler deploy", retired)
 
     def test_exporter_has_no_network_or_provider_write_path(self):
         source = (ROOT / "scripts/export_watchalong_assets.py").read_text(encoding="utf-8")

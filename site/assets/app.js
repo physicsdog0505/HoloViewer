@@ -1,5 +1,7 @@
 'use strict';
 const config=window.HOLOVIEWER_CONFIG||{};
+const WATCHALONG_STATIC_BASE=String(config.watchalongStaticBase||'').replace(/\/$/,'');
+function watchalongStaticUrl(path){if(!/^https:\/\//.test(WATCHALONG_STATIC_BASE))throw new Error('Watchalong Static Assets 未設定');return WATCHALONG_STATIC_BASE+path}
 const $=id=>document.getElementById(id);
 const names={home:'今日直播',single:'自訂觀看',multi:'多人連動',history:'歷史直播',ptt:'PTT 今日專串',watchalong:'同時視聽','custom-session':'自訂觀看','ptt-focus':'PTT 今日專串'};
 const stored=(()=>{try{return JSON.parse(sessionStorage.getItem('hvMulti')||'[]')}catch{return []}})();
@@ -2800,7 +2802,7 @@ async function loadWatchalongLanding(){
  watchalongPastGrid?.replaceChildren();
  try{
   const [manifestResponse,todayResult,historyManifest]=await Promise.all([
-   fetch('/data/watchalong/manifest.json',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}}),
+   fetch(watchalongStaticUrl('/data/watchalong/manifest.json'),{mode:'cors',credentials:'omit',cache:'no-store',headers:{Accept:'application/json'}}),
    api('/v1/catalog/today').catch(()=>null),
    loadYoutubeHistoryManifest().catch(()=>null)
   ]);
