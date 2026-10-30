@@ -14,7 +14,8 @@ const PLAYLIST_ID=validPlaylistId(params.get('playlist'));
 const EVENT_ID=String(params.get('watchalong_event')||params.get('event')||'').trim();
 const STATIC_EVENT_MODE=Boolean(EVENT_ID);
 const WATCHALONG_STATIC_BASE=String(config.watchalongStaticBase||'').replace(/\/$/,'');
-const WATCHALONG_MANIFEST_PATH=WATCHALONG_STATIC_BASE+'/data/watchalong/manifest.json';
+function watchalongStaticUrl(path){if(!/^https:\/\//.test(WATCHALONG_STATIC_BASE))throw new Error('Watchalong Static Assets 未設定');return WATCHALONG_STATIC_BASE+path}
+const WATCHALONG_MANIFEST_PATH=watchalongStaticUrl('/data/watchalong/manifest.json');
 
 const workspace=document.getElementById('watchalongWorkspace');
 const linkedPlayback=document.getElementById('linkedPlayback');
@@ -1062,7 +1063,7 @@ async function loadReadOnlyArtifacts(){
   if(!window.HoloViewerWatchalongStatic)throw new Error('Static verifier missing');
   const manifestResult=await fetchStaticJson(WATCHALONG_MANIFEST_PATH);
   const entry=HoloViewerWatchalongStatic.manifestEntry(manifestResult.payload,EVENT_ID);
-  const eventResult=await fetchStaticJson(WATCHALONG_STATIC_BASE+entry.path);
+  const eventResult=await fetchStaticJson(watchalongStaticUrl(entry.path));
   const digest=await sha256Hex(eventResult.buffer);
   HoloViewerWatchalongStatic.verifyDigest(digest,entry.sha256);
   const payload=HoloViewerWatchalongStatic.validateEvent(entry,eventResult.payload);
