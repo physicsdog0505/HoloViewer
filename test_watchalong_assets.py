@@ -15,14 +15,6 @@ DATA = ROOT / "site/data/watchalong"
 OLD_MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc", "t8q3XEmK0aM")
 NEW_MASTERS = ("jqJb0qnueDo", "x7bMoyNWaEE")
 MASTERS = OLD_MASTERS + NEW_MASTERS
-PRESERVED_EVENT_HASHES = {
-    "eFYByyw5AJc": "3d591074387770afcff50265220ff89fd25f0467582c686867eff71d071cee43",
-    "U2o13h1Oib4": "874f6a3a722a2af5cd21ba6d1dc4a13147de35470445122291e5dc134c091ba4",
-    "8pF4qHcshDc": "f92fc25f2935fbd2cc1291431bea2f84c3e557c046d05492322efdb10efa9d83",
-    "t8q3XEmK0aM": "895f9150c2c292da3f1c1269b3dc6a6d417bd165c10f1d2c107f0d6e0e38c230",
-    "jqJb0qnueDo": "d3b030036931ac8ce95435bafa721d33f57323bb61e33db2b694377cbe7f182a",
-}
-
 
 class WatchalongAssetTests(unittest.TestCase):
     @classmethod
@@ -283,6 +275,10 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertIn('(.source_video_ids | length) == 4', source)
         self.assertIn('.source_count == 3', source)
         self.assertIn('ff12e04eea458f096558a033ed5d2d44646ddd1e49c78ea067028553eef28db8', source)
+        self.assertIn("live-events.tsv", source)
+        self.assertIn("baseline-events.tsv", source)
+        self.assertIn("production event hash mismatch: $event_id", source)
+        self.assertIn("Production baseline event hash mismatch: $event_id", source)
         self.assertIn('npx --yes wrangler deploy --config cloudflare/wrangler.json --name holoviewer-public', source)
 
     def test_exporter_has_no_network_or_provider_write_path(self):
