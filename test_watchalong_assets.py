@@ -274,7 +274,8 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertIn('APPROVED_SYNC_ROOT must point to exact reviewed authority checkout', source)
         self.assertIn('--approved-sync-root "$APPROVED_SYNC_ROOT"', source)
         self.assertIn('npx --yes wrangler deploy --config "$WRANGLER_CONFIG" --name "$WORKER_NAME"', source)
-        self.assertNotIn('holoviewer-public', source)
+        self.assertNotIn('--name holoviewer-public', source)
+        self.assertNotIn('cloudflare/wrangler.json', source)
         self.assertIn("retired", retired)
         self.assertNotIn("wrangler deploy", retired)
 
