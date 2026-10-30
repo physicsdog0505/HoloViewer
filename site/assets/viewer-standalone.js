@@ -81,6 +81,8 @@ const pttFontValue=document.getElementById('pttFontValue');
 const players=[];
 const playerCards=[];
 const viewerLocalSubtitleSlots={A:null,B:null};
+const viewerVodSubtitleCache=new Map();
+let viewerVodSubtitle=null;
 let viewerLocalSubtitleMode='holodocchi';
 let viewerLocalSubtitleTimer=null;
 let catalogRows=[];
@@ -2040,6 +2042,7 @@ async function resolvePrimaryPtt(){
 
  const suppliedWindow=archiveWindows.get(id);
  if(suppliedWindow){
+  void loadViewerVodSubtitle(id);
   pttContext={mode:'vod',videoId:id,start:suppliedWindow.start,end:suppliedWindow.end,
               scheduledStart:suppliedWindow.scheduledStart||'',
               day:taipeiDayForDate(suppliedWindow.start),anchorSource:suppliedWindow.anchorSource};
@@ -2066,6 +2069,7 @@ async function resolvePrimaryPtt(){
    return;
   }
   if(lifecycle==='ended'){
+   void loadViewerVodSubtitle(id);
    const vodWindow=verifiedEndedVodWindow(row);
    if(vodWindow){
     const cached={videoId:id,start:vodWindow.start,end:vodWindow.end,
@@ -2097,6 +2101,7 @@ async function resolvePrimaryPtt(){
   }
   const vodWindow=verifiedEndedVodWindow(todayRow);
   if(vodWindow){
+   void loadViewerVodSubtitle(id);
    pttContext={mode:'vod',videoId:id,start:vodWindow.start,end:vodWindow.end,
                scheduledStart:vodWindow.scheduledStart||'',
                day:vodWindow.day,anchorSource:vodWindow.anchorSource};
@@ -2137,6 +2142,23 @@ function startCarousel(){
 }
 function viewerPrimaryVideoId(){
  return String(streams[primaryIndex]?.videoId||'');
+}
+async function loadViewerVodSubtitle(videoId){
+ if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)||!window.HoloViewerVodSubtitles)return null;
+ if(viewerVodSubtitleCache.has(videoId)){
+  viewerVodSubtitle=viewerVodSubtitleCache.get(videoId);
+  return viewerVodSubtitle;
+ }
+ try{
+  const base=String(window.HOLOVIEWER_CONFIG?.vodSubtitleStaticBase||'');
+  const loaded=await HoloViewerVodSubtitles.load(videoId,{baseUrl:base});
+  if(loaded){viewerVodSubtitleCache.set(videoId,loaded);viewerVodSubtitle=loaded;clearViewerLocalSubtitleOverlays()}
+  else if(viewerVodSubtitle?.videoId===videoId)viewerVodSubtitle=null;
+  return loaded;
+ }catch{
+  if(viewerVodSubtitle?.videoId===videoId)viewerVodSubtitle=null;
+  return null;
+ }
 }
 function viewerPrimaryCurrentSeconds(){
  try{
@@ -2226,7 +2248,6 @@ function clearViewerLocalSubtitle(slotName){
 }
 function renderViewerLocalSubtitle(){
  clearViewerLocalSubtitleOverlays();
- if(viewerLocalSubtitleMode==='holodocchi')return;
  const videoId=viewerPrimaryVideoId(),current=viewerPrimaryCurrentSeconds(),overlay=viewerLocalSubtitleOverlay();
  if(!overlay||!Number.isFinite(current))return;
  const single=overlay.querySelector('.viewer-local-subtitle-single');
@@ -2243,7 +2264,7 @@ function renderViewerLocalSubtitle(){
   overlay.hidden=!(aCue||bCue);
   return;
  }
- const slot=viewerLocalSubtitleSlots[viewerLocalSubtitleMode];
+ const slot=viewerLocalSubtitleMode==='holodocchi'?viewerVodSubtitle:viewerLocalSubtitleSlots[viewerLocalSubtitleMode];
  if(!slot||slot.videoId!==videoId)return;
  const cue=viewerLocalSubtitleCue(slot,current);
  if(single){single.hidden=false;single.textContent=String(cue?.translation||'');single.style.color='#fff';single.style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(cue))}
