@@ -127,6 +127,9 @@ def load_approved_sync(approved_root: Path, master: str) -> dict[str, Any]:
         raise ValueError(f"{master} approved sync identity mismatch")
     if artifact.get("master_video_id") != master:
         raise ValueError(f"{master} approved sync master mismatch")
+    approval_version = artifact.get("approval_version")
+    if not isinstance(approval_version, int) or approval_version < 1:
+        raise ValueError(f"{master} approved sync approval_version is invalid")
     sources = artifact.get("source_video_ids")
     host_starts = artifact.get("host_start_ms")
     source_starts = artifact.get("source_start_ms")
@@ -297,7 +300,9 @@ def build_event(source_root: Path, session: dict[str, Any], approved: dict[str, 
                 "identity": sha256(canonical_bytes(sync_payload)),
                 "status": status,
                 "note": note,
-                "source": "data/watchalong/watchalong_archive.sqlite3#watchalong_source_mappings",
+                "approved_sync_id": approved["approved_sync_id"],
+                "approval_version": approved["approval_version"],
+                "source": f"watchalong_approved_sync/{approved['_relative_path']}",
             },
         },
         "completeness": {
