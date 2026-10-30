@@ -133,7 +133,7 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
         original_parse=release.parse_frontend_config
         try:
             release.fetch=lambda origin,path,allow_404=False: b'not-json' if path=='/youtube/v1/manifest.json' else None
-            release.parse_frontend_config=lambda repo: ('https://holoviewer-youtube-static-assets.singlebagel.workers.dev',[])
+            release.parse_frontend_config=lambda repo: ('https://holoviewer-youtube-static-assets.singlebagel.workers.dev','https://holoviewer-watchalong-static-assets.singlebagel.workers.dev',[])
             with self.assertRaisesRegex(Exception,'neither JSON nor SPA fallback'):
                 release.enumerate_first_run_foreign(Path('.'))
         finally:
