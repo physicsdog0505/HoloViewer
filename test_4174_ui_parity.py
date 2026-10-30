@@ -1615,7 +1615,7 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("watchalongPastSearch?.addEventListener('keydown'",js)
         self.assertIn("if(event.key!=='Enter')return",js)
         self.assertIn("watchalongPastSearch?.addEventListener('input'",js)
-        self.assertIn("fetch('/data/watchalong/manifest.json'",js)
+        self.assertIn("fetch(watchalongStaticUrl('/data/watchalong/manifest.json')",js)
         self.assertIn("href:'/watchalong-viewer/?watchalong_event='",js)
 
     def test_history_search_accepts_single_dates_unbounded_ranges_and_combined_terms(self):
