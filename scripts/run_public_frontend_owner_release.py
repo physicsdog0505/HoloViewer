@@ -120,7 +120,7 @@ def active_version(repo: Path) -> str:
     raise ReleaseBlocked("unable to determine active Worker version")
 
 
-def parse_frontend_config(repo: Path) -> tuple[str, list[tuple[str, str]]]:
+def parse_frontend_config(repo: Path) -> tuple[str, str, list[tuple[str, str]]]:
     text = (repo / "site/assets/config.js").read_text()
     marker = 'youtubeStaticBase: "'
     if marker not in text:
@@ -128,6 +128,13 @@ def parse_frontend_config(repo: Path) -> tuple[str, list[tuple[str, str]]]:
     youtube = text.split(marker, 1)[1].split('"', 1)[0]
     if youtube != "https://holoviewer-youtube-static-assets.singlebagel.workers.dev":
         raise ReleaseBlocked("frontend YouTube consumer is not pointed at dedicated target")
+
+    watchalong_marker = 'watchalongStaticBase: "'
+    if watchalong_marker not in text:
+        raise ReleaseBlocked("watchalongStaticBase missing from frontend config")
+    watchalong = text.split(watchalong_marker, 1)[1].split('"', 1)[0]
+    if watchalong != "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev":
+        raise ReleaseBlocked("frontend Watchalong consumer is not pointed at dedicated target")
 
     pairs: list[tuple[str, str]] = []
     for block in text.split("base: ")[1:]:
@@ -143,11 +150,11 @@ def parse_frontend_config(repo: Path) -> tuple[str, list[tuple[str, str]]]:
         pairs.append((base, manifest))
     if not pairs:
         raise ReleaseBlocked("no dedicated PTT archive targets found in frontend config")
-    return youtube, pairs
+    return youtube, watchalong, pairs
 
 
 def dedicated_health(repo: Path) -> dict:
-    youtube, ptt = parse_frontend_config(repo)
+    youtube, watchalong, ptt = parse_frontend_config(repo)
     y = fetch(youtube, "/youtube/v1/manifest.json")
     if not y:
         raise ReleaseBlocked("dedicated YouTube manifest readback is empty")
@@ -155,6 +162,26 @@ def dedicated_health(repo: Path) -> dict:
         json.loads(y)
     except ValueError as exc:
         raise ReleaseBlocked("dedicated YouTube manifest is not JSON") from exc
+
+    wraw = fetch(watchalong, "/data/watchalong/manifest.json")
+    if not wraw:
+        raise ReleaseBlocked("dedicated Watchalong manifest readback is empty")
+    try:
+        wmanifest = json.loads(wraw)
+    except ValueError as exc:
+        raise ReleaseBlocked("dedicated Watchalong manifest is not JSON") from exc
+    if wmanifest.get("schema_version") != "holoviewer-watchalong-manifest-v1":
+        raise ReleaseBlocked("dedicated Watchalong manifest schema mismatch")
+    if wmanifest.get("event_count") != 6 or len(wmanifest.get("events", [])) != 6:
+        raise ReleaseBlocked("dedicated Watchalong manifest inventory mismatch")
+    for event in wmanifest["events"]:
+        rel = str(event.get("path") or "")
+        expected = str(event.get("sha256") or "")
+        if not rel.startswith("/data/watchalong/events/") or not re.fullmatch(r"[0-9a-f]{64}", expected):
+            raise ReleaseBlocked("dedicated Watchalong manifest entry invalid")
+        eraw = fetch(watchalong, rel)
+        if not eraw or sha256(eraw) != expected:
+            raise ReleaseBlocked(f"dedicated Watchalong event hash mismatch: {rel}")
 
     checked = []
     for base, manifest in ptt:
@@ -166,7 +193,12 @@ def dedicated_health(repo: Path) -> dict:
         except ValueError as exc:
             raise ReleaseBlocked(f"dedicated PTT manifest is not JSON: {base}{manifest}") from exc
         checked.append(base + manifest)
-    return {"youtube": youtube + "/youtube/v1/manifest.json", "ptt": checked, "status": "PASS"}
+    return {
+        "youtube": youtube + "/youtube/v1/manifest.json",
+        "watchalong": watchalong + "/data/watchalong/manifest.json",
+        "ptt": checked,
+        "status": "PASS",
+    }
 
 
 def ownership_gate(repo: Path) -> dict:
@@ -311,7 +343,7 @@ def enumerate_first_run_foreign(repo: Path) -> dict:
         except ValueError:
             raise ReleaseBlocked("legacy frontend YouTube manifest is neither JSON nor SPA fallback")
 
-    _, ptt = parse_frontend_config(repo)
+    _, _, ptt = parse_frontend_config(repo)
     for _, manifest in ptt:
         raw = fetch(CUSTOM_ORIGIN, manifest, allow_404=True)
         if raw:
