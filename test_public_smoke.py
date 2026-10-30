@@ -658,7 +658,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertEqual(manifest.get("event_count"), 6)
         self.assertEqual({row["event_id"] for row in manifest["events"]}, set(expected))
         for row in manifest["events"]:
-            path = ROOT / "site" / row["path"].lstrip("/")
+            path = ROOT / "watchalong-static" / row["path"].lstrip("/")
             raw = path.read_bytes()
             self.assertEqual(hashlib.sha256(raw).hexdigest(), row["sha256"])
             event = json.loads(raw)
