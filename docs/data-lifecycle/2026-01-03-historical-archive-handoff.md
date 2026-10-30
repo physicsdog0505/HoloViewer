@@ -1,13 +1,15 @@
 # 2026/01–03 Historical PTT Archive handoff
 
-Status: staged for owner-local deployment; production unchanged.
+Status: owner-local production deployment completed and manifest readback passed.
 
 ## Source authority
 
 - Public base: `physicsdog0505/HoloViewer@871923157254f4f8d7d951a7ea45532998ece8f2`
 - Recovery ledger: `physicsdog0505/Hololive-PTT-Viewer@1b634e4f9bafb589a9434e3f760a3e92e04f009b`
 - Historical tooling reference: `4874a194701357e320abced5dae7b57c47f31db0`
-- No PTT recovery, Collector, Publisher, D1, frontend, or production runtime operation was performed.
+- No PTT recovery, Collector, Publisher, D1, or frontend operation was performed.
+  The only production mutation was the explicitly authorized Owner-local Static
+  Assets deployment recorded below.
 
 ## Accepted sets and authoritative months
 
@@ -53,7 +55,7 @@ Unreferenced stale 06/07 hourly files are not restored into the staged bundle.
 
 ## Owner-local commands
 
-Deploy, only after a separate owner decision:
+Executed Owner-local deploy command after explicit owner authorization:
 
 ```bash
 OWNER_LOCAL=YES GITHUB_ACTIONS=NO CI_DEPLOY=NO npx --yes wrangler deploy --config /private/tmp/issue160-20260103-production-release-v2/wrangler.jsonc --name holoviewer-ptt-static-assets-full-offline
@@ -67,9 +69,20 @@ python3 -B -m ptt_offline.month_static_release verify-http --spec ptt_offline/fi
 
 The readback checks all baseline objects, all candidate registration/manifest/provenance/object identities, representative early/mid/late days, response headers, CORS, and 404 behavior.
 
+## Production deployment receipt
+
+- Deployed at: `2026-10-30T02:49:01Z`
+- Worker version: `ab656742-4cc9-4fee-8cd9-aa72866387b2`
+- Wrangler result: 102 new or changed assets uploaded; 1,151 existing assets reused.
+- HTTP readback reproduced the expected manifest SHA-256 for 2026-01 through
+  2026-08 and 2026-10.
+- The separate 2026-09 Pilot Worker remained reachable; its manifest SHA-256
+  after this deployment was
+  `a4f171c4e3cf04916f146625119c187f5e9e6f40afdc11fc9722f4311e461f32`.
+
 ## Execution boundary
 
-- `PRODUCTION_CHANGED=NO`
-- `DEPLOY=NO`
+- `PRODUCTION_CHANGED=YES`
+- `DEPLOY=YES`
 - No GitHub Actions were dispatched.
 - Pipeline build and release fail-closed gates passed. A separate standalone unit-test run was not requested or executed.
