@@ -648,7 +648,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("LOCAL_SUBTITLE_CORE=PASS", result.stdout)
 
     def test_watchalong_static_assets_integrity(self):
-        manifest = json.loads((ROOT / "site/data/watchalong/manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads((ROOT / "watchalong-static/data/watchalong/manifest.json").read_text(encoding="utf-8"))
         expected = {
             "eFYByyw5AJc": (1568, 6), "U2o13h1Oib4": (1438, 6),
             "8pF4qHcshDc": (1461, 6), "t8q3XEmK0aM": (1367, 6),
