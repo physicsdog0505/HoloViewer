@@ -117,7 +117,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("renderHomeRows(rows);", home_source)
         self.assertIn("loadHomeCollab();", home_source)
         self.assertLess(home_source.index("renderHomeRows(rows);"), home_source.index("loadHomeCollab();"))
-        self.assertIn("const [manifest,data,aliasRegistry,contentAliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,historyPromise,aliasesPromise,contentAliasesPromise,collabPromise,catalogPromise]);", js)
+        self.assertIn("const [manifest,subtitleIndex,data,aliasRegistry,contentAliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,subtitleIndexPromise,historyPromise,aliasesPromise,contentAliasesPromise,collabPromise,catalogPromise]);", js)
         self.assertIn("const manifestPromise=config.youtubeStaticBase?loadYoutubeHistoryManifest().catch(()=>null):Promise.resolve(null);", js)
         self.assertIn("const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);", js)
         self.assertIn("const HISTORY_MEMBER_ALIASES_PATH='/data/search/member-aliases.v1.json';", js)
@@ -822,8 +822,6 @@ class PublicSmokeTests(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
         config = (ROOT / "site/assets/config.js").read_text(encoding="utf-8")
-        fixture = json.loads((ROOT / "site/data/subtitles/index.json").read_text(encoding="utf-8"))
-
         self.assertIn('id="historySubtitleFilter"', html)
         self.assertIn('中文字幕', html)
         self.assertIn("vodSubtitleAvailability", config)
@@ -836,14 +834,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("window.addEventListener('popstate'", js)
         self.assertIn("subtitle-ready", js)
         self.assertIn(".history-subtitle-filter", css)
-        self.assertEqual(fixture["schema_version"], 1)
-        self.assertEqual(fixture["video_count"], 2)
-        self.assertEqual(
-            [row["video_id"] for row in fixture["videos"]],
-            ["VzgiaEu59Uk", "5cDfZaII0_0"],
-        )
-        self.assertNotIn("title", fixture["videos"][0])
-        self.assertNotIn("channel_name", fixture["videos"][0])
+        self.assertIn("button.hidden=!configured", js)
+        self.assertIn("return /^(localhost|127\\.0\\.0\\.1)$/.test(location.hostname)?path:'';", js)
 
 
 if __name__ == "__main__":
