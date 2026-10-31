@@ -254,6 +254,7 @@ function route(r){
  // Hash query belongs to the session, not the route key.
  r=String(r||'').split('?')[0];
  if(!names[r])r='home';
+ if(r!=='home')stopHomeHoverPreview();
  const reenteringHistory=r==='history'&&activeRoute&&activeRoute!=='history';
  if(reenteringHistory){
   $('historySearch').value='';
@@ -321,6 +322,52 @@ function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_i
 const HOME_FILTER_KEY='holoviewer-live-filter';
 const HOME_FILTERS=new Set(['hololive','holostars','mekpark','all']);
 const selectedHomeVideos=new Set();
+const HOME_HOVER_PREVIEW_DELAY_MS=600;
+let homeHoverPreviewTimer=0;
+let homeHoverPreviewThumb=null;
+function homeHoverPreviewSupported(){
+ return window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+}
+function homeHoverPreviewUrl(id){
+ const url=new URL('https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id));
+ url.searchParams.set('autoplay','1');
+ url.searchParams.set('mute','1');
+ url.searchParams.set('controls','0');
+ url.searchParams.set('playsinline','1');
+ url.searchParams.set('rel','0');
+ if(/^https?:$/.test(window.location.protocol))url.searchParams.set('origin',window.location.origin);
+ return url.toString();
+}
+function stopHomeHoverPreview(thumb=null){
+ if(homeHoverPreviewTimer){window.clearTimeout(homeHoverPreviewTimer);homeHoverPreviewTimer=0}
+ const target=thumb||homeHoverPreviewThumb;
+ if(target){
+  target.querySelector('.home-hover-preview')?.remove();
+  target.classList.remove('hover-preview-active');
+ }
+ if(!thumb||homeHoverPreviewThumb===thumb)homeHoverPreviewThumb=null;
+}
+function scheduleHomeHoverPreview(thumb,id){
+ if(!homeHoverPreviewSupported())return;
+ if(homeHoverPreviewTimer)window.clearTimeout(homeHoverPreviewTimer);
+ homeHoverPreviewTimer=window.setTimeout(()=>{
+  homeHoverPreviewTimer=0;
+  if(!thumb.isConnected||!thumb.matches(':hover'))return;
+  if(homeHoverPreviewThumb&&homeHoverPreviewThumb!==thumb)stopHomeHoverPreview(homeHoverPreviewThumb);
+  if(thumb.querySelector('.home-hover-preview'))return;
+  const preview=document.createElement('iframe');
+  preview.className='home-hover-preview';
+  preview.title='YouTube 靜音預覽';
+  preview.src=homeHoverPreviewUrl(id);
+  preview.allow='autoplay; encrypted-media; picture-in-picture';
+  preview.referrerPolicy='strict-origin-when-cross-origin';
+  preview.tabIndex=-1;
+  preview.setAttribute('aria-hidden','true');
+  thumb.append(preview);
+  thumb.classList.add('hover-preview-active');
+  homeHoverPreviewThumb=thumb;
+ },HOME_HOVER_PREVIEW_DELAY_MS);
+}
 const historyVodWindows=new Map();
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
 function trustedArchiveWindow(item){
@@ -662,7 +709,13 @@ function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={})
  const overlay=node('div',undefined,'thumb-overlay');
  if(!history)overlay.append(node('span',status[0],'thumb-badge '+status[1]));
  if(history&&historySubtitleAvailabilityIds.has(id))overlay.append(node('span','中文字幕','thumb-badge subtitle-ready'));
- const time=homeStartLabel(item,{includeYear:history});const duration=history?historyDurationLabel(item):'';overlay.append(node('span',time+(duration?' · '+duration:''),'thumb-time'));thumb.append(overlay);card.append(thumb);
+ const time=homeStartLabel(item,{includeYear:history});const duration=history?historyDurationLabel(item):'';overlay.append(node('span',time+(duration?' · '+duration:''),'thumb-time'));thumb.append(overlay);
+ if(!history&&lifecycleBucket==='live'){
+  thumb.dataset.hoverPreviewVideoId=id;
+  thumb.addEventListener('mouseenter',()=>scheduleHomeHoverPreview(thumb,id));
+  thumb.addEventListener('mouseleave',()=>stopHomeHoverPreview(thumb));
+ }
+ card.append(thumb);
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
  const copy=node('div',undefined,'yt-copy');copy.append(node('h3',String(item.title||id),'stream-title'));copy.append(node('div',name,'channel-name'));const viewers=Number(item.concurrent_viewers);if(lifecycleBucket==='live'&&Number.isInteger(viewers)&&viewers>0)copy.append(node('div',new Intl.NumberFormat('zh-TW').format(viewers)+' 人正在觀看','live-viewers'));meta.append(copy);card.append(meta);
@@ -917,6 +970,7 @@ async function loadHomeCollab(){
  }catch{}
 }
 async function loadHome(){
+ stopHomeHoverPreview();
  if(homeLoadInFlight)return;
  const cachedRows=homeCatalogRows.length?[]:readHomeCatalogCache();
  if(cachedRows.length)renderHomeRows(cachedRows);
