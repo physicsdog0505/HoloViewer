@@ -83,17 +83,17 @@ def _validate_video_asset(asset: object, *, expected_video_id: str | None = None
     cues = asset["cues"]
     if type(count) is not int or count < 1 or not isinstance(cues, list) or len(cues) != count:
         raise VodSubtitlePublishError("subtitle segment_count mismatch")
-    previous_end = -1
+    previous_start = -1
     for index, cue in enumerate(cues):
         if not isinstance(cue, dict) or set(cue) != {"id", "start_ms", "end_ms", "zh_tw"}:
             raise VodSubtitlePublishError("invalid subtitle cue")
         if cue["id"] != index or type(cue["start_ms"]) is not int or type(cue["end_ms"]) is not int:
             raise VodSubtitlePublishError("invalid subtitle cue identity")
-        if cue["start_ms"] < 0 or cue["end_ms"] <= cue["start_ms"] or cue["start_ms"] < previous_end:
+        if cue["start_ms"] < 0 or cue["end_ms"] <= cue["start_ms"] or cue["start_ms"] < previous_start:
             raise VodSubtitlePublishError("subtitle cues are not ordered")
         if not isinstance(cue["zh_tw"], str) or not cue["zh_tw"].strip():
             raise VodSubtitlePublishError("empty zh-TW subtitle cue")
-        previous_end = cue["end_ms"]
+        previous_start = cue["start_ms"]
     return asset
 
 
