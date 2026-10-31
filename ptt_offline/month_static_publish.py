@@ -220,11 +220,11 @@ def _events_for_article(db: sqlite3.Connection, article: dict[str,Any],
             raise MonthPublishError(f"invalid PTT timestamp: {aid}:{index}") from exc
         quality="source-minute"
         if event<previous:
-            if previous.month==12 and event.month==1:
+            if previous.month in (11,12) and event.month in (1,2):
                 event=event.replace(year=previous.year+1)
             else:
                 quality="source-minute-regression"
-        if event-previous>timedelta(days=45):
+        if event-previous>timedelta(days=120):
             raise MonthPublishError(f"unobserved chronology interval: {aid}:{index}")
         floor=(source["web_floor"] if article["source_kind"]=="Web" else index)
         if floor!=index:

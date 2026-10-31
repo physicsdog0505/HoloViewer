@@ -1,0 +1,33 @@
+{
+  "schema_version": "holoviewer-ptt-static-assets-release-v1",
+  "compatibility_date": "2026-10-18",
+  "target": {
+    "worker_name": "holoviewer-ptt-static-assets-full-offline",
+    "base_url": "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev"
+  },
+  "baselines": [
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-01.json","sha256":"032568e88c0184f34f7493527abdfd577896a5d999e00afc0d91581e3fc6aeed"},
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-02.json","sha256":"3290945ef8119f961b6de139aeb3651b5bb64e35ee15a0520d0b27291cfb1fe4"},
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-03.json","sha256":"ab72556d320d20e351efded092ca61b391cf5099cd4a183daf4a7553c18c2141"},
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-04.json","sha256":"f931ac184017a1ab6c9c6c8a9636f7198fdad6811c89fef652688485e716b8f5"},
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-05.json","sha256":"8105f48f13a53335fe4b47a00657501828fda68dbdfd75ebf37704ab042eaf6f"},
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-06.json","sha256":"b7eddc70382d4c26707306912ee743eebc12471daa63d1d6b650679df30ac5b7"},
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-07.json","sha256":"9f7a49c182e5d10b68d6c1b1ac66b398cdded9d55644be5ae45001e2cc117973"},
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-08.json","sha256":"73f7cf73ad8798e8e1590e87f727d020efbd1b23a40092a624896fd3ea7a9ccd"},
+    {"manifest_key":"ptt/v1/manifests/static-assets-full-2026-10.json","sha256":"4bc9dc9d91b36ab38046267663b40a1e1ecb1eb9447bcd15aa8ecf413ba93470"}
+  ],
+  "candidates": [
+    {
+      "month":"2025-09","source_sqlite_sha256":"bfc50c6b8df339b9c79495322ed9b969f0a8300284d9423ff6eed04d7d48e9a9","source_audit_sha256":"99da6f70edbebe16c00578496715944d28ea3ed6f15f249786453cc0bd2024d6","manifest_key":"ptt/v1/manifests/static-assets-full-2025-09.json","manifest_digest":"c8bbc7c504975af0650eeec4d3903e3b251582aaaa497045aab04ccb161459fa","registration_identity":"aee79963866859dcc25802f61e4c2ddca74ec5f282090e3dd37a37d6ab1d47e3","article_set_sha256":"56c9047f2f99292aa09df6908f8d5189722d9fe3732d024c9b6f4915a4e1fd65","articles":61,"pushes":177434,"objects":31
+    },
+    {
+      "month":"2025-10","source_sqlite_sha256":"563eff94cb54593108a44f80dde5ef5f48055daf1cd022a38539333f8bee7cbf","source_audit_sha256":"af378fca6d154c99c4f47a88ae78483c73b657b275c2a59f4ea736cca034893f","manifest_key":"ptt/v1/manifests/static-assets-full-2025-10.json","manifest_digest":"d46de04433059a5dbdbf40c937b34b3fb6e1e1e520235741c581d729bdb08cfa","registration_identity":"f51a23a1c3a9783969add3ba2345f9a85f2c38f28532ef727e4cb33b7a1c64fb","article_set_sha256":"1a3854df3956281950bc3d3c399eaeaec513b41660bb87411aa9c9964c40a55c","articles":62,"pushes":167238,"objects":32
+    },
+    {
+      "month":"2025-11","source_sqlite_sha256":"f05e0b5979bb4935d70f1a6bdcfeb81b7ecb28e56389bdb6aa21123ca53ac752","source_audit_sha256":"e20f4a206e81dcdbd021c785ff6a9e3e739a54fa9b034154b058ed56d9b01193","manifest_key":"ptt/v1/manifests/static-assets-full-2025-11.json","manifest_digest":"fe832f9f83c16242321365e350439e9c1e694d3fe997fd6edf4630fba19b4d12","registration_identity":"52fc651f3f8ac2fa30f460fe54cb424da0875788846b17b91f8d1fa167e02e0c","article_set_sha256":"4d9e652d6c8bd81d1294c5a07099fb45d5271603aeb467216f34deaf592b1d0c","articles":60,"pushes":108112,"objects":31
+    },
+    {
+      "month":"2025-12","source_sqlite_sha256":"a4bfb8b4f3c6fe286a062676332d5e175bab66d61b76269097c963ba7d09a763","source_audit_sha256":"b4e763704991fd44db9ef87eba1ef01cbfa7e776cdd1d524c00f3b425a431cae","manifest_key":"ptt/v1/manifests/static-assets-full-2025-12.json","manifest_digest":"47aee3d947015cd90270cf864a24d3aea6af80746436de531b35025c657b6002","registration_identity":"590c90cc4db0e5055adf6171485f2a575e183dad314db032250f3e2dd0150ae9","article_set_sha256":"dd3154ce2327f0ca310b2a1c5fd481e6ec19819e04ebbb0cc8204ef8a04627a5","articles":62,"pushes":173839,"objects":33
+    }
+  ]
+}
