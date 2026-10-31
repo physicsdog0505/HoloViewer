@@ -15,6 +15,20 @@ ROOT = Path(__file__).resolve().parent
 EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/watchalong-static-assets.wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/video-metadata-resolver.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/watchalong-viewer/index.html", "site/assets/watchalong-standalone.css", "site/assets/watchalong-standalone.js", "site/assets/watchalong-static-core.js", "site/assets/viewing-timeline-core.js", "site/assets/viewing-share-state.js", "site/assets/viewing-timeline-viewer-adapter.js", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/handoffs/WATCHALONG_EXPORT_AUTHORITY_HANDOFF_20261030.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "scripts/deploy_watchalong_event_owner_local.sh", "scripts/deploy_watchalong_static_assets_owner_local.sh", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py", "watchalong-static/_headers", "watchalong-static/data/watchalong/manifest.json", "watchalong-static/data/watchalong/events/eFYByyw5AJc.json", "watchalong-static/data/watchalong/events/U2o13h1Oib4.json", "watchalong-static/data/watchalong/events/8pF4qHcshDc.json", "watchalong-static/data/watchalong/events/t8q3XEmK0aM.json", "watchalong-static/data/watchalong/events/jqJb0qnueDo.json", "watchalong-static/data/watchalong/events/x7bMoyNWaEE.json", "scripts/export_watchalong_assets.py", "test_watchalong_assets.py", "test_viewing_timeline_core.py", "test_viewing_timeline_viewer_integration.py", "docs/handoffs/WATCHALONG_PUBLIC_ASSET_HANDOFF_20261020.md", "docs/handoffs/ISSUE176_CUSTOM_DOMAIN_OWNER_ROLLOUT.md", "docs/YOUTUBE_STATIC_ASSETS_PREVIEW.md", "docs/WATCHALONG_STATIC_ASSETS.md", "scripts/youtube_static_assets_preview.py", "scripts/run_youtube_static_assets_gate3_preview.sh", "test_youtube_static_assets_preview.py", "test_youtube_static_target_config.py", "test_history_search_aliases.py", "data/search/member_aliases.v1.json", "data/search/README.md", "site/data/search/member-aliases.v1.json", "scripts/run_alias_static_assets_release.sh", "test_alias_static_assets_release_gate.py", "site/assets/search/history-content-aliases.v1.json", "docs/ALIAS_STATIC_ASSETS_RELEASE.md", "site/data/search/aliases/v1/versions/ebd36f84fb5f0b507e54100d02e06e635f15a72e14396e57a613bf109252b9b2.json", "site/assets/ptt-links.css", "scripts/run_alias_static_assets_release.py", "test_public_frontend_release_gate.py", "site/data/search/aliases/v1/latest.json", "site/assets/ptt-links.js", "site/assets/daily-digest.js", "site/assets/daily-digest.css", "site/daily/index.html", "scripts/run_public_frontend_owner_release.sh", "scripts/run_public_frontend_owner_release.py", "scripts/alias_static_assets_release_gate.py", "site/assets/local-subtitle-core.js", "test_local_subtitle_core.js"}
 
 EXPECTED.add("docs/handoffs/PRODUCTION_COORDINATOR_HANDOFF_20261030.md")
+EXPECTED.update({
+    "cloudflare/vod-subtitle-static-assets.wrangler.json",
+    "docs/VOD_SUBTITLE_STATIC_ASSETS.md",
+    "scripts/deploy_vod_subtitle_static_assets_owner_local.sh",
+    "site/assets/vod-subtitle-core.js",
+    "test_vod_subtitle_assets.py",
+    "test_vod_subtitle_core.js",
+    "test_vod_subtitle_publisher.py",
+    "vod-subtitles-static/_headers",
+    "vod-subtitles-static/data/subtitles/manifests/.gitkeep",
+    "vod-subtitles-static/data/subtitles/manifests/by-vod-month/.gitkeep",
+    "vod-subtitles-static/data/subtitles/videos/.gitkeep",
+    "vod_subtitle_publisher.py",
+})
 
 
 class PublicSmokeTests(unittest.TestCase):
@@ -53,6 +67,12 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertEqual(dedicated["assets"], {"directory": "../watchalong-static"})
         self.assertNotIn("routes", dedicated)
         self.assertNotIn("main", dedicated)
+        vod = json.loads((ROOT / "cloudflare/vod-subtitle-static-assets.wrangler.json").read_text())
+        self.assertEqual(vod["name"], "holoviewer-vod-subtitles-static-assets")
+        self.assertTrue(vod["workers_dev"])
+        self.assertEqual(vod["assets"], {"directory": "../vod-subtitles-static"})
+        self.assertNotIn("routes", vod)
+        self.assertNotIn("main", vod)
         js = (ROOT / "site/assets/app.js").read_text()
         for token in ("setTimeout(", "location.reload(", "eval(", "innerHTML", "document.write("):
             self.assertNotIn(token, js)
@@ -125,6 +145,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("textContent=", js)
         frontend_config = (ROOT / "site/assets/config.js").read_text()
         self.assertIn("https://holoviewer-public-api.singlebagel.workers.dev", frontend_config)
+        self.assertIn("https://holoviewer-vod-subtitles-static-assets.singlebagel.workers.dev", frontend_config)
         self.assertIn("https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", frontend_config)
         self.assertIn("https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev", frontend_config)
         self.assertIn("/ptt/v1/manifests/static-assets-full-2026-08.json", frontend_config)
