@@ -89,6 +89,23 @@ class VodSubtitlePublisherTests(unittest.TestCase):
         self.assertEqual([row["video_id"] for row in month_index["videos"]], ["VzgiaEu59Uk"])
         self.assertNotIn("title", global_index["videos"][0])
 
+
+    def test_overlapping_ordered_cues_are_accepted(self):
+        raw = self._asset("VzgiaEu59Uk", "overlap")
+        path = self.assets / "data/subtitles/videos/VzgiaEu59Uk.json"
+        value = json.loads(raw)
+        value["cues"][0]["end_ms"] = 1800
+        value["cues"][1]["start_ms"] = 1200
+        path.write_bytes(canonical(value))
+        stage_receipt(
+            self.assets,
+            self.receipts,
+            "VzgiaEu59Uk",
+            "2026-10-31T01:00:00Z",
+        )
+        result = build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
+        self.assertEqual(result["video_count"], 1)
+
     def test_old_vod_translated_later_uses_original_catalog_month(self):
         self._stage("VzgiaEu59Uk", "old", "2027-03-02T08:00:00Z")
         build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
