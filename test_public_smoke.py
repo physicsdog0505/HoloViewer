@@ -647,7 +647,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("renderAnnouncements(target,artifact,byId)", js)
         self.assertIn("renderCategories(target,artifact,byId)", js)
         self.assertIn("renderUnverified(target,artifact,byId)", js)
-        self.assertIn("未取得足以核實直播內容的資料，不視為已驗證資訊", js)
+        self.assertIn("僅在 ?debug=1 顯示；Public 預設不呈現未驗證內容。", js)
         self.assertIn("daily-verify-unverified", css)
         self.assertNotIn("Gemini", js)
         self.assertNotIn("innerHTML", js)
