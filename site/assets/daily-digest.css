@@ -511,3 +511,44 @@ h3.daily-digest-title{margin:0}
     scroll-snap-align:start
   }
 }
+
+
+/* Owner review V3.1 — fix inherited rail sizing / excessive card height. */
+.daily-v1-section[data-layout="brief"] .daily-highlight-grid{
+  display:grid;
+  grid-auto-flow:row;
+  grid-auto-columns:initial;
+  overflow:visible;
+  scroll-snap-type:none;
+  align-items:start
+}
+.daily-v1-section[data-layout="brief"] .daily-highlight-card,
+.daily-v1-section[data-layout="brief"] .daily-highlight-card:nth-child(1),
+.daily-v1-section[data-layout="brief"] .daily-highlight-card:nth-child(2){
+  height:auto;
+  min-height:0;
+  align-self:start
+}
+.daily-v1-section[data-layout="brief"] .daily-highlight-media{
+  width:100%;
+  min-width:0;
+  align-self:start
+}
+.daily-v1-section[data-layout="brief"] .daily-highlight-media img{
+  width:100%;
+  height:100%;
+  min-width:0;
+  object-fit:cover
+}
+.daily-v1-section[data-layout="brief"] .daily-highlight-copy{
+  align-self:start
+}
+.daily-v1-section[data-layout="brief"] .daily-highlight-card h3,
+.daily-v1-section[data-layout="brief"] .daily-highlight-card p{
+  max-width:none
+}
+@media(min-width:761px){
+  .daily-v1-section[data-layout="brief"] .daily-highlight-card{
+    grid-template-columns:minmax(220px,42%) minmax(0,58%)
+  }
+}
