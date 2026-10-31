@@ -322,7 +322,7 @@ function catalogCard(item,container){if(!item||! /^[\w-]{11}$/.test(item.video_i
 const HOME_FILTER_KEY='holoviewer-live-filter';
 const HOME_FILTERS=new Set(['hololive','holostars','mekpark','all']);
 const selectedHomeVideos=new Set();
-const HOME_HOVER_PREVIEW_DELAY_MS=600;
+const HOME_HOVER_PREVIEW_DELAY_MS=300;
 let homeHoverPreviewFrame=0;
 let homeHoverPreviewStartedAt=0;
 let homeHoverPreviewThumb=null;
