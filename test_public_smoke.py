@@ -642,7 +642,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("const KIND='holodocchi.daily_digest';", js)
         self.assertIn("artifact.schema_version!==SCHEMA_VERSION||artifact.kind!==KIND", js)
         self.assertIn("text(artifact.target_day)!==day||artifact.timezone!==TAIPEI", js)
-        self.assertIn("renderOverview(target,artifact)", js)
+        self.assertIn("renderOverview(target,artifact,byId)", js)
         self.assertIn("renderStories(target,artifact,byId)", js)
         self.assertIn("renderAnnouncements(target,artifact,byId)", js)
         self.assertIn("renderCategories(target,artifact,byId)", js)
@@ -663,6 +663,14 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertEqual(len(artifact["announcements"]), 8)
         self.assertEqual(len(artifact["categories"]), 6)
         self.assertEqual(len(artifact["unverified"]), 1)
+        self.assertIn("function thumbnailCandidates(videoId)", js)
+        self.assertIn("maxresdefault.jpg", js)
+        self.assertIn("sddefault.jpg", js)
+        self.assertIn("hqdefault.jpg", js)
+        self.assertIn("visual.dataset.count=String(ids.length)", js)
+        self.assertIn("daily-highlight-media", js)
+        self.assertIn("Owner review V3", css)
+        self.assertIn('.daily-story-visual[data-count="5"]', css)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
