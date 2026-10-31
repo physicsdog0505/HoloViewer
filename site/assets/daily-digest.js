@@ -89,6 +89,48 @@ function itemReason(item){return text(item?.recommendation_reason||item?.recomme
 function itemState(item){return text(item?.lifecycle_state||item?.state).toLowerCase()}
 function itemStart(item){return text(item?.actual_start||item?.actual_start_at||item?.scheduled_start||item?.scheduled_start_at)}
 function itemThumbnail(item){return text(item?.thumbnail_url||item?.thumbnail)}
+function itemVideoId(item){
+  const direct=text(item?.video_id||item?.youtube_video_id);
+  if(/^[A-Za-z0-9_-]{11}$/.test(direct))return direct;
+  for(const value of [itemLink(item),itemThumbnail(item)]){
+    const raw=text(value);
+    if(!raw)continue;
+    try{
+      const url=new URL(raw,location.origin);
+      const host=url.hostname.toLowerCase();
+      let id='';
+      if(host==='youtu.be'||host==='www.youtu.be')id=url.pathname.split('/').filter(Boolean)[0]||'';
+      else if(host.endsWith('youtube.com'))id=url.searchParams.get('v')||url.pathname.match(/\/(?:live|embed|shorts)\/([A-Za-z0-9_-]{11})/)?.[1]||'';
+      else if(host==='i.ytimg.com')id=url.pathname.match(/\/vi\/([A-Za-z0-9_-]{11})\//)?.[1]||'';
+      if(/^[A-Za-z0-9_-]{11}$/.test(id))return id;
+    }catch(_error){}
+  }
+  return '';
+}
+function itemThumbnailCandidates(item,{highQuality=false}={}){
+  const out=[];
+  const videoId=itemVideoId(item);
+  if(highQuality&&videoId){
+    out.push(
+      'https://i.ytimg.com/vi/'+videoId+'/maxresdefault.jpg',
+      'https://i.ytimg.com/vi/'+videoId+'/sddefault.jpg',
+      'https://i.ytimg.com/vi/'+videoId+'/hqdefault.jpg'
+    );
+  }
+  const original=itemThumbnail(item);
+  if(original)out.push(original);
+  if(!highQuality&&videoId)out.push('https://i.ytimg.com/vi/'+videoId+'/hqdefault.jpg');
+  return [...new Set(out)];
+}
+function applyThumbnailFallback(img,media,candidates){
+  let index=0;
+  const loadNext=()=>{
+    if(index>=candidates.length){media.remove();return}
+    img.src=candidates[index++];
+  };
+  img.addEventListener('error',loadNext);
+  loadNext();
+}
 function itemTags(item){
   const raw=Array.isArray(item?.tags)?item.tags:(item?.category?[item.category]:[]);
   return raw.map(text).filter(Boolean);
@@ -96,16 +138,17 @@ function itemTags(item){
 function stateLabel(state){
   return {live:'直播中',upcoming:'即將開始',waiting:'等待中',ended:'已結束'}[state]||'';
 }
-function createItem(item,{compact=false}={}){
-  const card=el('article','daily-digest-card daily-digest-'+itemRole(item));
+function createItem(item,{compact=false,dailyPage=false,lead=false}={}){
+  const role=itemRole(item);
+  const card=el('article','daily-digest-card daily-digest-'+role+(lead?' daily-digest-lead':''));
   const href=itemLink(item);
-  const thumb=itemThumbnail(item);
-  if(thumb){
+  const candidates=itemThumbnailCandidates(item,{highQuality:dailyPage});
+  if(candidates.length){
     const media=href?el('a','daily-digest-media'):el('div','daily-digest-media');
     if(href){media.href=href;if(href.startsWith('http')){media.target='_blank';media.rel='noopener noreferrer'}}
     const img=el('img');
-    img.src=thumb; img.alt=''; img.loading='lazy'; img.referrerPolicy='no-referrer';
-    img.addEventListener('error',()=>media.remove());
+    img.alt=''; img.loading=lead?'eager':'lazy'; img.referrerPolicy='no-referrer';
+    applyThumbnailFallback(img,media,candidates);
     media.append(img); card.append(media);
   }
   const body=el('div','daily-digest-card-body');
@@ -162,8 +205,19 @@ function renderArtifact(target,artifact,{compact=false,home=false}={}){
     if(section.role)wrap.dataset.layout=section.role;
     if(section.title)wrap.append(el('h3','daily-digest-group-title',section.title));
     const grid=el('div','daily-digest-grid');
-    section.items.forEach(item=>{if(item&&typeof item==='object')grid.append(createItem(item,{compact}))});
-    if(grid.childElementCount){wrap.append(grid);target.append(wrap)}
+    const items=section.items.filter(item=>item&&typeof item==='object');
+    const visibleCount=Math.min(items.length,6);
+    grid.dataset.count=String(visibleCount);
+    const leadSection=!home&&(section.role==='hero'||section.role==='featured');
+    items.forEach((item,index)=>grid.append(createItem(item,{
+      compact,
+      dailyPage:!home,
+      lead:leadSection&&index===0
+    })));
+    if(grid.childElementCount){
+      if(leadSection)wrap.classList.add('daily-digest-story-section');
+      wrap.append(grid);target.append(wrap);
+    }
   }
   return target.childElementCount>0;
 }
