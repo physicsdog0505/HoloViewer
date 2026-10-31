@@ -2,6 +2,10 @@ window.HOLOVIEWER_CONFIG = Object.freeze({
   apiBase: "https://holoviewer-public-api.singlebagel.workers.dev",
   youtubeStaticBase: "https://holoviewer-youtube-static-assets.singlebagel.workers.dev",
   watchalongStaticBase: "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev",
+  vodSubtitleAvailability: Object.freeze({
+    base: "",
+    indexPath: "/data/subtitles/index.json"
+  }),
   dailyDigest: Object.freeze({
     base: "",
     pathTemplate: ""
