@@ -293,6 +293,9 @@ def build_candidate(asset_root: str | Path, receipts_root: str | Path, catalog_r
     destination.parent.mkdir(parents=True, exist_ok=True)
     temp: Path | None = Path(tempfile.mkdtemp(prefix=destination.name + ".", dir=destination.parent))
     try:
+        shell_headers = Path(__file__).resolve().parent / "vod-subtitles-static/_headers"
+        if shell_headers.is_file():
+            shutil.copy2(shell_headers, temp / "_headers")
         videos_dir = temp / "data/subtitles/videos"
         videos_dir.mkdir(parents=True, exist_ok=True)
         for video_id, receipt in receipts.items():
