@@ -797,6 +797,23 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn('base: ""', config)
         self.assertIn('pathTemplate: ""', config)
 
+    def test_home_live_hover_preview_contract(self):
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        self.assertIn("const HOME_HOVER_PREVIEW_DELAY_MS=600;", js)
+        self.assertIn("matchMedia('(hover:hover) and (pointer:fine)')", js)
+        self.assertIn("url.searchParams.set('autoplay','1');", js)
+        self.assertIn("url.searchParams.set('mute','1');", js)
+        self.assertIn("if(!history&&lifecycleBucket==='live')", js)
+        self.assertIn("thumb.addEventListener('mouseenter',()=>scheduleHomeHoverPreview(thumb,id));", js)
+        self.assertIn("thumb.addEventListener('mouseleave',()=>stopHomeHoverPreview(thumb));", js)
+        self.assertIn("if(homeHoverPreviewThumb&&homeHoverPreviewThumb!==thumb)stopHomeHoverPreview(homeHoverPreviewThumb);", js)
+        self.assertIn("preview.className='home-hover-preview';", js)
+        self.assertIn("preview.setAttribute('aria-hidden','true');", js)
+        self.assertIn(".home-hover-preview{position:absolute;inset:0", css)
+        self.assertIn("pointer-events:none", css)
+        self.assertNotIn("youtube.googleapis.com", js)
+
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
