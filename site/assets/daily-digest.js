@@ -68,14 +68,15 @@ function appendParagraphs(parent,value,className){
   chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
 }
 function storyVisual(videoIds,byId){
-  const ids=[...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,3);
+  const ids=[...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,6);
   if(!ids.length)return null;
   const visual=el('div','daily-story-visual');
+  visual.dataset.count=String(ids.length);
   ids.forEach((id,index)=>{
     const figure=el('figure','daily-story-visual-item');
     figure.dataset.slot=String(index+1);
-    const img=el('img');img.src=thumbnailUrl(id);img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';
-    figure.append(img);
+    const img=thumbnailImage(id);
+    if(img)figure.append(img);
     const row=byId.get(id),name=publicText(row?.channel_name);
     if(name)figure.append(el('figcaption','',name));
     visual.append(figure);
@@ -90,7 +91,27 @@ function streamMap(artifact){
   return new Map((Array.isArray(artifact?.streams)?artifact.streams:[]).map(row=>[String(row?.video_id||''),row]));
 }
 function youtubeUrl(videoId){return /^[A-Za-z0-9_-]{11}$/.test(String(videoId||''))?'https://www.youtube.com/watch?v='+videoId:''}
-function thumbnailUrl(videoId){return /^[A-Za-z0-9_-]{11}$/.test(String(videoId||''))?'https://i.ytimg.com/vi/'+videoId+'/mqdefault.jpg':''}
+function thumbnailCandidates(videoId){
+  const id=String(videoId||'');
+  if(!/^[A-Za-z0-9_-]{11}$/.test(id))return [];
+  return [
+    'https://i.ytimg.com/vi/'+id+'/maxresdefault.jpg',
+    'https://i.ytimg.com/vi/'+id+'/sddefault.jpg',
+    'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',
+    'https://i.ytimg.com/vi/'+id+'/mqdefault.jpg'
+  ];
+}
+function thumbnailUrl(videoId){return thumbnailCandidates(videoId)[0]||''}
+function thumbnailImage(videoId,{loading='lazy'}={}){
+  const candidates=thumbnailCandidates(videoId);
+  if(!candidates.length)return null;
+  const img=el('img');img.alt='';img.loading=loading;img.referrerPolicy='no-referrer';
+  let index=0;
+  const next=()=>{if(index<candidates.length)img.src=candidates[index++]};
+  img.addEventListener('error',next);
+  next();
+  return img;
+}
 function publicTypeLabel(type){
   return {
     merch_and_event:'活動・周邊',
@@ -109,7 +130,8 @@ function streamReference(videoId,byId){
   const head=el('summary','daily-stream-ref-head');
   const thumb=thumbnailUrl(videoId);
   if(thumb){
-    const img=el('img');img.src=thumb;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';head.append(img);
+    const img=thumbnailImage(videoId);
+    if(img)head.append(img);
   }
   const copy=el('span','daily-stream-ref-copy');
   copy.append(el('strong','',publicText(row?.channel_name)||'直播'));
@@ -158,7 +180,7 @@ function renderCoverage(target,artifact){
   bar.append(el('strong','',String(total)+' 場直播'));
   target.append(bar);
 }
-function renderOverview(target,artifact){
+function renderOverview(target,artifact,byId){
   const overview=artifact?.overview||{};
   const highlights=Array.isArray(overview.highlights)?overview.highlights.map(publicText).filter(Boolean):[];
   if(!highlights.length&&!publicText(overview.summary))return;
@@ -170,14 +192,27 @@ function renderOverview(target,artifact){
     if(first)appendParagraphs(wrap,first+'。','daily-overview-summary');
   }
   if(highlights.length){
+    const stories=Array.isArray(artifact?.stories)?artifact.stories:[];
     const grid=el('div','daily-highlight-grid');
     highlights.slice(0,5).forEach((item,index)=>{
       const card=el('article','daily-highlight-card');
       card.dataset.accent=String((index%3)+1);
+      const story=stories[index];
+      const firstVideo=(Array.isArray(story?.video_ids)?story.video_ids:[]).map(String).find(id=>byId.has(id));
+      if(firstVideo){
+        const media=el('div','daily-highlight-media');
+        const img=thumbnailImage(firstVideo,{loading:index===0?'eager':'lazy'});
+        if(img)media.append(img);
+        const row=byId.get(firstVideo),name=publicText(row?.channel_name);
+        if(name)media.append(el('span','daily-highlight-channel',name));
+        card.append(media);
+      }
+      const copy=el('div','daily-highlight-copy');
       const parts=item.split(/[：:]/);
-      card.append(el('h3','',shortHeadline(parts[0]||item,32)));
+      copy.append(el('h3','',shortHeadline(parts[0]||item,36)));
       const rest=parts.length>1?parts.slice(1).join('：'):item;
-      card.append(el('p','',clampText(rest,110)));
+      copy.append(el('p','',clampText(rest,150)));
+      card.append(copy);
       grid.append(card);
     });
     wrap.append(grid);
@@ -229,7 +264,8 @@ function renderStories(target,artifact,byId){
         const head=el('summary','daily-sub-event-head');
         const firstVideo=(Array.isArray(sub.video_ids)?sub.video_ids:[]).find(id=>byId.has(String(id)));
         if(firstVideo){
-          const img=el('img');img.src=thumbnailUrl(String(firstVideo));img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';head.append(img);
+          const img=thumbnailImage(String(firstVideo));
+          if(img)head.append(img);
         }
         const headCopy=el('span','daily-sub-event-head-copy');
         if(publicText(sub.title))headCopy.append(el('h4','',shortHeadline(sub.short_title||sub.title,38)));
@@ -250,7 +286,8 @@ function renderStories(target,artifact,byId){
           const head=el('summary','daily-sub-event-head');
           const firstVideo=(Array.isArray(sub.video_ids)?sub.video_ids:[]).find(id=>byId.has(String(id)));
           if(firstVideo){
-            const img=el('img');img.src=thumbnailUrl(String(firstVideo));img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';head.append(img);
+            const img=thumbnailImage(String(firstVideo));
+          if(img)head.append(img);
           }
           const headCopy=el('span','daily-sub-event-head-copy');
           if(publicText(sub.title))headCopy.append(el('h4','',shortHeadline(sub.title,38)));
@@ -338,7 +375,7 @@ function renderArtifact(target,artifact){
   target.replaceChildren();
   const byId=streamMap(artifact);
   renderCoverage(target,artifact);
-  renderOverview(target,artifact);
+  renderOverview(target,artifact,byId);
   renderStories(target,artifact,byId);
   renderAnnouncements(target,artifact,byId);
   renderCategories(target,artifact,byId);
