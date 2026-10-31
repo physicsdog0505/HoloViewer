@@ -661,6 +661,7 @@ function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={})
  const youTube=node('span','YouTube ↗','youtube-source-link');youTube.role='link';youTube.tabIndex=0;youTube.dataset.youtubeHref='https://www.youtube.com/watch?v='+id;thumb.append(youTube);
  const overlay=node('div',undefined,'thumb-overlay');
  if(!history)overlay.append(node('span',status[0],'thumb-badge '+status[1]));
+ if(history&&historySubtitleAvailabilityIds.has(id))overlay.append(node('span','中文字幕','thumb-badge subtitle-ready'));
  const time=homeStartLabel(item,{includeYear:history});const duration=history?historyDurationLabel(item):'';overlay.append(node('span',time+(duration?' · '+duration:''),'thumb-time'));thumb.append(overlay);card.append(thumb);
  const meta=node('div',undefined,'yt-meta');const ring=node('span',undefined,'channel-avatar-ring');const name=String(item.channel_title||item.channel_name||'頻道資訊待補');
  ring.append(homeAvatarChild(item,name));meta.append(ring);
@@ -952,7 +953,44 @@ function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tai
 function shiftDay(day,delta){const date=new Date(day+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+delta);return date.toISOString().slice(0,10)}
 function historyBounds(){const today=taipeiDay();return {latest:shiftDay(today,-1)}}
 function historyDateValid(day){const b=historyBounds();return /^\d{4}-\d{2}-\d{2}$/.test(day)&&day<=b.latest}
-function historyLink(label,day,page=1){const link=node('a',label,'subtle-action');link.href='/history?date='+encodeURIComponent(day)+(page>1?'&page='+page:'');link.onclick=e=>{e.preventDefault();$('historyDate').value=day;state.offset=(page-1)*50;loadHistory()};return link}
+function historyLink(label,day,page=1){const params=new URLSearchParams();params.set('date',day);if(page>1)params.set('page',String(page));if(historySubtitleFilterEnabled)params.set(HISTORY_SUBTITLE_PARAM,HISTORY_SUBTITLE_VALUE);const link=node('a',label,'subtle-action');link.href='/history?'+params.toString();link.onclick=e=>{e.preventDefault();$('historyDate').value=day;state.offset=(page-1)*50;loadHistory()};return link}
+const HISTORY_SUBTITLE_PARAM='subtitles';
+const HISTORY_SUBTITLE_VALUE='zh-TW';
+let historySubtitleFilterEnabled=false;
+let historySubtitleAvailabilityIds=new Set();
+let historySubtitleIndexState='idle';
+function vodSubtitleAvailabilityConfig(){const cfg=config.vodSubtitleAvailability;return cfg&&typeof cfg==='object'?cfg:{}}
+function vodSubtitleAvailabilityUrl(){
+ const cfg=vodSubtitleAvailabilityConfig(),path=String(cfg.indexPath||'');
+ if(!path.startsWith('/data/subtitles/'))return '';
+ const base=String(cfg.base||'').replace(/\/$/,'');
+ if(base){if(!/^https:\/\//.test(base))return '';return base+path}
+ return /^(localhost|127\.0\.0\.1)$/.test(location.hostname)?path:'';
+}
+async function loadVodSubtitleAvailabilityIndex(){
+ const url=vodSubtitleAvailabilityUrl();
+ if(!url)return {available:false,ids:new Set(),reason:'unconfigured'};
+ try{
+  const response=await fetch(url,{mode:url.startsWith('https://')?'cors':'same-origin',credentials:'omit',headers:{Accept:'application/json'},cache:'no-cache'});
+  if(!response.ok)throw Error('Subtitle index HTTP '+response.status);
+  const data=await response.json();
+  if(data?.schema_version!==1||!Array.isArray(data.videos))throw Error('Subtitle index format');
+  const ids=new Set(data.videos.map(row=>typeof row==='string'?row:String(row?.video_id||'')).filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)));
+  return {available:true,ids,reason:''};
+ }catch(error){return {available:false,ids:new Set(),reason:String(error?.message||error)}}
+}
+function historySubtitleFilterRows(rows){return historySubtitleFilterEnabled?rows.filter(row=>historySubtitleAvailabilityIds.has(String(row?.video_id||''))):rows}
+function renderHistorySubtitleFilter(){
+ const button=$('historySubtitleFilter'),status=$('historySubtitleFilterStatus');if(!button||!status)return;
+ button.setAttribute('aria-pressed',String(historySubtitleFilterEnabled));
+ const available=historySubtitleIndexState==='ready';button.disabled=!available;
+ if(historySubtitleIndexState==='unavailable'){status.hidden=false;status.textContent='字幕索引暫時無法使用'}
+ else if(historySubtitleIndexState==='ready'){status.hidden=true;status.textContent=''}
+ else{status.hidden=true;status.textContent=''}
+}
+function historyStateUrl(day,query=''){
+ const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',query);if(historySubtitleFilterEnabled)params.set(HISTORY_SUBTITLE_PARAM,HISTORY_SUBTITLE_VALUE);return '/history?'+params.toString();
+}
 const YOUTUBE_HISTORY_MANIFEST_PATH='/youtube/v1/manifest.json';
 const YOUTUBE_HISTORY_MANIFEST_TTL_MS=60000;
 const youtubeHistoryMonthCache=new Map();
@@ -1726,6 +1764,7 @@ async function loadHistory(){
    return loadHistory();
   }
   const manifestPromise=config.youtubeStaticBase?loadYoutubeHistoryManifest().catch(()=>null):Promise.resolve(null);
+  const subtitleIndexPromise=loadVodSubtitleAvailabilityIndex();
   const historyPromise=dateIntent?.kind==='range'
    ?loadYoutubeHistoryRange(dateIntent.start,dateIntent.end)
    :query?loadYoutubeHistorySearchMonth(day):loadHistoryData(day,state.offset);
@@ -1737,9 +1776,13 @@ async function loadHistory(){
      ?Promise.resolve({streams:homeCatalogRows})
      :requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null))
    :Promise.resolve(null);
-  const [manifest,data,aliasRegistry,contentAliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,historyPromise,aliasesPromise,contentAliasesPromise,collabPromise,catalogPromise]);
+  const [manifest,subtitleIndex,data,aliasRegistry,contentAliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,subtitleIndexPromise,historyPromise,aliasesPromise,contentAliasesPromise,collabPromise,catalogPromise]);
   if(generation!==historyLoadGeneration)return;
   if(manifest)applyHistoryAvailability(manifest,day);
+  historySubtitleAvailabilityIds=subtitleIndex.available?subtitleIndex.ids:new Set();
+  historySubtitleIndexState=subtitleIndex.available?'ready':'unavailable';
+  if(historySubtitleFilterEnabled&&!subtitleIndex.available)historySubtitleFilterEnabled=false;
+  renderHistorySubtitleFilter();
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
   const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
   const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows);
@@ -1752,9 +1795,10 @@ async function loadHistory(){
    renderHistorySearchIntent(parsedSearch,searchRows);
    endedItems=searchRows.map(row=>row.item);
   }
+  endedItems=historySubtitleFilterRows(endedItems);
   const resultCount=endedItems.length;
   const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map();
-  const facetContext=day+'|'+query;
+  const facetContext=day+'|'+query+'|'+(historySubtitleFilterEnabled?'subtitles':'all');
   if(historyChannelFacetContext!==facetContext){historyChannelSelection.clear();historyChannelFacetContext=facetContext}
   historyChannelFacetRows=query?endedItems:[];
   historyChannelFacetCollabMap=historyCollabByVideo;
@@ -1771,7 +1815,7 @@ async function loadHistory(){
    }
    updateHistorySearchSummary(facetResult);
   }else{
-   $('history-empty').textContent='這一天沒有可顯示的已結束直播，或歷史資料尚未接入。';
+   $('history-empty').textContent=historySubtitleFilterEnabled?'這一天沒有已完成 Holodocchi 中文字幕的直播。':'這一天沒有可顯示的已結束直播，或歷史資料尚未接入。';
   }
   const notices=[];
   if(data.source==='legacy-api'&&data.static_error)notices.push('YouTube 歷史 Static Assets 暫時不可用，已使用既有 History API。');
@@ -1781,8 +1825,7 @@ async function loadHistory(){
    const page=Math.floor(state.offset/50)+1;if(page>1)pagination.append(historyLink('上一頁',day,page-1));
    if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
   }
-  const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',$('historySearch').value.trim());
-  if($('history').classList.contains('active'))history.replaceState(null,'','/history?'+params.toString());
+  if($('history').classList.contains('active'))history.replaceState(null,'',historyStateUrl(day,query?$('historySearch').value.trim():''));
  }catch(e){
   if(generation!==historyLoadGeneration)return;
   $('history-search-summary').textContent='';
@@ -2444,6 +2487,14 @@ document.querySelectorAll('[data-mobile-dock-route]').forEach(link=>link.addEven
  const requested=params.get('date');
  $('historyDate').value=historyDateValid(requested)?requested:historyBounds().latest;
  $('historySearch').value=params.get('q')||'';
+ historySubtitleFilterEnabled=params.get(HISTORY_SUBTITLE_PARAM)===HISTORY_SUBTITLE_VALUE;
+ renderHistorySubtitleFilter();
+ $('historySubtitleFilter').addEventListener('click',()=>{
+  if(historySubtitleIndexState!=='ready')return;
+  historySubtitleFilterEnabled=!historySubtitleFilterEnabled;state.offset=0;historyChannelSelection.clear();historyChannelFacetContext='';
+  history.pushState(null,'',historyStateUrl($('historyDate').value,historyQuery()));
+  loadHistory();
+ });
  $('historyDate').addEventListener('change',event=>{if(historyDateValid(event.target.value)){state.offset=0;loadHistory()}});
  $('historyPrevDay').onclick=()=>historySetDay(shiftDay($('historyDate').value,-1));
  $('historyNextDay').onclick=()=>historySetDay(shiftDay($('historyDate').value,1));
@@ -2460,6 +2511,14 @@ document.querySelectorAll('[data-mobile-dock-route]').forEach(link=>link.addEven
   loadHistory();
  });
 }
+window.addEventListener('popstate',()=>{
+ if(location.pathname!=='/history')return;
+ const params=new URLSearchParams(location.search),requested=params.get('date');
+ $('historyDate').value=historyDateValid(requested)?requested:historyBounds().latest;
+ $('historySearch').value=params.get('q')||'';
+ historySubtitleFilterEnabled=params.get(HISTORY_SUBTITLE_PARAM)===HISTORY_SUBTITLE_VALUE;
+ state.offset=0;historyChannelSelection.clear();historyChannelFacetContext='';loadHistory();
+});
 renderMulti();
 const hashRoute=location.hash.substring(1).split('?')[0];
 const pathRoute=location.pathname==='/history'?'history':

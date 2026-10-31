@@ -946,3 +946,12 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
  .history-hub-filter-avatar{width:28px;height:28px}
  .history-hub-filter-avatars+.history-hub-markers{left:6px;bottom:38px}
 }
+
+/* #297 General VOD subtitle availability discovery. */
+.history-availability-filters{display:flex;align-items:center;gap:8px;min-width:0}
+.history-subtitle-filter{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font:inherit;font-size:12px;font-weight:850;cursor:pointer}
+.history-subtitle-filter:hover:not(:disabled){background:var(--surface-2)}
+.history-subtitle-filter[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:#fff}
+.history-subtitle-filter:disabled{cursor:not-allowed;opacity:.5}
+.history-subtitle-filter-status{font-size:11px;color:var(--muted)}
+.thumb-badge.subtitle-ready{background:rgba(35,31,28,.84);color:#fff}

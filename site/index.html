@@ -244,7 +244,13 @@
     </label>
    </div>
    <div id="history-search-intent" class="history-search-intent" hidden aria-live="polite"></div>
-   <div class="history-status-row"><span id="history-availability" class="history-availability" hidden></span><span id="history-search-summary" class="history-search-summary"></span></div>
+   <div class="history-status-row">
+    <div class="history-availability-filters">
+     <button id="historySubtitleFilter" class="history-subtitle-filter" type="button" aria-pressed="false">中文字幕</button>
+     <span id="historySubtitleFilterStatus" class="history-subtitle-filter-status" hidden></span>
+    </div>
+    <span id="history-availability" class="history-availability" hidden></span><span id="history-search-summary" class="history-search-summary"></span>
+   </div>
    <div id="history-channel-filters" class="history-channel-filters" hidden aria-label="頻道篩選"></div>
    <p id="history-error" class="form-error" hidden></p>
    <section class="section"><div class="section-head"><div><h2 id="history-heading"></h2></div></div>

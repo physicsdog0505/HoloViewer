@@ -816,5 +816,34 @@ class PublicSmokeTests(unittest.TestCase):
                 self.assertNotIn(p.suffix.lower(), {".sqlite3", ".db", ".pem", ".p12", ".key"})
         self.assertFalse((ROOT / "published_snapshot.json").exists())
 
+
+    def test_history_subtitle_discovery_preview_contract(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        config = (ROOT / "site/assets/config.js").read_text(encoding="utf-8")
+        fixture = json.loads((ROOT / "site/data/subtitles/index.json").read_text(encoding="utf-8"))
+
+        self.assertIn('id="historySubtitleFilter"', html)
+        self.assertIn('中文字幕', html)
+        self.assertIn("vodSubtitleAvailability", config)
+        self.assertIn('indexPath: "/data/subtitles/index.json"', config)
+        self.assertIn("const HISTORY_SUBTITLE_VALUE='zh-TW';", js)
+        self.assertIn("function loadVodSubtitleAvailabilityIndex()", js)
+        self.assertIn("historySubtitleFilterRows", js)
+        self.assertIn("historyStateUrl", js)
+        self.assertIn("window.addEventListener('popstate'", js)
+        self.assertIn("subtitle-ready", js)
+        self.assertIn(".history-subtitle-filter", css)
+        self.assertEqual(fixture["schema_version"], 1)
+        self.assertEqual(fixture["video_count"], 2)
+        self.assertEqual(
+            [row["video_id"] for row in fixture["videos"]],
+            ["VzgiaEu59Uk", "5cDfZaII0_0"],
+        )
+        self.assertNotIn("title", fixture["videos"][0])
+        self.assertNotIn("channel_name", fixture["videos"][0])
+
+
 if __name__ == "__main__":
     unittest.main()
