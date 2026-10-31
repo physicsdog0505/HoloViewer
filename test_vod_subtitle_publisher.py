@@ -132,6 +132,46 @@ class VodSubtitlePublisherTests(unittest.TestCase):
         self.assertEqual(before, september.read_bytes())
         self.assertTrue((self.candidate / MONTH_INDEX_DIR / "2026-10.json").is_file())
 
+    def test_receipt_path_is_content_addressed_and_timestamp_is_immutable(self):
+        raw = self._asset("VzgiaEu59Uk", "content-addressed")
+        asset_sha = hashlib.sha256(raw).hexdigest()
+        first = stage_receipt(
+            self.assets, self.receipts, "VzgiaEu59Uk", "2026-10-31T01:00:00Z"
+        )
+        expected = self.receipts / "VzgiaEu59Uk" / f"{asset_sha}.json"
+        self.assertEqual(Path(first["receipt_path"]), expected)
+        before = expected.read_bytes()
+        second = stage_receipt(
+            self.assets, self.receipts, "VzgiaEu59Uk", "2099-01-01T00:00:00Z"
+        )
+        self.assertFalse(second["created"])
+        self.assertEqual(before, expected.read_bytes())
+        self.assertEqual(json.loads(before)["staged_at"], "2026-10-31T01:00:00Z")
+
+    def test_same_video_and_asset_hash_with_different_binding_fails_closed(self):
+        raw = self._asset("VzgiaEu59Uk", "conflict")
+        asset_sha = hashlib.sha256(raw).hexdigest()
+        stage_receipt(
+            self.assets, self.receipts, "VzgiaEu59Uk", "2026-10-31T01:00:00Z"
+        )
+        receipt = self.receipts / "VzgiaEu59Uk" / f"{asset_sha}.json"
+        value = json.loads(receipt.read_text())
+        value["translation_artifact_id"] = "0" * 64
+        receipt.write_bytes(canonical(value))
+        with self.assertRaisesRegex(VodSubtitlePublishError, "immutable receipt conflict"):
+            stage_receipt(
+                self.assets, self.receipts, "VzgiaEu59Uk", "2026-10-31T01:00:00Z"
+            )
+
+    def test_multiple_receipts_for_same_video_fail_closed_without_supersession(self):
+        self._stage("VzgiaEu59Uk", "first-version")
+        self._asset("VzgiaEu59Uk", "second-version")
+        stage_receipt(
+            self.assets, self.receipts, "VzgiaEu59Uk", "2026-11-01T01:00:00Z"
+        )
+        with self.assertRaisesRegex(VodSubtitlePublishError, "explicit supersession"):
+            build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
+
     def test_identical_rerun_is_deterministic_and_idempotent(self):
         self._stage("VzgiaEu59Uk", "same")
         first = build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
@@ -147,8 +187,9 @@ class VodSubtitlePublisherTests(unittest.TestCase):
         self._asset("VzgiaEu59Uk", "missing")
         with self.assertRaisesRegex(VodSubtitlePublishError, "no immutable publish receipts"):
             build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
-        self.receipts.mkdir(parents=True)
-        (self.receipts / "VzgiaEu59Uk.json").write_text("{}")
+        invalid = self.receipts / "VzgiaEu59Uk" / ("0" * 64 + ".json")
+        invalid.parent.mkdir(parents=True)
+        invalid.write_text("{}")
         with self.assertRaisesRegex(VodSubtitlePublishError, "receipt contract"):
             build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
 
@@ -186,7 +227,7 @@ class VodSubtitlePublisherTests(unittest.TestCase):
         sentinel = production / "known-good.txt"
         sentinel.write_text("unchanged")
         self._stage("VzgiaEu59Uk", "bad")
-        receipt = self.receipts / "VzgiaEu59Uk.json"
+        receipt = next((self.receipts / "VzgiaEu59Uk").glob("*.json"))
         value = json.loads(receipt.read_text())
         value["asset_sha256"] = "0" * 64
         receipt.write_bytes(canonical(value))
