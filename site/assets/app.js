@@ -323,7 +323,8 @@ const HOME_FILTER_KEY='holoviewer-live-filter';
 const HOME_FILTERS=new Set(['hololive','holostars','mekpark','all']);
 const selectedHomeVideos=new Set();
 const HOME_HOVER_PREVIEW_DELAY_MS=600;
-let homeHoverPreviewTimer=0;
+let homeHoverPreviewFrame=0;
+let homeHoverPreviewStartedAt=0;
 let homeHoverPreviewThumb=null;
 function homeHoverPreviewSupported(){
  return window.matchMedia('(hover:hover) and (pointer:fine)').matches;
@@ -338,8 +339,13 @@ function homeHoverPreviewUrl(id){
  if(/^https?:$/.test(window.location.protocol))url.searchParams.set('origin',window.location.origin);
  return url.toString();
 }
+function cancelHomeHoverPreviewDelay(){
+ if(homeHoverPreviewFrame)window.cancelAnimationFrame(homeHoverPreviewFrame);
+ homeHoverPreviewFrame=0;
+ homeHoverPreviewStartedAt=0;
+}
 function stopHomeHoverPreview(thumb=null){
- if(homeHoverPreviewTimer){window.clearTimeout(homeHoverPreviewTimer);homeHoverPreviewTimer=0}
+ cancelHomeHoverPreviewDelay();
  const target=thumb||homeHoverPreviewThumb;
  if(target){
   target.querySelector('.home-hover-preview')?.remove();
@@ -349,10 +355,15 @@ function stopHomeHoverPreview(thumb=null){
 }
 function scheduleHomeHoverPreview(thumb,id){
  if(!homeHoverPreviewSupported())return;
- if(homeHoverPreviewTimer)window.clearTimeout(homeHoverPreviewTimer);
- homeHoverPreviewTimer=window.setTimeout(()=>{
-  homeHoverPreviewTimer=0;
-  if(!thumb.isConnected||!thumb.matches(':hover'))return;
+ cancelHomeHoverPreviewDelay();
+ homeHoverPreviewStartedAt=performance.now();
+ const tick=now=>{
+  if(!thumb.isConnected||!thumb.matches(':hover')){cancelHomeHoverPreviewDelay();return}
+  if(now-homeHoverPreviewStartedAt<HOME_HOVER_PREVIEW_DELAY_MS){
+   homeHoverPreviewFrame=window.requestAnimationFrame(tick);
+   return;
+  }
+  cancelHomeHoverPreviewDelay();
   if(homeHoverPreviewThumb&&homeHoverPreviewThumb!==thumb)stopHomeHoverPreview(homeHoverPreviewThumb);
   if(thumb.querySelector('.home-hover-preview'))return;
   const preview=document.createElement('iframe');
@@ -366,7 +377,8 @@ function scheduleHomeHoverPreview(thumb,id){
   thumb.append(preview);
   thumb.classList.add('hover-preview-active');
   homeHoverPreviewThumb=thumb;
- },HOME_HOVER_PREVIEW_DELAY_MS);
+ };
+ homeHoverPreviewFrame=window.requestAnimationFrame(tick);
 }
 const historyVodWindows=new Map();
 const PTT_ARCHIVE_ANCHOR='youtube-liveStreamingDetails-actualStartTime';
