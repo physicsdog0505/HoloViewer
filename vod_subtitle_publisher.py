@@ -120,8 +120,9 @@ def stage_receipt(asset_root: str | Path, receipts_root: str | Path, video_id: s
     asset_path = Path(asset_root) / relative
     raw, value = _read_json(asset_path)
     asset = _validate_video_asset(value, expected_video_id=video_id)
-    receipt_path = Path(receipts_root) / f"{video_id}.json"
-    planned = _receipt_payload(asset, _sha(raw), staged_at)
+    asset_sha256 = _sha(raw)
+    receipt_path = Path(receipts_root) / video_id / f"{asset_sha256}.json"
+    planned = _receipt_payload(asset, asset_sha256, staged_at)
     if receipt_path.exists():
         _existing_raw, existing_value = _read_json(receipt_path)
         existing = _validate_receipt(existing_value)
@@ -157,7 +158,7 @@ def _validate_receipt(value: object) -> dict[str, object]:
 
 def load_receipts(receipts_root: str | Path) -> dict[str, dict[str, object]]:
     root = Path(receipts_root)
-    paths = sorted(root.glob("*.json"))
+    paths = sorted(root.glob("*/*.json"))
     if not paths:
         raise VodSubtitlePublishError("no immutable publish receipts found")
     receipts: dict[str, dict[str, object]] = {}
@@ -167,8 +168,11 @@ def load_receipts(receipts_root: str | Path) -> dict[str, dict[str, object]]:
         if raw != _canonical_json(receipt):
             raise VodSubtitlePublishError(f"receipt is not canonical: {path.name}")
         video_id = str(receipt["video_id"])
-        if path.name != f"{video_id}.json" or video_id in receipts:
-            raise VodSubtitlePublishError("receipt filename/identity conflict")
+        asset_sha256 = str(receipt["asset_sha256"])
+        if path.parent.parent != root or path.parent.name != video_id or path.name != f"{asset_sha256}.json":
+            raise VodSubtitlePublishError("receipt path/identity conflict")
+        if video_id in receipts:
+            raise VodSubtitlePublishError(f"multiple immutable publish receipts for video require explicit supersession: {video_id}")
         receipts[video_id] = receipt
     return receipts
 
