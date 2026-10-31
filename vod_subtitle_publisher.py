@@ -291,7 +291,7 @@ def build_candidate(asset_root: str | Path, receipts_root: str | Path, catalog_r
 
     destination = Path(candidate_root)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temp = Path(tempfile.mkdtemp(prefix=destination.name + ".", dir=destination.parent))
+    temp: Path | None = Path(tempfile.mkdtemp(prefix=destination.name + ".", dir=destination.parent))
     try:
         videos_dir = temp / "data/subtitles/videos"
         videos_dir.mkdir(parents=True, exist_ok=True)
@@ -329,10 +329,10 @@ def build_candidate(asset_root: str | Path, receipts_root: str | Path, catalog_r
         if destination.exists():
             shutil.rmtree(destination)
         temp.replace(destination)
-        temp = Path()
+        temp = None
         return {**checked, "candidate_root": str(destination), "changed": True}
     finally:
-        if temp and temp.exists():
+        if temp is not None and temp.exists():
             shutil.rmtree(temp)
 
 
