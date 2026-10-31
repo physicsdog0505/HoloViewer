@@ -70,6 +70,9 @@ class VodSubtitleAssetsTests(unittest.TestCase):
         docs = (ROOT / "docs/VOD_SUBTITLE_STATIC_ASSETS.md").read_text()
         deploy = (ROOT / "scripts/deploy_vod_subtitle_static_assets_owner_local.sh").read_text()
         self.assertIn("This is not Watchalong", docs)
+        self.assertIn("manifests/by-vod-month", docs)
+        self.assertIn("data/subtitles/index.json", docs)
+        self.assertIn("old manifests/<YYYY-MM>.json contract is forbidden", deploy)
         self.assertNotIn("deploy_watchalong", deploy)
         self.assertNotIn("holoviewer-watchalong-static-assets", deploy)
 
