@@ -9,7 +9,7 @@ window.HOLOVIEWER_CONFIG = Object.freeze({
   }),
   dailyDigest: Object.freeze({
     base: "",
-    pathTemplate: ""
+    pathTemplate: "/data/daily-digest/{date}.json"
   }),
   pttArchiveMonths: Object.freeze({
     "2025-09": Object.freeze({
