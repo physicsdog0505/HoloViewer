@@ -832,6 +832,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("function loadVodSubtitleAvailabilityIndex()", js)
         self.assertIn("historySubtitleFilterRows", js)
         self.assertIn("historyStateUrl", js)
+        self.assertIn("button.hidden=!configured", js)
         self.assertIn("window.addEventListener('popstate'", js)
         self.assertIn("subtitle-ready", js)
         self.assertIn(".history-subtitle-filter", css)

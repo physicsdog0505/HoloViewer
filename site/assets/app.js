@@ -982,11 +982,12 @@ async function loadVodSubtitleAvailabilityIndex(){
 function historySubtitleFilterRows(rows){return historySubtitleFilterEnabled?rows.filter(row=>historySubtitleAvailabilityIds.has(String(row?.video_id||''))):rows}
 function renderHistorySubtitleFilter(){
  const button=$('historySubtitleFilter'),status=$('historySubtitleFilterStatus');if(!button||!status)return;
+ const configured=Boolean(vodSubtitleAvailabilityUrl());
+ const available=configured&&historySubtitleIndexState==='ready';
+ button.hidden=!configured;
+ status.hidden=true;status.textContent='';
  button.setAttribute('aria-pressed',String(historySubtitleFilterEnabled));
- const available=historySubtitleIndexState==='ready';button.disabled=!available;
- if(historySubtitleIndexState==='unavailable'){status.hidden=false;status.textContent='字幕索引暫時無法使用'}
- else if(historySubtitleIndexState==='ready'){status.hidden=true;status.textContent=''}
- else{status.hidden=true;status.textContent=''}
+ button.disabled=!available;
 }
 function historyStateUrl(day,query=''){
  const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',query);if(historySubtitleFilterEnabled)params.set(HISTORY_SUBTITLE_PARAM,HISTORY_SUBTITLE_VALUE);return '/history?'+params.toString();
