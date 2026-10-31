@@ -42,8 +42,24 @@ staged_at
 ```
 
 Receipts are durable validation evidence only and MUST remain outside
-`vod-subtitles-static/**`. They are the rebuild authority together with the
-existing VOD catalog. No second mutable subtitle registry is required.
+`vod-subtitles-static/**`. The canonical private/local durable root is:
+
+```text
+~/.holoviewer/vod-subtitle-publication/receipts/<video_id>/<asset_sha256>.json
+```
+
+The receipt path is content-addressed by the staged public subtitle asset SHA.
+An identical rerun verifies and reuses the existing receipt without rewriting
+its original `staged_at`. A conflicting binding at the same
+`video_id + asset_sha256` fails closed. If more than one different asset
+receipt exists for the same video, the V1 publisher fails closed until an
+explicit supersession contract is reviewed; it never invents a mutable current
+pointer.
+
+These durable receipts are the publication rebuild authority together with the
+existing VOD catalog. Transcript Corpus remains translation authority. No
+second mutable subtitle registry or duplicate translation receipt package is
+required. `/private/tmp/**` is scratch only and is never rebuild authority.
 
 ## Public index contract
 
@@ -77,7 +93,7 @@ asset root. Create one immutable receipt:
 ```sh
 python3 -B vod_subtitle_publisher.py receipt \
   --asset-root /absolute/staging-root \
-  --receipts-root /absolute/private-receipts \
+  --receipts-root "$HOME/.holoviewer/vod-subtitle-publication/receipts" \
   --video-id VIDEO_ID \
   --staged-at 2026-10-31T01:00:00Z
 ```
@@ -87,7 +103,7 @@ Then rebuild the complete candidate from all private receipts:
 ```sh
 python3 -B vod_subtitle_publisher.py build \
   --asset-root /absolute/staging-root \
-  --receipts-root /absolute/private-receipts \
+  --receipts-root "$HOME/.holoviewer/vod-subtitle-publication/receipts" \
   --catalog-root /absolute/youtube-static-root \
   --candidate-root /absolute/HoloViewer/vod-subtitles-static
 ```
@@ -96,15 +112,21 @@ Validation is deterministic and read-only:
 
 ```sh
 python3 -B vod_subtitle_publisher.py validate \
-  --receipts-root /absolute/private-receipts \
+  --receipts-root "$HOME/.holoviewer/vod-subtitle-publication/receipts" \
   --catalog-root /absolute/youtube-static-root \
   --candidate-root /absolute/HoloViewer/vod-subtitles-static
 ```
 
 Identical rebuilds produce the same candidate tree hash. Missing/invalid
-receipts, asset hash mismatch, missing VOD catalog membership, public receipt
-exposure, extra assets, or the retired month path fail closed before any
-Production action.
+receipts, receipt path/hash identity mismatch, ambiguous multi-receipt videos,
+asset hash mismatch, missing VOD catalog membership, public receipt exposure,
+extra assets, or the retired month path fail closed before any Production
+action.
+
+A final acceptance rebuild must be possible after deleting all #298 scratch
+workspaces under `/private/tmp`: required authority inputs are the durable
+Transcript Corpus artifact/provenance, the durable publication receipts above,
+and the existing VOD catalog.
 
 `scripts/deploy_vod_subtitle_static_assets_owner_local.sh prepare` is the
 separate release gate. `deploy` remains an explicit Owner-approved future
