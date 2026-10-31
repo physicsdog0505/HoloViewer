@@ -800,7 +800,7 @@ class PublicSmokeTests(unittest.TestCase):
     def test_home_live_hover_preview_contract(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
-        self.assertIn("const HOME_HOVER_PREVIEW_DELAY_MS=600;", js)
+        self.assertIn("const HOME_HOVER_PREVIEW_DELAY_MS=300;", js)
         self.assertIn("matchMedia('(hover:hover) and (pointer:fine)')", js)
         self.assertIn("url.searchParams.set('autoplay','1');", js)
         self.assertIn("url.searchParams.set('mute','1');", js)
