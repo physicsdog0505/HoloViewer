@@ -807,12 +807,16 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("if(!history&&lifecycleBucket==='live')", js)
         self.assertIn("thumb.addEventListener('mouseenter',()=>scheduleHomeHoverPreview(thumb,id));", js)
         self.assertIn("thumb.addEventListener('mouseleave',()=>stopHomeHoverPreview(thumb));", js)
+        self.assertIn("homeHoverPreviewStartedAt=performance.now();", js)
+        self.assertIn("homeHoverPreviewFrame=window.requestAnimationFrame(tick);", js)
+        self.assertIn("window.cancelAnimationFrame(homeHoverPreviewFrame)", js)
         self.assertIn("if(homeHoverPreviewThumb&&homeHoverPreviewThumb!==thumb)stopHomeHoverPreview(homeHoverPreviewThumb);", js)
         self.assertIn("preview.className='home-hover-preview';", js)
         self.assertIn("preview.setAttribute('aria-hidden','true');", js)
         self.assertIn(".home-hover-preview{position:absolute;inset:0", css)
         self.assertIn("pointer-events:none", css)
         self.assertNotIn("youtube.googleapis.com", js)
+        self.assertNotIn("setTimeout(", js)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
