@@ -62,6 +62,10 @@ async function fetchArtifact(day){
   if(!response.ok)return {state:'ERROR',artifact:null,reason:'http_'+response.status};
   let artifact;
   try{artifact=await response.json()}catch(_error){return {state:'ERROR',artifact:null,reason:'invalid_json'}}
+  if(artifact&&artifact.schema_version===1&&artifact.kind==='holodocchi.daily_digest'){
+    if(text(artifact.target_day)!==day||text(artifact.timezone)!==TAIPEI)return {state:'ERROR',artifact:null,reason:'day_mismatch'};
+    artifact=normalizeLegacyArtifact(artifact);
+  }
   if(!artifact||artifact.schema_version!==SCHEMA)return {state:'ERROR',artifact:null,reason:'schema'};
   const artifactDay=text(artifact.day||artifact.date);
   if(artifactDay!==day)return {state:'ERROR',artifact:null,reason:'day_mismatch'};
@@ -69,6 +73,72 @@ async function fetchArtifact(day){
   if(state==='MISSING')return {state:'MISSING',artifact,reason:'artifact_missing'};
   if(state!=='READY'&&state!=='PARTIAL')return {state:'ERROR',artifact:null,reason:'status'};
   return {state,artifact,reason:''};
+}
+function legacyStreamMap(artifact){
+  return new Map((Array.isArray(artifact?.streams)?artifact.streams:[])
+    .map(row=>[String(row?.video_id||''),row]));
+}
+function legacyItemFromEditorial(row,byId,role='standard'){
+  const ids=Array.isArray(row?.video_ids)?row.video_ids.map(String):[];
+  const stream=ids.map(id=>byId.get(id)).find(Boolean)||null;
+  const signals=row?.editorial_signals||{};
+  return {
+    display_role:role,
+    video_id:text(stream?.video_id||ids[0]),
+    youtube_url:text(stream?.youtube_url)||(ids[0]?'https://www.youtube.com/watch?v='+ids[0]:''),
+    title:text(row?.title)||text(stream?.title),
+    channel_name:text(stream?.channel_name),
+    summary:text(row?.summary)||text(stream?.summary),
+    recommendation_reason:text(signals?.rationale),
+    actual_start:text(stream?.actual_start),
+    state:'ended',
+    tags:Array.isArray(row?.member_names)?row.member_names.slice(0,4):[]
+  };
+}
+function normalizeLegacyArtifact(artifact){
+  const byId=legacyStreamMap(artifact);
+  const sections=[];
+  const stories=Array.isArray(artifact?.stories)?artifact.stories:[];
+  if(stories.length){
+    sections.push({
+      title:'今天發生什麼',
+      role:'hero',
+      items:stories.map((story,index)=>legacyItemFromEditorial(story,byId,index===0?'hero':'featured'))
+    });
+  }
+  const announcements=Array.isArray(artifact?.announcements)?artifact.announcements:[];
+  if(announcements.length){
+    sections.push({
+      title:'公告與預告',
+      role:'featured',
+      items:announcements.map((row,index)=>legacyItemFromEditorial(row,byId,index===0?'featured':'standard'))
+    });
+  }
+  const categories=Array.isArray(artifact?.categories)?artifact.categories:[];
+  for(const category of categories){
+    const items=(Array.isArray(category?.video_ids)?category.video_ids:[])
+      .map(id=>byId.get(String(id)))
+      .filter(Boolean)
+      .map(stream=>({
+        display_role:'standard',
+        video_id:text(stream?.video_id),
+        youtube_url:text(stream?.youtube_url),
+        title:text(stream?.title),
+        channel_name:text(stream?.channel_name),
+        summary:text(stream?.summary),
+        recommendation_reason:text(stream?.editorial_signals?.rationale),
+        actual_start:text(stream?.actual_start),
+        state:'ended',
+        tags:Array.isArray(stream?.topics)?stream.topics.slice(0,3):[]
+      }));
+    if(items.length)sections.push({title:text(category?.label)||'相關直播',role:'standard',items});
+  }
+  return {
+    schema_version:SCHEMA,
+    day:text(artifact?.target_day),
+    status:artifact?.coverage?.complete===true?'READY':'PARTIAL',
+    sections
+  };
 }
 function itemRole(item){
   const role=text(item?.display_role||item?.layout_role||item?.layout).toLowerCase();
