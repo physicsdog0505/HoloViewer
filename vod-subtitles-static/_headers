@@ -1,0 +1,5 @@
+/data/subtitles/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, HEAD, OPTIONS
+  Access-Control-Allow-Headers: Accept
+  X-Content-Type-Options: nosniff
