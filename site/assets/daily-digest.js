@@ -549,31 +549,57 @@ function renderCategories(target,artifact,byId){
   const rows=(Array.isArray(artifact?.categories)?artifact.categories:[])
     .filter(row=>text(row?.key)!=='unverified_streams');
   if(!rows.length)return;
-  const wrap=section('依內容瀏覽','daily-categories','chips');
-  wrap.append(el('p','daily-category-intro','從主題切入，需要時再展開相關直播；不再把全部直播重複鋪滿整頁。'));
-  const chips=el('div','daily-category-chips');
+  const wrap=section('依內容瀏覽','daily-categories','list');
+  wrap.append(el('p','daily-category-intro','從主題切入，需要時再展開相關直播。'));
   const panels=el('div','daily-category-panels');
+
   rows.forEach((row,index)=>{
     const ids=[...new Set((Array.isArray(row.video_ids)?row.video_ids:[]).map(String).filter(id=>byId.has(id)))];
     if(!ids.length)return;
-    const id='daily-category-'+String(index);
-    const button=el('button','daily-category-chip',shortHeadline(row.label||row.key,30));
-    button.type='button';
-    button.append(el('span','',String(ids.length)));
-    button.addEventListener('click',()=>{
-      const panel=document.getElementById(id);
-      if(panel){panel.open=!panel.open;if(panel.open)panel.scrollIntoView({behavior:'smooth',block:'nearest'})}
-    });
-    chips.append(button);
 
     const panel=el('details','daily-category');
-    panel.id=id;
+    panel.id='daily-category-'+String(index);
     panel.append(el('summary','',publicText(row.label)||'分類'));
-    const refs=el('div','daily-stream-refs');
-    ids.forEach(videoId=>refs.append(streamReference(videoId,byId)));
-    panel.append(refs);panels.append(panel);
+
+    const body=el('div','daily-category-body');
+    const refs=el('div','daily-stream-refs daily-category-stream-refs');
+    refs.dataset.openState='closed';
+
+    const setGroupOpen=(open)=>{
+      refs.dataset.openState=open?'open':'closed';
+      refs.querySelectorAll('.daily-stream-ref').forEach(node=>{node.open=open});
+    };
+
+    ids.forEach(videoId=>{
+      const card=streamReference(videoId,byId);
+      const summary=card.querySelector('summary');
+      if(summary){
+        summary.addEventListener('click',event=>{
+          event.preventDefault();
+          setGroupOpen(refs.dataset.openState!=='open');
+        });
+      }
+      refs.append(card);
+    });
+
+    const controls=el('div','daily-category-controls');
+    const prev=el('button','daily-category-arrow','←');
+    const next=el('button','daily-category-arrow','→');
+    prev.type='button';next.type='button';
+    prev.setAttribute('aria-label','上一組分類直播卡片');
+    next.setAttribute('aria-label','下一組分類直播卡片');
+    const step=()=>Math.max(refs.clientWidth*.92,300);
+    prev.addEventListener('click',()=>refs.scrollBy({left:-step(),behavior:'smooth'}));
+    next.addEventListener('click',()=>refs.scrollBy({left:step(),behavior:'smooth'}));
+    controls.append(prev,next);
+
+    body.append(refs,controls);
+    panel.append(body);
+    panels.append(panel);
   });
-  wrap.append(chips,panels);target.append(wrap);
+
+  wrap.append(panels);
+  target.append(wrap);
 }
 function renderUnverified(target,artifact,byId){
   const debug=new URLSearchParams(location.search).get('debug')==='1';
