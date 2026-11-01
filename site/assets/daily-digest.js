@@ -68,7 +68,7 @@ function appendParagraphs(parent,value,className){
   chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
 }
 function storyVisual(videoIds,byId){
-  const ids=[...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,6);
+  const ids=[...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))];
   if(!ids.length)return null;
   const visual=el('div','daily-story-visual');
   visual.dataset.count=String(ids.length);
@@ -346,6 +346,13 @@ function renderStories(target,artifact,byId){
       const visible=layout==='lead'?3:2;
       subs.slice(0,visible).forEach(sub=>{
         const item=el('details','daily-sub-event');
+        item.dataset.storyGroup=String(index+1);
+        item.addEventListener('toggle',()=>{
+          if(!item.open)return;
+          const group=item.closest('.daily-sub-events');
+          if(!group)return;
+          group.querySelectorAll('.daily-sub-event').forEach(node=>{if(!node.open)node.open=true});
+        });
         const head=el('summary','daily-sub-event-head');
         const firstVideo=(Array.isArray(sub.video_ids)?sub.video_ids:[]).find(id=>byId.has(String(id)));
         if(firstVideo){
