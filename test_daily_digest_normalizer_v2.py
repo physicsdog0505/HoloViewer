@@ -133,6 +133,12 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         result = normalize_digest(src)
         self.assertEqual(result.artifact["stories"][0]["reader_mode"], "summary_with_details")
 
+    def test_overview_above_hard_limit_is_rejected_without_silent_truncation(self):
+        src = v2_payload("compact")
+        src["overview"]["public_summary"] = zh("極端超長總覽。", 2001)
+        with self.assertRaisesRegex(ContractError, "overview.public_summary must be <= 2000 chars"):
+            normalize_digest(src)
+
     def test_invalid_story_reader_mode_falls_back_with_warning(self):
         src = v2_payload("compact")
         src["stories"][0]["reader_mode"] = "auto"
@@ -159,7 +165,9 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         src["overview"]["public_summary"] = zh("超長總覽內容。", 700)
         src["overview"]["highlights"][0]["summary"] = zh("超長重點摘要。", 180)
         result = normalize_digest(src)
-        self.assertLessEqual(len(result.artifact["overview"]["public_summary"]), 520)
+        self.assertEqual(result.artifact["overview"]["public_summary"], src["overview"]["public_summary"])
+        self.assertEqual(len(result.artifact["overview"]["public_summary"]), 700)
+        self.assertTrue(any("preserved without truncation" in w for w in result.warnings))
         self.assertLessEqual(len(result.artifact["overview"]["highlights"][0]["summary"]), 110)
         self.assertEqual(src["overview"]["highlights"][1], original["overview"]["highlights"][1])
         self.assertEqual(len(src["overview"]["highlights"][0]["summary"]), 180)
