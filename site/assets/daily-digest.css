@@ -191,7 +191,7 @@ h3.daily-digest-title{margin:0}
   border-left:5px solid color-mix(in srgb,var(--brand-main) 55%,var(--line));
   border-radius:12px 24px 24px 12px
 }
-.daily-story-card[data-layout="editorial"] .daily-story-summary{columns:1}
+.daily-story-card[data-layout="editorial"] .daily-story-summary{columns:auto}
 .daily-story-card[data-layout="compact"]{display:grid;grid-template-columns:minmax(240px,.72fr) minmax(0,1.28fr);gap:22px;align-items:start}
 .daily-story-card[data-layout="compact"] .daily-story-eyebrow,
 .daily-story-card[data-layout="compact"] .daily-story-title{grid-column:1}
@@ -356,6 +356,16 @@ h3.daily-digest-title{margin:0}
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden
 }
 .daily-story-summary-block{max-width:1020px}
+.daily-story-summary-columns{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:28px
+}
+.daily-story-summary-column{min-width:0}
+.daily-story-summary-column .daily-story-summary:first-child{margin-top:0}
+@media(max-width:900px){
+  .daily-story-summary-columns{grid-template-columns:1fr;gap:0}
+}
 .daily-story-summary-block .daily-story-summary{margin:12px 0 0}
 .daily-story-visual{
   display:grid;grid-template-columns:1.55fr .75fr .75fr;gap:10px;
