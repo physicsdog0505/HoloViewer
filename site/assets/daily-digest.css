@@ -842,3 +842,42 @@ html{scroll-behavior:smooth}
 .daily-story-summary-block{
   max-width:none
 }
+
+
+/* Owner review V3.8 — one synchronized story detail carousel. */
+.daily-story-detail-rail{
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:calc((100% - 24px)/3);
+  grid-template-columns:none;
+  gap:12px;
+  overflow-x:auto;
+  overscroll-behavior-inline:contain;
+  scroll-snap-type:x mandatory;
+  padding:2px 2px 12px;
+  margin-top:18px
+}
+.daily-story-detail-rail .daily-stream-ref{
+  scroll-snap-align:start;
+  min-width:0
+}
+.daily-story-detail-rail .daily-stream-ref.is-selected{
+  outline:2px solid color-mix(in srgb,var(--brand-main) 42%,transparent);
+  outline-offset:2px
+}
+.daily-story-visual-item.is-selectable{cursor:pointer}
+.daily-story-visual-item.is-selectable.is-selected{
+  outline:2px solid color-mix(in srgb,var(--brand-main) 52%,transparent);
+  outline-offset:3px
+}
+.daily-story-visual-item.is-selectable:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--brand-main) 68%,transparent);
+  outline-offset:3px
+}
+
+@media(max-width:980px){
+  .daily-story-detail-rail{grid-auto-columns:calc((100% - 12px)/2)}
+}
+@media(max-width:760px){
+  .daily-story-detail-rail{grid-auto-columns:86vw}
+}
