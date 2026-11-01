@@ -80,7 +80,11 @@ function storyVisual(videoIds,byId,{onSelect=null}={}){
       figure.classList.add('is-selectable');
       figure.tabIndex=0;
       figure.setAttribute('role','button');
-      const select=()=>onSelect(id,index);
+      const select=()=>{
+        visual.querySelectorAll('.daily-story-visual-item').forEach(node=>node.classList.toggle('is-selected',node===figure));
+        onSelect(id,index);
+      };
+      if(index===0)figure.classList.add('is-selected');
       figure.addEventListener('click',select);
       figure.addEventListener('keydown',event=>{
         if(event.key==='Enter'||event.key===' '){
@@ -178,26 +182,32 @@ function storyDetailRail(ids,byId){
   if(!visible.length)return null;
   const rail=el('div','daily-story-detail-rail');
   rail.dataset.openState='closed';
-  let syncing=false;
+
+  const setGroupOpen=(open)=>{
+    rail.dataset.openState=open?'open':'closed';
+    rail.querySelectorAll('.daily-stream-ref').forEach(node=>{node.open=open});
+  };
+
   visible.forEach((id,index)=>{
     const card=streamReference(id,byId);
     card.dataset.videoId=id;
     card.dataset.index=String(index);
-    card.addEventListener('toggle',()=>{
-      if(syncing)return;
-      syncing=true;
-      const nextOpen=card.open;
-      rail.dataset.openState=nextOpen?'open':'closed';
-      rail.querySelectorAll('.daily-stream-ref').forEach(node=>{node.open=nextOpen});
-      syncing=false;
-    });
+    if(index===0)card.classList.add('is-selected');
+    const summary=card.querySelector('summary');
+    if(summary){
+      summary.addEventListener('click',event=>{
+        event.preventDefault();
+        setGroupOpen(rail.dataset.openState!=='open');
+      });
+    }
     rail.append(card);
   });
+
   rail.selectVideo=(id)=>{
     const target=rail.querySelector('.daily-stream-ref[data-video-id="'+CSS.escape(String(id))+'"]');
     if(!target)return;
-    target.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'});
     rail.querySelectorAll('.daily-stream-ref').forEach(node=>node.classList.toggle('is-selected',node===target));
+    target.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'});
   };
   return rail;
 }
