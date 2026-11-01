@@ -504,11 +504,17 @@ function renderOverview(target,artifact,byId){
 function storyAutoLayout(story){
   return publicLayout(story,'editorial');
 }
+function singleImageStoryVariant(story,ordinal){
+  const requested=publicText(story?.single_image_layout).toLowerCase();
+  if(requested==='editorial-side'||requested==='wide')return requested;
+  return ordinal%2===0?'editorial-side':'wide';
+}
 function renderStories(target,artifact,byId){
   const stories=Array.isArray(artifact?.stories)?artifact.stories:[];
   if(!stories.length)return;
   const wrap=section('今日主題','daily-stories','editorial');
   const list=el('div','daily-story-list');
+  let singleImageOrdinal=0;
   stories.forEach((story,index)=>{
     const layout=storyAutoLayout(story);
     const card=el('article','daily-story-card');
@@ -516,6 +522,11 @@ function renderStories(target,artifact,byId){
     card.id='daily-story-'+String(index+1);
     const visibleIds=storyVisibleIds(story.video_ids,byId);
     card.dataset.streamCount=String(visibleIds.length);
+    if(visibleIds.length===1){
+      const variant=singleImageStoryVariant(story,singleImageOrdinal++);
+      card.dataset.singleImageLayout=variant;
+      if(variant==='editorial-side')card.classList.add('is-feature-story');
+    }
     const eyebrow=el('div','daily-story-eyebrow');
     const members=Array.isArray(story.member_names)?story.member_names.map(publicText).filter(Boolean):[];
     eyebrow.append(el('span','',index===0?'今日焦點':'今日話題'));
