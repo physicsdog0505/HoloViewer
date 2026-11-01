@@ -647,3 +647,47 @@ h3.daily-digest-title{margin:0}
   }
   .daily-highlight-grid[data-layout="rail"]{grid-auto-columns:86vw}
 }
+
+
+/* Owner review V3.3 — Auto selects one stable card template; intro gets its own lab. */
+.daily-layout-lab{
+  display:grid;
+  gap:10px
+}
+.daily-layout-lab-group{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap
+}
+.daily-overview[data-copy-layout="left"] .daily-overview-summary{
+  max-width:920px;
+  margin-left:0;
+  margin-right:auto;
+  text-align:left
+}
+.daily-overview[data-copy-layout="center"] .daily-overview-summary{
+  max-width:920px;
+  margin-left:auto;
+  margin-right:auto;
+  text-align:center
+}
+.daily-overview[data-copy-layout="columns"] .daily-overview-summary{
+  max-width:none;
+  column-count:2;
+  column-gap:36px;
+  text-align:left
+}
+.daily-overview[data-copy-layout="columns"] .daily-overview-summary + .daily-overview-summary{
+  margin-top:14px
+}
+
+/* Auto no longer creates per-card mixed spans. It resolves to compact, rail, or lead. */
+.daily-highlight-grid[data-layout-source="auto"][data-layout="compact"] .daily-highlight-card,
+.daily-highlight-grid[data-layout-source="auto"][data-layout="rail"] .daily-highlight-card,
+.daily-highlight-grid[data-layout-source="auto"][data-layout="lead"] .daily-highlight-card{
+  grid-column:auto
+}
+
+@media(max-width:760px){
+  .daily-overview[data-copy-layout="columns"] .daily-overview-summary{
+    column-count:1
+  }
+}
