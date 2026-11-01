@@ -204,7 +204,13 @@ def normalize_digest(payload: dict[str, Any]) -> NormalizeResult:
 
     original = copy.deepcopy(payload)
     warnings: list[str] = []
-    source_schema = _clean(payload.get("schema") or payload.get("schema_version_name") or payload.get("gemini_schema_version"))
+    meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    source_schema = _clean(
+        meta.get("schema_version")
+        or payload.get("schema")
+        or payload.get("schema_version_name")
+        or payload.get("gemini_schema_version")
+    )
     is_v2 = source_schema == GEMINI_V2_SCHEMA or _clean(payload.get("SCHEMA_VERSION")) == GEMINI_V2_SCHEMA
     legacy = not is_v2
 
