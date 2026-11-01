@@ -14,6 +14,7 @@ PUBLIC_SCHEMA_VERSION = 1
 GEMINI_V2_SCHEMA = "holodocchi.gemini.daily_digest.v2"
 VALID_OVERVIEW_LAYOUTS = {"compact", "rail", "lead"}
 VALID_ROLES = {"lead_candidate", "secondary_candidate", "normal"}
+VALID_STORY_READER_MODES = {"inline", "summary_with_details"}
 
 SHORT_TITLE_TARGET_MIN = 12
 SHORT_TITLE_TARGET_MAX = 32
@@ -213,6 +214,15 @@ def _normalize_story(
     editorial_summary = _story_editorial_summary(out)
     if editorial_summary:
         out["editorial_summary"] = editorial_summary
+
+    reader_mode = _clean(out.get("reader_mode")).lower()
+    if reader_mode:
+        if reader_mode not in VALID_STORY_READER_MODES:
+            warnings.append(f"stories[{index}].reader_mode={reader_mode!r} normalized to summary_with_details")
+            reader_mode = "summary_with_details"
+    else:
+        reader_mode = "summary_with_details"
+    out["reader_mode"] = reader_mode
 
     hint = _clean(out.get("presentation_hint")).lower()
     if hint and hint not in VALID_OVERVIEW_LAYOUTS:
