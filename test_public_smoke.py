@@ -753,7 +753,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn(".daily-highlight-card.is-jumpable", css)
         self.assertIn("scroll-margin-top:88px", css)
         self.assertIn("scroll-behavior:smooth", css)
-        self.assertIn("slice(0,6)", js)
+        self.assertIn("slice(0,9)", js)
         self.assertIn("storyVisibleIds", js)
         self.assertIn("storyDetailRail", js)
         self.assertIn("Owner review V3.5", css)
