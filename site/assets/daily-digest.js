@@ -393,12 +393,7 @@ function applyOverviewCopyLayout(wrap,mode){
   wrap.dataset.copyLayout=mode;
   const flow=wrap.querySelector('.daily-overview-summary-flow');
   if(!flow)return;
-  if(mode==='columns'){
-    restoreOverviewFlow(flow);
-    balanceOverviewColumns(flow);
-  }else{
-    restoreOverviewFlow(flow);
-  }
+  restoreOverviewFlow(flow);
 }
 function overviewLayoutLab(wrap,grid,highlights){
   if(!overviewLayoutLabEnabled())return null;
