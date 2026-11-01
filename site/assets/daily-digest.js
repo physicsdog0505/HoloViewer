@@ -431,10 +431,9 @@ function renderOverview(target,artifact,byId){
   const intro=publicText(overview.public_summary||overview.summary);
   if(intro){
     const cleaned=intro.replace(/^.*?共計\s*\d+\s*場[^。]*。\s*/,'');
-    const first=cleaned.split('。').filter(Boolean).slice(0,2).join('。');
-    if(first){
+    if(cleaned){
       const introFlow=el('div','daily-overview-summary-flow');
-      appendParagraphs(introFlow,first+'。','daily-overview-summary');
+      appendParagraphs(introFlow,cleaned,'daily-overview-summary');
       wrap.append(introFlow);
     }
   }
