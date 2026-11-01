@@ -693,6 +693,11 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn('data-layout="lead"', css)
         self.assertIn('data-copy-layout="columns"', css)
         self.assertIn('data-copy-layout="center"', css)
+        self.assertIn("daily-highlight-jump", js)
+        self.assertIn("href='#daily-story-'", js)
+        self.assertIn("card.id='daily-story-'", js)
+        self.assertIn("scroll-margin-top:88px", css)
+        self.assertIn("scroll-behavior:smooth", css)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
