@@ -24,7 +24,8 @@ SHORT_TITLE_HARD_MAX = 42
 HIGHLIGHT_SUMMARY_MIN = 45
 HIGHLIGHT_SUMMARY_MAX = 110
 OVERVIEW_MIN = 260
-OVERVIEW_MAX = 520
+OVERVIEW_RECOMMENDED_MAX = 520
+OVERVIEW_HARD_MAX = 2000
 STORY_EDITORIAL_TARGET_MIN = 320
 STORY_EDITORIAL_MAX = 760
 STORY_EDITORIAL_DEEP_MAX = 1200
@@ -287,9 +288,15 @@ def normalize_digest(payload: dict[str, Any]) -> NormalizeResult:
     summary = _clean(overview.get("public_summary") or overview.get("summary"))
     if not summary:
         raise ContractError("overview.public_summary/summary is required")
-    if len(summary) > OVERVIEW_MAX:
-        warnings.append(f"overview.public_summary normalized from {len(summary)} to <= {OVERVIEW_MAX}")
-        summary = _truncate(summary, OVERVIEW_MAX)
+    if len(summary) > OVERVIEW_HARD_MAX:
+        raise ContractError(
+            f"overview.public_summary must be <= {OVERVIEW_HARD_MAX} chars"
+        )
+    if len(summary) > OVERVIEW_RECOMMENDED_MAX:
+        warnings.append(
+            f"overview.public_summary length {len(summary)} exceeds recommended "
+            f"{OVERVIEW_RECOMMENDED_MAX}; preserved without truncation"
+        )
     if is_v2 and len(summary) < OVERVIEW_MIN:
         raise ContractError(f"overview.public_summary must be at least {OVERVIEW_MIN} chars")
 
