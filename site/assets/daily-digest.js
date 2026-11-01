@@ -56,7 +56,7 @@ function shortHeadline(value,max=42){
 function paragraphChunks(value,{min=2,max=3}={}){
   const raw=publicText(value);
   if(!raw)return [];
-  const sentences=raw.match(/[^。！？!?]+[。！？!?]?/g)?.map(item=>item.trim()).filter(Boolean)||[raw];
+  const sentences=raw.match(/[^。！？]+[。！？]?/g)?.map(item=>item.trim()).filter(Boolean)||[raw];
   if(sentences.length<=1)return [raw];
   const target=Math.min(max,Math.max(min,Math.ceil(raw.length/150)));
   const size=Math.ceil(sentences.length/target);
