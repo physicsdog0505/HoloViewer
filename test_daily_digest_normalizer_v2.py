@@ -86,6 +86,20 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         result = normalize_digest(src)
         self.assertEqual(result.artifact["stories"][0]["editorial_summary"], explicit)
 
+    def test_overlapping_stream_summary_replaces_compact_story_version(self):
+        src = v2_payload("compact")
+        compact = "KoZMy 晚酌派對宣布原創曲與個唱來賓。"
+        expanded = (
+            "KoZMy 萬聖節 3D 晚酌派對中，博衣こより與 AZKi、雪花ラミィ一同品嚐日本酒，"
+            "並宣布首支團體原創曲與 12 月個唱唯一來賓陣容。"
+        )
+        src["stories"][0]["public_summary"] = compact
+        src["streams"][0]["summary"] = expanded
+        result = normalize_digest(src)
+        editorial = result.artifact["stories"][0]["editorial_summary"]
+        self.assertIn(expanded, editorial)
+        self.assertNotIn(compact + " " + expanded, editorial)
+
     def test_invalid_hint_has_deterministic_fallback(self):
         src = v2_payload("magazine")
         result = normalize_digest(src)
