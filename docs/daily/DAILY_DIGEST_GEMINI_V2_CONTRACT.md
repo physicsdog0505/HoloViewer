@@ -33,11 +33,13 @@ Validation inputs produced under this contract must declare:
 SCHEMA_VERSION=holodocchi.gemini.daily_digest.v2
 ```
 
-JSON form may use:
+Canonical JSON identity is:
 
 ```json
-{"schema":"holodocchi.gemini.daily_digest.v2"}
+{"meta":{"schema_version":"holodocchi.gemini.daily_digest.v2"}}
 ```
+
+The normalizer also accepts earlier top-level schema markers during migration, but new Gemini v2 output should use `meta.schema_version`.
 
 ## Overview
 
@@ -109,6 +111,14 @@ The public artifact includes `producer_v2.source_sha256` so identical source inp
 The normalizer accepts the existing v1 artifact shape where `overview.highlights` is an array of strings. It migrates those strings into structured highlight objects, preserving story order and taking evidence `video_ids` from the corresponding story when available.
 
 Legacy compatibility is a migration path, not permission for new Gemini v2 output to omit required structured fields.
+
+## Source authority and local-summary QA
+
+The Gemini Drive input continues the original Issue #477 source model: the Stream List identifies the complete daily universe, and Gemini researches the supplied YouTube URLs directly. Holodocchi local Daily Summary Markdown is not embedded as the primary Gemini source in v2.
+
+The independently generated local Daily Summary remains useful after Gemini generation as QA evidence for coverage, omissions, factual drift, and quality comparison. If a future revision uses local summaries as supplementary evidence, that must be an explicit versioned contract change rather than a silent source substitution.
+
+Gemini JSON is not served directly to the frontend. The normalizer remains the deterministic assembly boundary that validates schema/copy/evidence and resolves authoritative artifact layout fields.
 
 ## Drive validation rule
 
