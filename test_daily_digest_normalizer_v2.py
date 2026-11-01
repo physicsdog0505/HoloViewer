@@ -69,15 +69,15 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         self.assertEqual(result.artifact["overview"]["highlights"][0]["video_ids"], ["v0000000000"])
         self.assertEqual(result.warnings, ())
 
-    def test_story_editorial_summary_uses_gemini_stream_research_when_public_copy_is_short(self):
+    def test_story_without_editorial_summary_preserves_public_summary_only(self):
         src = v2_payload("compact")
-        src["stories"][0]["public_summary"] = zh("跨直播短摘要。", 90)
+        public_summary = zh("跨直播短摘要。", 90)
+        src["stories"][0]["public_summary"] = public_summary
         result = normalize_digest(src)
         story = result.artifact["stories"][0]
-        self.assertEqual(story["public_summary"], src["stories"][0]["public_summary"])
-        self.assertGreater(len(story["editorial_summary"]), len(story["public_summary"]))
-        self.assertIn("Gemini 詳細研究內容", story["editorial_summary"])
-        self.assertLessEqual(len(story["editorial_summary"]), 760)
+        self.assertEqual(story["public_summary"], public_summary)
+        self.assertEqual(story["editorial_summary"], public_summary)
+        self.assertNotIn("Gemini 詳細研究內容", story["editorial_summary"])
 
     def test_explicit_story_editorial_summary_is_preserved(self):
         src = v2_payload("compact")
@@ -86,19 +86,16 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         result = normalize_digest(src)
         self.assertEqual(result.artifact["stories"][0]["editorial_summary"], explicit)
 
-    def test_overlapping_stream_summary_replaces_compact_story_version(self):
+    def test_stream_summary_does_not_duplicate_story_copy(self):
         src = v2_payload("compact")
         compact = "KoZMy 晚酌派對宣布原創曲與個唱來賓。"
-        expanded = (
+        src["stories"][0]["public_summary"] = compact
+        src["streams"][0]["summary"] = (
             "KoZMy 萬聖節 3D 晚酌派對中，博衣こより與 AZKi、雪花ラミィ一同品嚐日本酒，"
             "並宣布首支團體原創曲與 12 月個唱唯一來賓陣容。"
         )
-        src["stories"][0]["public_summary"] = compact
-        src["streams"][0]["summary"] = expanded
         result = normalize_digest(src)
-        editorial = result.artifact["stories"][0]["editorial_summary"]
-        self.assertIn(expanded, editorial)
-        self.assertNotIn(compact + " " + expanded, editorial)
+        self.assertEqual(result.artifact["stories"][0]["editorial_summary"], compact)
 
     def test_invalid_hint_has_deterministic_fallback(self):
         src = v2_payload("magazine")
