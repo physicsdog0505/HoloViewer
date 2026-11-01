@@ -115,6 +115,17 @@ For recurring weekly/news-style programs, `deep` means the editorial copy should
 
 Known aliases currently include `#朝こよ`, `#朝ミオ`, おはスバ / おはすば, `#朝ガオ`, `#ねるまえらじお`, アキちょこナイトパレット, and holoAN / `#昼ホロ` when those streams are present in the authoritative daily universe.
 
+## Major announcements and music setlists
+
+Major announcements may carry `summary_depth=deep` when verified source content contains actionable detail. Preserve dates, participants, venue/platform, ticketing/purchase method, versions/benefits, deadlines, and follow-up dates when explicitly stated; do not compress these away for layout.
+
+Music / karaoke / mini-live streams may carry structured setlist metadata when verified:
+- `program_type=music`
+- `setlist_status=complete | partial | unavailable`
+- ordered `setlist[]` entries with `order`, `title`, and optional `artist_or_source`, `performers`, `note`, `timestamp_text`.
+
+Partial verified setlists are preferable to omission. Never guess unknown songs. Structured setlists supplement, not replace, the editorial summary.
+
 ## Announcements and categories
 
 Announcements keep full title + full summary. Categories keep stable `key`, human `label`, and ordered `video_ids`. Neither section is destructively truncated by this contract.
