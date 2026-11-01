@@ -240,7 +240,13 @@ h3.daily-digest-title{margin:0}
 .daily-announcement-when{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;color:var(--muted);font-size:11px;font-weight:800}
 .daily-announcement-type{padding:4px 7px;border-radius:999px;background:var(--surface-2);color:var(--brand-main)}
 .daily-announcement-card h3{margin:0;font-size:18px;line-height:1.45;letter-spacing:-.015em}
-.daily-announcement-card p{margin:9px 0 0;line-height:1.7;color:var(--muted);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.daily-announcement-card p{
+  margin:9px 0 0;
+  line-height:1.7;
+  color:var(--muted);
+  display:block;
+  overflow:visible
+}
 
 .daily-category-intro{margin:-8px 0 16px;color:var(--muted);font-size:13px}
 .daily-category-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
