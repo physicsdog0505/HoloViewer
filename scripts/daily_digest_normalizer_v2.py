@@ -176,6 +176,21 @@ def _normalize_highlight(item: Any, story: dict[str, Any] | None, *, legacy: boo
     }, warnings
 
 
+def _char_bigrams(value: str) -> set[str]:
+    compact = re.sub(r"[^0-9A-Za-z\u3400-\u9fff]+", "", _clean(value))
+    if len(compact) < 2:
+        return {compact} if compact else set()
+    return {compact[i:i + 2] for i in range(len(compact) - 1)}
+
+
+def _overlap_ratio(a: str, b: str) -> float:
+    left = _char_bigrams(a)
+    right = _char_bigrams(b)
+    if not left or not right:
+        return 0.0
+    return len(left & right) / min(len(left), len(right))
+
+
 def _story_editorial_summary(story: dict[str, Any], stream_by_id: dict[str, dict[str, Any]]) -> str:
     explicit = _clean(story.get("editorial_summary"))
     if explicit:
@@ -186,15 +201,22 @@ def _story_editorial_summary(story: dict[str, Any], stream_by_id: dict[str, dict
         return _truncate(base, STORY_EDITORIAL_MAX) if len(base) > STORY_EDITORIAL_MAX else base
 
     parts: list[str] = [base] if base else []
-    joined = base
     for video_id in _ordered_video_ids(story.get("video_ids")):
         stream = stream_by_id.get(video_id) or {}
         candidate = _clean(stream.get("summary") or stream.get("public_summary"))
         if not candidate:
             continue
-        if candidate in joined or (joined and joined in candidate):
+
+        # Migration fallback: when a richer stream summary substantially overlaps
+        # the compact story summary, treat it as an expanded version of the same
+        # editorial beat instead of showing both versions side-by-side.
+        if parts and _overlap_ratio(parts[0], candidate) >= 0.28 and len(candidate) > len(parts[0]):
+            parts[0] = candidate
+        elif any(_overlap_ratio(existing, candidate) >= 0.42 for existing in parts):
             continue
-        parts.append(candidate)
+        else:
+            parts.append(candidate)
+
         joined = " ".join(parts)
         if len(joined) >= STORY_EDITORIAL_TARGET_MIN:
             break
