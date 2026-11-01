@@ -67,20 +67,98 @@ function appendParagraphs(parent,value,className){
   const chunks=paragraphChunks(value);
   chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
 }
-function storyVisual(videoIds,byId){
-  const ids=[...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,3);
+function storyVisualLayout(count,index,previous='',story=null){
+  const pools={
+    1:['feature-single','feature-single-wide','feature-single-editorial'],
+    2:['feature-duo','feature-duo-split','feature-duo-stack'],
+    3:['triptych','lead-two'],
+    4:['quad','lead-three'],
+    5:['three-two','lead-four'],
+    6:['mosaic-carousel','hero-full-carousel'],
+    7:['mosaic-carousel','hero-full-carousel'],
+    8:['mosaic-carousel','hero-full-carousel'],
+    9:['mosaic-carousel','hero-full-carousel']
+  };
+  const pool=pools[count]||['mosaic-carousel','hero-full-carousel'];
+  const titleLength=publicText(story?.title||story?.short_title).length;
+  const summaryLength=publicText(story?.public_summary||story?.summary).length;
+  let seed=(index+titleLength+summaryLength)%pool.length;
+  let variant=pool[seed];
+  if(pool.length>1&&variant===previous)variant=pool[(seed+1)%pool.length];
+  return variant;
+}
+function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
+  const ids=storyVisibleIds(videoIds,byId);
   if(!ids.length)return null;
+
+  const shell=el('div','daily-story-visual-shell');
   const visual=el('div','daily-story-visual');
+  visual.dataset.count=String(ids.length);
+  visual.dataset.visualLayout=layout;
+  const cropCycle=['center','upper','left','right','center','upper','left','right','center'];
+
   ids.forEach((id,index)=>{
     const figure=el('figure','daily-story-visual-item');
     figure.dataset.slot=String(index+1);
-    const img=el('img');img.src=thumbnailUrl(id);img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';
-    figure.append(img);
+    figure.dataset.videoId=id;
+    figure.dataset.crop=cropCycle[index%cropCycle.length];
+    figure.dataset.page=String(Math.floor(index/5));
+    if(onSelect){
+      figure.classList.add('is-selectable');
+      figure.tabIndex=0;
+      figure.setAttribute('role','button');
+      const select=()=>{
+        visual.querySelectorAll('.daily-story-visual-item').forEach(node=>node.classList.toggle('is-selected',node===figure));
+        onSelect(id,index);
+      };
+      if(index===0)figure.classList.add('is-selected');
+      figure.addEventListener('click',select);
+      figure.addEventListener('keydown',event=>{
+        if(event.key==='Enter'||event.key===' '){
+          event.preventDefault();
+          select();
+        }
+      });
+    }
+    const img=thumbnailImage(id);
+    if(img)figure.append(img);
     const row=byId.get(id),name=publicText(row?.channel_name);
     if(name)figure.append(el('figcaption','',name));
     visual.append(figure);
   });
-  return visual;
+
+  if((layout==='mosaic-carousel'||layout==='hero-full-carousel')&&ids.length>5){
+    let start=0;
+    let timer=null;
+    const maxStart=Math.max(1,ids.length-5);
+    const applyWindow=()=>{
+      visual.dataset.windowStart=String(start);
+      visual.classList.add('is-changing');
+      visual.querySelectorAll('.daily-story-visual-item').forEach((node,index)=>{
+        const slot=index-start+1;
+        const visible=slot>=1&&slot<=5;
+        node.hidden=!visible;
+        if(visible)node.dataset.slot=String(slot);
+      });
+      requestAnimationFrame(()=>requestAnimationFrame(()=>visual.classList.remove('is-changing')));
+    };
+    const rotate=()=>{
+      start=start>=maxStart?0:start+1;
+      applyWindow();
+    };
+    const startRotation=()=>{
+      if(timer)clearInterval(timer);
+      timer=setInterval(rotate,5000);
+    };
+    applyWindow();
+    startRotation();
+    shell.addEventListener('mouseenter',()=>{if(timer){clearInterval(timer);timer=null}});
+    shell.addEventListener('mouseleave',startRotation);
+    shell.append(visual);
+  }else{
+    shell.append(visual);
+  }
+  return shell;
 }
 function publicLayout(source,fallback){
   const requested=text(source?.layout_template||source?.display_template||source?.layout).toLowerCase();
@@ -90,7 +168,27 @@ function streamMap(artifact){
   return new Map((Array.isArray(artifact?.streams)?artifact.streams:[]).map(row=>[String(row?.video_id||''),row]));
 }
 function youtubeUrl(videoId){return /^[A-Za-z0-9_-]{11}$/.test(String(videoId||''))?'https://www.youtube.com/watch?v='+videoId:''}
-function thumbnailUrl(videoId){return /^[A-Za-z0-9_-]{11}$/.test(String(videoId||''))?'https://i.ytimg.com/vi/'+videoId+'/mqdefault.jpg':''}
+function thumbnailCandidates(videoId){
+  const id=String(videoId||'');
+  if(!/^[A-Za-z0-9_-]{11}$/.test(id))return [];
+  return [
+    'https://i.ytimg.com/vi/'+id+'/maxresdefault.jpg',
+    'https://i.ytimg.com/vi/'+id+'/sddefault.jpg',
+    'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',
+    'https://i.ytimg.com/vi/'+id+'/mqdefault.jpg'
+  ];
+}
+function thumbnailUrl(videoId){return thumbnailCandidates(videoId)[0]||''}
+function thumbnailImage(videoId,{loading='lazy'}={}){
+  const candidates=thumbnailCandidates(videoId);
+  if(!candidates.length)return null;
+  const img=el('img');img.alt='';img.loading=loading;img.referrerPolicy='no-referrer';
+  let index=0;
+  const next=()=>{if(index<candidates.length)img.src=candidates[index++]};
+  img.addEventListener('error',next);
+  next();
+  return img;
+}
 function publicTypeLabel(type){
   return {
     merch_and_event:'活動・周邊',
@@ -109,7 +207,8 @@ function streamReference(videoId,byId){
   const head=el('summary','daily-stream-ref-head');
   const thumb=thumbnailUrl(videoId);
   if(thumb){
-    const img=el('img');img.src=thumb;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';head.append(img);
+    const img=thumbnailImage(videoId);
+    if(img)head.append(img);
   }
   const copy=el('span','daily-stream-ref-copy');
   copy.append(el('strong','',publicText(row?.channel_name)||'直播'));
@@ -133,6 +232,64 @@ function streamReference(videoId,byId){
   }
   details.append(body);
   return details;
+}
+function storyVisibleIds(videoIds,byId){
+  return [...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,9);
+}
+function storyDetailRail(ids,byId){
+  const visible=storyVisibleIds(ids,byId);
+  if(!visible.length)return null;
+
+  const shell=el('div','daily-story-detail-shell');
+  if(visible.length<=2)shell.classList.add('is-small-set');
+  const rail=el('div','daily-story-detail-rail');
+  rail.dataset.openState='closed';
+
+  const setGroupOpen=(open)=>{
+    rail.dataset.openState=open?'open':'closed';
+    rail.querySelectorAll('.daily-stream-ref').forEach(node=>{node.open=open});
+  };
+
+  visible.forEach((id,index)=>{
+    const card=streamReference(id,byId);
+    card.dataset.videoId=id;
+    card.dataset.index=String(index);
+    if(index===0)card.classList.add('is-selected');
+    const summary=card.querySelector('summary');
+    if(summary){
+      summary.addEventListener('click',event=>{
+        event.preventDefault();
+        setGroupOpen(rail.dataset.openState!=='open');
+      });
+    }
+    rail.append(card);
+  });
+
+  const controls=el('div','daily-story-detail-controls');
+  const prev=el('button','daily-story-detail-arrow','←');
+  const next=el('button','daily-story-detail-arrow','→');
+  prev.type='button';next.type='button';
+  prev.setAttribute('aria-label','上一組直播卡片');
+  next.setAttribute('aria-label','下一組直播卡片');
+
+  const step=()=>Math.max(rail.clientWidth*0.92,300);
+  prev.addEventListener('click',()=>rail.scrollBy({left:-step(),behavior:'smooth'}));
+  next.addEventListener('click',()=>rail.scrollBy({left:step(),behavior:'smooth'}));
+  controls.append(prev,next);
+
+  rail.selectVideo=(id,{open=false}={})=>{
+    const target=rail.querySelector('.daily-stream-ref[data-video-id="'+CSS.escape(String(id))+'"]');
+    if(!target)return;
+    rail.querySelectorAll('.daily-stream-ref').forEach(node=>node.classList.toggle('is-selected',node===target));
+    if(open)setGroupOpen(true);
+    target.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'});
+  };
+
+  shell.append(rail,controls);
+  shell.rail=rail;
+  shell.selectVideo=(id,options)=>rail.selectVideo(id,options);
+  shell.setGroupOpen=setGroupOpen;
+  return shell;
 }
 function appendReferences(parent,ids,byId,{label='相關直播'}={}){
   const valid=[...new Set((Array.isArray(ids)?ids:[]).map(String).filter(id=>byId.has(id)))];
@@ -158,28 +315,159 @@ function renderCoverage(target,artifact){
   bar.append(el('strong','',String(total)+' 場直播'));
   target.append(bar);
 }
-function renderOverview(target,artifact){
+function overviewLayoutLabEnabled(){
+  return new URLSearchParams(location.search).get('layoutlab')==='1';
+}
+function overviewCardTitle(item){
+  const parts=publicText(item).split(/[：:]/);
+  return publicText(parts[0]||item);
+}
+function overviewAutoLayout(highlights){
+  const lengths=highlights.slice(0,5).map(item=>overviewCardTitle(item).length);
+  const first=lengths[0]||0;
+  const max=Math.max(0,...lengths);
+  const average=lengths.length?lengths.reduce((sum,n)=>sum+n,0)/lengths.length:0;
+  const longCount=lengths.filter(length=>length>32).length;
+  if(first>34||max>46)return 'lead';
+  if(longCount>=2||average>29)return 'rail';
+  return 'compact';
+}
+function applyOverviewLayout(grid,mode,highlights){
+  const resolved=mode==='auto'?overviewAutoLayout(highlights):mode;
+  grid.dataset.layout=resolved;
+  grid.dataset.layoutSource=mode==='auto'?'auto':'manual';
+  grid.querySelectorAll('.daily-highlight-card').forEach((card,index)=>{
+    card.dataset.titleLength=String(overviewCardTitle(highlights[index]||'').length);
+  });
+}
+function restoreOverviewFlow(flow){
+  if(!flow)return;
+  const original=flow.dataset.originalText||[...flow.querySelectorAll('.daily-overview-summary')].map(node=>publicText(node.textContent)).join('');
+  if(!original)return;
+  flow.dataset.originalText=original;
+  flow.replaceChildren();
+  appendParagraphs(flow,original,'daily-overview-summary');
+}
+function applyOverviewCopyLayout(wrap,mode){
+  wrap.dataset.copyLayout=mode;
+  const flow=wrap.querySelector('.daily-overview-summary-flow');
+  if(!flow)return;
+  restoreOverviewFlow(flow);
+}
+function overviewLayoutLab(wrap,grid,highlights){
+  if(!overviewLayoutLabEnabled())return null;
+  const lab=el('div','daily-layout-lab');
+  const cardGroup=el('div','daily-layout-lab-group');
+  cardGroup.append(el('span','daily-layout-lab-label','CARD'));
+  const modes=[
+    ['auto','Auto Fit'],
+    ['compact','Compact Grid'],
+    ['rail','Wide Rail'],
+    ['lead','Lead + Grid']
+  ];
+  modes.forEach(([mode,label],index)=>{
+    const button=el('button','daily-layout-lab-tab',label);
+    button.type='button';
+    button.dataset.layout=mode;
+    if(index===0)button.classList.add('is-active');
+    button.addEventListener('click',()=>{
+      cardGroup.querySelectorAll('.daily-layout-lab-tab').forEach(node=>node.classList.toggle('is-active',node===button));
+      applyOverviewLayout(grid,mode,highlights);
+    });
+    cardGroup.append(button);
+  });
+
+  const copyGroup=el('div','daily-layout-lab-group');
+  copyGroup.append(el('span','daily-layout-lab-label','INTRO'));
+  const copyModes=[
+    ['left','Left'],
+    ['center','Center'],
+    ['right','Right'],
+    ['columns','Two-column']
+  ];
+  copyModes.forEach(([mode,label],index)=>{
+    const button=el('button','daily-layout-lab-tab',label);
+    button.type='button';
+    button.dataset.copyLayout=mode;
+    if(index===0)button.classList.add('is-active');
+    button.addEventListener('click',()=>{
+      copyGroup.querySelectorAll('.daily-layout-lab-tab').forEach(node=>node.classList.toggle('is-active',node===button));
+      applyOverviewCopyLayout(wrap,mode);
+    });
+    copyGroup.append(button);
+  });
+
+  lab.append(cardGroup,copyGroup);
+  return lab;
+}
+function renderOverview(target,artifact,byId){
   const overview=artifact?.overview||{};
   const highlights=Array.isArray(overview.highlights)?overview.highlights.map(publicText).filter(Boolean):[];
   if(!highlights.length&&!publicText(overview.summary))return;
   const wrap=section('今天發生什麼','daily-overview','brief');
+  applyOverviewCopyLayout(wrap,'left');
   const intro=publicText(overview.public_summary||overview.summary);
   if(intro){
     const cleaned=intro.replace(/^.*?共計\s*\d+\s*場[^。]*。\s*/,'');
     const first=cleaned.split('。').filter(Boolean).slice(0,2).join('。');
-    if(first)appendParagraphs(wrap,first+'。','daily-overview-summary');
+    if(first){
+      const introFlow=el('div','daily-overview-summary-flow');
+      appendParagraphs(introFlow,first+'。','daily-overview-summary');
+      wrap.append(introFlow);
+    }
   }
   if(highlights.length){
+    const stories=Array.isArray(artifact?.stories)?artifact.stories:[];
     const grid=el('div','daily-highlight-grid');
     highlights.slice(0,5).forEach((item,index)=>{
       const card=el('article','daily-highlight-card');
       card.dataset.accent=String((index%3)+1);
+      const story=stories[index];
+      const firstVideo=(Array.isArray(story?.video_ids)?story.video_ids:[]).map(String).find(id=>byId.has(id));
+      if(firstVideo){
+        const media=el('div','daily-highlight-media');
+        const img=thumbnailImage(firstVideo,{loading:index===0?'eager':'lazy'});
+        if(img)media.append(img);
+        const row=byId.get(firstVideo),name=publicText(row?.channel_name);
+        if(name)media.append(el('span','daily-highlight-channel',name));
+        card.append(media);
+      }
+      const copy=el('div','daily-highlight-copy');
       const parts=item.split(/[：:]/);
-      card.append(el('h3','',shortHeadline(parts[0]||item,32)));
+      const rawTitle=publicText(parts[0]||item);
+      copy.append(el('h3','',shortHeadline(rawTitle,64)));
       const rest=parts.length>1?parts.slice(1).join('：'):item;
-      card.append(el('p','',clampText(rest,110)));
+      copy.append(el('p','',clampText(rest,170)));
+      card.append(copy);
+      if(story){
+        const targetId='daily-story-'+String(index+1);
+        card.classList.add('is-jumpable');
+        card.tabIndex=0;
+        card.setAttribute('role','link');
+        card.setAttribute('aria-label','前往詳細主題：'+rawTitle);
+        const jump=()=>{
+          const target=document.getElementById(targetId);
+          if(target){
+            history.replaceState(null,'','#'+targetId);
+            target.scrollIntoView({behavior:'smooth',block:'start'});
+          }
+        };
+        card.addEventListener('click',event=>{
+          if(event.target.closest('a,button,summary,details'))return;
+          jump();
+        });
+        card.addEventListener('keydown',event=>{
+          if(event.key==='Enter'||event.key===' '){
+            event.preventDefault();
+            jump();
+          }
+        });
+      }
       grid.append(card);
     });
+    applyOverviewLayout(grid,'auto',highlights);
+    const lab=overviewLayoutLab(wrap,grid,highlights);
+    if(lab)wrap.append(lab);
     wrap.append(grid);
   }
   target.append(wrap);
@@ -197,10 +485,15 @@ function renderStories(target,artifact,byId){
   if(!stories.length)return;
   const wrap=section('今日主題','daily-stories','editorial');
   const list=el('div','daily-story-list');
+  let previousVisualLayout='';
   stories.forEach((story,index)=>{
     const layout=publicLayout(story,storyAutoLayout(story,index));
     const card=el('article','daily-story-card');
     card.dataset.layout=layout;
+    card.id='daily-story-'+String(index+1);
+    const visibleIds=storyVisibleIds(story.video_ids,byId);
+    card.dataset.streamCount=String(visibleIds.length);
+    if(visibleIds.length<=2)card.classList.add('is-feature-story');
 
     const eyebrow=el('div','daily-story-eyebrow');
     const members=Array.isArray(story.member_names)?story.member_names.map(publicText).filter(Boolean):[];
@@ -208,7 +501,7 @@ function renderStories(target,artifact,byId){
     if(members.length)eyebrow.append(el('span','',members.slice(0,3).join('・')+(members.length>3?' 等':'')));
     card.append(eyebrow);
 
-    const headline=publicText(story.short_title)||shortHeadline(story.title,layout==='lead'?50:42);
+    const headline=publicText(story.title)||publicText(story.short_title);
     if(headline)card.append(el('h3','daily-story-title',headline));
 
     const summary=publicText(story.public_summary||story.summary);
@@ -217,55 +510,19 @@ function renderStories(target,artifact,byId){
       appendParagraphs(copy,summary,'daily-story-summary');
       card.append(copy);
     }
-    const visual=storyVisual(story.video_ids,byId);
-    if(visual)card.append(visual);
-
-    const subs=Array.isArray(story.sub_events)?story.sub_events:[];
-    if(subs.length){
-      const subWrap=el('div','daily-sub-events');
-      const visible=layout==='lead'?3:2;
-      subs.slice(0,visible).forEach(sub=>{
-        const item=el('details','daily-sub-event');
-        const head=el('summary','daily-sub-event-head');
-        const firstVideo=(Array.isArray(sub.video_ids)?sub.video_ids:[]).find(id=>byId.has(String(id)));
-        if(firstVideo){
-          const img=el('img');img.src=thumbnailUrl(String(firstVideo));img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';head.append(img);
-        }
-        const headCopy=el('span','daily-sub-event-head-copy');
-        if(publicText(sub.title))headCopy.append(el('h4','',shortHeadline(sub.short_title||sub.title,38)));
-        if(publicText(sub.summary))headCopy.append(el('p','',clampText(sub.summary,120)));
-        head.append(headCopy);
-        item.append(head);
-        const detail=el('div','daily-sub-event-detail');
-        if(publicText(sub.summary))appendParagraphs(detail,sub.summary,'');
-        appendReferences(detail,sub.video_ids,byId,{label:'相關直播'});
-        item.append(detail);
-        subWrap.append(item);
-      });
-      if(subs.length>visible){
-        const more=el('details','daily-sub-more');
-        more.append(el('summary','','展開更多整理（'+String(subs.length-visible)+'）'));
-        subs.slice(visible).forEach(sub=>{
-          const item=el('details','daily-sub-event');
-          const head=el('summary','daily-sub-event-head');
-          const firstVideo=(Array.isArray(sub.video_ids)?sub.video_ids:[]).find(id=>byId.has(String(id)));
-          if(firstVideo){
-            const img=el('img');img.src=thumbnailUrl(String(firstVideo));img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';head.append(img);
-          }
-          const headCopy=el('span','daily-sub-event-head-copy');
-          if(publicText(sub.title))headCopy.append(el('h4','',shortHeadline(sub.title,38)));
-          if(publicText(sub.summary))headCopy.append(el('p','',clampText(sub.summary,120)));
-          head.append(headCopy);item.append(head);
-          const detail=el('div','daily-sub-event-detail');
-          if(publicText(sub.summary))appendParagraphs(detail,sub.summary,'');
-          appendReferences(detail,sub.video_ids,byId,{label:'相關直播'});
-          item.append(detail);more.append(item);
-        });
-        subWrap.append(more);
+    const detailRail=storyDetailRail(story.video_ids,byId);
+    const visualLayout=storyVisualLayout(visibleIds.length,index,previousVisualLayout,story);
+    previousVisualLayout=visualLayout;
+    const visual=storyVisual(story.video_ids,byId,{
+      layout:visualLayout,
+      onSelect:(videoId)=>{
+        if(detailRail)detailRail.selectVideo(videoId,{open:true});
       }
-      card.append(subWrap);
-    }
-    appendReferences(card,story.video_ids,byId,{label:'這個主題用到的直播'});
+    });
+    if(visual)card.append(visual);
+    if(detailRail)card.append(detailRail);
+    const allIds=[...new Set((Array.isArray(story.video_ids)?story.video_ids:[]).map(String).filter(id=>byId.has(id)))];
+    if(allIds.length>9)appendReferences(card,allIds.slice(9),byId,{label:'更多相關直播'});
     list.append(card);
   });
   wrap.append(list);target.append(wrap);
@@ -281,7 +538,7 @@ function renderAnnouncements(target,artifact,byId){
     when.append(el('span','daily-announcement-type',publicTypeLabel(row.type)));
     if(publicText(row.event_date_text))when.append(el('time','',publicText(row.event_date_text)));
     card.append(when);
-    if(publicText(row.title))card.append(el('h3','',shortHeadline(row.short_title||row.title,44)));
+    if(publicText(row.title))card.append(el('h3','',publicText(row.title)));
     if(publicText(row.summary))card.append(el('p','',publicText(row.summary)));
     appendReferences(card,row.video_ids,byId,{label:'來源直播'});
     timeline.append(card);
@@ -292,31 +549,57 @@ function renderCategories(target,artifact,byId){
   const rows=(Array.isArray(artifact?.categories)?artifact.categories:[])
     .filter(row=>text(row?.key)!=='unverified_streams');
   if(!rows.length)return;
-  const wrap=section('依內容瀏覽','daily-categories','chips');
-  wrap.append(el('p','daily-category-intro','從主題切入，需要時再展開相關直播；不再把全部直播重複鋪滿整頁。'));
-  const chips=el('div','daily-category-chips');
+  const wrap=section('依內容瀏覽','daily-categories','list');
+  wrap.append(el('p','daily-category-intro','從主題切入，需要時再展開相關直播。'));
   const panels=el('div','daily-category-panels');
+
   rows.forEach((row,index)=>{
     const ids=[...new Set((Array.isArray(row.video_ids)?row.video_ids:[]).map(String).filter(id=>byId.has(id)))];
     if(!ids.length)return;
-    const id='daily-category-'+String(index);
-    const button=el('button','daily-category-chip',shortHeadline(row.label||row.key,30));
-    button.type='button';
-    button.append(el('span','',String(ids.length)));
-    button.addEventListener('click',()=>{
-      const panel=document.getElementById(id);
-      if(panel){panel.open=!panel.open;if(panel.open)panel.scrollIntoView({behavior:'smooth',block:'nearest'})}
-    });
-    chips.append(button);
 
     const panel=el('details','daily-category');
-    panel.id=id;
+    panel.id='daily-category-'+String(index);
     panel.append(el('summary','',publicText(row.label)||'分類'));
-    const refs=el('div','daily-stream-refs');
-    ids.forEach(videoId=>refs.append(streamReference(videoId,byId)));
-    panel.append(refs);panels.append(panel);
+
+    const body=el('div','daily-category-body');
+    const refs=el('div','daily-stream-refs daily-category-stream-refs');
+    refs.dataset.openState='closed';
+
+    const setGroupOpen=(open)=>{
+      refs.dataset.openState=open?'open':'closed';
+      refs.querySelectorAll('.daily-stream-ref').forEach(node=>{node.open=open});
+    };
+
+    ids.forEach(videoId=>{
+      const card=streamReference(videoId,byId);
+      const summary=card.querySelector('summary');
+      if(summary){
+        summary.addEventListener('click',event=>{
+          event.preventDefault();
+          setGroupOpen(refs.dataset.openState!=='open');
+        });
+      }
+      refs.append(card);
+    });
+
+    const controls=el('div','daily-category-controls');
+    const prev=el('button','daily-category-arrow','←');
+    const next=el('button','daily-category-arrow','→');
+    prev.type='button';next.type='button';
+    prev.setAttribute('aria-label','上一組分類直播卡片');
+    next.setAttribute('aria-label','下一組分類直播卡片');
+    const step=()=>Math.max(refs.clientWidth*.92,300);
+    prev.addEventListener('click',()=>refs.scrollBy({left:-step(),behavior:'smooth'}));
+    next.addEventListener('click',()=>refs.scrollBy({left:step(),behavior:'smooth'}));
+    controls.append(prev,next);
+
+    body.append(refs,controls);
+    panel.append(body);
+    panels.append(panel);
   });
-  wrap.append(chips,panels);target.append(wrap);
+
+  wrap.append(panels);
+  target.append(wrap);
 }
 function renderUnverified(target,artifact,byId){
   const debug=new URLSearchParams(location.search).get('debug')==='1';
@@ -338,7 +621,7 @@ function renderArtifact(target,artifact){
   target.replaceChildren();
   const byId=streamMap(artifact);
   renderCoverage(target,artifact);
-  renderOverview(target,artifact);
+  renderOverview(target,artifact,byId);
   renderStories(target,artifact,byId);
   renderAnnouncements(target,artifact,byId);
   renderCategories(target,artifact,byId);
