@@ -71,15 +71,15 @@ function storyVisualLayout(count,index,previous='',story=null){
   const pools={
     1:['feature-single','feature-single-wide','feature-single-editorial'],
     2:['feature-duo','feature-duo-split','feature-duo-stack'],
-    3:['triptych','lead-two','feature-three'],
-    4:['quad','lead-three','feature-four'],
-    5:['three-two','lead-four','feature-five'],
-    6:['mosaic-carousel','mosaic-hero','mosaic-staggered'],
-    7:['mosaic-carousel','mosaic-hero','mosaic-staggered'],
-    8:['mosaic-carousel','mosaic-hero','mosaic-staggered'],
-    9:['mosaic-carousel','mosaic-hero','mosaic-staggered']
+    3:['triptych','lead-two'],
+    4:['quad','lead-three'],
+    5:['three-two','lead-four'],
+    6:['mosaic-carousel','mosaic-hero'],
+    7:['mosaic-carousel','mosaic-hero'],
+    8:['mosaic-carousel','mosaic-hero'],
+    9:['mosaic-carousel','mosaic-hero']
   };
-  const pool=pools[count]||['mosaic-carousel','mosaic-hero','mosaic-staggered'];
+  const pool=pools[count]||['mosaic-carousel','mosaic-hero'];
   const titleLength=publicText(story?.title||story?.short_title).length;
   const summaryLength=publicText(story?.public_summary||story?.summary).length;
   let seed=(index+titleLength+summaryLength)%pool.length;
@@ -340,42 +340,54 @@ function applyOverviewLayout(grid,mode,highlights){
     card.dataset.titleLength=String(overviewCardTitle(highlights[index]||'').length);
   });
 }
+function overviewSentences(value){
+  const raw=publicText(value);
+  return raw.match(/[^。！？!?]+[。！？!?]?/g)?.map(item=>item.trim()).filter(Boolean)||[];
+}
 function balanceOverviewColumns(flow){
   if(!flow)return;
-  const paragraphs=[...flow.querySelectorAll('.daily-overview-summary')];
-  if(paragraphs.length<2)return;
+  const original=flow.dataset.originalText||[...flow.querySelectorAll('.daily-overview-summary')].map(node=>publicText(node.textContent)).join('');
+  if(!original)return;
+  flow.dataset.originalText=original;
+
+  const sentences=overviewSentences(original);
+  if(sentences.length<2)return;
 
   const probe=el('div','daily-overview-column-probe');
   probe.setAttribute('aria-hidden','true');
+  const leftProbe=el('div','daily-overview-column');
+  const rightProbe=el('div','daily-overview-column');
+  probe.append(leftProbe,rightProbe);
   flow.append(probe);
 
-  const heights=paragraphs.map(node=>{
-    const clone=node.cloneNode(true);
-    probe.replaceChildren(clone);
-    return clone.getBoundingClientRect().height;
-  });
-  probe.remove();
-
-  const total=heights.reduce((sum,n)=>sum+n,0);
-  let bestIndex=1,bestDiff=Infinity,left=0;
-  for(let index=1;index<paragraphs.length;index++){
-    left+=heights[index-1];
-    const right=total-left;
-    const diff=Math.abs(left-right);
-    if(diff<bestDiff){bestDiff=diff;bestIndex=index}
+  let bestIndex=1;
+  let bestDiff=Infinity;
+  for(let index=1;index<sentences.length;index++){
+    leftProbe.replaceChildren(el('p','daily-overview-summary',sentences.slice(0,index).join('')));
+    rightProbe.replaceChildren(el('p','daily-overview-summary',sentences.slice(index).join('')));
+    const leftHeight=leftProbe.getBoundingClientRect().height;
+    const rightHeight=rightProbe.getBoundingClientRect().height;
+    const diff=Math.abs(leftHeight-rightHeight);
+    if(diff<bestDiff){
+      bestDiff=diff;
+      bestIndex=index;
+    }
   }
+  probe.remove();
 
   const leftCol=el('div','daily-overview-column daily-overview-column-left');
   const rightCol=el('div','daily-overview-column daily-overview-column-right');
-  paragraphs.forEach((node,index)=>(index<bestIndex?leftCol:rightCol).append(node));
+  leftCol.append(el('p','daily-overview-summary',sentences.slice(0,bestIndex).join('')));
+  rightCol.append(el('p','daily-overview-summary',sentences.slice(bestIndex).join('')));
   flow.replaceChildren(leftCol,rightCol);
 }
 function restoreOverviewFlow(flow){
   if(!flow)return;
-  const columns=[...flow.querySelectorAll('.daily-overview-column')];
-  if(!columns.length)return;
-  const paragraphs=columns.flatMap(column=>[...column.querySelectorAll('.daily-overview-summary')]);
-  flow.replaceChildren(...paragraphs);
+  const original=flow.dataset.originalText||[...flow.querySelectorAll('.daily-overview-summary')].map(node=>publicText(node.textContent)).join('');
+  if(!original)return;
+  flow.dataset.originalText=original;
+  flow.replaceChildren();
+  appendParagraphs(flow,original,'daily-overview-summary');
 }
 function applyOverviewCopyLayout(wrap,mode){
   wrap.dataset.copyLayout=mode;
