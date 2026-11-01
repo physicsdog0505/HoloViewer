@@ -881,3 +881,34 @@ html{scroll-behavior:smooth}
 @media(max-width:760px){
   .daily-story-detail-rail{grid-auto-columns:86vw}
 }
+
+
+/* Owner review V3.9 — intro column mode uses one continuous reading flow. */
+.daily-overview-summary-flow{
+  max-width:920px
+}
+.daily-overview[data-copy-layout="left"] .daily-overview-summary-flow{
+  margin-left:0;
+  margin-right:auto
+}
+.daily-overview[data-copy-layout="center"] .daily-overview-summary-flow{
+  margin-left:auto;
+  margin-right:auto
+}
+.daily-overview[data-copy-layout="right"] .daily-overview-summary-flow{
+  margin-left:auto;
+  margin-right:0
+}
+.daily-overview[data-copy-layout="columns"] .daily-overview-summary-flow{
+  max-width:none;
+  column-count:2;
+  column-gap:36px;
+  column-fill:balance;
+  text-align:left
+}
+.daily-overview[data-copy-layout="columns"] .daily-overview-summary{
+  max-width:none;
+  margin:0 0 14px;
+  column-count:auto;
+  break-inside:avoid
+}
