@@ -832,3 +832,15 @@ html{scroll-behavior:smooth}
   }
   .daily-story-detail-rail{grid-auto-columns:86vw}
 }
+
+
+/* Owner review V3.7 — detailed story copy uses the full reading width. */
+.daily-story-card .daily-story-title,
+.daily-story-card[data-layout="lead"] .daily-story-title{
+  max-width:none
+}
+.daily-story-summary,
+.daily-story-card[data-layout="lead"] .daily-story-summary,
+.daily-story-summary-block{
+  max-width:none
+}
