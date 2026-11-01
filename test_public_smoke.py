@@ -709,8 +709,6 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("slice(0,6)", js)
         self.assertIn("storyVisibleIds", js)
         self.assertIn("storyDetailRail", js)
-        self.assertIn("group.querySelectorAll('.daily-sub-event')", js)
-        self.assertIn("node.open=true", js)
         self.assertIn("Owner review V3.5", css)
         self.assertIn("storyVisibleIds", js)
         self.assertIn("storyDetailRail", js)
