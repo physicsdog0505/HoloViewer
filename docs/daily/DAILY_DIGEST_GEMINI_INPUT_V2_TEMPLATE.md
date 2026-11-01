@@ -61,6 +61,28 @@ Gemini **不負責**：
 
 `presentation_hint` 只能是 `compact | rail | lead` 的建議。後續 Holodocchi normalizer 會驗證並決定 authoritative `overview_layout`。
 
+## 固定情報／固定雜談／固定廣播
+
+固定週期節目要視為高價值資訊來源，不得因為只有一支影片或標題含「雜談」就寫成薄摘要。
+
+已知 aliases：
+- `#朝こよ` / 朝こよ → `regular_news`, `summary_depth=deep`
+- `#朝ミオ` / 朝ミオ → `recurring_zatsudan`, `summary_depth=deep`
+- おはスバ / おはすば → `recurring_zatsudan`, `summary_depth=deep`
+- `#朝ガオ` → `recurring_zatsudan`, `summary_depth=deep`
+- `#ねるまえらじお` → `recurring_radio`, `summary_depth=deep`
+- アキちょこナイトパレット → `recurring_radio`, `summary_depth=deep`
+- holoAN room / `#昼ホロ` → `regular_news`, `summary_depth=deep`（僅當它已存在於 Stream List 時處理）
+
+deep treatment：
+- 整理成 3–7 個 semantic beats，不要寫成逐字稿流水帳。
+- 優先保留一週近況、工作／活動幕後、成員互動、生活近況中有後續價值的資訊、重要趣聞、公告、日期與下一步行程。
+- 情報節目要特別保留官方消息、作品／活動發表、固定情報單元與後續追蹤點。
+- 若主要資訊可在 story 主文中完整承載，優先 `reader_mode=inline`。
+- 單一 video 也可以是高 importance 的 story。
+
+可輸出 `recurring_program_id`、`program_type`、`summary_depth` 作為 editorial metadata。
+
 ## 今日概覽 overview
 
 `overview.public_summary`：
@@ -94,9 +116,10 @@ Stories 是跨直播／跨視角後的主要 editorial units，不是每支直�
 - `rank`：1 起算的 editorial order；
 - `title`：完整 detailed story 標題，禁止為卡片寬度破壞性截短；
 - `short_title`：optional overview/navigation 用短標題；
-- `editorial_summary`：主要 detailed-reader 主文。請把你已研究到、對讀者有價值的跨直播資訊完整整併進來，target 約 320–760 CJK characters，通常 2–5 個 semantic beats；事件本身簡單時可更短；
+- `editorial_summary`：主要 detailed-reader 主文。一般 story target 約 320–760 CJK；`summary_depth=deep` 可約 500–1200 CJK、通常 3–7 個 semantic beats；事件本身簡單時可更短；
 - `public_summary`：optional 較短版本／migration fallback，不應取代 `editorial_summary` 的資訊深度；
 - `reader_mode`：`inline | summary_with_details`；
+- `recurring_program_id` / `program_type` / `summary_depth`：optional editorial metadata；
 - `video_ids`：ordered supporting evidence，至少 1 筆；
 - `member_names`：相關成員；
 - `sub_events`：需要時才拆分，必須是 parent story 的子集合；
