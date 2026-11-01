@@ -67,21 +67,24 @@ function appendParagraphs(parent,value,className){
   const chunks=paragraphChunks(value);
   chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
 }
-function storyVisualLayout(count,index,previous=''){
+function storyVisualLayout(count,index,previous='',story=null){
   const pools={
-    1:['feature-single'],
-    2:['feature-duo'],
-    3:['triptych','lead-two'],
-    4:['quad','lead-three'],
-    5:['three-two','lead-four'],
-    6:['mosaic-carousel'],
-    7:['mosaic-carousel'],
-    8:['mosaic-carousel'],
-    9:['mosaic-carousel']
+    1:['feature-single','feature-single-wide','feature-single-editorial'],
+    2:['feature-duo','feature-duo-split','feature-duo-stack'],
+    3:['triptych','lead-two','feature-three'],
+    4:['quad','lead-three','feature-four'],
+    5:['three-two','lead-four','feature-five'],
+    6:['mosaic-carousel','mosaic-hero','mosaic-staggered'],
+    7:['mosaic-carousel','mosaic-hero','mosaic-staggered'],
+    8:['mosaic-carousel','mosaic-hero','mosaic-staggered'],
+    9:['mosaic-carousel','mosaic-hero','mosaic-staggered']
   };
-  const pool=pools[count]||['mosaic-carousel'];
-  let variant=pool[index%pool.length];
-  if(pool.length>1&&variant===previous)variant=pool[(index+1)%pool.length];
+  const pool=pools[count]||['mosaic-carousel','mosaic-hero','mosaic-staggered'];
+  const titleLength=publicText(story?.title||story?.short_title).length;
+  const summaryLength=publicText(story?.public_summary||story?.summary).length;
+  let seed=(index+titleLength+summaryLength)%pool.length;
+  let variant=pool[seed];
+  if(pool.length>1&&variant===previous)variant=pool[(seed+1)%pool.length];
   return variant;
 }
 function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
@@ -542,7 +545,7 @@ function renderStories(target,artifact,byId){
       card.append(copy);
     }
     const detailRail=storyDetailRail(story.video_ids,byId);
-    const visualLayout=storyVisualLayout(visibleIds.length,index,previousVisualLayout);
+    const visualLayout=storyVisualLayout(visibleIds.length,index,previousVisualLayout,story);
     previousVisualLayout=visualLayout;
     const visual=storyVisual(story.video_ids,byId,{
       layout:visualLayout,
