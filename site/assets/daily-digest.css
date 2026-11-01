@@ -912,3 +912,26 @@ html{scroll-behavior:smooth}
   column-count:auto;
   break-inside:avoid
 }
+
+
+/* Owner review V3.10 — balanced explicit two-column intro. */
+.daily-overview[data-copy-layout="columns"] .daily-overview-summary-flow{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:36px;
+  column-count:auto;
+  column-gap:0;
+  column-fill:auto
+}
+.daily-overview[data-copy-layout="columns"] .daily-overview-column{
+  min-width:0
+}
+.daily-overview[data-copy-layout="columns"] .daily-overview-column .daily-overview-summary{
+  margin:0 0 14px;
+  break-inside:auto
+}
+@media(max-width:760px){
+  .daily-overview[data-copy-layout="columns"] .daily-overview-summary-flow{
+    display:block
+  }
+}
