@@ -697,3 +697,21 @@ h3.daily-digest-title{margin:0}
     column-count:1
   }
 }
+
+
+/* Owner review V3.4 — overview → detailed story navigation. */
+.daily-highlight-jump{
+  display:inline-flex;
+  margin-top:12px;
+  font-size:12px;
+  font-weight:900;
+  color:var(--brand-main);
+  text-decoration:none
+}
+.daily-highlight-jump:hover{text-decoration:underline}
+.daily-story-card{scroll-margin-top:88px}
+.daily-story-card:target{
+  outline:2px solid color-mix(in srgb,var(--brand-main) 48%,transparent);
+  outline-offset:4px
+}
+html{scroll-behavior:smooth}
