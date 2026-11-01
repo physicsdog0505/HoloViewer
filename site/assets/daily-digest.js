@@ -68,7 +68,7 @@ function appendParagraphs(parent,value,className){
   chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
 }
 function storyVisual(videoIds,byId){
-  const ids=[...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))];
+  const ids=[...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,6);
   if(!ids.length)return null;
   const visual=el('div','daily-story-visual');
   visual.dataset.count=String(ids.length);
@@ -155,6 +155,16 @@ function streamReference(videoId,byId){
   }
   details.append(body);
   return details;
+}
+function storyVisibleIds(videoIds,byId){
+  return [...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,6);
+}
+function storyDetailRail(ids,byId){
+  const visible=storyVisibleIds(ids,byId);
+  if(!visible.length)return null;
+  const rail=el('div','daily-story-detail-rail');
+  visible.forEach(id=>rail.append(streamReference(id,byId)));
+  return rail;
 }
 function appendReferences(parent,ids,byId,{label='相關直播'}={}){
   const valid=[...new Set((Array.isArray(ids)?ids:[]).map(String).filter(id=>byId.has(id)))];
@@ -394,7 +404,10 @@ function renderStories(target,artifact,byId){
       }
       card.append(subWrap);
     }
-    appendReferences(card,story.video_ids,byId,{label:'這個主題用到的直播'});
+    const detailRail=storyDetailRail(story.video_ids,byId);
+    if(detailRail)card.append(detailRail);
+    const allIds=[...new Set((Array.isArray(story.video_ids)?story.video_ids:[]).map(String).filter(id=>byId.has(id)))];
+    if(allIds.length>6)appendReferences(card,allIds.slice(6),byId,{label:'更多相關直播'});
     list.append(card);
   });
   wrap.append(list);target.append(wrap);
