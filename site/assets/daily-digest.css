@@ -1565,3 +1565,48 @@ html{scroll-behavior:smooth}
 .daily-overview-column-probe .daily-overview-column{
   min-width:0
 }
+
+
+/* Owner review V3.24 — restore full hero + four-up strip without orphan rows. */
+.daily-story-visual[data-visual-layout="hero-full-carousel"]{
+  display:grid;
+  grid-template-columns:repeat(12,minmax(0,1fr));
+  gap:10px;
+  min-height:0
+}
+.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[hidden]{
+  display:none!important
+}
+.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="1"]{
+  grid-column:1/-1;
+  grid-row:auto;
+  width:100%;
+  aspect-ratio:16/9;
+  min-height:0
+}
+.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="2"],
+.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="3"],
+.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="4"],
+.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="5"]{
+  grid-column:span 3;
+  grid-row:auto;
+  aspect-ratio:16/9;
+  min-height:0
+}
+.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item img{
+  object-fit:contain!important;
+  object-position:50% 50%!important
+}
+@media(max-width:900px){
+  .daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="2"],
+  .daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="3"],
+  .daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="4"],
+  .daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="5"]{
+    grid-column:span 6
+  }
+}
+@media(max-width:620px){
+  .daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot]{
+    grid-column:1/-1
+  }
+}
