@@ -1,0 +1,8 @@
+{
+  "name": "holoviewer-daily-digest-static-assets",
+  "compatibility_date": "2026-11-02",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../daily-digest-static"
+  }
+}
