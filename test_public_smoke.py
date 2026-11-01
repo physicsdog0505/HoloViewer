@@ -16,6 +16,14 @@ EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md",
 
 EXPECTED.add("docs/handoffs/PRODUCTION_COORDINATOR_HANDOFF_20261030.md")
 EXPECTED.update({
+    "cloudflare/daily-digest-static-assets.wrangler.json",
+    "daily-digest-static/_headers",
+    "daily-digest-static/data/daily-digest/months/.gitkeep",
+    "scripts/daily_digest_monthly_publish.py",
+    "scripts/deploy_daily_digest_static_assets_owner_local.sh",
+    "test_daily_digest_monthly_publish.py",
+})
+EXPECTED.update({
     "cloudflare/vod-subtitle-static-assets.wrangler.json",
     "docs/VOD_SUBTITLE_STATIC_ASSETS.md",
     "scripts/deploy_vod_subtitle_static_assets_owner_local.sh",
@@ -773,29 +781,28 @@ class PublicSmokeTests(unittest.TestCase):
         js = (ROOT / "site/assets/daily-digest.js").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/daily-digest.css").read_text(encoding="utf-8")
         config = (ROOT / "site/assets/config.js").read_text(encoding="utf-8")
-        self.assertIn('id="home-daily-digest"', html)
         self.assertIn('href="/daily/"', html)
+        self.assertIn('id="home-daily-digest"', html)
         self.assertIn('src="assets/daily-digest.js"', html)
         self.assertIn('id="daily-digest-page"', daily_html)
         self.assertIn('src="/assets/daily-digest.js"', daily_html)
-        self.assertIn("const SCHEMA='holodocchi.daily_digest.v1';", js)
+        self.assertIn("const SCHEMA_VERSION=1;", js)
+        self.assertIn("const KIND='holodocchi.daily_digest';", js)
         self.assertIn("const TAIPEI='Asia/Taipei';", js)
-        self.assertIn("if(!base||!template||!DATE_RE.test(day))return '';", js)
+        self.assertIn("const month=day.slice(0,7);", js)
+        self.assertIn(".replaceAll('{month}',encodeURIComponent(month))", js)
+        self.assertIn("payload?.kind==='holodocchi.daily_digest_month'", js)
+        self.assertIn("artifact=payload.days[day]||null;", js)
+        self.assertIn("reason:'day_not_in_month'", js)
         self.assertIn("if(response.status===404)return {state:'MISSING'", js)
-        self.assertIn("if(state!=='READY'&&state!=='PARTIAL')", js)
-        self.assertIn("section.items.forEach(item=>", js)
-        self.assertNotIn(".sort(", js)
         self.assertNotIn("Gemini", js)
         self.assertNotIn("fetch('https://www.googleapis.com", js)
         self.assertNotIn("innerHTML", js)
         self.assertIn("credentials:'omit'", js)
-        self.assertIn("cache:day===taipeiDay()?'no-cache':'force-cache'", js)
-        self.assertIn("item?.concurrent_viewers", js)
-        self.assertIn("itemState(item)==='live'", js)
         self.assertIn("grid-template-columns:minmax(0,1fr)", css)
         self.assertIn('dailyDigest: Object.freeze({', config)
-        self.assertIn('base: ""', config)
-        self.assertIn('pathTemplate: ""', config)
+        self.assertIn('base: "https://holoviewer-daily-digest-static-assets.singlebagel.workers.dev"', config)
+        self.assertIn('pathTemplate: "/data/daily-digest/months/{month}.json"', config)
 
     def test_home_live_hover_preview_contract(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
@@ -822,7 +829,7 @@ class PublicSmokeTests(unittest.TestCase):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
         self.assertIn("img-src 'self' data: https:;", headers)
-        for directive in ("default-src 'none'", "script-src 'self'", "connect-src 'self' https://holoviewer-public-api.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev", "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
+        for directive in ("default-src 'none'", "script-src 'self'", "connect-src 'self' https://holoviewer-public-api.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev", "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev", "https://holoviewer-daily-digest-static-assets.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
             self.assertIn(directive, headers)
         self.assertNotIn("'unsafe-inline'", headers)
         self.assertNotIn("'unsafe-eval'", headers)
