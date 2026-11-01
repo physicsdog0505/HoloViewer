@@ -312,9 +312,6 @@ h3.daily-digest-title{margin:0}
   position:relative;margin:0;min-width:0;overflow:hidden;border-radius:18px;
   background:var(--surface-2);aspect-ratio:16/9
 }
-.daily-story-visual-item[data-slot="2"],
-.daily-story-visual-item[data-slot="3"]{aspect-ratio:auto}
-.daily-story-visual-item img{width:100%;height:100%;object-fit:cover;display:block}
 .daily-story-visual-item figcaption{
   position:absolute;left:8px;right:8px;bottom:8px;padding:5px 7px;border-radius:8px;
   background:rgba(20,18,17,.72);color:white;font-size:10px;white-space:nowrap;
@@ -1013,13 +1010,6 @@ html{scroll-behavior:smooth}
   background:var(--surface-2);
   aspect-ratio:16/9
 }
-.daily-story-visual-item img{
-  width:100%;
-  height:100%;
-  display:block;
-  object-fit:cover;
-  object-position:50% 50%
-}
 .daily-story-visual-item[data-crop="upper"] img{object-position:50% 38%}
 .daily-story-visual-item[data-crop="left"] img{object-position:38% 50%}
 .daily-story-visual-item[data-crop="right"] img{object-position:62% 50%}
@@ -1285,13 +1275,23 @@ html{scroll-behavior:smooth}
 }
 
 
-/* Owner review V3.19 — preserve complete YouTube thumbnail framing. */
-.daily-story-visual-item{
+/* Canonical story-media contract — layout may change placement, never thumbnail ratio. */
+.daily-story-visual-item,
+.daily-story-visual-item[data-slot]{
+  position:relative;
+  min-width:0;
+  min-height:0;
+  height:auto;
+  aspect-ratio:16/9;
+  overflow:hidden;
   background:color-mix(in srgb,var(--surface-2) 82%,#111)
 }
 .daily-story-visual-item img{
+  display:block;
+  width:100%;
+  height:100%;
   object-fit:contain!important;
-  object-position:50% 50%!important;
+  object-position:center!important;
   background:inherit
 }
 /* Keep highlight/detail thumbnails conservative too. */
@@ -1381,12 +1381,26 @@ html{scroll-behavior:smooth}
 .daily-story-card.is-feature-story .daily-story-summary-block{
   grid-area:summary;
   margin:0;
-  max-width:none
+  max-width:none;
+  align-self:start
 }
 .daily-story-card.is-feature-story .daily-story-visual-shell{
   grid-area:visual;
   margin:0;
-  align-self:start
+  align-self:start;
+  height:max-content;
+  min-height:0
+}
+.daily-story-card.is-feature-story .daily-story-visual{
+  align-self:start;
+  height:max-content;
+  min-height:0
+}
+.daily-story-card.is-feature-story .daily-story-visual-item{
+  align-self:start;
+  height:auto!important;
+  min-height:0!important;
+  aspect-ratio:16/9!important
 }
 .daily-story-card.is-feature-story .daily-story-detail-shell{
   grid-area:detail;
