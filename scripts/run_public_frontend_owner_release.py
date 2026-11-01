@@ -17,7 +17,7 @@ CUSTOM_ORIGIN = "https://holodocchi.com"
 WORKERS_ORIGIN = "https://holoviewer-public.singlebagel.workers.dev"
 WORKER_NAME = "holoviewer-public"
 WRANGLER_CONFIG = "cloudflare/wrangler.json"
-FOREIGN_PREFIXES = ("youtube/v1/", "ptt/v1/", "data/watchalong/")
+FOREIGN_PREFIXES = ("youtube/v1/", "ptt/v1/", "data/watchalong/", "data/daily-digest/")
 PROTECTED_RUNTIME_PREFIXES = ("data/search/aliases/",)
 SKIP_REMOTE = {"_headers", "_redirects"}
 
