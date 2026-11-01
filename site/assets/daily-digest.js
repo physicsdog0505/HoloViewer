@@ -180,6 +180,52 @@ function renderCoverage(target,artifact){
   bar.append(el('strong','',String(total)+' 場直播'));
   target.append(bar);
 }
+function overviewLayoutLabEnabled(){
+  return new URLSearchParams(location.search).get('layoutlab')==='1';
+}
+function overviewCardTitle(item){
+  const parts=publicText(item).split(/[：:]/);
+  return publicText(parts[0]||item);
+}
+function overviewAutoLayout(highlights){
+  const lengths=highlights.slice(0,5).map(item=>overviewCardTitle(item).length);
+  const longCount=lengths.filter(length=>length>32).length;
+  const veryLong=lengths.some(length=>length>42);
+  if(veryLong||longCount>=2)return 'adaptive';
+  return 'compact';
+}
+function applyOverviewLayout(grid,mode,highlights){
+  const resolved=mode==='auto'?overviewAutoLayout(highlights):mode;
+  grid.dataset.layout=resolved;
+  grid.querySelectorAll('.daily-highlight-card').forEach((card,index)=>{
+    const titleLength=overviewCardTitle(highlights[index]||'').length;
+    card.dataset.titleLength=String(titleLength);
+    card.dataset.fit=titleLength>42?'xl':titleLength>32?'wide':'compact';
+  });
+}
+function overviewLayoutLab(grid,highlights){
+  if(!overviewLayoutLabEnabled())return null;
+  const lab=el('div','daily-layout-lab');
+  lab.append(el('span','daily-layout-lab-label','DEV LAYOUT LAB'));
+  const modes=[
+    ['auto','Auto Fit'],
+    ['compact','Compact Grid'],
+    ['rail','Wide Rail'],
+    ['lead','Lead + Grid']
+  ];
+  modes.forEach(([mode,label],index)=>{
+    const button=el('button','daily-layout-lab-tab',label);
+    button.type='button';
+    button.dataset.layout=mode;
+    if(index===0)button.classList.add('is-active');
+    button.addEventListener('click',()=>{
+      lab.querySelectorAll('.daily-layout-lab-tab').forEach(node=>node.classList.toggle('is-active',node===button));
+      applyOverviewLayout(grid,mode,highlights);
+    });
+    lab.append(button);
+  });
+  return lab;
+}
 function renderOverview(target,artifact,byId){
   const overview=artifact?.overview||{};
   const highlights=Array.isArray(overview.highlights)?overview.highlights.map(publicText).filter(Boolean):[];
@@ -209,12 +255,16 @@ function renderOverview(target,artifact,byId){
       }
       const copy=el('div','daily-highlight-copy');
       const parts=item.split(/[：:]/);
-      copy.append(el('h3','',shortHeadline(parts[0]||item,36)));
+      const rawTitle=publicText(parts[0]||item);
+      copy.append(el('h3','',shortHeadline(rawTitle,64)));
       const rest=parts.length>1?parts.slice(1).join('：'):item;
-      copy.append(el('p','',clampText(rest,150)));
+      copy.append(el('p','',clampText(rest,170)));
       card.append(copy);
       grid.append(card);
     });
+    applyOverviewLayout(grid,'auto',highlights);
+    const lab=overviewLayoutLab(grid,highlights);
+    if(lab)wrap.append(lab);
     wrap.append(grid);
   }
   target.append(wrap);
