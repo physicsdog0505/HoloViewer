@@ -222,6 +222,17 @@ def normalize_digest(payload: dict[str, Any]) -> NormalizeResult:
     out.pop("gemini_schema_version", None)
     out.pop("SCHEMA_VERSION", None)
 
+    target_day = _clean(out.get("target_day") or meta.get("target_day"))
+    timezone = _clean(out.get("timezone") or meta.get("timezone"))
+    if is_v2 and not target_day:
+        raise ContractError("meta.target_day/target_day is required")
+    if is_v2 and not timezone:
+        raise ContractError("meta.timezone/timezone is required")
+    if target_day:
+        out["target_day"] = target_day
+    if timezone:
+        out["timezone"] = timezone
+
     overview = out.get("overview")
     if not isinstance(overview, dict):
         raise ContractError("overview must be an object")
