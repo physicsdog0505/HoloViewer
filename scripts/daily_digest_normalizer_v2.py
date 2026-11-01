@@ -15,6 +15,7 @@ GEMINI_V2_SCHEMA = "holodocchi.gemini.daily_digest.v2"
 VALID_OVERVIEW_LAYOUTS = {"compact", "rail", "lead"}
 VALID_ROLES = {"lead_candidate", "secondary_candidate", "normal"}
 VALID_STORY_READER_MODES = {"inline", "summary_with_details"}
+VALID_SUMMARY_DEPTHS = {"deep", "standard", "brief"}
 
 SHORT_TITLE_TARGET_MIN = 12
 SHORT_TITLE_TARGET_MAX = 32
@@ -26,6 +27,7 @@ OVERVIEW_MIN = 260
 OVERVIEW_MAX = 520
 STORY_EDITORIAL_TARGET_MIN = 320
 STORY_EDITORIAL_MAX = 760
+STORY_EDITORIAL_DEEP_MAX = 1200
 
 
 class ContractError(ValueError):
@@ -177,14 +179,14 @@ def _normalize_highlight(item: Any, story: dict[str, Any] | None, *, legacy: boo
     }, warnings
 
 
-def _story_editorial_summary(story: dict[str, Any]) -> str:
+def _story_editorial_summary(story: dict[str, Any], *, maximum: int) -> str:
     explicit = _clean(story.get("editorial_summary"))
     if explicit:
-        return _truncate(explicit, STORY_EDITORIAL_MAX) if len(explicit) > STORY_EDITORIAL_MAX else explicit
+        return _truncate(explicit, maximum) if len(explicit) > maximum else explicit
 
     base = _clean(story.get("public_summary") or story.get("summary"))
-    if len(base) > STORY_EDITORIAL_MAX:
-        return _truncate(base, STORY_EDITORIAL_MAX)
+    if len(base) > maximum:
+        return _truncate(base, maximum)
     return base
 
 def _normalize_story(
@@ -211,7 +213,18 @@ def _normalize_story(
         out["public_summary"] = public_summary
 
     out["video_ids"] = _ordered_video_ids(out.get("video_ids"))
-    editorial_summary = _story_editorial_summary(out)
+
+    summary_depth = _clean(out.get("summary_depth")).lower()
+    if summary_depth:
+        if summary_depth not in VALID_SUMMARY_DEPTHS:
+            warnings.append(f"stories[{index}].summary_depth={summary_depth!r} normalized to standard")
+            summary_depth = "standard"
+    else:
+        summary_depth = "standard"
+    out["summary_depth"] = summary_depth
+
+    maximum = STORY_EDITORIAL_DEEP_MAX if summary_depth == "deep" else STORY_EDITORIAL_MAX
+    editorial_summary = _story_editorial_summary(out, maximum=maximum)
     if editorial_summary:
         out["editorial_summary"] = editorial_summary
 
