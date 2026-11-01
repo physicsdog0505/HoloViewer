@@ -260,8 +260,41 @@ function applyOverviewLayout(grid,mode,highlights){
     card.dataset.titleLength=String(overviewCardTitle(highlights[index]||'').length);
   });
 }
+function balanceOverviewColumns(flow){
+  if(!flow)return;
+  const paragraphs=[...flow.querySelectorAll('.daily-overview-summary')];
+  if(paragraphs.length<2)return;
+  const textLengths=paragraphs.map(node=>publicText(node.textContent).length);
+  const total=textLengths.reduce((sum,n)=>sum+n,0);
+  let bestIndex=1,bestDiff=Infinity,left=0;
+  for(let index=1;index<paragraphs.length;index++){
+    left+=textLengths[index-1];
+    const right=total-left;
+    const diff=Math.abs(left-right);
+    if(diff<bestDiff){bestDiff=diff;bestIndex=index}
+  }
+  const leftCol=el('div','daily-overview-column daily-overview-column-left');
+  const rightCol=el('div','daily-overview-column daily-overview-column-right');
+  paragraphs.forEach((node,index)=>(index<bestIndex?leftCol:rightCol).append(node));
+  flow.replaceChildren(leftCol,rightCol);
+}
+function restoreOverviewFlow(flow){
+  if(!flow)return;
+  const columns=[...flow.querySelectorAll('.daily-overview-column')];
+  if(!columns.length)return;
+  const paragraphs=columns.flatMap(column=>[...column.querySelectorAll('.daily-overview-summary')]);
+  flow.replaceChildren(...paragraphs);
+}
 function applyOverviewCopyLayout(wrap,mode){
   wrap.dataset.copyLayout=mode;
+  const flow=wrap.querySelector('.daily-overview-summary-flow');
+  if(!flow)return;
+  if(mode==='columns'){
+    restoreOverviewFlow(flow);
+    balanceOverviewColumns(flow);
+  }else{
+    restoreOverviewFlow(flow);
+  }
 }
 function overviewLayoutLab(wrap,grid,highlights){
   if(!overviewLayoutLabEnabled())return null;
