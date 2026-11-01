@@ -74,9 +74,12 @@ function storyVisualLayout(count,index,previous=''){
     3:['triptych','lead-two'],
     4:['quad','lead-three'],
     5:['three-two','lead-four'],
-    6:['six-grid','hero-left','hero-top','staggered']
+    6:['mosaic-carousel'],
+    7:['mosaic-carousel'],
+    8:['mosaic-carousel'],
+    9:['mosaic-carousel']
   };
-  const pool=pools[count]||['six-grid'];
+  const pool=pools[count]||['mosaic-carousel'];
   let variant=pool[index%pool.length];
   if(pool.length>1&&variant===previous)variant=pool[(index+1)%pool.length];
   return variant;
@@ -84,15 +87,19 @@ function storyVisualLayout(count,index,previous=''){
 function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
   const ids=storyVisibleIds(videoIds,byId);
   if(!ids.length)return null;
+
+  const shell=el('div','daily-story-visual-shell');
   const visual=el('div','daily-story-visual');
   visual.dataset.count=String(ids.length);
   visual.dataset.visualLayout=layout;
-  const cropCycle=['center','upper','left','right','center','upper'];
+  const cropCycle=['center','upper','left','right','center','upper','left','right','center'];
+
   ids.forEach((id,index)=>{
     const figure=el('figure','daily-story-visual-item');
     figure.dataset.slot=String(index+1);
     figure.dataset.videoId=id;
     figure.dataset.crop=cropCycle[index%cropCycle.length];
+    figure.dataset.page=String(Math.floor(index/5));
     if(onSelect){
       figure.classList.add('is-selectable');
       figure.tabIndex=0;
@@ -116,7 +123,31 @@ function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
     if(name)figure.append(el('figcaption','',name));
     visual.append(figure);
   });
-  return visual;
+
+  if(layout==='mosaic-carousel'&&ids.length>5){
+    let page=0;
+    const pages=Math.ceil(ids.length/5);
+    const applyPage=()=>{
+      visual.dataset.page=String(page);
+      visual.querySelectorAll('.daily-story-visual-item').forEach(node=>{
+        node.hidden=Number(node.dataset.page)!==page;
+      });
+    };
+    const controls=el('div','daily-story-visual-controls');
+    const prev=el('button','daily-story-visual-arrow','←');
+    const next=el('button','daily-story-visual-arrow','→');
+    prev.type='button';next.type='button';
+    prev.setAttribute('aria-label','上一組主題圖片');
+    next.setAttribute('aria-label','下一組主題圖片');
+    prev.addEventListener('click',()=>{page=(page-1+pages)%pages;applyPage()});
+    next.addEventListener('click',()=>{page=(page+1)%pages;applyPage()});
+    controls.append(prev,next);
+    shell.append(visual,controls);
+    applyPage();
+  }else{
+    shell.append(visual);
+  }
+  return shell;
 }
 function publicLayout(source,fallback){
   const requested=text(source?.layout_template||source?.display_template||source?.layout).toLowerCase();
@@ -192,7 +223,7 @@ function streamReference(videoId,byId){
   return details;
 }
 function storyVisibleIds(videoIds,byId){
-  return [...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,6);
+  return [...new Set((Array.isArray(videoIds)?videoIds:[]).map(String).filter(id=>byId.has(id)))].slice(0,9);
 }
 function storyDetailRail(ids,byId){
   const visible=storyVisibleIds(ids,byId);
@@ -511,7 +542,7 @@ function renderStories(target,artifact,byId){
     if(visual)card.append(visual);
     if(detailRail)card.append(detailRail);
     const allIds=[...new Set((Array.isArray(story.video_ids)?story.video_ids:[]).map(String).filter(id=>byId.has(id)))];
-    if(allIds.length>6)appendReferences(card,allIds.slice(6),byId,{label:'更多相關直播'});
+    if(allIds.length>9)appendReferences(card,allIds.slice(9),byId,{label:'更多相關直播'});
     list.append(card);
   });
   wrap.append(list);target.append(wrap);
