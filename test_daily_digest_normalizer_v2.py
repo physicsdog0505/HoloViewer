@@ -32,7 +32,11 @@ def v2_payload(hint="compact"):
             "editorial_signals": {"recommended_role": "lead_candidate" if i == 0 else "normal"},
         })
     return {
-        "schema": GEMINI_V2_SCHEMA,
+        "meta": {
+            "schema_version": GEMINI_V2_SCHEMA,
+            "target_day": "2026-10-25",
+            "timezone": "Asia/Taipei",
+        },
         "target_day": "2026-10-25",
         "timezone": "Asia/Taipei",
         "overview": {
@@ -53,6 +57,7 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         self.assertEqual(result.artifact["overview_layout"], "rail")
         self.assertEqual(result.artifact["schema_version"], 1)
         self.assertEqual(result.artifact["kind"], "holodocchi.daily_digest")
+        self.assertEqual(result.artifact["producer_v2"]["source_schema"], GEMINI_V2_SCHEMA)
         self.assertIsInstance(result.artifact["overview"]["highlights"][0], dict)
         self.assertEqual(result.artifact["overview"]["highlights"][0]["video_ids"], ["v0000000000"])
         self.assertEqual(result.warnings, ())
