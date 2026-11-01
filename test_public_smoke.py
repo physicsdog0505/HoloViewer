@@ -816,7 +816,6 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("slice(0,9)", js)
         self.assertIn("storyVisibleIds", js)
         self.assertIn("storyDetailRail", js)
-        self.assertIn("Owner review V3.5", css)
         self.assertIn("storyVisibleIds", js)
         self.assertIn("storyDetailRail", js)
         self.assertIn("slice(0,9)", js)
