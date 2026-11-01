@@ -1115,3 +1115,39 @@ html{scroll-behavior:smooth}
     scroll-snap-align:start
   }
 }
+
+
+/* Owner review V3.14 — overlay carousel arrows on the card rail. */
+.daily-story-detail-shell{
+  position:relative;
+  margin-top:18px;
+  padding-inline:42px
+}
+.daily-story-detail-controls{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  margin:0
+}
+.daily-story-detail-arrow{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  z-index:2;
+  pointer-events:auto;
+  width:36px;
+  height:36px;
+  border-radius:999px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08)
+}
+.daily-story-detail-arrow:first-child{left:0}
+.daily-story-detail-arrow:last-child{right:0}
+
+@media(max-width:760px){
+  .daily-story-detail-shell{padding-inline:34px}
+  .daily-story-detail-arrow{
+    width:30px;
+    height:30px;
+    font-size:16px
+  }
+}
