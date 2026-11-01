@@ -68,6 +68,21 @@ function appendParagraphs(parent,value,className){
   const chunks=paragraphChunks(value);
   chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
 }
+function appendStoryEditorialCopy(parent,value){
+  const chunks=paragraphChunks(value,{min:2,max:5});
+  if(chunks.length<3){
+    chunks.forEach(chunk=>parent.append(el('p','daily-story-summary',chunk)));
+    return;
+  }
+  const split=Math.ceil(chunks.length/2);
+  const columns=el('div','daily-story-summary-columns');
+  const left=el('div','daily-story-summary-column');
+  const right=el('div','daily-story-summary-column');
+  chunks.slice(0,split).forEach(chunk=>left.append(el('p','daily-story-summary',chunk)));
+  chunks.slice(split).forEach(chunk=>right.append(el('p','daily-story-summary',chunk)));
+  columns.append(left,right);
+  parent.append(columns);
+}
 function storyVisualLayout(count){
   if(count<=1)return 'feature-single-wide';
   if(count===2)return 'duo';
@@ -513,7 +528,7 @@ function renderStories(target,artifact,byId){
     const summary=publicText(story.editorial_summary||story.public_summary||story.summary);
     if(summary){
       const copy=el('div','daily-story-summary-block');
-      appendParagraphs(copy,summary,'daily-story-summary');
+      appendStoryEditorialCopy(copy,summary);
       card.append(copy);
     }
     const detailRail=storyDetailRail(story.video_ids,byId);
