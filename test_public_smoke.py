@@ -16,6 +16,14 @@ EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md",
 
 EXPECTED.add("docs/handoffs/PRODUCTION_COORDINATOR_HANDOFF_20261030.md")
 EXPECTED.update({
+    "cloudflare/daily-digest-static-assets.wrangler.json",
+    "daily-digest-static/_headers",
+    "daily-digest-static/data/daily-digest/months/.gitkeep",
+    "scripts/daily_digest_monthly_publish.py",
+    "scripts/deploy_daily_digest_static_assets_owner_local.sh",
+    "test_daily_digest_monthly_publish.py",
+})
+EXPECTED.update({
     "cloudflare/vod-subtitle-static-assets.wrangler.json",
     "docs/VOD_SUBTITLE_STATIC_ASSETS.md",
     "scripts/deploy_vod_subtitle_static_assets_owner_local.sh",
