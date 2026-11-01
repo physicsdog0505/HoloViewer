@@ -669,6 +669,12 @@ h3.daily-digest-title{margin:0}
   margin-right:auto;
   text-align:center
 }
+.daily-overview[data-copy-layout="right"] .daily-overview-summary{
+  max-width:920px;
+  margin-left:auto;
+  margin-right:0;
+  text-align:right
+}
 .daily-overview[data-copy-layout="columns"] .daily-overview-summary{
   max-width:none;
   column-count:2;
