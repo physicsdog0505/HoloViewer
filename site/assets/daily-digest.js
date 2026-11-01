@@ -69,8 +69,8 @@ function appendParagraphs(parent,value,className){
 }
 function storyVisualLayout(count,index,previous=''){
   const pools={
-    1:['single'],
-    2:['duo'],
+    1:['feature-single'],
+    2:['feature-duo'],
     3:['triptych','lead-two'],
     4:['quad','lead-three'],
     5:['three-two','lead-four'],
@@ -238,6 +238,7 @@ function storyDetailRail(ids,byId){
   if(!visible.length)return null;
 
   const shell=el('div','daily-story-detail-shell');
+  if(visible.length<=2)shell.classList.add('is-small-set');
   const rail=el('div','daily-story-detail-rail');
   rail.dataset.openState='closed';
 
@@ -521,6 +522,9 @@ function renderStories(target,artifact,byId){
     const card=el('article','daily-story-card');
     card.dataset.layout=layout;
     card.id='daily-story-'+String(index+1);
+    const visibleIds=storyVisibleIds(story.video_ids,byId);
+    card.dataset.streamCount=String(visibleIds.length);
+    if(visibleIds.length<=2)card.classList.add('is-feature-story');
 
     const eyebrow=el('div','daily-story-eyebrow');
     const members=Array.isArray(story.member_names)?story.member_names.map(publicText).filter(Boolean):[];
@@ -538,7 +542,6 @@ function renderStories(target,artifact,byId){
       card.append(copy);
     }
     const detailRail=storyDetailRail(story.video_ids,byId);
-    const visibleIds=storyVisibleIds(story.video_ids,byId);
     const visualLayout=storyVisualLayout(visibleIds.length,index,previousVisualLayout);
     previousVisualLayout=visualLayout;
     const visual=storyVisual(story.video_ids,byId,{
