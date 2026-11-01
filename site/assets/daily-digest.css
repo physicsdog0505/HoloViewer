@@ -1368,3 +1368,89 @@ html{scroll-behavior:smooth}
   .daily-story-detail-arrow:first-child{left:6px!important}
   .daily-story-detail-arrow:last-child{right:6px!important}
 }
+
+
+/* Owner review V3.21 — magazine feature layout for one/two-stream stories. */
+.daily-story-card.is-feature-story{
+  display:grid;
+  grid-template-columns:minmax(280px,.9fr) minmax(0,1.1fr);
+  grid-template-areas:
+    "eyebrow eyebrow"
+    "title summary"
+    "visual summary"
+    "detail detail";
+  column-gap:28px;
+  row-gap:14px;
+  align-items:start
+}
+.daily-story-card.is-feature-story .daily-story-eyebrow{grid-area:eyebrow}
+.daily-story-card.is-feature-story .daily-story-title{
+  grid-area:title;
+  margin:0;
+  align-self:start
+}
+.daily-story-card.is-feature-story .daily-story-summary-block{
+  grid-area:summary;
+  margin:0;
+  max-width:none
+}
+.daily-story-card.is-feature-story .daily-story-visual-shell{
+  grid-area:visual;
+  margin:0;
+  align-self:start
+}
+.daily-story-card.is-feature-story .daily-story-detail-shell{
+  grid-area:detail;
+  margin-top:6px
+}
+
+.daily-story-visual[data-visual-layout="feature-single"],
+.daily-story-visual[data-visual-layout="feature-duo"]{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  min-height:0
+}
+.daily-story-visual[data-visual-layout="feature-single"] .daily-story-visual-item,
+.daily-story-visual[data-visual-layout="feature-duo"] .daily-story-visual-item{
+  grid-column:auto;
+  grid-row:auto;
+  width:100%;
+  min-height:0;
+  aspect-ratio:16/9
+}
+.daily-story-visual[data-visual-layout="feature-duo"]{
+  grid-template-columns:1fr;
+}
+.daily-story-visual[data-visual-layout="feature-duo"] .daily-story-visual-item{
+  aspect-ratio:16/9
+}
+
+/* One/two detail cards should read naturally, not as a forced carousel. */
+.daily-story-detail-shell.is-small-set .daily-story-detail-controls{
+  display:none
+}
+.daily-story-detail-shell.is-small-set .daily-story-detail-rail{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:12px;
+  overflow:visible;
+  scroll-snap-type:none
+}
+.daily-story-detail-shell.is-small-set .daily-stream-ref{
+  width:auto;
+  min-width:0
+}
+
+@media(max-width:900px){
+  .daily-story-card.is-feature-story{
+    grid-template-columns:1fr;
+    grid-template-areas:
+      "eyebrow"
+      "title"
+      "summary"
+      "visual"
+      "detail";
+    row-gap:14px
+  }
+}
