@@ -700,15 +700,13 @@ h3.daily-digest-title{margin:0}
 
 
 /* Owner review V3.4 — overview → detailed story navigation. */
-.daily-highlight-jump{
-  display:inline-flex;
-  margin-top:12px;
-  font-size:12px;
-  font-weight:900;
-  color:var(--brand-main);
-  text-decoration:none
+.daily-highlight-card.is-jumpable{
+  cursor:pointer
 }
-.daily-highlight-jump:hover{text-decoration:underline}
+.daily-highlight-card.is-jumpable:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--brand-main) 58%,transparent);
+  outline-offset:3px
+}
 .daily-story-card{scroll-margin-top:88px}
 .daily-story-card:target{
   outline:2px solid color-mix(in srgb,var(--brand-main) 48%,transparent);
