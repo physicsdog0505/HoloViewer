@@ -249,17 +249,56 @@ h3.daily-digest-title{margin:0}
 }
 
 .daily-category-intro{margin:-8px 0 16px;color:var(--muted);font-size:13px}
-.daily-category-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.daily-category-chip{
-  border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:8px 11px;
-  color:var(--text);font-weight:850;cursor:pointer
-}
-.daily-category-chip span{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;padding:0 5px;border-radius:999px;background:var(--surface-2);font-size:10px;color:var(--muted)}
 .daily-category-panels{display:grid;gap:8px}
 .daily-category{margin:0;border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}
 .daily-category summary{padding:13px 15px;font-weight:850;cursor:pointer}
 .daily-category[open] summary{border-bottom:1px solid var(--line)}
-.daily-category .daily-stream-refs{padding:12px 14px;margin:0}
+.daily-category-body{position:relative;padding:12px 14px}
+.daily-category-stream-refs{
+  margin:0;
+  padding:0 2px 2px;
+  scrollbar-width:none;
+  -ms-overflow-style:none
+}
+.daily-category-stream-refs::-webkit-scrollbar{display:none}
+.daily-category-controls{
+  position:absolute;
+  inset:12px 14px;
+  pointer-events:none;
+  z-index:4
+}
+.daily-category-arrow{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:36px;
+  border:1px solid color-mix(in srgb,var(--line) 78%,transparent);
+  border-radius:999px;
+  background:color-mix(in srgb,var(--surface) 72%,transparent);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  box-shadow:0 4px 14px rgba(0,0,0,.12);
+  font:inherit;
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+  pointer-events:auto;
+  opacity:.82
+}
+.daily-category-arrow:hover{
+  opacity:1;
+  background:color-mix(in srgb,var(--surface) 88%,var(--brand-soft) 12%)
+}
+.daily-category-arrow:first-child{left:6px}
+.daily-category-arrow:last-child{right:6px}
+@media(max-width:760px){
+  .daily-category-arrow{
+    width:32px;
+    height:32px;
+    font-size:16px
+  }
+}
 .daily-unverified{display:block}
 
 @media(max-width:980px){
