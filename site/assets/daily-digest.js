@@ -125,30 +125,33 @@ function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
   });
 
   if(layout==='mosaic-carousel'&&ids.length>5){
-    let page=0;
-    const starts=[0,Math.max(1,ids.length-5)];
-    const applyPage=()=>{
-      const start=starts[page];
-      visual.dataset.page=String(page);
+    let start=0;
+    let timer=null;
+    const maxStart=Math.max(1,ids.length-5);
+    const applyWindow=()=>{
       visual.dataset.windowStart=String(start);
+      visual.classList.add('is-changing');
       visual.querySelectorAll('.daily-story-visual-item').forEach((node,index)=>{
         const slot=index-start+1;
         const visible=slot>=1&&slot<=5;
         node.hidden=!visible;
         if(visible)node.dataset.slot=String(slot);
       });
+      requestAnimationFrame(()=>requestAnimationFrame(()=>visual.classList.remove('is-changing')));
     };
-    const controls=el('div','daily-story-visual-controls');
-    const prev=el('button','daily-story-visual-arrow','←');
-    const next=el('button','daily-story-visual-arrow','→');
-    prev.type='button';next.type='button';
-    prev.setAttribute('aria-label','上一組主題圖片');
-    next.setAttribute('aria-label','下一組主題圖片');
-    prev.addEventListener('click',()=>{page=(page-1+starts.length)%starts.length;applyPage()});
-    next.addEventListener('click',()=>{page=(page+1)%starts.length;applyPage()});
-    controls.append(prev,next);
-    shell.append(visual,controls);
-    applyPage();
+    const rotate=()=>{
+      start=start>=maxStart?0:start+1;
+      applyWindow();
+    };
+    const startRotation=()=>{
+      if(timer)clearInterval(timer);
+      timer=setInterval(rotate,5000);
+    };
+    applyWindow();
+    startRotation();
+    shell.addEventListener('mouseenter',()=>{if(timer){clearInterval(timer);timer=null}});
+    shell.addEventListener('mouseleave',startRotation);
+    shell.append(visual);
   }else{
     shell.append(visual);
   }
