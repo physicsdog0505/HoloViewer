@@ -600,15 +600,6 @@ h3.daily-digest-title{margin:0}
   margin-right:0;
   text-align:left
 }
-.daily-overview[data-copy-layout="columns"] .daily-overview-summary{
-  max-width:none;
-  column-count:2;
-  column-gap:36px;
-  text-align:left
-}
-.daily-overview[data-copy-layout="columns"] .daily-overview-summary + .daily-overview-summary{
-  margin-top:14px
-}
 
 /* Auto no longer creates per-card mixed spans. It resolves to compact, rail, or lead. */
 .daily-highlight-grid[data-layout-source="auto"][data-layout="compact"] .daily-highlight-card,
@@ -617,11 +608,6 @@ h3.daily-digest-title{margin:0}
   grid-column:auto
 }
 
-@media(max-width:760px){
-  .daily-overview[data-copy-layout="columns"] .daily-overview-summary{
-    column-count:1
-  }
-}
 
 
 /* Owner review V3.4 — overview → detailed story navigation. */
@@ -667,20 +653,6 @@ html{scroll-behavior:smooth}
 .daily-story-visual[data-count="5"] .daily-story-visual-item:nth-child(n+4){grid-column:span 6}
 .daily-story-visual[data-count="6"] .daily-story-visual-item{grid-column:span 4}
 
-.daily-story-detail-rail{
-  display:grid;
-  grid-auto-flow:column;
-  grid-auto-columns:minmax(300px,330px);
-  grid-template-columns:none;
-  gap:12px;
-  overflow-x:auto;
-  overscroll-behavior-inline:contain;
-  scroll-snap-type:x proximity;
-  padding:2px 2px 10px;
-  margin-top:18px
-}
-.daily-story-detail-rail .daily-stream-ref{scroll-snap-align:start}
-
 @media(max-width:980px){
   .daily-story-visual{grid-template-columns:repeat(2,minmax(0,1fr))}
   .daily-story-visual-item,
@@ -704,7 +676,6 @@ html{scroll-behavior:smooth}
 .daily-story-visual[data-count="5"] .daily-story-visual-item:nth-child(n){
     display:block;aspect-ratio:16/9;scroll-snap-align:start
   }
-  .daily-story-detail-rail{grid-auto-columns:86vw}
 }
 
 
@@ -774,42 +745,6 @@ html{scroll-behavior:smooth}
 .daily-overview[data-copy-layout="right"] .daily-overview-summary-flow{
   margin-left:auto;
   margin-right:0
-}
-.daily-overview[data-copy-layout="columns"] .daily-overview-summary-flow{
-  max-width:none;
-  column-count:2;
-  column-gap:36px;
-  column-fill:balance;
-  text-align:left
-}
-.daily-overview[data-copy-layout="columns"] .daily-overview-summary{
-  max-width:none;
-  margin:0 0 14px;
-  column-count:auto;
-  break-inside:avoid
-}
-
-
-/* Owner review V3.10 — balanced explicit two-column intro. */
-.daily-overview[data-copy-layout="columns"] .daily-overview-summary-flow{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:36px;
-  column-count:auto;
-  column-gap:0;
-  column-fill:auto
-}
-.daily-overview[data-copy-layout="columns"] .daily-overview-column{
-  min-width:0
-}
-.daily-overview[data-copy-layout="columns"] .daily-overview-column .daily-overview-summary{
-  margin:0 0 14px;
-  break-inside:auto
-}
-@media(max-width:760px){
-  .daily-overview[data-copy-layout="columns"] .daily-overview-summary-flow{
-    display:block
-  }
 }
 
 
