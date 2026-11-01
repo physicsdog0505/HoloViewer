@@ -37,8 +37,6 @@ def v2_payload(hint="compact"):
             "target_day": "2026-10-25",
             "timezone": "Asia/Taipei",
         },
-        "target_day": "2026-10-25",
-        "timezone": "Asia/Taipei",
         "overview": {
             "public_summary": zh("今日主要脈絡涵蓋跨頻道大型企劃、遊戲連動與重要公告。", 320),
             "presentation_hint": hint,
@@ -57,6 +55,8 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         self.assertEqual(result.artifact["overview_layout"], "rail")
         self.assertEqual(result.artifact["schema_version"], 1)
         self.assertEqual(result.artifact["kind"], "holodocchi.daily_digest")
+        self.assertEqual(result.artifact["target_day"], "2026-10-25")
+        self.assertEqual(result.artifact["timezone"], "Asia/Taipei")
         self.assertEqual(result.artifact["producer_v2"]["source_schema"], GEMINI_V2_SCHEMA)
         self.assertIsInstance(result.artifact["overview"]["highlights"][0], dict)
         self.assertEqual(result.artifact["overview"]["highlights"][0]["video_ids"], ["v0000000000"])
