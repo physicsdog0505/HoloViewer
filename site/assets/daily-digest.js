@@ -531,7 +531,9 @@ function renderStories(target,artifact,byId){
       appendStoryEditorialCopy(copy,summary);
       card.append(copy);
     }
-    const detailRail=storyDetailRail(story.video_ids,byId);
+    const readerMode=publicText(story.reader_mode)==='inline'?'inline':'summary_with_details';
+    card.dataset.readerMode=readerMode;
+    const detailRail=readerMode==='summary_with_details'?storyDetailRail(story.video_ids,byId):null;
     const visualLayout=storyVisualLayout(visibleIds.length);
     const visual=storyVisual(story.video_ids,byId,{
       layout:visualLayout,
