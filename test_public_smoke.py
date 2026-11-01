@@ -799,6 +799,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("object-fit:contain!important", css)
         self.assertIn("object-position:center!important", css)
         self.assertIn('.daily-story-visual-item[data-slot="1"]', css)
+        self.assertIn("grid-column:2/12!important", css)
+        self.assertIn('[data-slot="1"] figcaption', css)
         self.assertIn('.daily-story-visual-item[data-slot="5"]', css)
         self.assertIn(".daily-story-detail-rail .daily-stream-ref-detail p", css)
         self.assertIn("position:absolute", css)
