@@ -74,12 +74,12 @@ function storyVisualLayout(count,index,previous='',story=null){
     3:['triptych','lead-two'],
     4:['quad','lead-three'],
     5:['three-two','lead-four'],
-    6:['mosaic-carousel','mosaic-hero'],
-    7:['mosaic-carousel','mosaic-hero'],
-    8:['mosaic-carousel','mosaic-hero'],
-    9:['mosaic-carousel','mosaic-hero']
+    6:['mosaic-carousel','hero-full-carousel'],
+    7:['mosaic-carousel','hero-full-carousel'],
+    8:['mosaic-carousel','hero-full-carousel'],
+    9:['mosaic-carousel','hero-full-carousel']
   };
-  const pool=pools[count]||['mosaic-carousel','mosaic-hero'];
+  const pool=pools[count]||['mosaic-carousel','hero-full-carousel'];
   const titleLength=publicText(story?.title||story?.short_title).length;
   const summaryLength=publicText(story?.public_summary||story?.summary).length;
   let seed=(index+titleLength+summaryLength)%pool.length;
@@ -127,7 +127,7 @@ function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
     visual.append(figure);
   });
 
-  if(layout==='mosaic-carousel'&&ids.length>5){
+  if((layout==='mosaic-carousel'||layout==='hero-full-carousel')&&ids.length>5){
     let start=0;
     let timer=null;
     const maxStart=Math.max(1,ids.length-5);
