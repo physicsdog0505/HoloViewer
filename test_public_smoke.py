@@ -698,6 +698,12 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("card.id='daily-story-'", js)
         self.assertIn("scroll-margin-top:88px", css)
         self.assertIn("scroll-behavior:smooth", css)
+        self.assertNotIn("slice(0,6)", js)
+        self.assertIn("group.querySelectorAll('.daily-sub-event')", js)
+        self.assertIn("node.open=true", js)
+        self.assertIn("Owner review V3.5", css)
+        self.assertIn("grid-auto-flow:column", css)
+        self.assertIn("scroll-snap-type:x proximity", css)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
