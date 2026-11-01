@@ -338,7 +338,7 @@ function renderStories(target,artifact,byId){
     if(members.length)eyebrow.append(el('span','',members.slice(0,3).join('・')+(members.length>3?' 等':'')));
     card.append(eyebrow);
 
-    const headline=publicText(story.short_title)||shortHeadline(story.title,layout==='lead'?50:42);
+    const headline=publicText(story.title)||publicText(story.short_title);
     if(headline)card.append(el('h3','daily-story-title',headline));
 
     const summary=publicText(story.public_summary||story.summary);
