@@ -189,24 +189,30 @@ function overviewCardTitle(item){
 }
 function overviewAutoLayout(highlights){
   const lengths=highlights.slice(0,5).map(item=>overviewCardTitle(item).length);
+  const first=lengths[0]||0;
+  const max=Math.max(0,...lengths);
+  const average=lengths.length?lengths.reduce((sum,n)=>sum+n,0)/lengths.length:0;
   const longCount=lengths.filter(length=>length>32).length;
-  const veryLong=lengths.some(length=>length>42);
-  if(veryLong||longCount>=2)return 'adaptive';
+  if(first>34||max>46)return 'lead';
+  if(longCount>=2||average>29)return 'rail';
   return 'compact';
 }
 function applyOverviewLayout(grid,mode,highlights){
   const resolved=mode==='auto'?overviewAutoLayout(highlights):mode;
   grid.dataset.layout=resolved;
+  grid.dataset.layoutSource=mode==='auto'?'auto':'manual';
   grid.querySelectorAll('.daily-highlight-card').forEach((card,index)=>{
-    const titleLength=overviewCardTitle(highlights[index]||'').length;
-    card.dataset.titleLength=String(titleLength);
-    card.dataset.fit=titleLength>42?'xl':titleLength>32?'wide':'compact';
+    card.dataset.titleLength=String(overviewCardTitle(highlights[index]||'').length);
   });
 }
-function overviewLayoutLab(grid,highlights){
+function applyOverviewCopyLayout(wrap,mode){
+  wrap.dataset.copyLayout=mode;
+}
+function overviewLayoutLab(wrap,grid,highlights){
   if(!overviewLayoutLabEnabled())return null;
   const lab=el('div','daily-layout-lab');
-  lab.append(el('span','daily-layout-lab-label','DEV LAYOUT LAB'));
+  const cardGroup=el('div','daily-layout-lab-group');
+  cardGroup.append(el('span','daily-layout-lab-label','CARD'));
   const modes=[
     ['auto','Auto Fit'],
     ['compact','Compact Grid'],
@@ -219,11 +225,32 @@ function overviewLayoutLab(grid,highlights){
     button.dataset.layout=mode;
     if(index===0)button.classList.add('is-active');
     button.addEventListener('click',()=>{
-      lab.querySelectorAll('.daily-layout-lab-tab').forEach(node=>node.classList.toggle('is-active',node===button));
+      cardGroup.querySelectorAll('.daily-layout-lab-tab').forEach(node=>node.classList.toggle('is-active',node===button));
       applyOverviewLayout(grid,mode,highlights);
     });
-    lab.append(button);
+    cardGroup.append(button);
   });
+
+  const copyGroup=el('div','daily-layout-lab-group');
+  copyGroup.append(el('span','daily-layout-lab-label','INTRO'));
+  const copyModes=[
+    ['left','Left'],
+    ['center','Center'],
+    ['columns','Two-column']
+  ];
+  copyModes.forEach(([mode,label],index)=>{
+    const button=el('button','daily-layout-lab-tab',label);
+    button.type='button';
+    button.dataset.copyLayout=mode;
+    if(index===0)button.classList.add('is-active');
+    button.addEventListener('click',()=>{
+      copyGroup.querySelectorAll('.daily-layout-lab-tab').forEach(node=>node.classList.toggle('is-active',node===button));
+      applyOverviewCopyLayout(wrap,mode);
+    });
+    copyGroup.append(button);
+  });
+
+  lab.append(cardGroup,copyGroup);
   return lab;
 }
 function renderOverview(target,artifact,byId){
@@ -231,6 +258,7 @@ function renderOverview(target,artifact,byId){
   const highlights=Array.isArray(overview.highlights)?overview.highlights.map(publicText).filter(Boolean):[];
   if(!highlights.length&&!publicText(overview.summary))return;
   const wrap=section('今天發生什麼','daily-overview','brief');
+  applyOverviewCopyLayout(wrap,'left');
   const intro=publicText(overview.public_summary||overview.summary);
   if(intro){
     const cleaned=intro.replace(/^.*?共計\s*\d+\s*場[^。]*。\s*/,'');
@@ -263,7 +291,7 @@ function renderOverview(target,artifact,byId){
       grid.append(card);
     });
     applyOverviewLayout(grid,'auto',highlights);
-    const lab=overviewLayoutLab(grid,highlights);
+    const lab=overviewLayoutLab(wrap,grid,highlights);
     if(lab)wrap.append(lab);
     wrap.append(grid);
   }
