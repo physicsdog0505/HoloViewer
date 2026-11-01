@@ -935,3 +935,38 @@ html{scroll-behavior:smooth}
     display:block
   }
 }
+
+
+/* Owner review V3.11 — Auto Fit must render identically to the selected manual template. */
+.daily-highlight-grid[data-layout-source="auto"][data-layout="lead"] .daily-highlight-card{
+  grid-column:auto
+}
+.daily-highlight-grid[data-layout-source="auto"][data-layout="lead"] .daily-highlight-card:first-child{
+  grid-column:1/-1;
+  grid-template-columns:minmax(360px,48%) minmax(0,52%);
+  min-height:260px
+}
+.daily-highlight-grid[data-layout-source="auto"][data-layout="lead"] .daily-highlight-card:first-child .daily-highlight-copy{
+  padding:28px
+}
+.daily-highlight-grid[data-layout-source="auto"][data-layout="lead"] .daily-highlight-card:first-child h3{
+  font-size:24px;
+  line-height:1.35
+}
+.daily-highlight-grid[data-layout-source="auto"][data-layout="lead"] .daily-highlight-card:first-child p{
+  font-size:15px;
+  line-height:1.8
+}
+
+@media(max-width:980px){
+  .daily-highlight-grid[data-layout-source="auto"][data-layout="lead"] .daily-highlight-card:first-child{
+    grid-column:auto
+  }
+}
+@media(max-width:760px){
+  .daily-highlight-grid[data-layout-source="auto"][data-layout="lead"] .daily-highlight-card:first-child{
+    display:block;
+    grid-template-columns:none;
+    min-height:0
+  }
+}
