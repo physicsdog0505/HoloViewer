@@ -83,6 +83,26 @@ deep treatment：
 
 可輸出 `recurring_program_id`、`program_type`、`summary_depth` 作為 editorial metadata。
 
+## 生日／週年／特殊 Live 優先規則
+
+生日 Live、週年 Live、周年記念、誕生日記念、重大 3D Live 等特殊節目，預設視為當日日報高優先級內容：
+- `program_type=special_event`
+- `summary_depth=deep`
+- 原則上獨立成 story，不要塞進一般 roundup
+- 強烈考慮放入 overview highlights，並視內容給 `lead_candidate` / `secondary_candidate`
+
+請完整整理可驗證的：
+- Live 主題與紀念性質
+- 完整或 partial setlist
+- 來賓、duet、surprise guest
+- 首次披露的新歌／MV／3D／衣裝等
+- Live 內重大告知
+- 周邊商品、套組／單品、特典、價格（若可驗證）
+- 預購／販售期間、截止日期、購買平台
+- 票務、抽選、觀看期限與後續日期
+
+若同一場 Live 同時包含演出、重大告知與周邊，優先做成一篇完整 special-event story，再用 structured announcements 保留需追蹤的 actionable details，不要拆成重複薄文。
+
 ## 重大告知與歌回
 
 重大告知：
