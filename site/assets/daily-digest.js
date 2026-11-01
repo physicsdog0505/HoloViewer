@@ -288,6 +288,11 @@ function renderOverview(target,artifact,byId){
       copy.append(el('h3','',shortHeadline(rawTitle,64)));
       const rest=parts.length>1?parts.slice(1).join('：'):item;
       copy.append(el('p','',clampText(rest,170)));
+      if(story){
+        const jump=el('a','daily-highlight-jump','查看詳細主題 ↓');
+        jump.href='#daily-story-'+String(index+1);
+        copy.append(jump);
+      }
       card.append(copy);
       grid.append(card);
     });
@@ -315,6 +320,7 @@ function renderStories(target,artifact,byId){
     const layout=publicLayout(story,storyAutoLayout(story,index));
     const card=el('article','daily-story-card');
     card.dataset.layout=layout;
+    card.id='daily-story-'+String(index+1);
 
     const eyebrow=el('div','daily-story-eyebrow');
     const members=Array.isArray(story.member_names)?story.member_names.map(publicText).filter(Boolean):[];
