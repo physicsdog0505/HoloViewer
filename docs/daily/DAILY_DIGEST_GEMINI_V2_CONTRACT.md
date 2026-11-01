@@ -83,13 +83,14 @@ Every story keeps:
 - optional compact `public_summary` (or legacy `summary`) as shorter source copy / migration fallback;
 - `reader_mode`: `inline | summary_with_details`;
 - ordered `video_ids`;
+- optional `recurring_program_id`, `program_type`, and `summary_depth` editorial metadata;
 - existing `editorial_signals` / source evidence;
 - optional non-authoritative `presentation_hint`.
 
 Story copy rules:
 
 - `editorial_summary` should preserve the useful depth already discovered during Gemini research instead of collapsing a multi-stream story into a thin card caption.
-- Target roughly 320-760 CJK characters for a substantial multi-stream story, normally 2-5 semantic beats. Shorter is acceptable when the source event is genuinely simple.
+- Standard stories target roughly 320-760 CJK characters. Stories marked `summary_depth=deep` may use roughly 500-1200 CJK characters and 3-7 semantic beats when the source genuinely supports that depth. Shorter is acceptable when the event is simple.
 - Prefer concrete cross-stream facts, outcomes, announcements and relationships over filler prose.
 - Do not duplicate every per-stream summary verbatim; synthesize the story as an editorial unit.
 - The normalizer preserves an explicit `editorial_summary` unchanged within the public bound.
@@ -98,9 +99,21 @@ Story copy rules:
 - Use `reader_mode=summary_with_details` only when individual supporting streams contain materially distinct details, POVs, chronology, or evidence that remain useful after the story synthesis.
 - Do not choose `summary_with_details` merely because a story has multiple `video_ids`; the decision is editorial, not a video-count heuristic.
 
-The detailed frontend must show the full story title and prefer `editorial_summary` for the story body. It must not truncate that body merely to satisfy a visual template.
+The detailed frontend must show the full story title and prefer `editorial_summary` for the story body. It must not truncate that body merely to satisfy a visual template. Recurring news / recurring zatsudan / recurring radio stories marked `summary_depth=deep` may carry materially longer editorial copy than standard stories.
 
 Story visual layout is structural, not editorial ranking. The frontend may use stable count-based media grids (for example 1, 2, 3, 4, 5, or 6+ supporting videos), but must not select visual prominence from story index, title length, summary length, viewers, or timing.
+
+## Recurring program deep treatment
+
+Known recurring news / zatsudan / radio series may be tagged by Gemini with:
+
+- `recurring_program_id`
+- `program_type`: `regular_news | recurring_zatsudan | recurring_radio | zatsudan | game | music | event | other`
+- `summary_depth`: `deep | standard | brief`
+
+For recurring weekly/news-style programs, `deep` means the editorial copy should preserve useful weekly/member updates, work or activity behind-the-scenes, notable member interactions, announcements, dated follow-ups, and the program's recurring information segments. A single-video story must not be made shallow merely because it has one evidence video.
+
+Known aliases currently include `#朝こよ`, `#朝ミオ`, おはスバ / おはすば, `#朝ガオ`, `#ねるまえらじお`, アキちょこナイトパレット, and holoAN / `#昼ホロ` when those streams are present in the authoritative daily universe.
 
 ## Announcements and categories
 
