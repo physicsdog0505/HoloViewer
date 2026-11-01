@@ -97,6 +97,24 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         result = normalize_digest(src)
         self.assertEqual(result.artifact["stories"][0]["editorial_summary"], compact)
 
+    def test_story_reader_mode_inline_is_preserved(self):
+        src = v2_payload("compact")
+        src["stories"][0]["reader_mode"] = "inline"
+        result = normalize_digest(src)
+        self.assertEqual(result.artifact["stories"][0]["reader_mode"], "inline")
+
+    def test_story_reader_mode_defaults_to_summary_with_details(self):
+        src = v2_payload("compact")
+        result = normalize_digest(src)
+        self.assertEqual(result.artifact["stories"][0]["reader_mode"], "summary_with_details")
+
+    def test_invalid_story_reader_mode_falls_back_with_warning(self):
+        src = v2_payload("compact")
+        src["stories"][0]["reader_mode"] = "auto"
+        result = normalize_digest(src)
+        self.assertEqual(result.artifact["stories"][0]["reader_mode"], "summary_with_details")
+        self.assertTrue(any("reader_mode='auto'" in w for w in result.warnings))
+
     def test_invalid_hint_has_deterministic_fallback(self):
         src = v2_payload("magazine")
         result = normalize_digest(src)
