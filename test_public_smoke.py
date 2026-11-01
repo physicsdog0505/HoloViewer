@@ -127,6 +127,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("if(visibleIds.length===1)", js)
         self.assertIn("card.dataset.singleImageLayout=variant;", js)
         self.assertIn("card.classList.add('is-feature-story')", js)
+        self.assertIn("const hasEditorialSummary=Boolean(publicText(story.editorial_summary));", js)
+        self.assertIn("const readerMode=(visibleIds.length<=2&&hasEditorialSummary)?'inline':requestedReaderMode;", js)
         self.assertIn(".daily-story-card.is-feature-story{", css)
         self.assertIn('"title summary"', css)
         self.assertIn('"visual summary"', css)
