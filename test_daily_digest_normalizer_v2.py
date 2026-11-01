@@ -43,6 +43,13 @@ def v2_payload(hint="compact"):
             "highlights": highlights,
         },
         "stories": stories,
+        "streams": [
+            {
+                "video_id": f"v{i:010d}",
+                "summary": zh(f"第{i+1}支直播的 Gemini 詳細研究內容，包含具體事件與脈絡。", 260),
+            }
+            for i in range(3)
+        ],
         "announcements": [{"title": "完整公告標題", "summary": "完整公告摘要", "video_ids": ["v0000000000"]}],
         "categories": [{"key": "x", "label": "分類", "video_ids": ["v0000000000", "v0000000000"]}],
     }
@@ -61,6 +68,23 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         self.assertIsInstance(result.artifact["overview"]["highlights"][0], dict)
         self.assertEqual(result.artifact["overview"]["highlights"][0]["video_ids"], ["v0000000000"])
         self.assertEqual(result.warnings, ())
+
+    def test_story_editorial_summary_uses_gemini_stream_research_when_public_copy_is_short(self):
+        src = v2_payload("compact")
+        src["stories"][0]["public_summary"] = zh("跨直播短摘要。", 90)
+        result = normalize_digest(src)
+        story = result.artifact["stories"][0]
+        self.assertEqual(story["public_summary"], src["stories"][0]["public_summary"])
+        self.assertGreater(len(story["editorial_summary"]), len(story["public_summary"]))
+        self.assertIn("Gemini 詳細研究內容", story["editorial_summary"])
+        self.assertLessEqual(len(story["editorial_summary"]), 760)
+
+    def test_explicit_story_editorial_summary_is_preserved(self):
+        src = v2_payload("compact")
+        explicit = zh("Gemini 已完成的完整跨直播編輯主文。", 420)
+        src["stories"][0]["editorial_summary"] = explicit
+        result = normalize_digest(src)
+        self.assertEqual(result.artifact["stories"][0]["editorial_summary"], explicit)
 
     def test_invalid_hint_has_deterministic_fallback(self):
         src = v2_payload("magazine")
