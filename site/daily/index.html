@@ -17,15 +17,32 @@
 <a data-mobile-dock-route="multi" href="/collab" aria-label="多人連動"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="2.7"/><circle cx="16" cy="8" r="2.7"/><path d="M3.5 19c.4-3 1.9-4.7 4.5-4.7s4.1 1.7 4.5 4.7M11.5 19c.4-3 1.9-4.7 4.5-4.7s4.1 1.7 4.5 4.7"/></svg></a>
 <a data-mobile-dock-route="ptt" href="/ptt-today/" aria-label="PTT 今日專串"><span>PTT</span></a>
 </nav>
-<header class="client-topbar"><a class="mobile-top-brand" href="/">HoloDocchi</a><span class="top-status">每日精選</span></header>
+<header class="client-topbar">
+<a class="mobile-top-brand" href="/">HoloDocchi</a>
+<button id="dailyDigestDateTrigger" class="top-status daily-digest-date-trigger" type="button" aria-haspopup="dialog" aria-controls="dailyDigestDateHub">每日精選</button>
+</header>
+<dialog id="dailyDigestDateHub" class="daily-date-hub" aria-labelledby="dailyDigestDateHubTitle">
+<div class="daily-date-hub-shell">
+<header class="daily-date-hub-head">
+<div><p class="daily-date-hub-kicker">HOLODOCCHI DAILY</p><h2 id="dailyDigestDateHubTitle">選擇日報日期</h2></div>
+<div class="daily-date-hub-head-actions">
+<button id="dailyDigestDateToday" type="button">今天</button>
+<button id="dailyDigestDateClose" type="button" aria-label="關閉日報月曆">×</button>
+</div>
+</header>
+<div class="daily-date-hub-toolbar">
+<button id="dailyDigestMonthPrev" type="button" aria-label="上個月">‹</button>
+<strong id="dailyDigestMonthLabel"></strong>
+<button id="dailyDigestMonthNext" type="button" aria-label="下個月">›</button>
+</div>
+<section class="daily-date-hub-calendar" aria-label="日報月份總覽">
+<div class="daily-date-hub-weekdays" aria-hidden="true"><span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span></div>
+<div id="dailyDigestDateGrid" class="daily-date-hub-grid"></div>
+</section>
+</div>
+</dialog>
 <main class="client-main daily-digest-shell" id="daily-digest-page">
 <div class="page-head"><div><h1 id="daily-digest-date-label">每日精選</h1><p>Daily Digest · Asia/Taipei</p></div></div>
-<div class="daily-digest-toolbar" aria-label="日報日期">
-<button id="dailyDigestPrev" type="button">← 前一天</button>
-<label>日期 <input id="dailyDigestDate" type="date"></label>
-<button id="dailyDigestNext" type="button">下一天 →</button>
-<button id="dailyDigestToday" type="button">今天</button>
-</div>
 <p id="daily-digest-status" class="daily-digest-status" role="status" aria-live="polite">正在載入今日精選…</p>
 <div id="daily-digest-content"></div>
 </main>
