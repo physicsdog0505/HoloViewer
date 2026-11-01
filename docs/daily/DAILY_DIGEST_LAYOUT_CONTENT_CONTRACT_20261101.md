@@ -59,18 +59,19 @@ If a meaningful title cannot fit within ~42 CJK characters, the producer should 
 
 ## 3. Supported overview templates
 
-Development Layout Lab currently demonstrates:
+Development Layout Lab currently demonstrates three production-shape card templates:
 
 - `compact` — two-column small cards; best for short titles
-- `adaptive` — mixed grid; long-title cards expand to full width
 - `rail` — large Home-style horizontal scroll cards
 - `lead` — first card is large editorial lead; remaining cards stay compact
+
+`Auto Fit` is not a fourth template. It is a development selector that chooses exactly one of `compact / rail / lead` for the whole overview block.
 
 Preferred future artifact field:
 
 ```json
 {
-  "overview_layout": "adaptive",
+  "overview_layout": "compact | rail | lead",
   "highlights": [
     {
       "short_title": "...",
@@ -88,12 +89,23 @@ The exact artifact migration should be coordinated with the producer schema auth
 Suggested producer-side fit intent:
 
 - short title <= 32 CJK + short summary → `compact`
-- title 33–42 CJK or denser summary → `wide` / full-row card
+- title 33–42 CJK or a day with several medium/long titles → prefer `rail`
 - very important first story with strong thumbnail → `lead`
-- several medium/long titles in one day → `rail`
-- mixed title lengths → `adaptive`
+- otherwise → `compact`
+- the producer should choose one overview template for the whole block; do not mix per-card editorial templates unless the schema is explicitly revised
 
 These are layout-fit rules, not editorial ranking rules.
+
+
+### Detailed story title / reading surface
+
+The overview card and the detailed `今日主題` card have different copy responsibilities:
+
+- overview/highlight cards may use bounded `short_title` to fit compact layouts
+- detailed story cards must display the complete selected story `title`; do not ellipsize or shorten it in the frontend
+- detailed story title and summary should use the full available reading width unless a future explicit artifact layout says otherwise
+
+This keeps the overview concise while preserving the complete editorial headline once the reader enters the detailed topic.
 
 ## 5. Thumbnail contract
 
