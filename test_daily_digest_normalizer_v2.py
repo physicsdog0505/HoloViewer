@@ -97,6 +97,31 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         result = normalize_digest(src)
         self.assertEqual(result.artifact["stories"][0]["editorial_summary"], compact)
 
+    def test_deep_story_allows_richer_editorial_copy(self):
+        src = v2_payload("compact")
+        src["stories"][0]["summary_depth"] = "deep"
+        explicit = zh("固定週期節目完整主文。", 1000)
+        src["stories"][0]["editorial_summary"] = explicit
+        result = normalize_digest(src)
+        story = result.artifact["stories"][0]
+        self.assertEqual(story["summary_depth"], "deep")
+        self.assertEqual(story["editorial_summary"], explicit)
+
+    def test_standard_story_remains_bounded_to_standard_limit(self):
+        src = v2_payload("compact")
+        src["stories"][0]["summary_depth"] = "standard"
+        src["stories"][0]["editorial_summary"] = zh("一般故事主文。", 1000)
+        result = normalize_digest(src)
+        self.assertEqual(result.artifact["stories"][0]["summary_depth"], "standard")
+        self.assertLessEqual(len(result.artifact["stories"][0]["editorial_summary"]), 760)
+
+    def test_invalid_summary_depth_falls_back_to_standard(self):
+        src = v2_payload("compact")
+        src["stories"][0]["summary_depth"] = "weekly"
+        result = normalize_digest(src)
+        self.assertEqual(result.artifact["stories"][0]["summary_depth"], "standard")
+        self.assertTrue(any("summary_depth='weekly'" in w for w in result.warnings))
+
     def test_story_reader_mode_inline_is_preserved(self):
         src = v2_payload("compact")
         src["stories"][0]["reader_mode"] = "inline"
