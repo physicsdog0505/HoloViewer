@@ -301,15 +301,27 @@ function balanceOverviewColumns(flow){
   if(!flow)return;
   const paragraphs=[...flow.querySelectorAll('.daily-overview-summary')];
   if(paragraphs.length<2)return;
-  const textLengths=paragraphs.map(node=>publicText(node.textContent).length);
-  const total=textLengths.reduce((sum,n)=>sum+n,0);
+
+  const probe=el('div','daily-overview-column-probe');
+  probe.setAttribute('aria-hidden','true');
+  flow.append(probe);
+
+  const heights=paragraphs.map(node=>{
+    const clone=node.cloneNode(true);
+    probe.replaceChildren(clone);
+    return clone.getBoundingClientRect().height;
+  });
+  probe.remove();
+
+  const total=heights.reduce((sum,n)=>sum+n,0);
   let bestIndex=1,bestDiff=Infinity,left=0;
   for(let index=1;index<paragraphs.length;index++){
-    left+=textLengths[index-1];
+    left+=heights[index-1];
     const right=total-left;
     const diff=Math.abs(left-right);
     if(diff<bestDiff){bestDiff=diff;bestIndex=index}
   }
+
   const leftCol=el('div','daily-overview-column daily-overview-column-left');
   const rightCol=el('div','daily-overview-column daily-overview-column-right');
   paragraphs.forEach((node,index)=>(index<bestIndex?leftCol:rightCol).append(node));
