@@ -92,7 +92,7 @@ Story copy rules:
 - Prefer concrete cross-stream facts, outcomes, announcements and relationships over filler prose.
 - Do not duplicate every per-stream summary verbatim; synthesize the story as an editorial unit.
 - The normalizer preserves an explicit `editorial_summary` unchanged within the public bound.
-- During migration, when only a short `public_summary` exists, the normalizer may deterministically assemble additional copy from the same story's Gemini-produced supporting stream summaries. It must not invent new facts or replace the preserved source copy.
+- During migration, when `editorial_summary` is absent, the normalizer must preserve and reuse the existing story `public_summary` / legacy `summary` only. It must not synthesize a second prose version from `streams[].summary`; richer story prose must come from Gemini as an explicit `editorial_summary`.
 
 The detailed frontend must show the full story title and prefer `editorial_summary` for the story body. It must not truncate that body merely to satisfy a visual template.
 
