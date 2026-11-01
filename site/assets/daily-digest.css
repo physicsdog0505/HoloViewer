@@ -1162,3 +1162,14 @@ html{scroll-behavior:smooth}
   left:-99999px;
   top:0
 }
+
+
+/* Owner review V3.16 — improve detail carousel text readability. */
+.daily-story-detail-rail .daily-stream-ref-copy strong{font-size:13px}
+.daily-story-detail-rail .daily-stream-ref-copy>span{font-size:12px}
+.daily-story-detail-rail .daily-stream-ref-detail p{
+  font-size:13px;
+  line-height:1.75
+}
+.daily-story-detail-rail .daily-stream-topic-chips span{font-size:11px}
+.daily-story-detail-rail .daily-stream-youtube{font-size:12px}
