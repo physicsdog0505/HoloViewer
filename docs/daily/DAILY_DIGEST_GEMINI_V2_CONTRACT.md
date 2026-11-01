@@ -115,6 +115,20 @@ For recurring weekly/news-style programs, `deep` means the editorial copy should
 
 Known aliases currently include `#朝こよ`, `#朝ミオ`, おはスバ / おはすば, `#朝ガオ`, `#ねるまえらじお`, アキちょこナイトパレット, and holoAN / `#昼ホロ` when those streams are present in the authoritative daily universe.
 
+## Birthday / anniversary special-event priority
+
+Birthday lives, anniversary lives, anniversary commemorations, and comparable special 3D lives are high-priority editorial units.
+
+Recommended metadata:
+- `program_type=special_event`
+- `summary_depth=deep`
+- `special_event_type=birthday_live | anniversary_live | special_3d_live | memorial_event | other`
+- optional `guests`, `event_merchandise`, `sales_window`, `deadline_text`, `setlist_status`, `setlist`.
+
+These events should normally become standalone stories and should be strongly considered for overview highlights / lead or secondary placement. Their editorial body should preserve performance theme, verified setlist, guests, first reveals, live announcements, merchandise, sales deadlines, ticketing/purchase details, and dated follow-ups when the sources support them.
+
+Do not split one event into several thin overlapping stories for performance / announcement / merchandise. Prefer one complete special-event story plus structured actionable announcements where useful.
+
 ## Major announcements and music setlists
 
 Major announcements may carry `summary_depth=deep` when verified source content contains actionable detail. Preserve dates, participants, venue/platform, ticketing/purchase method, versions/benefits, deadlines, and follow-up dates when explicitly stated; do not compress these away for layout.
