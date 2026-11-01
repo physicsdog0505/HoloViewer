@@ -821,7 +821,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("grid-column:2/12!important", css)
         self.assertIn('[data-slot="1"] figcaption', css)
         self.assertIn('.daily-story-visual-item[data-slot="5"]', css)
-        self.assertIn(".daily-story-detail-rail .daily-stream-ref-detail p", css)
+        self.assertIn(".daily-stream-ref-detail p{margin:7px 0 12px", css)
         self.assertIn("position:absolute", css)
         self.assertIn(".daily-story-detail-arrow:first-child{left:8px!important}", css)
         self.assertIn(".daily-story-detail-arrow:last-child{right:8px!important}", css)
