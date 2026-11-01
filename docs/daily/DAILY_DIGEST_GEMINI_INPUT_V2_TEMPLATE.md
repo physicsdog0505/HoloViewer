@@ -83,6 +83,21 @@ deep treatment：
 
 可輸出 `recurring_program_id`、`program_type`、`summary_depth` 作為 editorial metadata。
 
+## 重大告知與歌回
+
+重大告知：
+- 只要 verified content 中有票務、發售、活動、live、專輯、原創曲、新衣裝、新 3D、周邊、合作、抽選、出演等重大告知，請視資訊量使用 `summary_depth=deep`。
+- 不要只寫『宣布 X』；應保留可驗證的日期、參與者、地點／平台、購票／購買方式、版本／特典、期限、下一個重要日期。
+- 可輸出 `announcement_details`, `follow_up_dates`, `action_items`，但只能放來源明示內容。
+
+歌回 / music live：
+- 若可從影片、description、章節、逐字稿或其他可驗證內容確認曲目，請輸出 ordered `setlist`。
+- `setlist_status=complete | partial | unavailable`。
+- 每首可含 `order`, `title`, optional `artist_or_source`, `performers`, `note`, `timestamp_text`。
+- 可以只列 partial setlist；不要因無法確認全部歌曲就整份不列。
+- 不確定曲名不要猜。
+- setlist 是 structured evidence；主文仍要寫演出亮點、首次披露、來賓與重大告知。
+
 ## 今日概覽 overview
 
 `overview.public_summary`：
