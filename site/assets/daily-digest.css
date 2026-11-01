@@ -1641,3 +1641,24 @@ html{scroll-behavior:smooth}
     grid-column:span 6!important
   }
 }
+
+
+/* Owner review V3.26 — native line-level balancing for overview intro columns. */
+.daily-overview[data-copy-layout="columns"] .daily-overview-summary-flow{
+  display:block!important;
+  max-width:none!important;
+  column-count:2!important;
+  column-gap:36px!important;
+  column-fill:balance!important
+}
+.daily-overview[data-copy-layout="columns"] .daily-overview-summary{
+  max-width:none!important;
+  margin:0!important;
+  break-inside:auto!important;
+  column-count:auto!important
+}
+@media(max-width:760px){
+  .daily-overview[data-copy-layout="columns"] .daily-overview-summary-flow{
+    column-count:1!important
+  }
+}
