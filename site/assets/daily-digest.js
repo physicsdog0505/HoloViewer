@@ -180,6 +180,8 @@ function storyVisibleIds(videoIds,byId){
 function storyDetailRail(ids,byId){
   const visible=storyVisibleIds(ids,byId);
   if(!visible.length)return null;
+
+  const shell=el('div','daily-story-detail-shell');
   const rail=el('div','daily-story-detail-rail');
   rail.dataset.openState='closed';
 
@@ -203,13 +205,31 @@ function storyDetailRail(ids,byId){
     rail.append(card);
   });
 
-  rail.selectVideo=(id)=>{
+  const controls=el('div','daily-story-detail-controls');
+  const prev=el('button','daily-story-detail-arrow','←');
+  const next=el('button','daily-story-detail-arrow','→');
+  prev.type='button';next.type='button';
+  prev.setAttribute('aria-label','上一組直播卡片');
+  next.setAttribute('aria-label','下一組直播卡片');
+
+  const step=()=>Math.max(rail.clientWidth*0.92,300);
+  prev.addEventListener('click',()=>rail.scrollBy({left:-step(),behavior:'smooth'}));
+  next.addEventListener('click',()=>rail.scrollBy({left:step(),behavior:'smooth'}));
+  controls.append(prev,next);
+
+  rail.selectVideo=(id,{open=false}={})=>{
     const target=rail.querySelector('.daily-stream-ref[data-video-id="'+CSS.escape(String(id))+'"]');
     if(!target)return;
     rail.querySelectorAll('.daily-stream-ref').forEach(node=>node.classList.toggle('is-selected',node===target));
+    if(open)setGroupOpen(true);
     target.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'});
   };
-  return rail;
+
+  shell.append(rail,controls);
+  shell.rail=rail;
+  shell.selectVideo=(id,options)=>rail.selectVideo(id,options);
+  shell.setGroupOpen=setGroupOpen;
+  return shell;
 }
 function appendReferences(parent,ids,byId,{label='相關直播'}={}){
   const valid=[...new Set((Array.isArray(ids)?ids:[]).map(String).filter(id=>byId.has(id)))];
@@ -451,7 +471,7 @@ function renderStories(target,artifact,byId){
     const detailRail=storyDetailRail(story.video_ids,byId);
     const visual=storyVisual(story.video_ids,byId,{
       onSelect:(videoId)=>{
-        if(detailRail)detailRail.selectVideo(videoId);
+        if(detailRail)detailRail.selectVideo(videoId,{open:true});
       }
     });
     if(visual)card.append(visual);
