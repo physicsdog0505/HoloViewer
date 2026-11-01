@@ -1548,3 +1548,20 @@ html{scroll-behavior:smooth}
     width:100%
   }
 }
+
+
+/* Owner review V3.23 — sentence-level intro balancing probe. */
+.daily-overview-column-probe{
+  position:absolute;
+  visibility:hidden;
+  pointer-events:none;
+  left:-99999px;
+  top:0;
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:36px
+}
+.daily-overview-column-probe .daily-overview-column{
+  min-width:0
+}
