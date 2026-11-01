@@ -552,3 +552,98 @@ h3.daily-digest-title{margin:0}
     grid-template-columns:minmax(220px,42%) minmax(0,58%)
   }
 }
+
+
+/* Owner review V3.2 — dev-only overview layout lab + scalable templates. */
+.daily-layout-lab{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin:18px 0 14px;padding:10px 12px;border:1px dashed color-mix(in srgb,var(--brand-main) 32%,var(--line));
+  border-radius:14px;background:color-mix(in srgb,var(--brand-soft) 9%,var(--surface))
+}
+.daily-layout-lab-label{font-size:10px;font-weight:900;letter-spacing:.08em;color:var(--muted)}
+.daily-layout-lab-tab{
+  appearance:none;border:1px solid var(--line);border-radius:999px;background:var(--surface);
+  padding:7px 10px;font:inherit;font-size:11px;font-weight:850;cursor:pointer
+}
+.daily-layout-lab-tab.is-active{
+  border-color:color-mix(in srgb,var(--brand-main) 45%,var(--line));
+  background:color-mix(in srgb,var(--brand-soft) 28%,var(--surface));color:var(--brand-main)
+}
+
+/* Compact Grid: preserve the approved two-column card. */
+.daily-highlight-grid[data-layout="compact"],
+.daily-highlight-grid[data-layout="adaptive"]{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;
+  grid-auto-flow:row;overflow:visible;scroll-snap-type:none
+}
+.daily-highlight-grid[data-layout="compact"] .daily-highlight-card,
+.daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card{
+  display:grid;grid-template-columns:minmax(220px,42%) minmax(0,58%);
+  min-height:0;height:auto
+}
+
+/* Auto Fit: long titles become larger cards, short titles keep compact density. */
+.daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="wide"],
+.daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="xl"]{
+  grid-column:1/-1;
+  grid-template-columns:minmax(300px,36%) minmax(0,64%)
+}
+.daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="xl"] .daily-highlight-copy{
+  padding:22px 24px
+}
+.daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="xl"] h3{
+  font-size:20px;line-height:1.4
+}
+.daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="xl"] p{
+  font-size:14px;line-height:1.75
+}
+
+/* Wide Rail: Home-like large cards with horizontal scrolling. */
+.daily-highlight-grid[data-layout="rail"]{
+  display:grid;grid-auto-flow:column;grid-auto-columns:minmax(620px,72vw);grid-template-columns:none;
+  gap:16px;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x mandatory;
+  padding:2px 2px 12px;margin-inline:-2px
+}
+.daily-highlight-grid[data-layout="rail"] .daily-highlight-card{
+  display:grid;grid-template-columns:minmax(300px,44%) minmax(0,56%);
+  scroll-snap-align:start;min-height:220px
+}
+.daily-highlight-grid[data-layout="rail"] .daily-highlight-copy{padding:24px}
+.daily-highlight-grid[data-layout="rail"] .daily-highlight-card h3{font-size:21px;line-height:1.4}
+.daily-highlight-grid[data-layout="rail"] .daily-highlight-card p{font-size:14px;line-height:1.75}
+
+/* Lead + Grid: one editorial lead, then compact cards. */
+.daily-highlight-grid[data-layout="lead"]{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px
+}
+.daily-highlight-grid[data-layout="lead"] .daily-highlight-card{
+  display:grid;grid-template-columns:minmax(220px,42%) minmax(0,58%)
+}
+.daily-highlight-grid[data-layout="lead"] .daily-highlight-card:first-child{
+  grid-column:1/-1;grid-template-columns:minmax(360px,48%) minmax(0,52%);min-height:260px
+}
+.daily-highlight-grid[data-layout="lead"] .daily-highlight-card:first-child .daily-highlight-copy{padding:28px}
+.daily-highlight-grid[data-layout="lead"] .daily-highlight-card:first-child h3{font-size:24px;line-height:1.35}
+.daily-highlight-grid[data-layout="lead"] .daily-highlight-card:first-child p{font-size:15px;line-height:1.8}
+
+@media(max-width:980px){
+  .daily-highlight-grid[data-layout="compact"],
+  .daily-highlight-grid[data-layout="adaptive"],
+  .daily-highlight-grid[data-layout="lead"]{grid-template-columns:1fr}
+  .daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="wide"],
+  .daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="xl"],
+  .daily-highlight-grid[data-layout="lead"] .daily-highlight-card:first-child{grid-column:auto}
+  .daily-highlight-grid[data-layout="rail"]{grid-auto-columns:minmax(540px,86vw)}
+}
+@media(max-width:760px){
+  .daily-highlight-grid[data-layout="compact"] .daily-highlight-card,
+  .daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card,
+  .daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="wide"],
+  .daily-highlight-grid[data-layout="adaptive"] .daily-highlight-card[data-fit="xl"],
+  .daily-highlight-grid[data-layout="lead"] .daily-highlight-card,
+  .daily-highlight-grid[data-layout="lead"] .daily-highlight-card:first-child,
+  .daily-highlight-grid[data-layout="rail"] .daily-highlight-card{
+    display:block;grid-template-columns:none;min-height:0
+  }
+  .daily-highlight-grid[data-layout="rail"]{grid-auto-columns:86vw}
+}
