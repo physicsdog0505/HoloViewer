@@ -340,47 +340,6 @@ function applyOverviewLayout(grid,mode,highlights){
     card.dataset.titleLength=String(overviewCardTitle(highlights[index]||'').length);
   });
 }
-function overviewSentences(value){
-  const raw=publicText(value);
-  return raw.match(/[^。！？!?]+[。！？!?]?/g)?.map(item=>item.trim()).filter(Boolean)||[];
-}
-function balanceOverviewColumns(flow){
-  if(!flow)return;
-  const original=flow.dataset.originalText||[...flow.querySelectorAll('.daily-overview-summary')].map(node=>publicText(node.textContent)).join('');
-  if(!original)return;
-  flow.dataset.originalText=original;
-
-  const sentences=overviewSentences(original);
-  if(sentences.length<2)return;
-
-  const probe=el('div','daily-overview-column-probe');
-  probe.setAttribute('aria-hidden','true');
-  const leftProbe=el('div','daily-overview-column');
-  const rightProbe=el('div','daily-overview-column');
-  probe.append(leftProbe,rightProbe);
-  flow.append(probe);
-
-  let bestIndex=1;
-  let bestDiff=Infinity;
-  for(let index=1;index<sentences.length;index++){
-    leftProbe.replaceChildren(el('p','daily-overview-summary',sentences.slice(0,index).join('')));
-    rightProbe.replaceChildren(el('p','daily-overview-summary',sentences.slice(index).join('')));
-    const leftHeight=leftProbe.getBoundingClientRect().height;
-    const rightHeight=rightProbe.getBoundingClientRect().height;
-    const diff=Math.abs(leftHeight-rightHeight);
-    if(diff<bestDiff){
-      bestDiff=diff;
-      bestIndex=index;
-    }
-  }
-  probe.remove();
-
-  const leftCol=el('div','daily-overview-column daily-overview-column-left');
-  const rightCol=el('div','daily-overview-column daily-overview-column-right');
-  leftCol.append(el('p','daily-overview-summary',sentences.slice(0,bestIndex).join('')));
-  rightCol.append(el('p','daily-overview-summary',sentences.slice(bestIndex).join('')));
-  flow.replaceChildren(leftCol,rightCol);
-}
 function restoreOverviewFlow(flow){
   if(!flow)return;
   const original=flow.dataset.originalText||[...flow.querySelectorAll('.daily-overview-summary')].map(node=>publicText(node.textContent)).join('');
