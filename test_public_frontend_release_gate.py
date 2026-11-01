@@ -22,6 +22,7 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
         self.assertTrue(is_foreign_rel("youtube/v1/manifest.json"))
         self.assertTrue(is_foreign_rel("ptt/v1/manifests/x.json"))
         self.assertTrue(is_foreign_rel("data/watchalong/manifest.json"))
+        self.assertTrue(is_foreign_rel("data/daily-digest/months/2026-11.json"))
         self.assertFalse(is_foreign_rel("data/search/aliases/v1/latest.json"))
 
     def test_ownership_gate_accepts_frontend_without_watchalong_data(self):
@@ -53,7 +54,7 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
                 ownership_gate(root)
 
     def test_foreign_prefix_contract_is_explicit(self):
-        self.assertEqual(FOREIGN_PREFIXES, ("youtube/v1/", "ptt/v1/", "data/watchalong/"))
+        self.assertEqual(FOREIGN_PREFIXES, ("youtube/v1/", "ptt/v1/", "data/watchalong/", "data/daily-digest/"))
 
 
     def test_protected_runtime_prefix_contract_is_explicit(self):
