@@ -640,55 +640,6 @@ h3.daily-digest-title{margin:0}
 html{scroll-behavior:smooth}
 
 
-/* Owner review V3.5 — story media is a fixed 16:9 horizontal rail. */
-.daily-story-visual,
-.daily-story-visual[data-count]{
-  display:grid;
-  grid-auto-flow:column;
-  grid-auto-columns:minmax(300px,34%);
-  grid-template-columns:none;
-  gap:10px;
-  overflow-x:auto;
-  overscroll-behavior-inline:contain;
-  scroll-snap-type:x proximity;
-  padding:2px 2px 10px;
-  margin:22px 0 4px
-}
-.daily-story-visual-item,
-.daily-story-visual-item[data-slot]{
-  display:block;
-  grid-column:auto;
-  max-width:none;
-  aspect-ratio:16/9;
-  scroll-snap-align:start
-}
-.daily-story-card[data-layout="compact"] .daily-story-visual{
-  display:grid;
-  grid-auto-flow:column;
-  grid-auto-columns:minmax(300px,68%);
-  grid-template-columns:none;
-  overflow-x:auto
-}
-.daily-story-card[data-layout="compact"] .daily-story-visual-item{
-  display:block;
-  aspect-ratio:16/9
-}
-
-@media(max-width:980px){
-  .daily-story-visual,
-.daily-story-visual[data-count]{
-    grid-auto-columns:minmax(280px,48%)
-  }
-}
-@media(max-width:760px){
-  .daily-story-visual,
-.daily-story-visual[data-count],
-.daily-story-card[data-layout="compact"] .daily-story-visual{
-    grid-auto-columns:84%;
-  }
-}
-
-
 /* Owner review V3.6 — restore count-based media grid; detail cards mirror visible media count. */
 .daily-story-visual,
 .daily-story-visual[data-count]{
@@ -1032,17 +983,6 @@ html{scroll-behavior:smooth}
 }
 
 
-/* Owner review V3.15 — hidden probe for rendered-height column balancing. */
-.daily-overview-column-probe{
-  position:absolute;
-  visibility:hidden;
-  pointer-events:none;
-  width:calc((100% - 36px)/2);
-  left:-99999px;
-  top:0
-}
-
-
 /* Owner review V3.16 — improve detail carousel text readability. */
 .daily-story-detail-rail .daily-stream-ref-copy strong{font-size:13px}
 .daily-story-detail-rail .daily-stream-ref-copy>span{font-size:12px}
@@ -1052,88 +992,6 @@ html{scroll-behavior:smooth}
 }
 .daily-story-detail-rail .daily-stream-topic-chips span{font-size:11px}
 .daily-story-detail-rail .daily-stream-youtube{font-size:12px}
-
-
-/* Owner review V3.17 — 5-slot mosaic carousel for 6–9 story images. */
-.daily-story-visual-shell{
-  position:relative
-}
-.daily-story-visual[data-visual-layout="mosaic-carousel"]{
-  display:grid;
-  grid-template-columns:repeat(12,minmax(0,1fr));
-  grid-template-rows:repeat(2,minmax(0,1fr));
-  gap:10px;
-  min-height:360px
-}
-.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item{
-  aspect-ratio:auto;
-  min-height:0
-}
-.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item:not([hidden]):first-of-type,
-.daily-story-visual[data-visual-layout="mosaic-carousel"][data-page="0"] .daily-story-visual-item[data-page="0"]:first-of-type{
-  grid-column:span 6;
-  grid-row:span 2
-}
-.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item:not([hidden]){
-  grid-column:span 3;
-  grid-row:span 1
-}
-/* On later pages with four remaining images, use a clean 2x2 grid. */
-.daily-story-visual[data-visual-layout="mosaic-carousel"][data-page="1"] .daily-story-visual-item:not([hidden]){
-  grid-column:span 6;
-  grid-row:span 1;
-  aspect-ratio:16/9
-}
-.daily-story-visual[data-visual-layout="mosaic-carousel"][data-page="1"] .daily-story-visual-item:not([hidden]):first-of-type{
-  grid-column:span 6;
-  grid-row:span 1
-}
-.daily-story-visual-controls{
-  position:absolute;
-  inset:0;
-  pointer-events:none
-}
-.daily-story-visual-arrow{
-  position:absolute;
-  top:50%;
-  transform:translateY(-50%);
-  z-index:3;
-  width:38px;
-  height:38px;
-  border:1px solid var(--line);
-  border-radius:999px;
-  background:color-mix(in srgb,var(--surface) 92%,transparent);
-  box-shadow:0 2px 10px rgba(0,0,0,.12);
-  font:inherit;
-  font-size:18px;
-  cursor:pointer;
-  pointer-events:auto
-}
-.daily-story-visual-arrow:first-child{left:10px}
-.daily-story-visual-arrow:last-child{right:10px}
-
-@media(max-width:980px){
-  .daily-story-visual[data-visual-layout="mosaic-carousel"]{
-    min-height:300px
-  }
-}
-@media(max-width:760px){
-  .daily-story-visual[data-visual-layout="mosaic-carousel"]{
-    display:grid;
-    grid-auto-flow:column;
-    grid-auto-columns:84%;
-    grid-template-columns:none;
-    grid-template-rows:none;
-    min-height:0;
-    overflow-x:auto
-  }
-  .daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item:not([hidden]),
-.daily-story-visual[data-visual-layout="mosaic-carousel"][data-page="1"] .daily-story-visual-item:not([hidden]){
-    grid-column:auto;
-    grid-row:auto;
-    aspect-ratio:16/9
-  }
-}
 
 
 /* Owner review V3.18 — stable 5-slot mosaic windows; no orphan remainder pages. */
@@ -1394,115 +1252,12 @@ html{scroll-behavior:smooth}
   aspect-ratio:16/9
 }
 
-.daily-story-visual[data-visual-layout="feature-three"]{
-  display:grid;
-  grid-template-columns:1.25fr .75fr;
-  gap:10px
-}
-.daily-story-visual[data-visual-layout="feature-three"] .daily-story-visual-item[data-slot="1"]{
-  grid-row:span 2
-}
-.daily-story-visual[data-visual-layout="feature-four"]{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px
-}
-.daily-story-visual[data-visual-layout="feature-five"]{
-  display:grid;
-  grid-template-columns:repeat(6,minmax(0,1fr));
-  gap:10px
-}
-.daily-story-visual[data-visual-layout="feature-five"] .daily-story-visual-item[data-slot="1"],
-.daily-story-visual[data-visual-layout="feature-five"] .daily-story-visual-item[data-slot="2"]{
-  grid-column:span 3
-}
-.daily-story-visual[data-visual-layout="feature-five"] .daily-story-visual-item[data-slot="3"],
-.daily-story-visual[data-visual-layout="feature-five"] .daily-story-visual-item[data-slot="4"],
-.daily-story-visual[data-visual-layout="feature-five"] .daily-story-visual-item[data-slot="5"]{
-  grid-column:span 2
-}
-
-.daily-story-visual[data-visual-layout="mosaic-hero"]{
-  display:grid;
-  grid-template-columns:repeat(12,minmax(0,1fr));
-  gap:10px
-}
-.daily-story-visual[data-visual-layout="mosaic-hero"] .daily-story-visual-item[data-slot="1"]{
-  grid-column:span 6;
-  grid-row:span 2
-}
-.daily-story-visual[data-visual-layout="mosaic-hero"] .daily-story-visual-item:not([data-slot="1"]){
-  grid-column:span 3
-}
 @media(max-width:900px){
-  .daily-story-visual[data-visual-layout="feature-duo-split"],
-.daily-story-visual[data-visual-layout="feature-three"]{
+  .daily-story-visual[data-visual-layout="feature-duo-split"]{
     grid-template-columns:1fr
   }
   .daily-story-visual[data-visual-layout="feature-single-editorial"] .daily-story-visual-item{
     width:100%
-  }
-}
-
-
-/* Owner review V3.23 — sentence-level intro balancing probe. */
-.daily-overview-column-probe{
-  position:absolute;
-  visibility:hidden;
-  pointer-events:none;
-  left:-99999px;
-  top:0;
-  width:100%;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:36px
-}
-.daily-overview-column-probe .daily-overview-column{
-  min-width:0
-}
-
-
-/* Owner review V3.24 — restore full hero + four-up strip without orphan rows. */
-.daily-story-visual[data-visual-layout="hero-full-carousel"]{
-  display:grid;
-  grid-template-columns:repeat(12,minmax(0,1fr));
-  gap:10px;
-  min-height:0
-}
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[hidden]{
-  display:none!important
-}
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="1"]{
-  grid-column:1/-1;
-  grid-row:auto;
-  width:100%;
-  aspect-ratio:16/9;
-  min-height:0
-}
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="2"],
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="3"],
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="4"],
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="5"]{
-  grid-column:span 3;
-  grid-row:auto;
-  aspect-ratio:16/9;
-  min-height:0
-}
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item img{
-  object-fit:contain!important;
-  object-position:50% 50%!important
-}
-@media(max-width:900px){
-  .daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="2"],
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="3"],
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="4"],
-.daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot="5"]{
-    grid-column:span 6
-  }
-}
-@media(max-width:620px){
-  .daily-story-visual[data-visual-layout="hero-full-carousel"] .daily-story-visual-item[data-slot]{
-    grid-column:1/-1
   }
 }
 
