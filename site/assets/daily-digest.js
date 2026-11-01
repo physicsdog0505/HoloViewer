@@ -542,7 +542,9 @@ function renderStories(target,artifact,byId){
       appendStoryEditorialCopy(copy,summary);
       card.append(copy);
     }
-    const readerMode=publicText(story.reader_mode)==='inline'?'inline':'summary_with_details';
+    const requestedReaderMode=publicText(story.reader_mode)==='inline'?'inline':'summary_with_details';
+    const hasEditorialSummary=Boolean(publicText(story.editorial_summary));
+    const readerMode=(visibleIds.length<=2&&hasEditorialSummary)?'inline':requestedReaderMode;
     card.dataset.readerMode=readerMode;
     const detailRail=readerMode==='summary_with_details'?storyDetailRail(story.video_ids,byId):null;
     const visualLayout=storyVisualLayout(visibleIds.length);
