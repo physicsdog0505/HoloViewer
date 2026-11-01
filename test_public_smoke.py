@@ -671,6 +671,17 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("daily-highlight-media", js)
         self.assertIn("Owner review V3", css)
         self.assertIn('.daily-story-visual[data-count="5"]', css)
+        self.assertIn("overviewLayoutLabEnabled", js)
+        self.assertIn("layoutlab", js)
+        self.assertIn("Auto Fit", js)
+        self.assertIn("Compact Grid", js)
+        self.assertIn("Wide Rail", js)
+        self.assertIn("Lead + Grid", js)
+        self.assertIn("overviewAutoLayout", js)
+        self.assertIn('grid.dataset.layout=resolved', js)
+        self.assertIn('data-layout="rail"', css)
+        self.assertIn('data-layout="lead"', css)
+        self.assertIn('data-layout="adaptive"', css)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
