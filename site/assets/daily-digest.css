@@ -1255,3 +1255,42 @@ html{scroll-behavior:smooth}
     aspect-ratio:16/9
   }
 }
+
+
+/* Owner review V3.18 — stable 5-slot mosaic windows; no orphan remainder pages. */
+.daily-story-visual[data-visual-layout="mosaic-carousel"]{
+  display:grid;
+  grid-template-columns:repeat(12,minmax(0,1fr));
+  grid-template-rows:repeat(2,minmax(0,1fr));
+  gap:10px;
+  min-height:360px
+}
+.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item[hidden]{
+  display:none!important
+}
+.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item[data-slot="1"]{
+  grid-column:span 6;
+  grid-row:span 2;
+  aspect-ratio:auto;
+  min-height:360px
+}
+.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item[data-slot="2"],
+.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item[data-slot="3"],
+.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item[data-slot="4"],
+.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item[data-slot="5"]{
+  grid-column:span 3;
+  grid-row:span 1;
+  aspect-ratio:auto;
+  min-height:0
+}
+@media(max-width:980px){
+  .daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item[data-slot]{
+    min-height:0
+  }
+}
+@media(max-width:760px){
+  .daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item[data-slot]{
+    aspect-ratio:16/9;
+    min-height:0
+  }
+}
