@@ -538,7 +538,7 @@ function renderAnnouncements(target,artifact,byId){
     when.append(el('span','daily-announcement-type',publicTypeLabel(row.type)));
     if(publicText(row.event_date_text))when.append(el('time','',publicText(row.event_date_text)));
     card.append(when);
-    if(publicText(row.title))card.append(el('h3','',shortHeadline(row.short_title||row.title,44)));
+    if(publicText(row.title))card.append(el('h3','',publicText(row.title)));
     if(publicText(row.summary))card.append(el('p','',publicText(row.summary)));
     appendReferences(card,row.video_ids,byId,{label:'來源直播'});
     timeline.append(card);
