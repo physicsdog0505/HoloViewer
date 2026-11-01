@@ -970,3 +970,40 @@ html{scroll-behavior:smooth}
     min-height:0
   }
 }
+
+
+/* Owner review V3.12 — arrow-driven detail carousel without visible scrollbar. */
+.daily-story-detail-shell{
+  position:relative;
+  margin-top:18px
+}
+.daily-story-detail-rail{
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+  padding-bottom:2px
+}
+.daily-story-detail-rail::-webkit-scrollbar{display:none}
+.daily-story-detail-controls{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:10px
+}
+.daily-story-detail-arrow{
+  width:36px;
+  height:36px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--surface);
+  font:inherit;
+  font-size:18px;
+  line-height:1;
+  cursor:pointer
+}
+.daily-story-detail-arrow:hover{
+  background:color-mix(in srgb,var(--brand-soft) 24%,var(--surface))
+}
+.daily-story-detail-arrow:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--brand-main) 58%,transparent);
+  outline-offset:2px
+}
