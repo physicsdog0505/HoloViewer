@@ -24,7 +24,10 @@ verify_candidate(){
   expected_head="$1"
   repo_root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"; cd "$repo_root"
   [ "$(git rev-parse HEAD)" = "$expected_head" ]||fail "checkout is not reviewed candidate HEAD"
-  [ -z "$(git status --porcelain --untracked-files=all)" ]||fail "candidate checkout is not clean"
+
+  dirty="$(git status --porcelain --untracked-files=all | grep -Ev '^.. daily-digest-static/data/daily-digest/months/[0-9]{4}-[0-9]{2}\.json$' || true)"
+  [ -z "$dirty" ]||fail "candidate checkout has non-Daily-Digest runtime drift"
+
   [ ! -e site/data/daily-digest ]||fail "Daily Digest data must not be packaged by holoviewer-public"
   root="$ASSET_ROOT/data/daily-digest/months"
   [ -d "$root" ]||fail "month shard root missing"
@@ -47,15 +50,12 @@ verify_candidate(){
 
 readback(){
   tmp="$(mktemp -d /private/tmp/daily-digest-static-readback.XXXXXX)"
-  count=0
   find "$ASSET_ROOT/data/daily-digest/months" -type f -name '*.json' | while read -r file; do
     rel="${file#$ASSET_ROOT/}"
     out="$tmp/$(basename "$file")"
     curl -fsS --max-time 30 "$LIVE_ORIGIN/$rel?release=$(date +%s)" -o "$out"
     [ "$(sha256_file "$out")" = "$(sha256_file "$file")" ]||fail "production month shard mismatch: $rel"
-    count=$((count+1))
   done
-  cors="$(curl -fsSI --max-time 30 "$LIVE_ORIGIN/data/daily-digest/months/2099-12.json" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}' || true)"
   printf 'DAILY_DIGEST_STATIC_READBACK=PASS\n'
 }
 
@@ -70,6 +70,18 @@ case "$mode" in
     printf 'CANDIDATE_HEAD=%s\n' "$2"
     printf 'BASELINE_VERSION=%s\n' "$baseline"
     printf 'PRODUCTION_MUTATION=NO\n'
+    ;;
+  verify)
+    [ "$#" -eq 2 ]||fail "usage: $0 verify EXPECTED_HEAD"
+    require_hex "$2" 40
+    verify_candidate "$2"
+    current="$(current_version)"
+    [ "$current" != "ABSENT" ]||fail "dedicated Worker is absent"
+    readback
+    printf 'DAILY_DIGEST_STATIC_VERIFY=PASS\n'
+    printf 'CURRENT_VERSION=%s\n' "$current"
+    printf 'PRODUCTION_MUTATION=NO\n'
+    printf 'FRONTEND_DEPLOY=NO\n'
     ;;
   deploy)
     [ "$#" -eq 3 ]||fail "usage: $0 deploy EXPECTED_HEAD EXPECTED_BASELINE_VERSION"
@@ -87,6 +99,6 @@ case "$mode" in
     printf 'FRONTEND_DEPLOY=NO\n'
     ;;
   *)
-    fail "first argument must be prepare or deploy"
+    fail "first argument must be prepare, verify, or deploy"
     ;;
 esac

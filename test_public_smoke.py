@@ -22,6 +22,7 @@ EXPECTED.update({
     "scripts/daily_digest_monthly_publish.py",
     "scripts/deploy_daily_digest_static_assets_owner_local.sh",
     "test_daily_digest_monthly_publish.py",
+    "test_daily_digest_static_release_gate.py",
 })
 EXPECTED.update({
     "cloudflare/vod-subtitle-static-assets.wrangler.json",
