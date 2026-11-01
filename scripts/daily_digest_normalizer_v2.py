@@ -23,6 +23,8 @@ HIGHLIGHT_SUMMARY_MIN = 45
 HIGHLIGHT_SUMMARY_MAX = 110
 OVERVIEW_MIN = 260
 OVERVIEW_MAX = 520
+STORY_EDITORIAL_TARGET_MIN = 320
+STORY_EDITORIAL_MAX = 760
 
 
 class ContractError(ValueError):
@@ -174,7 +176,42 @@ def _normalize_highlight(item: Any, story: dict[str, Any] | None, *, legacy: boo
     }, warnings
 
 
-def _normalize_story(story: Any, *, legacy: bool, index: int) -> tuple[dict[str, Any], list[str]]:
+def _story_editorial_summary(story: dict[str, Any], stream_by_id: dict[str, dict[str, Any]]) -> str:
+    explicit = _clean(story.get("editorial_summary"))
+    if explicit:
+        return _truncate(explicit, STORY_EDITORIAL_MAX) if len(explicit) > STORY_EDITORIAL_MAX else explicit
+
+    base = _clean(story.get("public_summary") or story.get("summary"))
+    if len(base) >= STORY_EDITORIAL_TARGET_MIN:
+        return _truncate(base, STORY_EDITORIAL_MAX) if len(base) > STORY_EDITORIAL_MAX else base
+
+    parts: list[str] = [base] if base else []
+    joined = base
+    for video_id in _ordered_video_ids(story.get("video_ids")):
+        stream = stream_by_id.get(video_id) or {}
+        candidate = _clean(stream.get("summary") or stream.get("public_summary"))
+        if not candidate:
+            continue
+        if candidate in joined or (joined and joined in candidate):
+            continue
+        parts.append(candidate)
+        joined = " ".join(parts)
+        if len(joined) >= STORY_EDITORIAL_TARGET_MIN:
+            break
+
+    editorial = " ".join(part for part in parts if part).strip()
+    if len(editorial) > STORY_EDITORIAL_MAX:
+        editorial = _truncate(editorial, STORY_EDITORIAL_MAX)
+    return editorial
+
+
+def _normalize_story(
+    story: Any,
+    *,
+    legacy: bool,
+    index: int,
+    stream_by_id: dict[str, dict[str, Any]],
+) -> tuple[dict[str, Any], list[str]]:
     if not isinstance(story, dict):
         raise ContractError(f"stories[{index}] must be object")
     out = copy.deepcopy(story)
@@ -187,10 +224,16 @@ def _normalize_story(story: Any, *, legacy: bool, index: int) -> tuple[dict[str,
         out["short_title"] = _derive_short_title(_clean(out["short_title"]))
     elif not legacy:
         out["short_title"] = _derive_short_title(title)
+
     public_summary = _clean(out.get("public_summary") or out.get("summary"))
     if public_summary:
         out["public_summary"] = public_summary
+
     out["video_ids"] = _ordered_video_ids(out.get("video_ids"))
+    editorial_summary = _story_editorial_summary(out, stream_by_id)
+    if editorial_summary:
+        out["editorial_summary"] = editorial_summary
+
     hint = _clean(out.get("presentation_hint")).lower()
     if hint and hint not in VALID_OVERVIEW_LAYOUTS:
         warnings.append(f"stories[{index}].presentation_hint={hint!r} dropped")
@@ -273,9 +316,19 @@ def normalize_digest(payload: dict[str, Any]) -> NormalizeResult:
     out["overview_layout"] = layout
 
     if stories_src:
+        stream_by_id = {
+            _clean(row.get("video_id")): row
+            for row in (out.get("streams") if isinstance(out.get("streams"), list) else [])
+            if isinstance(row, dict) and _clean(row.get("video_id"))
+        }
         stories: list[dict[str, Any]] = []
         for index, story in enumerate(stories_src):
-            normalized, local_warnings = _normalize_story(story, legacy=legacy, index=index)
+            normalized, local_warnings = _normalize_story(
+                story,
+                legacy=legacy,
+                index=index,
+                stream_by_id=stream_by_id,
+            )
             stories.append(normalized)
             warnings.extend(local_warnings)
         out["stories"] = stories
