@@ -81,6 +81,7 @@ Every story keeps:
 - optional bounded `short_title`;
 - `editorial_summary`: the primary detailed-reader copy, synthesized by Gemini from the supporting streams;
 - optional compact `public_summary` (or legacy `summary`) as shorter source copy / migration fallback;
+- `reader_mode`: `inline | summary_with_details`;
 - ordered `video_ids`;
 - existing `editorial_signals` / source evidence;
 - optional non-authoritative `presentation_hint`.
@@ -93,6 +94,9 @@ Story copy rules:
 - Do not duplicate every per-stream summary verbatim; synthesize the story as an editorial unit.
 - The normalizer preserves an explicit `editorial_summary` unchanged within the public bound.
 - During migration, when `editorial_summary` is absent, the normalizer must preserve and reuse the existing story `public_summary` / legacy `summary` only. It must not synthesize a second prose version from `streams[].summary`; richer story prose must come from Gemini as an explicit `editorial_summary`.
+- Use `reader_mode=inline` when the story body can absorb the useful supporting-stream details without losing clarity; the detailed frontend should then omit redundant per-stream detail cards.
+- Use `reader_mode=summary_with_details` only when individual supporting streams contain materially distinct details, POVs, chronology, or evidence that remain useful after the story synthesis.
+- Do not choose `summary_with_details` merely because a story has multiple `video_ids`; the decision is editorial, not a video-count heuristic.
 
 The detailed frontend must show the full story title and prefer `editorial_summary` for the story body. It must not truncate that body merely to satisfy a visual template.
 
