@@ -117,6 +117,21 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("/ptt/v1/manifests/static-assets-full-2026-10.json", frontend_config)
         self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
 
+    def test_daily_digest_single_image_story_variants(self):
+        js = (ROOT / "site/assets/daily-digest.js").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/daily-digest.css").read_text(encoding="utf-8")
+        self.assertIn("function singleImageStoryVariant(story,ordinal)", js)
+        self.assertIn("requested==='editorial-side'||requested==='wide'", js)
+        self.assertIn("return ordinal%2===0?'editorial-side':'wide';", js)
+        self.assertIn("let singleImageOrdinal=0;", js)
+        self.assertIn("if(visibleIds.length===1)", js)
+        self.assertIn("card.dataset.singleImageLayout=variant;", js)
+        self.assertIn("card.classList.add('is-feature-story')", js)
+        self.assertIn(".daily-story-card.is-feature-story{", css)
+        self.assertIn('"title summary"', css)
+        self.assertIn('"visual summary"', css)
+        self.assertIn("@media(max-width:900px)", css)
+
     def test_standalone_viewer_mode_contract(self):
         html = (ROOT / "site/viewer/index.html").read_text(encoding="utf-8")
         js = (ROOT / "site/assets/viewer-standalone.js").read_text(encoding="utf-8")
