@@ -1312,3 +1312,59 @@ html{scroll-behavior:smooth}
   object-position:50% 50%;
   background:color-mix(in srgb,var(--surface-2) 82%,#111)
 }
+
+
+/* Owner review V3.20 — auto-rotating visual mosaic + true overlay detail arrows. */
+.daily-story-visual[data-visual-layout="mosaic-carousel"] .daily-story-visual-item{
+  transition:opacity .28s ease,transform .28s ease
+}
+.daily-story-visual[data-visual-layout="mosaic-carousel"].is-changing .daily-story-visual-item:not([hidden]){
+  opacity:.7;
+  transform:scale(.992)
+}
+.daily-story-visual-controls,
+.daily-story-visual-arrow{
+  display:none!important
+}
+
+.daily-story-detail-shell{
+  position:relative;
+  margin-top:18px;
+  padding-inline:0!important
+}
+.daily-story-detail-controls{
+  position:absolute;
+  inset:0;
+  margin:0!important;
+  pointer-events:none;
+  z-index:4
+}
+.daily-story-detail-arrow{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  width:38px;
+  height:38px;
+  pointer-events:auto;
+  border:1px solid color-mix(in srgb,var(--line) 78%,transparent);
+  background:color-mix(in srgb,var(--surface) 72%,transparent);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  box-shadow:0 4px 14px rgba(0,0,0,.12);
+  opacity:.82
+}
+.daily-story-detail-arrow:hover{
+  opacity:1;
+  background:color-mix(in srgb,var(--surface) 88%,var(--brand-soft) 12%)
+}
+.daily-story-detail-arrow:first-child{left:8px!important}
+.daily-story-detail-arrow:last-child{right:8px!important}
+@media(max-width:760px){
+  .daily-story-detail-shell{padding-inline:0!important}
+  .daily-story-detail-arrow{
+    width:32px;
+    height:32px
+  }
+  .daily-story-detail-arrow:first-child{left:6px!important}
+  .daily-story-detail-arrow:last-child{right:6px!important}
+}
