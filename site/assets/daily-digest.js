@@ -660,7 +660,8 @@ async function fetchArtifact(day){
   const url=artifactUrl(day);
   if(!url)return {state:'MISSING',artifact:null,reason:'unconfigured'};
   let response;
-  try{response=await fetch(url,{credentials:'omit',cache:day===taipeiDay()?'no-cache':'force-cache'})}
+  const localPreview=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+  try{response=await fetch(url,{credentials:'omit',cache:(localPreview||day===taipeiDay())?'no-cache':'force-cache'})}
   catch{return {state:'ERROR',artifact:null,reason:'network'}}
   if(response.status===404)return {state:'MISSING',artifact:null,reason:'not_found'};
   if(!response.ok)return {state:'ERROR',artifact:null,reason:'http_'+response.status};
