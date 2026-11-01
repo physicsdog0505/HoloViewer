@@ -743,7 +743,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("data-crop", css)
         self.assertIn("Owner review V3.13", css)
         self.assertIn("Owner review V3.14", css)
-        self.assertIn("Owner review V3.16", css)
+        self.assertNotIn("Owner review V3.16", css)
         self.assertIn(".daily-story-detail-rail .daily-stream-ref-copy strong{font-size:13px}", css)
         self.assertIn("mosaic-carousel", js)
         self.assertIn("slice(0,9)", js)
