@@ -90,12 +90,13 @@ Repeated identical input:
 
 Return ingest does not deploy and does not mutate production automatically.
 
-A later publication step may promote the exact candidate SHA into:
+Local publication authority:
+`scripts/daily_digest_publish_candidate_v2.py`
+
+The publish gate verifies the return receipt is `READY_FOR_PUBLICATION`, checks the exact candidate SHA, enforces `<TARGET_DAY>.json`, and defaults to dry-run. Only `--execute` atomically promotes the exact candidate bytes into:
 `site/data/daily-digest/<TARGET_DAY>.json`
 
-only after the receipt is accepted by the configured Owner-local publication policy.
-
-Production deploy remains a separate Owner-local release boundary.
+This is local artifact promotion only. Production deploy remains a separate Owner-local release boundary.
 
 ## Failure behavior
 
