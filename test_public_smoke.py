@@ -708,6 +708,10 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("daily-story-detail-rail", css)
         self.assertIn("Owner review V3.6", css)
         self.assertIn('.daily-story-visual[data-count="6"]', css)
+        self.assertIn("const headline=publicText(story.title)||publicText(story.short_title);", js)
+        self.assertIn("Owner review V3.7", css)
+        self.assertIn(".daily-story-card .daily-story-title", css)
+        self.assertIn("max-width:none", css)
 
     def test_static_response_content_security_policy(self):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
