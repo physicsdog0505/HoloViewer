@@ -797,7 +797,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertNotIn("上一組主題圖片", js)
         self.assertNotIn("下一組主題圖片", js)
         self.assertIn("object-fit:contain!important", css)
-        self.assertIn("object-position:50% 50%!important", css)
+        self.assertIn("object-position:center!important", css)
         self.assertIn('.daily-story-visual-item[data-slot="1"]', css)
         self.assertIn('.daily-story-visual-item[data-slot="5"]', css)
         self.assertIn(".daily-story-detail-rail .daily-stream-ref-detail p", css)
