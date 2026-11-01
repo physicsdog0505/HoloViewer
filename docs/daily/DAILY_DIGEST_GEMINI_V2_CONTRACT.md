@@ -79,12 +79,24 @@ Every story keeps:
 
 - full `title`;
 - optional bounded `short_title`;
-- complete `public_summary` (or legacy `summary` as source copy);
+- `editorial_summary`: the primary detailed-reader copy, synthesized by Gemini from the supporting streams;
+- optional compact `public_summary` (or legacy `summary`) as shorter source copy / migration fallback;
 - ordered `video_ids`;
 - existing `editorial_signals` / source evidence;
 - optional non-authoritative `presentation_hint`.
 
-The detailed frontend must show the full story title. Do not destructively shorten it for the overview card.
+Story copy rules:
+
+- `editorial_summary` should preserve the useful depth already discovered during Gemini research instead of collapsing a multi-stream story into a thin card caption.
+- Target roughly 320-760 CJK characters for a substantial multi-stream story, normally 2-5 semantic beats. Shorter is acceptable when the source event is genuinely simple.
+- Prefer concrete cross-stream facts, outcomes, announcements and relationships over filler prose.
+- Do not duplicate every per-stream summary verbatim; synthesize the story as an editorial unit.
+- The normalizer preserves an explicit `editorial_summary` unchanged within the public bound.
+- During migration, when only a short `public_summary` exists, the normalizer may deterministically assemble additional copy from the same story's Gemini-produced supporting stream summaries. It must not invent new facts or replace the preserved source copy.
+
+The detailed frontend must show the full story title and prefer `editorial_summary` for the story body. It must not truncate that body merely to satisfy a visual template.
+
+Story visual layout is structural, not editorial ranking. The frontend may use stable count-based media grids (for example 1, 2, 3, 4, 5, or 6+ supporting videos), but must not select visual prominence from story index, title length, summary length, viewers, or timing.
 
 ## Announcements and categories
 
