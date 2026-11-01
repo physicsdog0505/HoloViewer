@@ -96,6 +96,7 @@ Stories 是跨直播／跨視角後的主要 editorial units，不是每支直�
 - `short_title`：optional overview/navigation 用短標題；
 - `editorial_summary`：主要 detailed-reader 主文。請把你已研究到、對讀者有價值的跨直播資訊完整整併進來，target 約 320–760 CJK characters，通常 2–5 個 semantic beats；事件本身簡單時可更短；
 - `public_summary`：optional 較短版本／migration fallback，不應取代 `editorial_summary` 的資訊深度；
+- `reader_mode`：`inline | summary_with_details`；
 - `video_ids`：ordered supporting evidence，至少 1 筆；
 - `member_names`：相關成員；
 - `sub_events`：需要時才拆分，必須是 parent story 的子集合；
@@ -103,6 +104,11 @@ Stories 是跨直播／跨視角後的主要 editorial units，不是每支直�
 - `presentation_hint`：optional、non-authoritative。
 
 `editorial_summary` 應優先保留跨 POV 的具體內容、結果、公告、人物關係與值得閱讀的細節；不要因為前端卡片尺寸而把已研究到的資訊壓成兩三句。也不要把每支 stream summary 原封不動串接，應該做真正的 editorial synthesis。
+
+reader mode 判斷：
+- `inline`：當 supporting streams 的重要細節可以自然整併進 `editorial_summary`，請直接把讀者真正需要的資訊寫進主文；不要再要求前端重複顯示同一批 detail cards。
+- `summary_with_details`：只有當各支 supporting streams 仍有明顯不同的 POV、時間線、細節或證據，讀者展開個別直播仍有額外價值時才使用。
+- 不要因為 `video_ids` 數量多就自動選 `summary_with_details`；這是 editorial judgment。
 
 不同 POV 若描述同一事件，應合併為同一 story / sub-event；不要用多篇重複故事灌數量。
 
