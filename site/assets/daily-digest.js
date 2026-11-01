@@ -83,13 +83,15 @@ function appendStoryEditorialCopy(parent,value){
   columns.append(left,right);
   parent.append(columns);
 }
-function storyVisualLayout(count){
+function storyVisualLayout(count,{largeOrdinal=0,explicit=''}={}){
+  const requested=publicText(explicit).toLowerCase();
+  if(count>=6&&(requested==='hero-full-carousel'||requested==='mosaic-carousel'))return requested;
   if(count<=1)return 'feature-single-wide';
   if(count===2)return 'duo';
   if(count===3)return 'triptych';
   if(count===4)return 'quad';
   if(count===5)return 'three-two';
-  return 'mosaic-carousel';
+  return largeOrdinal%2===0?'hero-full-carousel':'mosaic-carousel';
 }
 function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
   const ids=storyVisibleIds(videoIds,byId);
@@ -515,6 +517,7 @@ function renderStories(target,artifact,byId){
   const wrap=section('今日主題','daily-stories','editorial');
   const list=el('div','daily-story-list');
   let singleImageOrdinal=0;
+  let largeVisualOrdinal=0;
   stories.forEach((story,index)=>{
     const layout=storyAutoLayout(story);
     const card=el('article','daily-story-card');
@@ -547,7 +550,11 @@ function renderStories(target,artifact,byId){
     const readerMode=(visibleIds.length<=2&&hasEditorialSummary)?'inline':requestedReaderMode;
     card.dataset.readerMode=readerMode;
     const detailRail=readerMode==='summary_with_details'?storyDetailRail(story.video_ids,byId):null;
-    const visualLayout=storyVisualLayout(visibleIds.length);
+    const largeOrdinal=visibleIds.length>=6?largeVisualOrdinal++:0;
+    const visualLayout=storyVisualLayout(visibleIds.length,{
+      largeOrdinal,
+      explicit:story.visual_layout
+    });
     const visual=storyVisual(story.video_ids,byId,{
       layout:visualLayout,
       onSelect:(videoId)=>{
