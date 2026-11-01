@@ -236,6 +236,7 @@ function overviewLayoutLab(wrap,grid,highlights){
   const copyModes=[
     ['left','Left'],
     ['center','Center'],
+    ['right','Right'],
     ['columns','Two-column']
   ];
   copyModes.forEach(([mode,label],index)=>{
