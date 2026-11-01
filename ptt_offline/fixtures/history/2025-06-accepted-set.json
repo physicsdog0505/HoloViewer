@@ -1,0 +1,728 @@
+{
+  "articles": [
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-01",
+      "expected_stored_push_count": 2337,
+      "gate_push_count": 1462,
+      "period": "日間",
+      "ptt_aid": "#1eEv4Jkf",
+      "source_basename": "hololive_issue235_repair_batch32.sqlite3",
+      "source_sha256": "14d9ea8e60a4eeeb9292380b7fded62e2318ecedbd653972e220ab4aad695a5a",
+      "web_aid": "M.1748734227.A.BA9"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-01",
+      "expected_stored_push_count": 5272,
+      "gate_push_count": 1478,
+      "period": "晚間",
+      "ptt_aid": "#1eF35-GQ",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1748775294.A.41A"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-02",
+      "expected_stored_push_count": 318,
+      "gate_push_count": 318,
+      "period": "日間",
+      "ptt_aid": "#1eFEGJI6",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1748821011.A.486"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-02",
+      "expected_stored_push_count": 1684,
+      "gate_push_count": 1476,
+      "period": "晚間",
+      "ptt_aid": "#1eFO6ISm",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1748861330.A.730"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-03",
+      "expected_stored_push_count": 450,
+      "gate_push_count": 450,
+      "period": "日間",
+      "ptt_aid": "#1eFZ1Bp7",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1748906059.A.CC7"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-03",
+      "expected_stored_push_count": 3795,
+      "gate_push_count": 1469,
+      "period": "晚間",
+      "ptt_aid": "#1eFjAYhv",
+      "source_basename": "hololive_issue235_repair_batch26.sqlite3",
+      "source_sha256": "c9b0aaa34be82b481d1987760c1a0b584b07bd730880262c01e52c7c429762e0",
+      "web_aid": "M.1748947618.A.AF9"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-04",
+      "expected_stored_push_count": 403,
+      "gate_push_count": 403,
+      "period": "日間",
+      "ptt_aid": "#1eFuWT3h",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1748994077.A.0EB"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-04",
+      "expected_stored_push_count": 1627,
+      "gate_push_count": 1478,
+      "period": "晚間",
+      "ptt_aid": "#1eG2FWBO",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749033952.A.2D8"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-05",
+      "expected_stored_push_count": 1374,
+      "gate_push_count": 1374,
+      "period": "日間",
+      "ptt_aid": "#1eGDFBCu",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1749078987.A.338"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-05",
+      "expected_stored_push_count": 4966,
+      "gate_push_count": 1472,
+      "period": "晚間",
+      "ptt_aid": "#1eGNL8Mp",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749120328.A.5B3"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-06",
+      "expected_stored_push_count": 471,
+      "gate_push_count": 471,
+      "period": "日間",
+      "ptt_aid": "#1eGYHSEn",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1749165148.A.3B1"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-06",
+      "expected_stored_push_count": 8106,
+      "gate_push_count": 1470,
+      "period": "晚間",
+      "ptt_aid": "#1eGiPSYB",
+      "source_basename": "hololive_issue235_repair_batch25.sqlite3",
+      "source_sha256": "e29d6d7eb856d7b47e403fae2bfbde0d390f3c502bf000a6725b5f567e7bd348",
+      "web_aid": "M.1749206620.A.88B"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-07",
+      "expected_stored_push_count": 1720,
+      "gate_push_count": 1471,
+      "period": "日間",
+      "ptt_aid": "#1eGtNd77",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749251559.A.1C7"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-07",
+      "expected_stored_push_count": 6542,
+      "gate_push_count": 1463,
+      "period": "晚間",
+      "ptt_aid": "#1eH1U0-T",
+      "source_basename": "hololive_issue235_repair_batch32.sqlite3",
+      "source_sha256": "14d9ea8e60a4eeeb9292380b7fded62e2318ecedbd653972e220ab4aad695a5a",
+      "web_aid": "M.1749292928.A.F9D"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-08",
+      "expected_stored_push_count": 4022,
+      "gate_push_count": 1466,
+      "period": "日間",
+      "ptt_aid": "#1eHCNqgf",
+      "source_basename": "hololive_issue235_repair_batch30.sqlite3",
+      "source_sha256": "7b8dc57d04309517d486f60036aee3f5da506d930cc74abf05c3b61709100646",
+      "web_aid": "M.1749337588.A.AA9"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-08",
+      "expected_stored_push_count": 3174,
+      "gate_push_count": 1473,
+      "period": "晚間",
+      "ptt_aid": "#1eHMfk2B",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749379694.A.08B"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-09",
+      "expected_stored_push_count": 1403,
+      "gate_push_count": 1403,
+      "period": "日間",
+      "ptt_aid": "#1eHXZLmX",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749424341.A.C21"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-09",
+      "expected_stored_push_count": 3598,
+      "gate_push_count": 1474,
+      "period": "晚間",
+      "ptt_aid": "#1eHhgAsv",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749465738.A.DB9"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-10",
+      "expected_stored_push_count": 820,
+      "gate_push_count": 820,
+      "period": "日間",
+      "ptt_aid": "#1eHsbQH9",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1749510490.A.449"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-10",
+      "expected_stored_push_count": 4151,
+      "gate_push_count": 1476,
+      "period": "晚間",
+      "ptt_aid": "#1eI0iHnS",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749551889.A.C5C"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-11",
+      "expected_stored_push_count": 659,
+      "gate_push_count": 659,
+      "period": "日間",
+      "ptt_aid": "#1eIBlflO",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1749597161.A.BD8"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-11",
+      "expected_stored_push_count": 6229,
+      "gate_push_count": 1473,
+      "period": "晚間",
+      "ptt_aid": "#1eILspLJ",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749638579.A.553"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-12",
+      "expected_stored_push_count": 996,
+      "gate_push_count": 996,
+      "period": "日間",
+      "ptt_aid": "#1eIWnaXV",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1749683300.A.85F"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-12",
+      "expected_stored_push_count": 4870,
+      "gate_push_count": 1475,
+      "period": "晚間",
+      "ptt_aid": "#1eIh1lI2",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749725295.A.482"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-13",
+      "expected_stored_push_count": 1490,
+      "gate_push_count": 1472,
+      "period": "日間",
+      "ptt_aid": "#1eIrtPYi",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749769689.A.8AC"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-13",
+      "expected_stored_push_count": 5753,
+      "gate_push_count": 1473,
+      "period": "晚間",
+      "ptt_aid": "#1eJ0Ap4P",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749811891.A.119"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-14",
+      "expected_stored_push_count": 1609,
+      "gate_push_count": 1471,
+      "period": "日間",
+      "ptt_aid": "#1eJBArAv",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749856949.A.2B9"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-14",
+      "expected_stored_push_count": 6312,
+      "gate_push_count": 1474,
+      "period": "晚間",
+      "ptt_aid": "#1eJL637p",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749897603.A.1F3"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-15",
+      "expected_stored_push_count": 1117,
+      "gate_push_count": 1117,
+      "period": "日間",
+      "ptt_aid": "#1eJVzaur",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1749942116.A.E35"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-15",
+      "expected_stored_push_count": 1796,
+      "gate_push_count": 1471,
+      "period": "晚間",
+      "ptt_aid": "#1eJgUjTm",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1749985197.A.770"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-16",
+      "expected_stored_push_count": 937,
+      "gate_push_count": 937,
+      "period": "日間",
+      "ptt_aid": "#1eJrBvgU",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750029049.A.A9E"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-16",
+      "expected_stored_push_count": 2335,
+      "gate_push_count": 1475,
+      "period": "晚間",
+      "ptt_aid": "#1eJ_W0L1",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1750071296.A.541"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-17",
+      "expected_stored_push_count": 1040,
+      "gate_push_count": 1040,
+      "period": "日間",
+      "ptt_aid": "#1eKAHZdt",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750115427.A.9F7"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-17",
+      "expected_stored_push_count": 3151,
+      "gate_push_count": 1474,
+      "period": "晚間",
+      "ptt_aid": "#1eKKW3TV",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1750157315.A.75F"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-18",
+      "expected_stored_push_count": 751,
+      "gate_push_count": 751,
+      "period": "日間",
+      "ptt_aid": "#1eKVKkhj",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750201646.A.AED"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-18",
+      "expected_stored_push_count": 5029,
+      "gate_push_count": 1477,
+      "period": "晚間",
+      "ptt_aid": "#1eKfe6t3",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1750243846.A.DC3"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-19",
+      "expected_stored_push_count": 1266,
+      "gate_push_count": 1266,
+      "period": "日間",
+      "ptt_aid": "#1eKqS2qj",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750288130.A.D2D"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-19",
+      "expected_stored_push_count": 2439,
+      "gate_push_count": 1469,
+      "period": "晚間",
+      "ptt_aid": "#1eK-h64M",
+      "source_basename": "hololive_issue235_repair_batch27.sqlite3",
+      "source_sha256": "12071f578e51515584b78dcacdcec718682e8a3abd9caa905c6e2389e49be433",
+      "web_aid": "M.1750330054.A.116"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-20",
+      "expected_stored_push_count": 576,
+      "gate_push_count": 576,
+      "period": "日間",
+      "ptt_aid": "#1eL9dJc0",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750374867.A.980"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-20",
+      "expected_stored_push_count": 3860,
+      "gate_push_count": 1471,
+      "period": "晚間",
+      "ptt_aid": "#1eLJvvAD",
+      "source_basename": "issue403-recovery-202506-batch01.sqlite3",
+      "source_sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43",
+      "web_aid": "M.1750417017.A.28D"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-21",
+      "expected_stored_push_count": 1206,
+      "gate_push_count": 1206,
+      "period": "日間",
+      "ptt_aid": "#1eLUjG7Z",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750461264.A.1E3"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-21",
+      "expected_stored_push_count": 2135,
+      "gate_push_count": 1474,
+      "period": "晚間",
+      "ptt_aid": "#1eLf9eVM",
+      "source_basename": "issue403-recovery-202506-batch02.sqlite3",
+      "source_sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284",
+      "web_aid": "M.1750504040.A.7D6"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-22",
+      "expected_stored_push_count": 2048,
+      "gate_push_count": 1466,
+      "period": "日間",
+      "ptt_aid": "#1eLpwckp",
+      "source_basename": "hololive_issue235_repair_batch30.sqlite3",
+      "source_sha256": "7b8dc57d04309517d486f60036aee3f5da506d930cc74abf05c3b61709100646",
+      "web_aid": "M.1750548134.A.BB3"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-22",
+      "expected_stored_push_count": 3663,
+      "gate_push_count": 1477,
+      "period": "晚間",
+      "ptt_aid": "#1eLzqIfo",
+      "source_basename": "issue403-recovery-202506-batch02.sqlite3",
+      "source_sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284",
+      "web_aid": "M.1750588690.A.A72"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-23",
+      "expected_stored_push_count": 1536,
+      "gate_push_count": 1471,
+      "period": "日間",
+      "ptt_aid": "#1eM8rhVK",
+      "source_basename": "issue403-recovery-202506-batch02.sqlite3",
+      "source_sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284",
+      "web_aid": "M.1750633835.A.7D4"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-23",
+      "expected_stored_push_count": 2537,
+      "gate_push_count": 1470,
+      "period": "晚間",
+      "ptt_aid": "#1eMJ44aR",
+      "source_basename": "hololive_issue235_repair_batch25.sqlite3",
+      "source_sha256": "e29d6d7eb856d7b47e403fae2bfbde0d390f3c502bf000a6725b5f567e7bd348",
+      "web_aid": "M.1750675716.A.91B"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-24",
+      "expected_stored_push_count": 656,
+      "gate_push_count": 656,
+      "period": "日間",
+      "ptt_aid": "#1eMT-N3_",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750720407.A.0FF"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-24",
+      "expected_stored_push_count": 1728,
+      "gate_push_count": 1469,
+      "period": "晚間",
+      "ptt_aid": "#1eMeHsK9",
+      "source_basename": "hololive_issue235_repair_batch27.sqlite3",
+      "source_sha256": "12071f578e51515584b78dcacdcec718682e8a3abd9caa905c6e2389e49be433",
+      "web_aid": "M.1750762614.A.509"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-25",
+      "expected_stored_push_count": 1357,
+      "gate_push_count": 1357,
+      "period": "日間",
+      "ptt_aid": "#1eMp2uc4",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750806712.A.984"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-25",
+      "expected_stored_push_count": 2516,
+      "gate_push_count": 1479,
+      "period": "晚間",
+      "ptt_aid": "#1eMzWycP",
+      "source_basename": "issue403-recovery-202506-batch02.sqlite3",
+      "source_sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284",
+      "web_aid": "M.1750849596.A.999"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-26",
+      "expected_stored_push_count": 1406,
+      "gate_push_count": 1406,
+      "period": "日間",
+      "ptt_aid": "#1eN8JGaG",
+      "source_basename": "issue403-recovery-202506-batch02.sqlite3",
+      "source_sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284",
+      "web_aid": "M.1750893776.A.910"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-26",
+      "expected_stored_push_count": 1813,
+      "gate_push_count": 1472,
+      "period": "晚間",
+      "ptt_aid": "#1eNIScJz",
+      "source_basename": "issue403-recovery-202506-batch02.sqlite3",
+      "source_sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284",
+      "web_aid": "M.1750935334.A.4FD"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-27",
+      "expected_stored_push_count": 307,
+      "gate_push_count": 307,
+      "period": "日間",
+      "ptt_aid": "#1eNTJetQ",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1750979816.A.DDA"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-27",
+      "expected_stored_push_count": 2452,
+      "gate_push_count": 1472,
+      "period": "晚間",
+      "ptt_aid": "#1eNdSTsr",
+      "source_basename": "issue403-recovery-202506-batch02.sqlite3",
+      "source_sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284",
+      "web_aid": "M.1751021341.A.DB5"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-28",
+      "expected_stored_push_count": 3324,
+      "gate_push_count": 1459,
+      "period": "日間",
+      "ptt_aid": "#1eNoUW-x",
+      "source_basename": "hololive_issue235_repair_batch33.sqlite3",
+      "source_sha256": "dcf163b7720221bcb8e1d3eed2b436bdcccf590e4b8814bdb0f52b7caf3a0a1f",
+      "web_aid": "M.1751066528.A.FBB"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-28",
+      "expected_stored_push_count": 3847,
+      "gate_push_count": 1468,
+      "period": "晚間",
+      "ptt_aid": "#1eNygSkZ",
+      "source_basename": "hololive_issue235_repair_batch28.sqlite3",
+      "source_sha256": "a3b16e5df1da4c6a090239f3d5d3fcdd39bd666dc1bb1ff71fb9d5ac4468f55a",
+      "web_aid": "M.1751108252.A.BA3"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-29",
+      "expected_stored_push_count": 2906,
+      "gate_push_count": 1467,
+      "period": "日間",
+      "ptt_aid": "#1eO7Rb4s",
+      "source_basename": "hololive_issue235_repair_batch29.sqlite3",
+      "source_sha256": "c44cd370a9d00f50b934ec433036917794cf1b5d4795f9d00a28e7b2c8164de1",
+      "web_aid": "M.1751152357.A.136"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-29",
+      "expected_stored_push_count": 1771,
+      "gate_push_count": 1472,
+      "period": "晚間",
+      "ptt_aid": "#1eOHnIQ0",
+      "source_basename": "issue403-recovery-202506-batch02.sqlite3",
+      "source_sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284",
+      "web_aid": "M.1751194706.A.680"
+    },
+    {
+      "accepted_source_kind": "Web",
+      "date": "2025-06-30",
+      "expected_stored_push_count": 463,
+      "gate_push_count": 463,
+      "period": "日間",
+      "ptt_aid": "#1eOSTrZ8",
+      "source_basename": "web_week_pilot_2026.sqlite3",
+      "source_sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f",
+      "web_aid": "M.1751238517.A.8C8"
+    },
+    {
+      "accepted_source_kind": "Raw",
+      "date": "2025-06-30",
+      "expected_stored_push_count": 2628,
+      "gate_push_count": 1470,
+      "period": "晚間",
+      "ptt_aid": "#1eOcnZnp",
+      "source_basename": "hololive_issue235_repair_batch25.sqlite3",
+      "source_sha256": "e29d6d7eb856d7b47e403fae2bfbde0d390f3c502bf000a6725b5f567e7bd348",
+      "web_aid": "M.1751280739.A.C73"
+    }
+  ],
+  "evidence": {
+    "exhaustive_roster_sha256": "c7ddc87c0ba1a5092ccd1a19224c68a525e5473442c55cfadbbe6a32f4323c5e",
+    "ledger_commit": "4c9b3d0208bfd31d5ae3ef37b284e8440411d93c"
+  },
+  "expected": {
+    "articles": 60,
+    "high_risk_raw": 41,
+    "high_risk_total": 41,
+    "high_risk_web_exceptions": 0,
+    "low_risk_web": 19
+  },
+  "month": "2025-06",
+  "policy": {
+    "high_risk_rule": "final-complete Collector Raw with exact source/screen/push identity",
+    "low_risk_rule": "declared_push_count == parsed_push_count == stored web_pushes with contiguous floors 1..declared",
+    "raw_required_at_or_above": 1400
+  },
+  "raw_sources": [
+    {
+      "basename": "hololive_issue235_repair_batch25.sqlite3",
+      "sha256": "e29d6d7eb856d7b47e403fae2bfbde0d390f3c502bf000a6725b5f567e7bd348"
+    },
+    {
+      "basename": "hololive_issue235_repair_batch26.sqlite3",
+      "sha256": "c9b0aaa34be82b481d1987760c1a0b584b07bd730880262c01e52c7c429762e0"
+    },
+    {
+      "basename": "hololive_issue235_repair_batch27.sqlite3",
+      "sha256": "12071f578e51515584b78dcacdcec718682e8a3abd9caa905c6e2389e49be433"
+    },
+    {
+      "basename": "hololive_issue235_repair_batch28.sqlite3",
+      "sha256": "a3b16e5df1da4c6a090239f3d5d3fcdd39bd666dc1bb1ff71fb9d5ac4468f55a"
+    },
+    {
+      "basename": "hololive_issue235_repair_batch29.sqlite3",
+      "sha256": "c44cd370a9d00f50b934ec433036917794cf1b5d4795f9d00a28e7b2c8164de1"
+    },
+    {
+      "basename": "hololive_issue235_repair_batch30.sqlite3",
+      "sha256": "7b8dc57d04309517d486f60036aee3f5da506d930cc74abf05c3b61709100646"
+    },
+    {
+      "basename": "hololive_issue235_repair_batch32.sqlite3",
+      "sha256": "14d9ea8e60a4eeeb9292380b7fded62e2318ecedbd653972e220ab4aad695a5a"
+    },
+    {
+      "basename": "hololive_issue235_repair_batch33.sqlite3",
+      "sha256": "dcf163b7720221bcb8e1d3eed2b436bdcccf590e4b8814bdb0f52b7caf3a0a1f"
+    },
+    {
+      "basename": "issue403-recovery-202506-batch01.sqlite3",
+      "sha256": "429162ed2a6e0fdd3a3a4dbdfefa2ebca94d7169755e69a07effcf56318dfb43"
+    },
+    {
+      "basename": "issue403-recovery-202506-batch02.sqlite3",
+      "sha256": "b32d252f0f0308ad77f439c9246a81041cdaae1482e7291bd7a24b77a6a9c284"
+    }
+  ],
+  "schema_version": "holoviewer-ptt-accepted-month-v1",
+  "web_source": {
+    "basename": "web_week_pilot_2026.sqlite3",
+    "sha256": "a40cd81643d3baa1ba07a3f81aecc133742eb0c24564918526aff21cb5b7848f"
+  }
+}
