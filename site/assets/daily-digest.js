@@ -298,12 +298,31 @@ function renderOverview(target,artifact,byId){
       copy.append(el('h3','',shortHeadline(rawTitle,64)));
       const rest=parts.length>1?parts.slice(1).join('：'):item;
       copy.append(el('p','',clampText(rest,170)));
-      if(story){
-        const jump=el('a','daily-highlight-jump','查看詳細主題 ↓');
-        jump.href='#daily-story-'+String(index+1);
-        copy.append(jump);
-      }
       card.append(copy);
+      if(story){
+        const targetId='daily-story-'+String(index+1);
+        card.classList.add('is-jumpable');
+        card.tabIndex=0;
+        card.setAttribute('role','link');
+        card.setAttribute('aria-label','前往詳細主題：'+rawTitle);
+        const jump=()=>{
+          const target=document.getElementById(targetId);
+          if(target){
+            history.replaceState(null,'','#'+targetId);
+            target.scrollIntoView({behavior:'smooth',block:'start'});
+          }
+        };
+        card.addEventListener('click',event=>{
+          if(event.target.closest('a,button,summary,details'))return;
+          jump();
+        });
+        card.addEventListener('keydown',event=>{
+          if(event.key==='Enter'||event.key===' '){
+            event.preventDefault();
+            jump();
+          }
+        });
+      }
       grid.append(card);
     });
     applyOverviewLayout(grid,'auto',highlights);
