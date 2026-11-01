@@ -1294,3 +1294,21 @@ html{scroll-behavior:smooth}
     min-height:0
   }
 }
+
+
+/* Owner review V3.19 — preserve complete YouTube thumbnail framing. */
+.daily-story-visual-item{
+  background:color-mix(in srgb,var(--surface-2) 82%,#111)
+}
+.daily-story-visual-item img{
+  object-fit:contain!important;
+  object-position:50% 50%!important;
+  background:inherit
+}
+/* Keep highlight/detail thumbnails conservative too. */
+.daily-highlight-media img,
+.daily-stream-ref-head img{
+  object-fit:contain;
+  object-position:50% 50%;
+  background:color-mix(in srgb,var(--surface-2) 82%,#111)
+}
