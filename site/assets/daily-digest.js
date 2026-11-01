@@ -31,6 +31,7 @@ function artifactUrl(day){
 }
 
 const PUBLIC_LAYOUTS=new Set(['brief','lead','split','editorial','compact','rail','timeline','chips']);
+const OVERVIEW_LAYOUTS=new Set(['compact','rail','lead']);
 
 function publicText(value){
   return text(value)
@@ -318,9 +319,30 @@ function renderCoverage(target,artifact){
 function overviewLayoutLabEnabled(){
   return new URLSearchParams(location.search).get('layoutlab')==='1';
 }
+function overviewHighlightModel(item){
+  if(item&&typeof item==='object'&&!Array.isArray(item)){
+    return {
+      title:publicText(item.short_title||item.title),
+      summary:publicText(item.summary||item.public_summary),
+      videoIds:Array.isArray(item.video_ids)?item.video_ids.map(text).filter(Boolean):[]
+    };
+  }
+  const raw=publicText(item);
+  const parts=raw.split(/[：:]/);
+  return {
+    title:publicText(parts[0]||raw),
+    summary:publicText(parts.length>1?parts.slice(1).join('：'):raw),
+    videoIds:[]
+  };
+}
 function overviewCardTitle(item){
-  const parts=publicText(item).split(/[：:]/);
-  return publicText(parts[0]||item);
+  return overviewHighlightModel(item).title;
+}
+function applyArtifactOverviewLayout(grid,layout,highlights){
+  applyOverviewLayout(grid,layout,highlights);
+  // Keep the frozen Auto-Fit CSS path while recording that layout authority came from the artifact.
+  grid.dataset.layoutSource='auto';
+  grid.dataset.layoutAuthority='artifact';
 }
 function overviewAutoLayout(highlights){
   const lengths=highlights.slice(0,5).map(item=>overviewCardTitle(item).length);
@@ -402,8 +424,8 @@ function overviewLayoutLab(wrap,grid,highlights){
 }
 function renderOverview(target,artifact,byId){
   const overview=artifact?.overview||{};
-  const highlights=Array.isArray(overview.highlights)?overview.highlights.map(publicText).filter(Boolean):[];
-  if(!highlights.length&&!publicText(overview.summary))return;
+  const highlights=Array.isArray(overview.highlights)?overview.highlights.map(overviewHighlightModel).filter(item=>item.title||item.summary):[];
+  if(!highlights.length&&!publicText(overview.public_summary||overview.summary))return;
   const wrap=section('今天發生什麼','daily-overview','brief');
   applyOverviewCopyLayout(wrap,'left');
   const intro=publicText(overview.public_summary||overview.summary);
@@ -423,7 +445,8 @@ function renderOverview(target,artifact,byId){
       const card=el('article','daily-highlight-card');
       card.dataset.accent=String((index%3)+1);
       const story=stories[index];
-      const firstVideo=(Array.isArray(story?.video_ids)?story.video_ids:[]).map(String).find(id=>byId.has(id));
+      const firstVideo=[...(item.videoIds||[]),...(Array.isArray(story?.video_ids)?story.video_ids:[])]
+        .map(String).find(id=>byId.has(id));
       if(firstVideo){
         const media=el('div','daily-highlight-media');
         const img=thumbnailImage(firstVideo,{loading:index===0?'eager':'lazy'});
@@ -433,11 +456,9 @@ function renderOverview(target,artifact,byId){
         card.append(media);
       }
       const copy=el('div','daily-highlight-copy');
-      const parts=item.split(/[：:]/);
-      const rawTitle=publicText(parts[0]||item);
+      const rawTitle=publicText(item.title);
       copy.append(el('h3','',shortHeadline(rawTitle,64)));
-      const rest=parts.length>1?parts.slice(1).join('：'):item;
-      copy.append(el('p','',clampText(rest,170)));
+      copy.append(el('p','',clampText(item.summary,170)));
       card.append(copy);
       if(story){
         const targetId='daily-story-'+String(index+1);
@@ -465,7 +486,13 @@ function renderOverview(target,artifact,byId){
       }
       grid.append(card);
     });
-    applyOverviewLayout(grid,'auto',highlights);
+    const artifactLayout=text(artifact?.overview_layout).toLowerCase();
+    if(OVERVIEW_LAYOUTS.has(artifactLayout)){
+      applyArtifactOverviewLayout(grid,artifactLayout,highlights);
+    }else{
+      applyOverviewLayout(grid,'auto',highlights);
+      grid.dataset.layoutAuthority='legacy-auto';
+    }
     const lab=overviewLayoutLab(wrap,grid,highlights);
     if(lab)wrap.append(lab);
     wrap.append(grid);
