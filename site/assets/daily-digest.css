@@ -1151,3 +1151,14 @@ html{scroll-behavior:smooth}
     font-size:16px
   }
 }
+
+
+/* Owner review V3.15 — hidden probe for rendered-height column balancing. */
+.daily-overview-column-probe{
+  position:absolute;
+  visibility:hidden;
+  pointer-events:none;
+  width:calc((100% - 36px)/2);
+  left:-99999px;
+  top:0
+}
