@@ -70,7 +70,7 @@ function appendParagraphs(parent,value,className){
 }
 function storyVisualLayout(count){
   if(count<=1)return 'feature-single-wide';
-  if(count===2)return 'feature-duo-split';
+  if(count===2)return 'duo';
   if(count===3)return 'triptych';
   if(count===4)return 'quad';
   if(count===5)return 'three-two';
