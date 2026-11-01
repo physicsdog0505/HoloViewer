@@ -67,15 +67,32 @@ function appendParagraphs(parent,value,className){
   const chunks=paragraphChunks(value);
   chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
 }
-function storyVisual(videoIds,byId,{onSelect=null}={}){
+function storyVisualLayout(count,index,previous=''){
+  const pools={
+    1:['single'],
+    2:['duo'],
+    3:['triptych','lead-two'],
+    4:['quad','lead-three'],
+    5:['three-two','lead-four'],
+    6:['six-grid','hero-left','hero-top','staggered']
+  };
+  const pool=pools[count]||['six-grid'];
+  let variant=pool[index%pool.length];
+  if(pool.length>1&&variant===previous)variant=pool[(index+1)%pool.length];
+  return variant;
+}
+function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
   const ids=storyVisibleIds(videoIds,byId);
   if(!ids.length)return null;
   const visual=el('div','daily-story-visual');
   visual.dataset.count=String(ids.length);
+  visual.dataset.visualLayout=layout;
+  const cropCycle=['center','upper','left','right','center','upper'];
   ids.forEach((id,index)=>{
     const figure=el('figure','daily-story-visual-item');
     figure.dataset.slot=String(index+1);
     figure.dataset.videoId=id;
+    figure.dataset.crop=cropCycle[index%cropCycle.length];
     if(onSelect){
       figure.classList.add('is-selectable');
       figure.tabIndex=0;
@@ -447,6 +464,7 @@ function renderStories(target,artifact,byId){
   if(!stories.length)return;
   const wrap=section('今日主題','daily-stories','editorial');
   const list=el('div','daily-story-list');
+  let previousVisualLayout='';
   stories.forEach((story,index)=>{
     const layout=publicLayout(story,storyAutoLayout(story,index));
     const card=el('article','daily-story-card');
@@ -469,7 +487,11 @@ function renderStories(target,artifact,byId){
       card.append(copy);
     }
     const detailRail=storyDetailRail(story.video_ids,byId);
+    const visibleIds=storyVisibleIds(story.video_ids,byId);
+    const visualLayout=storyVisualLayout(visibleIds.length,index,previousVisualLayout);
+    previousVisualLayout=visualLayout;
     const visual=storyVisual(story.video_ids,byId,{
+      layout:visualLayout,
       onSelect:(videoId)=>{
         if(detailRail)detailRail.selectVideo(videoId,{open:true});
       }
