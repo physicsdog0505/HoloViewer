@@ -68,25 +68,13 @@ function appendParagraphs(parent,value,className){
   const chunks=paragraphChunks(value);
   chunks.forEach(chunk=>parent.append(el('p',className,chunk)));
 }
-function storyVisualLayout(count,index,previous='',story=null){
-  const pools={
-    1:['feature-single','feature-single-wide','feature-single-editorial'],
-    2:['feature-duo','feature-duo-split','feature-duo-stack'],
-    3:['triptych','lead-two'],
-    4:['quad','lead-three'],
-    5:['three-two','lead-four'],
-    6:['mosaic-carousel','hero-full-carousel'],
-    7:['mosaic-carousel','hero-full-carousel'],
-    8:['mosaic-carousel','hero-full-carousel'],
-    9:['mosaic-carousel','hero-full-carousel']
-  };
-  const pool=pools[count]||['mosaic-carousel','hero-full-carousel'];
-  const titleLength=publicText(story?.title||story?.short_title).length;
-  const summaryLength=publicText(story?.public_summary||story?.summary).length;
-  let seed=(index+titleLength+summaryLength)%pool.length;
-  let variant=pool[seed];
-  if(pool.length>1&&variant===previous)variant=pool[(seed+1)%pool.length];
-  return variant;
+function storyVisualLayout(count){
+  if(count<=1)return 'feature-single-wide';
+  if(count===2)return 'feature-duo-split';
+  if(count===3)return 'triptych';
+  if(count===4)return 'quad';
+  if(count===5)return 'three-two';
+  return 'mosaic-carousel';
 }
 function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
   const ids=storyVisibleIds(videoIds,byId);
@@ -498,29 +486,21 @@ function renderOverview(target,artifact,byId){
   }
   target.append(wrap);
 }
-function storyAutoLayout(story,index){
-  const subs=Array.isArray(story?.sub_events)?story.sub_events.length:0;
-  const refs=Array.isArray(story?.video_ids)?story.video_ids.length:0;
-  if(index===0)return 'lead';
-  if(subs>=3)return 'split';
-  if(refs>=8)return 'editorial';
-  return index%2?'compact':'split';
+function storyAutoLayout(story){
+  return publicLayout(story,'editorial');
 }
 function renderStories(target,artifact,byId){
   const stories=Array.isArray(artifact?.stories)?artifact.stories:[];
   if(!stories.length)return;
   const wrap=section('今日主題','daily-stories','editorial');
   const list=el('div','daily-story-list');
-  let previousVisualLayout='';
   stories.forEach((story,index)=>{
-    const layout=publicLayout(story,storyAutoLayout(story,index));
+    const layout=storyAutoLayout(story);
     const card=el('article','daily-story-card');
     card.dataset.layout=layout;
     card.id='daily-story-'+String(index+1);
     const visibleIds=storyVisibleIds(story.video_ids,byId);
     card.dataset.streamCount=String(visibleIds.length);
-    if(visibleIds.length<=2)card.classList.add('is-feature-story');
-
     const eyebrow=el('div','daily-story-eyebrow');
     const members=Array.isArray(story.member_names)?story.member_names.map(publicText).filter(Boolean):[];
     eyebrow.append(el('span','',index===0?'今日焦點':'今日話題'));
@@ -530,15 +510,14 @@ function renderStories(target,artifact,byId){
     const headline=publicText(story.title)||publicText(story.short_title);
     if(headline)card.append(el('h3','daily-story-title',headline));
 
-    const summary=publicText(story.public_summary||story.summary);
+    const summary=publicText(story.editorial_summary||story.public_summary||story.summary);
     if(summary){
       const copy=el('div','daily-story-summary-block');
       appendParagraphs(copy,summary,'daily-story-summary');
       card.append(copy);
     }
     const detailRail=storyDetailRail(story.video_ids,byId);
-    const visualLayout=storyVisualLayout(visibleIds.length,index,previousVisualLayout,story);
-    previousVisualLayout=visualLayout;
+    const visualLayout=storyVisualLayout(visibleIds.length);
     const visual=storyVisual(story.video_ids,byId,{
       layout:visualLayout,
       onSelect:(videoId)=>{
