@@ -69,6 +69,18 @@ case "$mode" in
     printf 'BASELINE_VERSION=%s\n' "$baseline"
     printf 'PRODUCTION_MUTATION=NO\n'
     ;;
+  verify)
+    [ "$#" -eq 2 ]||fail "usage: $0 verify EXPECTED_HEAD"
+    require_hex "$2" 40
+    verify_candidate "$2"
+    current="$(current_version)"
+    [ "$current" != "ABSENT" ]||fail "dedicated Worker is absent"
+    readback
+    printf 'DAILY_DIGEST_STATIC_VERIFY=PASS\n'
+    printf 'CURRENT_VERSION=%s\n' "$current"
+    printf 'PRODUCTION_MUTATION=NO\n'
+    printf 'FRONTEND_DEPLOY=NO\n'
+    ;;
   deploy)
     [ "$#" -eq 3 ]||fail "usage: $0 deploy EXPECTED_HEAD EXPECTED_BASELINE_VERSION"
     require_hex "$2" 40
@@ -85,7 +97,7 @@ case "$mode" in
     printf 'FRONTEND_DEPLOY=NO\n'
     ;;
   *)
-    fail "first argument must be prepare or deploy"
+    fail "first argument must be prepare, verify, or deploy"
     ;;
 esac
  || true)"
