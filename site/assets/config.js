@@ -8,8 +8,8 @@ window.HOLOVIEWER_CONFIG = Object.freeze({
     indexPath: "/data/subtitles/index.json"
   }),
   dailyDigest: Object.freeze({
-    base: "",
-    pathTemplate: "/data/daily-digest/{date}.json"
+    base: "https://holoviewer-daily-digest-static-assets.singlebagel.workers.dev",
+    pathTemplate: "/data/daily-digest/months/{month}.json"
   }),
   pttArchiveMonths: Object.freeze({
     "2025-09": Object.freeze({
