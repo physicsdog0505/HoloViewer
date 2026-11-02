@@ -777,7 +777,10 @@ function initDailyDateHub(day,today){
         button.classList.add('is-available');
         const mark=el('span','daily-date-hub-day-mark');
         mark.setAttribute('aria-hidden','true');
-        mark.innerHTML='<svg viewBox="0 0 24 24" focusable="false"><path d="M3.8 5.3c2.9-.7 5.5-.2 8.2 1.6v12.2c-2.6-1.7-5.3-2.2-8.2-1.4V5.3Zm16.4 0c-2.9-.7-5.5-.2-8.2 1.6v12.2c2.6-1.7 5.3-2.2 8.2-1.4V5.3Z"/><path d="M6.2 8.2c1.4-.1 2.6.2 3.8.9M6.2 11c1.4-.1 2.6.2 3.8.9M6.2 13.8c1.4-.1 2.6.2 3.8.9M17.8 8.2c-1.4-.1-2.6.2-3.8.9M17.8 11c-1.4-.1-2.6.2-3.8.9M17.8 13.8c-1.4-.1-2.6.2-3.8.9"/></svg>';
+        const icon=el('img');
+        icon.src='/assets/docchi-news-open-newspaper.svg';
+        icon.alt='';
+        mark.append(icon);
         button.append(mark);
         button.setAttribute('aria-label',value+'，有 Docchi News');
         button.addEventListener('click',()=>setDailyUrl(value));
