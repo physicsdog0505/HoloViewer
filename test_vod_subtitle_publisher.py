@@ -193,11 +193,51 @@ class VodSubtitlePublisherTests(unittest.TestCase):
         with self.assertRaisesRegex(VodSubtitlePublishError, "receipt contract"):
             build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
 
-    def test_catalog_month_lookup_failure_fails_closed_without_candidate(self):
-        self._stage("DDDDDDDDDDD", "unknown")
-        with self.assertRaisesRegex(VodSubtitlePublishError, "catalog month lookup failed"):
-            build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
-        self.assertFalse(self.candidate.exists())
+    def test_missing_catalog_mapping_publishes_asset_without_month_projection(self):
+        video_id = "DDDDDDDDDDD"
+        self._stage(video_id, "unknown")
+        result = build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
+
+        self.assertTrue(self.candidate.exists())
+        self.assertTrue(
+            (self.candidate / f"data/subtitles/videos/{video_id}.json").is_file()
+        )
+        global_index = json.loads((self.candidate / GLOBAL_INDEX_PATH).read_text())
+        self.assertEqual(
+            [row["video_id"] for row in global_index["videos"]],
+            [video_id],
+        )
+        self.assertEqual(list((self.candidate / MONTH_INDEX_DIR).glob("*.json")), [])
+        self.assertEqual(result["video_count"], 1)
+        self.assertEqual(result["catalog_mapped_video_count"], 0)
+        self.assertEqual(result["pending_catalog_mapping_count"], 1)
+        self.assertEqual(result["pending_catalog_mapping_video_ids"], [video_id])
+        checked = validate_candidate(self.candidate, self.receipts, self.catalog)
+        self.assertEqual(checked["pending_catalog_mapping_video_ids"], [video_id])
+
+    def test_mapped_and_unmapped_receipts_publish_together(self):
+        mapped = "VzgiaEu59Uk"
+        unmapped = "DDDDDDDDDDD"
+        self._stage(mapped, "mapped")
+        self._stage(unmapped, "unmapped")
+
+        result = build_candidate(self.assets, self.receipts, self.catalog, self.candidate)
+
+        global_index = json.loads((self.candidate / GLOBAL_INDEX_PATH).read_text())
+        self.assertEqual(
+            [row["video_id"] for row in global_index["videos"]],
+            [unmapped, mapped],
+        )
+        month_index = json.loads(
+            (self.candidate / MONTH_INDEX_DIR / "2024-06.json").read_text()
+        )
+        self.assertEqual(
+            [row["video_id"] for row in month_index["videos"]],
+            [mapped],
+        )
+        self.assertEqual(result["video_count"], 2)
+        self.assertEqual(result["catalog_mapped_video_count"], 1)
+        self.assertEqual(result["pending_catalog_mapping_video_ids"], [unmapped])
 
     def test_rebuild_from_receipts_is_reproducible(self):
         self._stage("VzgiaEu59Uk", "one")
