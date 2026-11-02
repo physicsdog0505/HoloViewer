@@ -548,9 +548,7 @@ function renderStories(target,artifact,byId){
       if(variant==='editorial-side')card.classList.add('is-feature-story');
     }
     const eyebrow=el('div','daily-story-eyebrow');
-    const members=Array.isArray(story.member_names)?story.member_names.map(publicText).filter(Boolean):[];
     eyebrow.append(el('span','',index===0?'今日焦點':'今日話題'));
-    if(members.length)eyebrow.append(el('span','daily-story-member-names',members.slice(0,3).join('・')+(members.length>3?' 等':'')));
     card.append(eyebrow);
 
     const headline=publicText(story.title)||publicText(story.short_title);
@@ -618,7 +616,6 @@ function renderCategories(target,artifact,byId){
     });
   if(!rows.length)return;
   const wrap=section('主題分類','daily-categories','list');
-  wrap.append(el('p','daily-category-intro','按主題分類瀏覽本日內容與相關直播。'));
   const panels=el('div','daily-category-panels');
 
   rows.forEach((row,index)=>{
@@ -783,10 +780,15 @@ function initDailyDateHub(day,today){
       if(value===day)button.classList.add('is-selected');
       if(available.has(value)){
         button.classList.add('is-available');
+        const mark=el('span','daily-date-hub-day-mark','報');
+        mark.setAttribute('aria-hidden','true');
+        button.append(mark);
+        button.setAttribute('aria-label',value+'，有 Docchi 日報');
         button.addEventListener('click',()=>setDailyUrl(value));
       }else{
         button.disabled=true;
         button.classList.add('is-unavailable');
+        button.setAttribute('aria-label',value+'，無 Docchi 日報');
       }
       grid.append(button);
     }
