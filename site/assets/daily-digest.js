@@ -25,7 +25,10 @@ function artifactUrl(day){
   const base=text(cfg.base).replace(/\/$/,'');
   const template=text(cfg.pathTemplate);
   if(!template||!DATE_RE.test(day))return '';
-  const path=template.replaceAll('{date}',encodeURIComponent(day));
+  const month=day.slice(0,7);
+  const path=template
+    .replaceAll('{month}',encodeURIComponent(month))
+    .replaceAll('{date}',encodeURIComponent(day));
   if(!path.startsWith('/'))return '';
   return base?base+path:path;
 }
