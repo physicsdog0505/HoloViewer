@@ -536,7 +536,18 @@ function renderStories(target,artifact,byId){
     const eyebrow=el('div','daily-story-eyebrow');
     const members=Array.isArray(story.member_names)?story.member_names.map(publicText).filter(Boolean):[];
     eyebrow.append(el('span','',index===0?'今日焦點':'今日話題'));
-    if(members.length)eyebrow.append(el('span','',members.slice(0,3).join('・')+(members.length>3?' 等':'')));
+    if(visibleIds.length){
+      const avatars=el('span','daily-story-host-avatars');
+      visibleIds.slice(0,Math.min(3,Math.max(1,members.length))).forEach(videoId=>{
+        const avatar=thumbnailImage(videoId);
+        if(!avatar)return;
+        avatar.className='daily-story-host-avatar';
+        avatar.loading='lazy';
+        avatars.append(avatar);
+      });
+      if(avatars.childElementCount)eyebrow.append(avatars);
+    }
+    if(members.length)eyebrow.append(el('span','daily-story-member-names',members.slice(0,3).join('・')+(members.length>3?' 等':'')));
     card.append(eyebrow);
 
     const headline=publicText(story.title)||publicText(story.short_title);
@@ -592,10 +603,18 @@ function renderAnnouncements(target,artifact,byId){
 }
 function renderCategories(target,artifact,byId){
   const rows=(Array.isArray(artifact?.categories)?artifact.categories:[])
-    .filter(row=>text(row?.key)!=='unverified_streams');
+    .filter(row=>{
+      const key=text(row?.key).toLowerCase();
+      const label=publicText(row?.label);
+      return key!=='unverified_streams'
+        && key!=='performance'
+        && key!=='performances'
+        && label!=='表演'
+        && label!=='演出';
+    });
   if(!rows.length)return;
-  const wrap=section('依內容瀏覽','daily-categories','list');
-  wrap.append(el('p','daily-category-intro','從主題切入，需要時再展開相關直播。'));
+  const wrap=section('主題分類','daily-categories','list');
+  wrap.append(el('p','daily-category-intro','按主題分類瀏覽本日內容與相關直播。'));
   const panels=el('div','daily-category-panels');
 
   rows.forEach((row,index)=>{
@@ -700,17 +719,57 @@ async function fetchArtifact(day){
   return {state:artifact?.coverage?.complete===true?'READY':'PARTIAL',artifact,reason:''};
 }
 function setStatus(node,message,kind=''){if(!node)return;node.textContent=message;node.dataset.state=kind;node.hidden=!message}
-function selectedDay(){const query=new URLSearchParams(location.search).get('date')||'';return DATE_RE.test(query)?query:taipeiDay()}
+function selectedDay(){const query=new URLSearchParams(location.search).get('date')||'';return DATE_RE.test(query)?query:''}
 function setDailyUrl(day){const url=new URL(location.href);url.searchParams.set('date',day);location.href=url.pathname+url.search}
 function monthKey(day){return DATE_RE.test(day)?day.slice(0,7):taipeiDay().slice(0,7)}
 function shiftMonth(key,delta){const [year,month]=key.split('-').map(Number);const date=new Date(Date.UTC(year,month-1+delta,1,12));return date.getUTCFullYear()+'-'+String(date.getUTCMonth()+1).padStart(2,'0')}
 function monthLabel(key){const [year,month]=key.split('-').map(Number);return new Intl.DateTimeFormat('zh-TW',{timeZone:'UTC',year:'numeric',month:'long'}).format(new Date(Date.UTC(year,month-1,1,12)))}
+
+const monthDayCache=new Map();
+async function fetchMonthDays(month){
+  if(monthDayCache.has(month))return monthDayCache.get(month);
+  const probe=month+'-01',url=artifactUrl(probe);
+  if(!url){monthDayCache.set(month,[]);return []}
+  try{
+    const response=await fetch(url,{credentials:'omit',cache:'no-cache'});
+    if(!response.ok){monthDayCache.set(month,[]);return []}
+    const payload=await response.json();
+    if(payload?.kind==='holodocchi.daily_digest_month'&&payload.schema_version===1&&text(payload.month)===month&&payload.days&&typeof payload.days==='object'){
+      const days=Object.keys(payload.days).filter(day=>DATE_RE.test(day)&&day.startsWith(month+'-')).sort();
+      monthDayCache.set(month,days);return days;
+    }
+    if(payload?.kind===KIND&&DATE_RE.test(text(payload.target_day))){
+      const day=text(payload.target_day),days=day.startsWith(month+'-')?[day]:[];
+      monthDayCache.set(month,days);return days;
+    }
+  }catch{}
+  monthDayCache.set(month,[]);return [];
+}
+async function latestAvailableDay(today){
+  let month=monthKey(today);
+  for(let offset=0;offset<24;offset++){
+    const days=(await fetchMonthDays(month)).filter(day=>day<=today);
+    if(days.length)return days[days.length-1];
+    month=shiftMonth(month,-1);
+  }
+  return '';
+}
+function renderDailyTitle(node,day){
+  if(!node)return;
+  node.replaceChildren(
+    el('span','daily-digest-title-date',displayDay(day)),
+    el('span','daily-digest-title-name','Docchi 日報')
+  );
+}
 function initDailyDateHub(day,today){
-  const dialog=document.getElementById('dailyDigestDateHub'),trigger=document.getElementById('dailyDigestDateTrigger'),grid=document.getElementById('dailyDigestDateGrid'),label=document.getElementById('dailyDigestMonthLabel'),prev=document.getElementById('dailyDigestMonthPrev'),next=document.getElementById('dailyDigestMonthNext'),todayButton=document.getElementById('dailyDigestDateToday'),close=document.getElementById('dailyDigestDateClose');
+  const dialog=document.getElementById('dailyDigestDateHub'),trigger=document.getElementById('dailyDigestDateTrigger'),grid=document.getElementById('dailyDigestDateGrid'),label=document.getElementById('dailyDigestMonthLabel'),prev=document.getElementById('dailyDigestMonthPrev'),next=document.getElementById('dailyDigestMonthNext'),latestButton=document.getElementById('dailyDigestDateToday'),close=document.getElementById('dailyDigestDateClose');
   if(!dialog||!trigger||!grid||!label)return;
-  let month=monthKey(day);trigger.textContent=displayDay(day);
-  function render(){
+  let month=monthKey(day),renderSerial=0;trigger.textContent=displayDay(day);
+  async function render(){
+    const serial=++renderSerial;
     label.textContent=monthLabel(month);grid.replaceChildren();
+    const available=new Set(await fetchMonthDays(month));
+    if(serial!==renderSerial)return;
     const [year,monthNumber]=month.split('-').map(Number),first=new Date(Date.UTC(year,monthNumber-1,1,12)),start=first.getUTCDay(),days=new Date(Date.UTC(year,monthNumber,0,12)).getUTCDate();
     for(let slot=0;slot<42;slot++){
       const number=slot-start+1;
@@ -718,8 +777,13 @@ function initDailyDateHub(day,today){
       const value=month+'-'+String(number).padStart(2,'0'),button=el('button','daily-date-hub-day');
       button.type='button';button.append(el('strong','daily-date-hub-day-number',number));
       if(value===day)button.classList.add('is-selected');
-      if(value===today)button.classList.add('is-today');
-      if(value>today){button.disabled=true;button.classList.add('is-future')}else button.addEventListener('click',()=>setDailyUrl(value));
+      if(available.has(value)){
+        button.classList.add('is-available');
+        button.addEventListener('click',()=>setDailyUrl(value));
+      }else{
+        button.disabled=true;
+        button.classList.add('is-unavailable');
+      }
       grid.append(button);
     }
     next.disabled=month>=monthKey(today);
@@ -727,24 +791,34 @@ function initDailyDateHub(day,today){
   trigger.addEventListener('click',()=>{month=monthKey(day);render();dialog.showModal()});
   prev.addEventListener('click',()=>{month=shiftMonth(month,-1);render()});
   next.addEventListener('click',()=>{if(month<monthKey(today)){month=shiftMonth(month,1);render()}});
-  todayButton.addEventListener('click',()=>setDailyUrl(today));
+  latestButton.addEventListener('click',async()=>{const latest=await latestAvailableDay(today);if(latest)setDailyUrl(latest)});
   close.addEventListener('click',()=>dialog.close());
   dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
 }
 async function initDaily(){
   const root=document.getElementById('daily-digest-page');if(!root)return;
   const content=document.getElementById('daily-digest-content'),status=document.getElementById('daily-digest-status'),title=document.getElementById('daily-digest-date-label');
-  const day=selectedDay(),today=taipeiDay();
-  if(title)title.textContent=displayDay(day)+' 日報';
+  const today=taipeiDay();
+  let day=selectedDay();
+  setStatus(status,'正在載入 Docchi 日報…','loading');content.replaceChildren();
+  if(!day){
+    day=await latestAvailableDay(today);
+    if(!day){
+      if(title)title.textContent='Docchi 日報';
+      setStatus(status,'目前尚無可用的 Docchi 日報。','MISSING');
+      return;
+    }
+    const url=new URL(location.href);url.searchParams.set('date',day);history.replaceState(null,'',url.pathname+url.search);
+  }
+  renderDailyTitle(title,day);
   initDailyDateHub(day,today);
-  setStatus(status,'正在載入日報…','loading');content.replaceChildren();
   const result=await fetchArtifact(day);
   if(result.state==='READY'||result.state==='PARTIAL'){
     const rendered=renderArtifact(content,result.artifact);
-    if(rendered)setStatus(status,result.state==='PARTIAL'?'本日資料尚未完整，未驗證項目不會視為已驗證內容。':'',result.state);
-    else setStatus(status,'本日 Daily Digest 沒有可顯示內容。',result.state);
-  }else if(result.state==='MISSING')setStatus(status,displayDay(day)+' 日報尚未產生','MISSING');
-  else setStatus(status,'日報暫時無法載入','ERROR');
+    if(rendered)setStatus(status,'',result.state);
+    else setStatus(status,'這篇 Docchi 日報目前沒有可顯示內容。',result.state);
+  }else if(result.state==='MISSING')setStatus(status,displayDay(day)+' Docchi 日報尚未產生','MISSING');
+  else setStatus(status,'Docchi 日報暫時無法載入','ERROR');
 }
 window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({schemaVersion:SCHEMA_VERSION,kind:KIND,taipeiDay,fetchArtifact,renderArtifact});
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',initDaily,{once:true});
