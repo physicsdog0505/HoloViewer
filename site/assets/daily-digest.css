@@ -1315,3 +1315,55 @@ html{scroll-behavior:smooth}
     column-count:1!important
   }
 }
+
+
+/* Owner review — Docchi Daily navigation, identity and date authority. */
+.daily-digest-page-head{margin-bottom:18px}
+.daily-digest-title-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.daily-digest-title-row h1{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  margin:0;font-weight:950;letter-spacing:-.04em;line-height:1.05
+}
+.daily-digest-title-date{font-size:.72em;font-weight:780;letter-spacing:-.025em;color:var(--muted,#6b6761)}
+.daily-digest-title-name{
+  font-size:1em;font-weight:950;
+  color:var(--brand-main,#ad4e82);
+  text-wrap:balance
+}
+.daily-digest-title-row>p{
+  margin:0;font-size:12px;font-weight:800;letter-spacing:.055em;
+  color:color-mix(in srgb,var(--brand-main,#ad4e82) 68%,var(--muted,#6b6761));
+  text-transform:uppercase
+}
+.daily-digest-status[hidden]{display:none!important}
+
+.daily-date-hub-day.is-unavailable{
+  color:color-mix(in srgb,var(--muted,#8a8782) 44%,transparent);
+  background:color-mix(in srgb,var(--surface-2,#f7f4f1) 48%,transparent);
+  cursor:default
+}
+.daily-date-hub-day.is-unavailable:hover{background:color-mix(in srgb,var(--surface-2,#f7f4f1) 48%,transparent)}
+.daily-date-hub-day.is-available{cursor:pointer}
+.daily-date-hub-day.is-available:not(.is-selected):hover{
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 34%,var(--surface,#fff))
+}
+.daily-date-hub-day.is-selected{
+  border-color:color-mix(in srgb,var(--brand-main,#ad4e82) 55%,var(--line,#dedad2));
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 40%,var(--surface,#fff))
+}
+
+.daily-story-host-avatars{display:inline-flex;align-items:center;margin-left:1px}
+.daily-story-host-avatar{
+  width:24px;height:24px;border-radius:999px;object-fit:cover;
+  border:2px solid var(--surface,#fff);background:var(--surface-2,#f6f3ee);
+  box-shadow:0 1px 5px rgba(33,28,31,.14)
+}
+.daily-story-host-avatar+.daily-story-host-avatar{margin-left:-7px}
+.daily-story-member-names{font-weight:760;color:var(--muted,#6b6761)}
+
+@media(max-width:760px){
+  .daily-digest-title-row{gap:8px 10px}
+  .daily-digest-title-row h1{gap:7px}
+  .daily-digest-title-row>p{width:100%;font-size:11px}
+  .daily-story-host-avatar{width:22px;height:22px}
+}
