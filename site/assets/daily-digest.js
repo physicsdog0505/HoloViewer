@@ -754,7 +754,7 @@ function renderDailyTitle(node,day){
   if(!node)return;
   node.replaceChildren(
     el('span','daily-digest-title-date',siteDateLabel(day)),
-    el('span','daily-digest-title-name','Docchi 日報')
+    el('span','daily-digest-title-name','Docchi News')
   );
 }
 function initDailyDateHub(day,today){
@@ -779,12 +779,12 @@ function initDailyDateHub(day,today){
         mark.setAttribute('aria-hidden','true');
         mark.innerHTML='<svg viewBox="0 0 24 24" focusable="false"><path d="M3.8 5.3c2.9-.7 5.5-.2 8.2 1.6v12.2c-2.6-1.7-5.3-2.2-8.2-1.4V5.3Zm16.4 0c-2.9-.7-5.5-.2-8.2 1.6v12.2c2.6-1.7 5.3-2.2 8.2-1.4V5.3Z"/><path d="M6.2 8.2c1.4-.1 2.6.2 3.8.9M6.2 11c1.4-.1 2.6.2 3.8.9M6.2 13.8c1.4-.1 2.6.2 3.8.9M17.8 8.2c-1.4-.1-2.6.2-3.8.9M17.8 11c-1.4-.1-2.6.2-3.8.9M17.8 13.8c-1.4-.1-2.6.2-3.8.9"/></svg>';
         button.append(mark);
-        button.setAttribute('aria-label',value+'，有 Docchi 日報');
+        button.setAttribute('aria-label',value+'，有 Docchi News');
         button.addEventListener('click',()=>setDailyUrl(value));
       }else{
         button.disabled=true;
         button.classList.add('is-unavailable');
-        button.setAttribute('aria-label',value+'，無 Docchi 日報');
+        button.setAttribute('aria-label',value+'，無 Docchi News');
       }
       grid.append(button);
     }
@@ -802,12 +802,12 @@ async function initDaily(){
   const content=document.getElementById('daily-digest-content'),status=document.getElementById('daily-digest-status'),title=document.getElementById('daily-digest-date-label');
   const today=taipeiDay();
   let day=selectedDay();
-  setStatus(status,'正在載入 Docchi 日報…','loading');content.replaceChildren();
+  setStatus(status,'正在載入 Docchi News…','loading');content.replaceChildren();
   if(!day){
     day=await latestAvailableDay(today);
     if(!day){
-      if(title)title.textContent='Docchi 日報';
-      setStatus(status,'目前尚無可用的 Docchi 日報。','MISSING');
+      if(title)title.textContent='Docchi News';
+      setStatus(status,'目前尚無可用的 Docchi News。','MISSING');
       return;
     }
     const url=new URL(location.href);url.searchParams.set('date',day);history.replaceState(null,'',url.pathname+url.search);
@@ -818,9 +818,9 @@ async function initDaily(){
   if(result.state==='READY'||result.state==='PARTIAL'){
     const rendered=renderArtifact(content,result.artifact);
     if(rendered)setStatus(status,'',result.state);
-    else setStatus(status,'這篇 Docchi 日報目前沒有可顯示內容。',result.state);
-  }else if(result.state==='MISSING')setStatus(status,displayDay(day)+' Docchi 日報尚未產生','MISSING');
-  else setStatus(status,'Docchi 日報暫時無法載入','ERROR');
+    else setStatus(status,'這篇 Docchi News目前沒有可顯示內容。',result.state);
+  }else if(result.state==='MISSING')setStatus(status,displayDay(day)+' Docchi News尚未產生','MISSING');
+  else setStatus(status,'Docchi News暫時無法載入','ERROR');
 }
 window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({schemaVersion:SCHEMA_VERSION,kind:KIND,taipeiDay,fetchArtifact,renderArtifact});
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',initDaily,{once:true});
