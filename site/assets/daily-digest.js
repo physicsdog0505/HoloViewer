@@ -777,7 +777,7 @@ function initDailyDateHub(day,today){
         button.classList.add('is-available');
         const mark=el('span','daily-date-hub-day-mark');
         mark.setAttribute('aria-hidden','true');
-        mark.innerHTML='<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4h11a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2V4Zm13 4h1.5A1.5 1.5 0 0 1 21 9.5V17a2 2 0 0 1-2 2h-1M8 8h7M8 11h7M8 14h4"/></svg>';
+        mark.innerHTML='<svg viewBox="0 0 24 24" focusable="false"><path d="M3.8 5.3c2.9-.7 5.5-.2 8.2 1.6v12.2c-2.6-1.7-5.3-2.2-8.2-1.4V5.3Zm16.4 0c-2.9-.7-5.5-.2-8.2 1.6v12.2c2.6-1.7 5.3-2.2 8.2-1.4V5.3Z"/><path d="M6.2 8.2c1.4-.1 2.6.2 3.8.9M6.2 11c1.4-.1 2.6.2 3.8.9M6.2 13.8c1.4-.1 2.6.2 3.8.9M17.8 8.2c-1.4-.1-2.6.2-3.8.9M17.8 11c-1.4-.1-2.6.2-3.8.9M17.8 13.8c-1.4-.1-2.6.2-3.8.9"/></svg>';
         button.append(mark);
         button.setAttribute('aria-label',value+'，有 Docchi 日報');
         button.addEventListener('click',()=>setDailyUrl(value));
