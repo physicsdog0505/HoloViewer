@@ -780,8 +780,9 @@ function initDailyDateHub(day,today){
       if(value===day)button.classList.add('is-selected');
       if(available.has(value)){
         button.classList.add('is-available');
-        const mark=el('span','daily-date-hub-day-mark','報');
+        const mark=el('span','daily-date-hub-day-mark');
         mark.setAttribute('aria-hidden','true');
+        mark.innerHTML='<svg viewBox="0 0 24 24" focusable="false"><path d="M5 4h11a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2V4Zm13 4h1.5A1.5 1.5 0 0 1 21 9.5V17a2 2 0 0 1-2 2h-1M8 8h7M8 11h7M8 14h4"/></svg>';
         button.append(mark);
         button.setAttribute('aria-label',value+'，有 Docchi 日報');
         button.addEventListener('click',()=>setDailyUrl(value));
