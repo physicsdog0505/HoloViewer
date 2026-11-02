@@ -536,17 +536,6 @@ function renderStories(target,artifact,byId){
     const eyebrow=el('div','daily-story-eyebrow');
     const members=Array.isArray(story.member_names)?story.member_names.map(publicText).filter(Boolean):[];
     eyebrow.append(el('span','',index===0?'今日焦點':'今日話題'));
-    if(visibleIds.length){
-      const avatars=el('span','daily-story-host-avatars');
-      visibleIds.slice(0,Math.min(3,Math.max(1,members.length))).forEach(videoId=>{
-        const avatar=thumbnailImage(videoId);
-        if(!avatar)return;
-        avatar.className='daily-story-host-avatar';
-        avatar.loading='lazy';
-        avatars.append(avatar);
-      });
-      if(avatars.childElementCount)eyebrow.append(avatars);
-    }
     if(members.length)eyebrow.append(el('span','daily-story-member-names',members.slice(0,3).join('・')+(members.length>3?' 等':'')));
     card.append(eyebrow);
 
