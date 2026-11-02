@@ -145,8 +145,6 @@ function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
     }
     const img=thumbnailImage(id);
     if(img)figure.append(img);
-    const row=byId.get(id),name=publicText(row?.channel_name);
-    if(name)figure.append(el('figcaption','',name));
     visual.append(figure);
   });
 
@@ -234,7 +232,6 @@ function streamReference(videoId,byId){
     if(img)head.append(img);
   }
   const copy=el('span','daily-stream-ref-copy');
-  copy.append(el('strong','',publicText(row?.channel_name)||'直播'));
   copy.append(el('span','',clampText(row?.title||'直播資訊',62)));
   head.append(copy);
   details.append(head);
@@ -472,8 +469,6 @@ function renderOverview(target,artifact,byId){
         const media=el('div','daily-highlight-media');
         const img=thumbnailImage(firstVideo,{loading:index===0?'eager':'lazy'});
         if(img)media.append(img);
-        const row=byId.get(firstVideo),name=publicText(row?.channel_name);
-        if(name)media.append(el('span','daily-highlight-channel',name));
         card.append(media);
       }
       const copy=el('div','daily-highlight-copy');
