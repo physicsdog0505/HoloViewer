@@ -680,8 +680,17 @@ async function fetchArtifact(day){
   catch{return {state:'ERROR',artifact:null,reason:'network'}}
   if(response.status===404)return {state:'MISSING',artifact:null,reason:'not_found'};
   if(!response.ok)return {state:'ERROR',artifact:null,reason:'http_'+response.status};
-  let artifact;
-  try{artifact=await response.json()}catch{return {state:'ERROR',artifact:null,reason:'invalid_json'}}
+  let payload;
+  try{payload=await response.json()}catch{return {state:'ERROR',artifact:null,reason:'invalid_json'}}
+  let artifact=payload;
+  if(payload?.kind==='holodocchi.daily_digest_month'){
+    const month=day.slice(0,7);
+    if(payload.schema_version!==1||text(payload.month)!==month||!payload.days||typeof payload.days!=='object'){
+      return {state:'ERROR',artifact:null,reason:'month_schema'};
+    }
+    artifact=payload.days[day]||null;
+    if(!artifact)return {state:'MISSING',artifact:null,reason:'day_not_in_month'};
+  }
   if(!artifact||artifact.schema_version!==SCHEMA_VERSION||artifact.kind!==KIND)return {state:'ERROR',artifact:null,reason:'schema'};
   if(text(artifact.target_day)!==day||artifact.timezone!==TAIPEI)return {state:'ERROR',artifact:null,reason:'day_mismatch'};
   return {state:artifact?.coverage?.complete===true?'READY':'PARTIAL',artifact,reason:''};
