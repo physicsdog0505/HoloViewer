@@ -107,13 +107,31 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         self.assertEqual(story["summary_depth"], "deep")
         self.assertEqual(story["editorial_summary"], explicit)
 
-    def test_standard_story_remains_bounded_to_standard_limit(self):
+    def test_standard_story_above_recommended_limit_is_preserved(self):
         src = v2_payload("compact")
         src["stories"][0]["summary_depth"] = "standard"
-        src["stories"][0]["editorial_summary"] = zh("一般故事主文。", 1000)
+        explicit = zh("一般故事主文。", 1000)
+        src["stories"][0]["editorial_summary"] = explicit
         result = normalize_digest(src)
         self.assertEqual(result.artifact["stories"][0]["summary_depth"], "standard")
-        self.assertLessEqual(len(result.artifact["stories"][0]["editorial_summary"]), 760)
+        self.assertEqual(result.artifact["stories"][0]["editorial_summary"], explicit)
+        self.assertFalse(result.artifact["stories"][0]["editorial_summary"].endswith("…"))
+        self.assertTrue(
+            any(
+                "stories[0].editorial_summary length" in warning
+                and "preserved without truncation" in warning
+                for warning in result.warnings
+            )
+        )
+
+    def test_story_editorial_summary_above_hard_limit_is_rejected(self):
+        src = v2_payload("compact")
+        src["stories"][0]["editorial_summary"] = zh("異常超長主文。", 6001)
+        with self.assertRaisesRegex(
+            ContractError,
+            r"stories\[0\]\.editorial_summary must be <= 6000 chars",
+        ):
+            normalize_digest(src)
 
     def test_invalid_summary_depth_falls_back_to_standard(self):
         src = v2_payload("compact")

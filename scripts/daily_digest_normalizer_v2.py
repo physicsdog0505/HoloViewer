@@ -27,8 +27,9 @@ OVERVIEW_MIN = 260
 OVERVIEW_RECOMMENDED_MAX = 520
 OVERVIEW_HARD_MAX = 2000
 STORY_EDITORIAL_TARGET_MIN = 320
-STORY_EDITORIAL_MAX = 760
-STORY_EDITORIAL_DEEP_MAX = 1200
+STORY_EDITORIAL_RECOMMENDED_MAX = 760
+STORY_EDITORIAL_DEEP_RECOMMENDED_MAX = 1200
+STORY_EDITORIAL_HARD_MAX = 6000
 
 
 class ContractError(ValueError):
@@ -276,15 +277,12 @@ def _normalize_highlight(item: Any, story: dict[str, Any] | None, *, legacy: boo
     }, warnings
 
 
-def _story_editorial_summary(story: dict[str, Any], *, maximum: int) -> str:
+def _story_editorial_summary(story: dict[str, Any]) -> str:
     explicit = _clean(story.get("editorial_summary"))
     if explicit:
-        return _truncate(explicit, maximum) if len(explicit) > maximum else explicit
+        return explicit
 
-    base = _clean(story.get("public_summary") or story.get("summary"))
-    if len(base) > maximum:
-        return _truncate(base, maximum)
-    return base
+    return _clean(story.get("public_summary") or story.get("summary"))
 
 def _normalize_story(
     story: Any,
@@ -320,9 +318,22 @@ def _normalize_story(
         summary_depth = "standard"
     out["summary_depth"] = summary_depth
 
-    maximum = STORY_EDITORIAL_DEEP_MAX if summary_depth == "deep" else STORY_EDITORIAL_MAX
-    editorial_summary = _story_editorial_summary(out, maximum=maximum)
+    recommended_max = (
+        STORY_EDITORIAL_DEEP_RECOMMENDED_MAX
+        if summary_depth == "deep"
+        else STORY_EDITORIAL_RECOMMENDED_MAX
+    )
+    editorial_summary = _story_editorial_summary(out)
     if editorial_summary:
+        if len(editorial_summary) > STORY_EDITORIAL_HARD_MAX:
+            raise ContractError(
+                f"stories[{index}].editorial_summary must be <= {STORY_EDITORIAL_HARD_MAX} chars"
+            )
+        if len(editorial_summary) > recommended_max:
+            warnings.append(
+                f"stories[{index}].editorial_summary length {len(editorial_summary)} "
+                f"exceeds recommended {recommended_max}; preserved without truncation"
+            )
         out["editorial_summary"] = editorial_summary
 
     reader_mode = _clean(out.get("reader_mode")).lower()
