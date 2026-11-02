@@ -1315,3 +1315,65 @@ html{scroll-behavior:smooth}
     column-count:1!important
   }
 }
+
+
+/* Owner review — Docchi Daily navigation, identity and date authority. */
+.daily-digest-page-head{margin-bottom:18px}
+.daily-digest-title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.daily-digest-title-row h1{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  margin:0;font-weight:950;letter-spacing:-.04em;line-height:1.05
+}
+.daily-digest-title-date{font-size:.72em;font-weight:780;letter-spacing:-.025em;color:var(--muted,#6b6761)}
+.daily-digest-title-name{display:none}
+.daily-digest-title-meta{
+  margin-left:auto;display:flex;align-items:baseline;gap:10px;
+  text-align:right;white-space:nowrap
+}
+.daily-digest-title-meta>strong{
+  font-size:18px;font-weight:950;letter-spacing:-.02em;
+  color:var(--brand-main,#ad4e82)
+}
+.daily-digest-title-meta>p{
+  margin:0;font-size:12px;font-weight:800;letter-spacing:.055em;
+  color:color-mix(in srgb,var(--brand-main,#ad4e82) 68%,var(--muted,#6b6761));
+  text-transform:uppercase
+}
+.daily-digest-status[hidden]{display:none!important}
+
+.daily-date-hub-day.is-unavailable{
+  color:color-mix(in srgb,var(--muted,#8a8782) 44%,transparent);
+  background:color-mix(in srgb,var(--surface-2,#f7f4f1) 48%,transparent);
+  cursor:default
+}
+.daily-date-hub-day.is-unavailable:hover{background:color-mix(in srgb,var(--surface-2,#f7f4f1) 48%,transparent)}
+.daily-date-hub-day.is-available{cursor:pointer;position:relative}
+.daily-date-hub-day-mark{
+  position:absolute;top:7px;right:7px;
+  width:44px;height:44px;border-radius:13px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 42%,var(--surface,#fff));
+  border:1px solid color-mix(in srgb,var(--brand-main,#ad4e82) 22%,transparent);
+  box-shadow:0 2px 7px rgba(33,28,31,.10)
+}
+.daily-date-hub-day-mark img{
+  width:38px;height:38px;display:block;object-fit:contain
+}
+.daily-date-hub-day.is-selected .daily-date-hub-day-mark{
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 66%,var(--surface,#fff));
+  border-color:color-mix(in srgb,var(--brand-main,#ad4e82) 42%,transparent)
+}
+.daily-date-hub-day.is-available:not(.is-selected):hover{
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 34%,var(--surface,#fff))
+}
+.daily-date-hub-day.is-selected{
+  border-color:color-mix(in srgb,var(--brand-main,#ad4e82) 55%,var(--line,#dedad2));
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 40%,var(--surface,#fff))
+}
+
+@media(max-width:760px){
+  .daily-digest-title-row{gap:8px 10px}
+  .daily-digest-title-row h1{gap:7px}
+  .daily-digest-title-meta{width:100%;justify-content:flex-start;text-align:left;margin-left:0}
+  .daily-digest-title-meta>p{font-size:11px}
+}

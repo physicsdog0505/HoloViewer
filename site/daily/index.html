@@ -1,15 +1,17 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>每日精選 · HoloDocchi</title>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Docchi News · HoloDocchi</title>
 <link rel="stylesheet" href="/assets/shared-shell.css"><link rel="stylesheet" href="/assets/daily-digest.css"></head>
 <body>
 <aside class="client-rail" aria-label="主要功能">
 <a class="rail-brand" href="/" aria-label="HoloDocchi 首頁"><span class="rail-icon">H</span><span class="rail-label">HoloDocchi</span></a>
 <nav class="rail-nav">
-<a href="/"><span class="rail-icon">今</span><span class="rail-label">今日直播</span></a>
-<a href="/history"><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
-<a href="/watchalong"><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a>
-<a href="/daily/" class="active"><span class="rail-icon">報</span><span class="rail-label">每日精選</span></a>
-<a href="/ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a>
+  <a data-route="home" href="/" class=""><span class="rail-icon">今</span><span class="rail-label">今日直播</span></a>
+  <a data-route="history" href="/history" class=""><span class="rail-icon">史</span><span class="rail-label">歷史直播</span></a>
+  <a data-route="watchalong" href="/watchalong" class=""><span class="rail-icon">視</span><span class="rail-label">同時視聽</span></a>
+  <a href="/daily/" class="active"><span class="rail-icon">報</span><span class="rail-label">Docchi News</span></a>
+  <a data-route="single" href="/custom-view" class=""><span class="rail-icon">自</span><span class="rail-label">自訂觀看</span></a>
+  <a data-route="multi" href="/collab" class=""><span class="rail-icon" aria-hidden="true"></span><span class="rail-label">多人連動</span></a>
+  <a data-route="ptt" href="/ptt-today/"><span class="rail-icon">PTT</span><span class="rail-label">PTT 今日專串</span></a>
 </nav></aside>
 <nav class="mobile-bottom-dock" aria-label="手機主要功能">
 <a data-mobile-dock-route="home" href="/" aria-label="今日直播"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 10.5V20h13v-9.5M9.5 20v-5h5v5"/></svg></a>
@@ -19,14 +21,14 @@
 </nav>
 <header class="client-topbar">
 <a class="mobile-top-brand" href="/">HoloDocchi</a>
-<button id="dailyDigestDateTrigger" class="top-status daily-digest-date-trigger" type="button" aria-haspopup="dialog" aria-controls="dailyDigestDateHub">每日精選</button>
+<button id="dailyDigestDateTrigger" class="top-status daily-digest-date-trigger" type="button" aria-haspopup="dialog" aria-controls="dailyDigestDateHub">Docchi News</button>
 </header>
 <dialog id="dailyDigestDateHub" class="daily-date-hub" aria-labelledby="dailyDigestDateHubTitle">
 <div class="daily-date-hub-shell">
 <header class="daily-date-hub-head">
 <div><p class="daily-date-hub-kicker">HOLODOCCHI DAILY</p><h2 id="dailyDigestDateHubTitle">選擇日報日期</h2></div>
 <div class="daily-date-hub-head-actions">
-<button id="dailyDigestDateToday" type="button">今天</button>
+<button id="dailyDigestDateToday" type="button">最新</button>
 <button id="dailyDigestDateClose" type="button" aria-label="關閉日報月曆">×</button>
 </div>
 </header>
@@ -42,8 +44,8 @@
 </div>
 </dialog>
 <main class="client-main daily-digest-shell" id="daily-digest-page">
-<div class="page-head"><div><h1 id="daily-digest-date-label">每日精選</h1><p>Daily Digest · Asia/Taipei</p></div></div>
-<p id="daily-digest-status" class="daily-digest-status" role="status" aria-live="polite">正在載入今日精選…</p>
+<div class="page-head daily-digest-page-head"><div class="daily-digest-title-row"><h1 id="daily-digest-date-label">Docchi News</h1><div class="daily-digest-title-meta"><strong>Docchi News</strong><p>Daily Digest · Asia/Taipei</p></div></div></div>
+<p id="daily-digest-status" class="daily-digest-status" role="status" aria-live="polite">正在載入 Docchi News…</p>
 <div id="daily-digest-content"></div>
 </main>
 <script src="/assets/config.js"></script><script src="/assets/daily-digest.js"></script>
