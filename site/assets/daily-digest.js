@@ -19,6 +19,20 @@ function taipeiDay(now=new Date()){
   return map.year+'-'+map.month+'-'+map.day;
 }
 function displayDay(day){return DATE_RE.test(day)?day.replaceAll('-','/'):day}
+function siteDateLabel(day){
+  if(!DATE_RE.test(day))return day;
+  const date=new Date(day+'T12:00:00Z');
+  if(!Number.isFinite(date.getTime()))return day;
+  const pieces=new Intl.DateTimeFormat('en-US',{
+    timeZone:'Asia/Taipei',
+    weekday:'short',
+    month:'short',
+    day:'2-digit',
+    year:'numeric'
+  }).formatToParts(date);
+  const parts=Object.fromEntries(pieces.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+  return (parts.weekday+' · '+parts.month+' '+parts.day+', '+parts.year).toUpperCase();
+}
 function config(){const cfg=window.HOLOVIEWER_CONFIG?.dailyDigest;return cfg&&typeof cfg==='object'?cfg:{}}
 function artifactUrl(day){
   const cfg=config();
@@ -201,7 +215,7 @@ function thumbnailImage(videoId,{loading='lazy'}={}){
 function publicTypeLabel(type){
   return {
     merch_and_event:'活動・周邊',
-    concert:'演出',
+    concert:'',
     music:'音樂',
     outfit_reveal:'新衣裝',
     membership_and_schedule:'近期行程',
@@ -580,7 +594,8 @@ function renderAnnouncements(target,artifact,byId){
   rows.forEach(row=>{
     const card=el('article','daily-announcement-card');
     const when=el('div','daily-announcement-when');
-    when.append(el('span','daily-announcement-type',publicTypeLabel(row.type)));
+    const typeLabel=publicTypeLabel(row.type);
+    if(typeLabel)when.append(el('span','daily-announcement-type',typeLabel));
     if(publicText(row.event_date_text))when.append(el('time','',publicText(row.event_date_text)));
     card.append(when);
     if(publicText(row.title))card.append(el('h3','',publicText(row.title)));
@@ -746,14 +761,14 @@ async function latestAvailableDay(today){
 function renderDailyTitle(node,day){
   if(!node)return;
   node.replaceChildren(
-    el('span','daily-digest-title-date',displayDay(day)),
+    el('span','daily-digest-title-date',siteDateLabel(day)),
     el('span','daily-digest-title-name','Docchi 日報')
   );
 }
 function initDailyDateHub(day,today){
   const dialog=document.getElementById('dailyDigestDateHub'),trigger=document.getElementById('dailyDigestDateTrigger'),grid=document.getElementById('dailyDigestDateGrid'),label=document.getElementById('dailyDigestMonthLabel'),prev=document.getElementById('dailyDigestMonthPrev'),next=document.getElementById('dailyDigestMonthNext'),latestButton=document.getElementById('dailyDigestDateToday'),close=document.getElementById('dailyDigestDateClose');
   if(!dialog||!trigger||!grid||!label)return;
-  let month=monthKey(day),renderSerial=0;trigger.textContent=displayDay(day);
+  let month=monthKey(day),renderSerial=0;trigger.textContent=siteDateLabel(day);
   async function render(){
     const serial=++renderSerial;
     label.textContent=monthLabel(month);grid.replaceChildren();
