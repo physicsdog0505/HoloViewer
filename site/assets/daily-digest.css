@@ -1343,7 +1343,16 @@ html{scroll-behavior:smooth}
   cursor:default
 }
 .daily-date-hub-day.is-unavailable:hover{background:color-mix(in srgb,var(--surface-2,#f7f4f1) 48%,transparent)}
-.daily-date-hub-day.is-available{cursor:pointer}
+.daily-date-hub-day.is-available{cursor:pointer;position:relative}
+.daily-date-hub-day-mark{
+  position:absolute;top:8px;right:8px;
+  min-width:20px;height:20px;padding:0 5px;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:900;line-height:1;
+  color:var(--brand-main,#ad4e82);
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 70%,var(--surface,#fff));
+  border:1px solid color-mix(in srgb,var(--brand-main,#ad4e82) 28%,transparent)
+}
 .daily-date-hub-day.is-available:not(.is-selected):hover{
   background:color-mix(in srgb,var(--brand-soft,#f3dce9) 34%,var(--surface,#fff))
 }
@@ -1351,8 +1360,6 @@ html{scroll-behavior:smooth}
   border-color:color-mix(in srgb,var(--brand-main,#ad4e82) 55%,var(--line,#dedad2));
   background:color-mix(in srgb,var(--brand-soft,#f3dce9) 40%,var(--surface,#fff))
 }
-
-.daily-story-member-names{font-weight:760;color:var(--muted,#6b6761)}
 
 @media(max-width:760px){
   .daily-digest-title-row{gap:8px 10px}
