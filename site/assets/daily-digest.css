@@ -1345,13 +1345,20 @@ html{scroll-behavior:smooth}
 .daily-date-hub-day.is-unavailable:hover{background:color-mix(in srgb,var(--surface-2,#f7f4f1) 48%,transparent)}
 .daily-date-hub-day.is-available{cursor:pointer;position:relative}
 .daily-date-hub-day-mark{
-  position:absolute;top:8px;right:8px;
-  min-width:20px;height:20px;padding:0 5px;border-radius:999px;
+  position:absolute;top:9px;right:9px;
+  width:30px;height:30px;border-radius:10px;
   display:inline-flex;align-items:center;justify-content:center;
-  font-size:10px;font-weight:900;line-height:1;
   color:var(--brand-main,#ad4e82);
-  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 70%,var(--surface,#fff));
-  border:1px solid color-mix(in srgb,var(--brand-main,#ad4e82) 28%,transparent)
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 78%,var(--surface,#fff));
+  border:1px solid color-mix(in srgb,var(--brand-main,#ad4e82) 34%,transparent);
+  box-shadow:0 1px 4px rgba(33,28,31,.08)
+}
+.daily-date-hub-day-mark svg{
+  width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round
+}
+.daily-date-hub-day.is-selected .daily-date-hub-day-mark{
+  color:#fff;background:var(--brand-main,#ad4e82);border-color:var(--brand-main,#ad4e82)
 }
 .daily-date-hub-day.is-available:not(.is-selected):hover{
   background:color-mix(in srgb,var(--brand-soft,#f3dce9) 34%,var(--surface,#fff))
