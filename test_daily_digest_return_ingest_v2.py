@@ -120,6 +120,30 @@ class DailyDigestReturnIngestV2Tests(unittest.TestCase):
             self.assertEqual(public["kind"], "holodocchi.daily_digest")
             self.assertEqual(public["target_day"], "2026-10-31")
 
+
+    def test_accepts_canonical_output_filenames_without_review_suffix(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            json_name = "2026-10-31-holodocchi-gemini-digest.json"
+            md_name = "2026-10-31-holodocchi-gemini-digest.md"
+            manifest_path = root / "manifest.md"
+            json_path = root / json_name
+            md_path = root / md_name
+            manifest_path.write_text(manifest(json_name, md_name), encoding="utf-8")
+            json_path.write_text(json.dumps(payload(), ensure_ascii=False), encoding="utf-8")
+            md_path.write_text("# readable canonical sibling\n", encoding="utf-8")
+
+            result = stage_return(
+                manifest_path=manifest_path,
+                gemini_json_path=json_path,
+                gemini_markdown_path=md_path,
+                staging_root=root / "staging",
+            )
+
+            self.assertEqual(result["status"], "READY_FOR_PUBLICATION")
+            self.assertEqual(result["gemini_json_file"], json_name)
+            self.assertEqual(result["gemini_markdown_file"], md_name)
+
     def test_identical_return_is_idempotent(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
