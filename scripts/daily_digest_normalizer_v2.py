@@ -55,6 +55,102 @@ def _clean(value: Any) -> str:
         return ""
     return re.sub(r"\s+", " ", str(value)).strip()
 
+PUBLIC_PROSE_SCALAR_KEYS = {
+    "title",
+    "short_title",
+    "summary",
+    "public_summary",
+    "editorial_summary",
+    "rationale",
+    "label",
+    "event_date_text",
+    "deadline_text",
+    "sales_window",
+    "note",
+}
+PUBLIC_PROSE_LIST_KEYS = {
+    "topics",
+    "event_merchandise",
+    "action_items",
+    "follow_up_dates",
+}
+
+
+def _collect_evidence_video_ids(value: Any) -> set[str]:
+    out: set[str] = set()
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, item in node.items():
+                if key == "video_id":
+                    vid = _clean(item)
+                    if vid:
+                        out.add(vid)
+                elif key == "video_ids" and isinstance(item, list):
+                    for candidate in item:
+                        vid = _clean(candidate)
+                        if vid:
+                            out.add(vid)
+                else:
+                    visit(item)
+        elif isinstance(node, list):
+            for item in node:
+                visit(item)
+
+    visit(value)
+    return out
+
+
+def _strip_known_video_ids(value: Any, video_ids: set[str]) -> str:
+    raw = _clean(value)
+    if not raw or not video_ids:
+        return raw
+
+    cleaned = raw
+    for video_id in sorted(video_ids, key=len, reverse=True):
+        token = re.escape(video_id)
+        cleaned = re.sub(rf"[（(]\\s*{token}\\s*[，,:：;；、]\\s*", lambda m: m.group(0)[0], cleaned)
+        cleaned = re.sub(rf"[（(]\\s*{token}\\s*[）)]", "", cleaned)
+        cleaned = re.sub(rf"`\\s*{token}\\s*`", "", cleaned)
+        cleaned = re.sub(rf"(?<![A-Za-z0-9_-]){token}(?![A-Za-z0-9_-])", "", cleaned)
+
+    cleaned = re.sub(r"（\\s*）|\\(\\s*\\)", "", cleaned)
+    cleaned = re.sub(r"\\s+([，。！？；：、,.!?;:])", r"\\1", cleaned)
+    cleaned = re.sub(r"\\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _scrub_public_prose(node: Any, video_ids: set[str], *, parent_key: str = "") -> tuple[Any, int]:
+    if isinstance(node, dict):
+        changed = 0
+        out: dict[str, Any] = {}
+        for key, value in node.items():
+            if isinstance(value, str) and key in PUBLIC_PROSE_SCALAR_KEYS:
+                cleaned = _strip_known_video_ids(value, video_ids)
+                out[key] = cleaned
+                changed += int(cleaned != value)
+            else:
+                scrubbed, local_changed = _scrub_public_prose(value, video_ids, parent_key=key)
+                out[key] = scrubbed
+                changed += local_changed
+        return out, changed
+
+    if isinstance(node, list):
+        changed = 0
+        out: list[Any] = []
+        for value in node:
+            if isinstance(value, str) and parent_key in PUBLIC_PROSE_LIST_KEYS:
+                cleaned = _strip_known_video_ids(value, video_ids)
+                out.append(cleaned)
+                changed += int(cleaned != value)
+            else:
+                scrubbed, local_changed = _scrub_public_prose(value, video_ids, parent_key=parent_key)
+                out.append(scrubbed)
+                changed += local_changed
+        return out, changed
+
+    return node, 0
+
 
 def _split_legacy_highlight(value: str) -> tuple[str, str]:
     raw = _clean(value)
@@ -345,6 +441,13 @@ def normalize_digest(payload: dict[str, Any]) -> NormalizeResult:
         for row in out["categories"]:
             if isinstance(row, dict):
                 row["video_ids"] = _ordered_video_ids(row.get("video_ids"))
+
+    evidence_video_ids = _collect_evidence_video_ids(out)
+    out, scrubbed_public_fields = _scrub_public_prose(out, evidence_video_ids)
+    if scrubbed_public_fields:
+        warnings.append(
+            f"removed known video_id tokens from {scrubbed_public_fields} public prose field(s)"
+        )
 
     provenance = out.get("producer_v2") if isinstance(out.get("producer_v2"), dict) else {}
     provenance.update({
