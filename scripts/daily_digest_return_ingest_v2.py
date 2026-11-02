@@ -16,7 +16,7 @@ from scripts.daily_digest_normalizer_v2 import GEMINI_V2_SCHEMA, ContractError, 
 
 MANIFEST_DAY_RE = re.compile(r"^TARGET_DAY:\s*(\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
 MANIFEST_TZ_RE = re.compile(r"^TIMEZONE:\s*([^\s]+)\s*$", re.MULTILINE)
-MANIFEST_OUTPUT_RE = re.compile(r"^-\s+([^\s]+holodocchi-gemini-digest[^\s]+\.(?:json|md))\s*$", re.MULTILINE)
+MANIFEST_OUTPUT_RE = re.compile(r"^-\s+([^\s]+holodocchi-gemini-digest[^\s.]*\.(?:json|md))\s*$", re.MULTILINE)
 MANIFEST_VIDEO_RE = re.compile(r"^-\s+video_id:\s*[\"']?([^\s\"']+)", re.MULTILINE)
 
 
