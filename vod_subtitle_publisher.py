@@ -246,7 +246,7 @@ def _validate_indexes(candidate_root: Path, receipts: dict[str, dict[str, object
     for video_id in sorted(receipts):
         month = months.get(video_id)
         if month is None:
-            raise VodSubtitlePublishError(f"VOD catalog month lookup failed: {video_id}")
+            continue
         grouped.setdefault(month, []).append(_index_entry(receipts[video_id]))
     month_dir = candidate_root / MONTH_INDEX_DIR
     actual = sorted(p.name for p in month_dir.glob("*.json")) if month_dir.exists() else []
@@ -283,15 +283,19 @@ def validate_candidate(candidate_root: str | Path, receipts_root: str | Path, ca
     if actual_assets != expected_assets:
         raise VodSubtitlePublishError("candidate video asset set does not match receipts")
     _validate_indexes(root, receipts, months)
-    return {"video_count": len(receipts), "tree_sha256": _tree_digest(root)}
+    pending = sorted(video_id for video_id in receipts if video_id not in months)
+    return {
+        "video_count": len(receipts),
+        "catalog_mapped_video_count": len(receipts) - len(pending),
+        "pending_catalog_mapping_count": len(pending),
+        "pending_catalog_mapping_video_ids": pending,
+        "tree_sha256": _tree_digest(root),
+    }
 
 
 def build_candidate(asset_root: str | Path, receipts_root: str | Path, catalog_root: str | Path, candidate_root: str | Path, *, catalog_manifest: str = DEFAULT_CATALOG_MANIFEST) -> dict[str, object]:
     receipts = load_receipts(receipts_root)
     months = catalog_video_months(catalog_root, catalog_manifest)
-    for video_id in receipts:
-        if video_id not in months:
-            raise VodSubtitlePublishError(f"VOD catalog month lookup failed: {video_id}")
 
     destination = Path(candidate_root)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -323,7 +327,10 @@ def build_candidate(asset_root: str | Path, receipts_root: str | Path, catalog_r
 
         grouped: dict[str, list[dict[str, object]]] = {}
         for video_id in sorted(receipts):
-            grouped.setdefault(months[video_id], []).append(_index_entry(receipts[video_id]))
+            month = months.get(video_id)
+            if month is None:
+                continue
+            grouped.setdefault(month, []).append(_index_entry(receipts[video_id]))
         month_dir = temp / MONTH_INDEX_DIR
         month_dir.mkdir(parents=True, exist_ok=True)
         for month, rows in sorted(grouped.items()):
