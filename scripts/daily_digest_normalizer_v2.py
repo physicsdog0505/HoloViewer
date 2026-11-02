@@ -109,14 +109,14 @@ def _strip_known_video_ids(value: Any, video_ids: set[str]) -> str:
     cleaned = raw
     for video_id in sorted(video_ids, key=len, reverse=True):
         token = re.escape(video_id)
-        cleaned = re.sub(rf"[（(]\\s*{token}\\s*[，,:：;；、]\\s*", lambda m: m.group(0)[0], cleaned)
-        cleaned = re.sub(rf"[（(]\\s*{token}\\s*[）)]", "", cleaned)
-        cleaned = re.sub(rf"`\\s*{token}\\s*`", "", cleaned)
+        cleaned = re.sub(rf"[（(]\s*{token}\s*[，,:：;；、]\s*", lambda m: m.group(0)[0], cleaned)
+        cleaned = re.sub(rf"[（(]\s*{token}\s*[）)]", "", cleaned)
+        cleaned = re.sub(rf"`\s*{token}\s*`", "", cleaned)
         cleaned = re.sub(rf"(?<![A-Za-z0-9_-]){token}(?![A-Za-z0-9_-])", "", cleaned)
 
-    cleaned = re.sub(r"（\\s*）|\\(\\s*\\)", "", cleaned)
-    cleaned = re.sub(r"\\s+([，。！？；：、,.!?;:])", r"\\1", cleaned)
-    cleaned = re.sub(r"\\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"（\s*）|\(\s*\)", "", cleaned)
+    cleaned = re.sub(r"\s+([，。！？；：、,.!?;:])", r"\1", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
 
 
