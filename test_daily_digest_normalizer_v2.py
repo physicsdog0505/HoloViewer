@@ -208,6 +208,41 @@ class DailyDigestNormalizerV2Tests(unittest.TestCase):
         self.assertIn(result.artifact["overview_layout"], {"compact", "rail", "lead"})
         self.assertEqual(result.artifact["producer_v2"]["source_schema"], "legacy-v1")
 
+    def test_known_video_ids_are_removed_from_public_prose_but_evidence_is_preserved(self):
+        src = v2_payload("compact")
+        video_id = "v0000000000"
+        tick = chr(96)
+        src["stories"][0]["editorial_summary"] = (
+            f"主直播（{video_id}）完成重大發表。"
+            f"另一段（{video_id}，僅取得基本中繼資料）仍保留狀態說明。"
+            f"反引號 {tick}{video_id}{tick} 也不應出現在正文。"
+        )
+        src["streams"][0]["summary"] = f"直播 {video_id} 的詳細摘要。"
+        src["streams"][0]["topics"] = [f"來源（{video_id}）的重要主題"]
+        src["announcements"][0]["summary"] = f"公告來源 ({video_id}) 已驗證。"
+
+        result = normalize_digest(src)
+
+        story = result.artifact["stories"][0]
+        self.assertNotIn(video_id, story["editorial_summary"])
+        self.assertIn("僅取得基本中繼資料", story["editorial_summary"])
+        self.assertEqual(story["video_ids"], [video_id])
+
+        self.assertNotIn(video_id, result.artifact["streams"][0]["summary"])
+        self.assertNotIn(video_id, result.artifact["streams"][0]["topics"][0])
+        self.assertEqual(result.artifact["streams"][0]["video_id"], video_id)
+
+        self.assertNotIn(video_id, result.artifact["announcements"][0]["summary"])
+        self.assertEqual(result.artifact["announcements"][0]["video_ids"], [video_id])
+        self.assertTrue(any("removed known video_id tokens" in w for w in result.warnings))
+
+    def test_unknown_11_character_token_is_not_removed(self):
+        src = v2_payload("compact")
+        unknown = "abcdefghijk"
+        src["stories"][0]["editorial_summary"] = f"作品代碼（{unknown}）不是已知 evidence video ID。"
+        result = normalize_digest(src)
+        self.assertIn(unknown, result.artifact["stories"][0]["editorial_summary"])
+
     def test_source_hash_changes_only_when_source_changes(self):
         src = v2_payload()
         a = normalize_digest(src)
