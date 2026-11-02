@@ -1349,20 +1349,19 @@ html{scroll-behavior:smooth}
 .daily-date-hub-day.is-unavailable:hover{background:color-mix(in srgb,var(--surface-2,#f7f4f1) 48%,transparent)}
 .daily-date-hub-day.is-available{cursor:pointer;position:relative}
 .daily-date-hub-day-mark{
-  position:absolute;top:9px;right:9px;
-  width:30px;height:30px;border-radius:10px;
+  position:absolute;top:7px;right:7px;
+  width:44px;height:44px;border-radius:13px;
   display:inline-flex;align-items:center;justify-content:center;
-  color:var(--brand-main,#ad4e82);
-  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 78%,var(--surface,#fff));
-  border:1px solid color-mix(in srgb,var(--brand-main,#ad4e82) 34%,transparent);
-  box-shadow:0 1px 4px rgba(33,28,31,.08)
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 42%,var(--surface,#fff));
+  border:1px solid color-mix(in srgb,var(--brand-main,#ad4e82) 22%,transparent);
+  box-shadow:0 2px 7px rgba(33,28,31,.10)
 }
-.daily-date-hub-day-mark svg{
-  width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;
-  stroke-linecap:round;stroke-linejoin:round
+.daily-date-hub-day-mark img{
+  width:38px;height:38px;display:block;object-fit:contain
 }
 .daily-date-hub-day.is-selected .daily-date-hub-day-mark{
-  color:#fff;background:var(--brand-main,#ad4e82);border-color:var(--brand-main,#ad4e82)
+  background:color-mix(in srgb,var(--brand-soft,#f3dce9) 66%,var(--surface,#fff));
+  border-color:color-mix(in srgb,var(--brand-main,#ad4e82) 42%,transparent)
 }
 .daily-date-hub-day.is-available:not(.is-selected):hover{
   background:color-mix(in srgb,var(--brand-soft,#f3dce9) 34%,var(--surface,#fff))
