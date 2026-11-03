@@ -10,6 +10,10 @@ HOME_HTML = ROOT / "site" / "index.html"
 DAILY_HTML = ROOT / "site" / "daily" / "index.html"
 PTT_HTML = ROOT / "site" / "ptt-today" / "index.html"
 VIEWER_HTML = ROOT / "site" / "viewer" / "index.html"
+APP_CSS = ROOT / "site" / "assets" / "app.css"
+PTT_CSS = ROOT / "site" / "assets" / "ptt-today.css"
+VIEWER_CSS = ROOT / "site" / "assets" / "viewer-standalone.css"
+WATCHALONG_CSS = ROOT / "site" / "assets" / "watchalong-standalone.css"
 
 
 class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
@@ -21,6 +25,10 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.daily_html = DAILY_HTML.read_text(encoding="utf-8")
         self.ptt_html = PTT_HTML.read_text(encoding="utf-8")
         self.viewer_html = VIEWER_HTML.read_text(encoding="utf-8")
+        self.app_css = APP_CSS.read_text(encoding="utf-8")
+        self.ptt_css = PTT_CSS.read_text(encoding="utf-8")
+        self.viewer_css = VIEWER_CSS.read_text(encoding="utf-8")
+        self.watchalong_css = WATCHALONG_CSS.read_text(encoding="utf-8")
 
     def test_sidecar_path_contract_is_configured(self):
         self.assertIn(
@@ -95,6 +103,43 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.assertIn(daily_link, self.ptt_html)
         self.assertIn(daily_link, self.viewer_html)
         self.assertIn('<a href="/daily/">Docchi News</a>', self.ptt_html)
+
+    def test_tablet_daily_page_reserves_desktop_sidebar_width(self):
+        self.assertIn("@media(min-width:761px){", self.css)
+        self.assertIn(
+            "padding-left:calc(24px + var(--rail-collapsed));",
+            self.css,
+        )
+        self.assertIn(
+            "padding-left:calc(24px + var(--rail-expanded))",
+            self.css,
+        )
+        self.assertIn(
+            "@media(min-width:761px) and (max-width:980px){",
+            self.css,
+        )
+        self.assertIn(
+            "grid-template-columns:minmax(0,1fr) auto;",
+            self.css,
+        )
+
+    def test_other_tablet_surfaces_already_reserve_sidebar_width(self):
+        self.assertIn(
+            "padding:24px 24px 80px calc(24px + var(--rail-collapsed));",
+            self.app_css,
+        )
+        self.assertIn(
+            "padding:16px 24px 16px calc(24px + var(--rail-collapsed));",
+            self.ptt_css,
+        )
+        self.assertIn(
+            "margin-left:var(--rail-collapsed)",
+            self.viewer_css,
+        )
+        self.assertIn(
+            ".watchalong-shell{margin-left:var(--rail-collapsed);",
+            self.watchalong_css,
+        )
 
     def test_mobile_daily_page_cannot_overflow_viewport(self):
         self.assertIn("/* Mobile Daily Digest viewport containment", self.css)
