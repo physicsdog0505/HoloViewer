@@ -142,6 +142,86 @@ def load_json_or(path: Path, default: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def discover_accepted_receipts(receipts_dir: Path) -> tuple[dict[str, str], dict[str, str]]:
+    accepted: dict[str, str] = {}
+    candidates: dict[str, str] = {}
+    if not receipts_dir.exists():
+        return accepted, candidates
+    for path in sorted(receipts_dir.glob("*.finalized.json")):
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError334(f"invalid accepted receipt: {path}") from exc
+        if not isinstance(receipt, dict) or receipt.get("status") != "validated_accepted":
+            continue
+        target_day = str(receipt.get("target_day") or "").strip()
+        _parse_day(target_day)
+        digest_sha = str(receipt.get("public_candidate_sha256") or "").strip()
+        revision_dir = str(receipt.get("revision_dir") or "").strip()
+        if not digest_sha or not revision_dir:
+            raise RuntimeError334(f"accepted receipt missing candidate identity: {path}")
+        candidate = Path(revision_dir) / f"{target_day}.public-candidate.json"
+        if candidate.is_file():
+            actual_sha = sha256_bytes(candidate.read_bytes())
+            if actual_sha != digest_sha:
+                raise RuntimeError334(
+                    f"accepted candidate SHA mismatch: {candidate}"
+                )
+        accepted[target_day] = digest_sha
+        candidates[target_day] = str(candidate)
+    return accepted, candidates
+
+
+def build_job_command_plan(
+    job: dict[str, Any],
+    *,
+    candidate_path: str,
+    private_repo: Path,
+    corpus_root: Path,
+    sidecar_root: Path,
+    python_executable: str,
+) -> dict[str, Any]:
+    target_day = str(job.get("target_day") or "")
+    _parse_day(target_day)
+    candidate = Path(candidate_path)
+    work_root = sidecar_root / ".work" / target_day
+    language_map = work_root / f"{target_day}.source-languages.json"
+    sidecar = (
+        sidecar_root
+        / target_day[:7]
+        / f"{target_day}-related-clips.json"
+    )
+    exporter = private_repo / "scripts" / "export_daily_digest_source_languages.py"
+    resolver = Path(__file__).resolve().parent / "daily_digest_related_clips.py"
+    return {
+        "target_day": target_day,
+        "stage": str(job.get("stage") or ""),
+        "digest": str(candidate),
+        "source_language_map": str(language_map),
+        "sidecar": str(sidecar),
+        "commands": [
+            [
+                python_executable,
+                str(exporter),
+                str(candidate),
+                str(language_map),
+                "--corpus-root",
+                str(corpus_root),
+            ],
+            [
+                python_executable,
+                str(resolver),
+                str(candidate),
+                str(sidecar),
+                "--source-language-map",
+                str(language_map),
+            ],
+        ],
+        "provider_execution": "NOT_EXECUTED_BY_PLAN",
+        "static_deploy": "NOT_EXECUTED_BY_PLAN",
+    }
+
+
 def day_state(state: dict[str, Any], target_day: str) -> dict[str, Any]:
     _parse_day(target_day)
     days = state["days"]
@@ -443,7 +523,9 @@ def digest_unchanged(before: bytes, after: bytes) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", type=Path, required=True)
-    parser.add_argument("--accepted-days", type=Path, required=True)
+    accepted_group = parser.add_mutually_exclusive_group(required=True)
+    accepted_group.add_argument("--accepted-days", type=Path)
+    accepted_group.add_argument("--accepted-receipts-dir", type=Path)
     parser.add_argument("--backfill-queue", type=Path)
     parser.add_argument("--today", required=True)
     parser.add_argument("--backfill-limit", type=int, default=5)
@@ -456,9 +538,16 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         state = validate_state(load_json_or(args.state, empty_state()))
-        accepted = json.loads(args.accepted_days.read_text(encoding="utf-8"))
-        if not isinstance(accepted, dict):
-            raise RuntimeError334("accepted-days must be a day -> digest SHA object")
+        if args.accepted_receipts_dir:
+            accepted, _candidate_paths = discover_accepted_receipts(
+                args.accepted_receipts_dir
+            )
+        else:
+            accepted = json.loads(args.accepted_days.read_text(encoding="utf-8"))
+            if not isinstance(accepted, dict):
+                raise RuntimeError334(
+                    "accepted-days must be a day -> digest SHA object"
+                )
         queue_days: list[str] = []
         if args.backfill_queue:
             queue = validate_queue(load_json_or(args.backfill_queue, empty_queue()))
