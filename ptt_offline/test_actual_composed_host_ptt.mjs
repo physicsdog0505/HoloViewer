@@ -22,7 +22,8 @@ function db({threads=['aid-day','aid-night'],rows=[],gap=false}={}){
               const limit=args.at(-1);
               const anchor=sql.includes('(occurred_at,aid,source_line,push_id)>')?args.slice(1,5):null;
               const cmp=(a,b)=>a.occurred_at.localeCompare(b.occurred_at)||a.aid.localeCompare(b.aid)||a.source_line-b.source_line||a.push_id.localeCompare(b.push_id);
-              return {results:rows.filter(r=>!anchor||cmp(r,{occurred_at:anchor[0],aid:anchor[1],source_line:anchor[2],push_id:anchor[3]})>0).sort((a,b)=>ascending?cmp(a,b):-cmp(a,b)).slice(0,limit)};
+              const dayScoped=sql.includes('WHERE day=?')?rows.filter(r=>r.day===args[0]):rows;
+              return {results:dayScoped.filter(r=>!anchor||cmp(r,{occurred_at:anchor[0],aid:anchor[1],source_line:anchor[2],push_id:anchor[3]})>0).sort((a,b)=>ascending?cmp(a,b):-cmp(a,b)).slice(0,limit)};
             }
             return {results:[]};
           },
@@ -36,8 +37,49 @@ function db({threads=['aid-day','aid-night'],rows=[],gap=false}={}){
   };
 }
 const url=(route)=>new Request('https://public-api.example'+route);
-const row=(id,aid,line,t)=>({push_id:id,aid,source_line:line,kind:'推',author:'viewer',content:'fixture',occurred_at:t,floor:line,source_url:'https://www.ptt.cc',});
+const row=(id,aid,line,t,day=t.slice(0,10),floor=line)=>({push_id:id,aid,day,source_line:line,kind:'推',author:'viewer',content:'fixture',occurred_at:t,floor,source_url:'https://www.ptt.cc',});
 const day='2026-10-16';
+
+test('production route parity: recent-tail contract, bounds, nullable floor, and unchanged routes',async()=>{
+  const rows=[
+    row('p-old','aid-night',98,'2026-10-15T15:58:00Z','2026-10-15'),
+    row('p-null','aid-night',99,'2026-10-15T15:59:00Z','2026-10-15',null),
+    row('p-mid','aid-day',1,'2026-10-15T16:00:00Z','2026-10-16'),
+    row('p-new','aid-day',2,'2026-10-15T16:01:00Z','2026-10-16'),
+  ];
+  const DB=db({rows});
+  const original=Date.now;
+  Date.now=()=>Date.parse('2026-10-15T16:05:00Z');
+  try{
+    const response=await host.fetch(url('/v1/ptt/recent?limit=3'),{DB});
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.schema_version,'public-consumer-v1');
+    assert.equal(body.day,null);
+    assert.deepEqual(body.freshness,{status:'unknown',last_success_at:null});
+    assert.deepEqual(body.completeness,{status:'partial',gap:null});
+    assert.equal(body.checkpoint,null);
+    assert.deepEqual(body.pushes.map(r=>r.push_id),['p-null','p-mid','p-new']);
+    assert.deepEqual(Object.keys(body.pushes[0]),[
+      'push_id','aid','source_line','kind','author','content','occurred_at','floor','source_url'
+    ]);
+    assert.equal(body.pushes[0].floor,null);
+    assert.deepEqual(body.page,{limit:3,has_more:true,next_checkpoint:null});
+    assert.deepEqual(body.window,{kind:'recent-tail',taipei_days:['2026-10-15','2026-10-16']});
+
+    assert.equal((await host.fetch(url('/v1/ptt/recent?limit=1001'),{DB})).status,400);
+    assert.equal((await host.fetch(url('/health'),{DB})).status,200);
+    assert.equal((await host.fetch(url('/v1/ptt/today?day='+day),{DB})).status,200);
+    assert.equal((await host.fetch(url('/v1/ptt/history?day='+day),{DB})).status,200);
+    assert.equal((await host.fetch(url('/v1/ptt/not-a-route'),{DB})).status,404);
+    const privateResponse=await host.fetch(new Request('https://public-api.example/private/ptt/canonical-remap',{
+      method:'POST',body:'{}'
+    }),{DB});
+    assert.equal(privateResponse.status,503);
+    assert.equal((await privateResponse.json()).error,'canonical_remap_disabled');
+    assert.equal(DB.writes,0);
+  }finally{Date.now=original;}
+});
 test('actual worker host handles health, methods, CORS and empty-day availability',async()=>{
   const DB=db({threads:[]}),env={DB,ALLOWED_ORIGIN:'https://holoviewer.example'};
   assert.equal((await host.fetch(url('/health'),env)).status,200);

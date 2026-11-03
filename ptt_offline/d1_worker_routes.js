@@ -2,6 +2,7 @@
 // Intended to be mounted into the existing Cloudflare Worker, not a second Worker.
 // GET /v1/ptt/today?day=YYYY-MM-DD&limit=300
 // GET /v1/ptt/history?day=YYYY-MM-DD&limit=200&after=<push_id>
+// GET /v1/ptt/recent?limit=1000
 const dayRe = /^\d{4}-\d{2}-\d{2}$/;
 const keys = ['push_id','aid','source_line','kind','author','content','occurred_at','floor','source_url'];
 const select = keys.join(',');
@@ -24,8 +25,53 @@ export function publicPttDayFreshness(threads, stateRows, nowMs = Date.now()) {
     : grades.includes('stale') ? 'stale' : 'fresh';
 }
 
+function taipeiDayParts(nowMs = Date.now()) {
+  const parts = new Intl.DateTimeFormat('en-CA',{
+    timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(new Date(nowMs));
+  const out=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+  const today=`${out.year}-${out.month}-${out.day}`;
+  const noonUtc=new Date(today+'T04:00:00Z');
+  const previous=new Date(noonUtc.getTime()-86400000).toISOString().slice(0,10);
+  return {today,previous};
+}
+
+export async function handlePttRecentRead(request, db, {nowMs=Date.now()}={}) {
+  const u=new URL(request.url);
+  if(u.pathname!=='/v1/ptt/recent') return null;
+  const limit=Number(u.searchParams.get('limit')||'1000');
+  if(!Number.isInteger(limit)||limit<1||limit>1000)
+    return json({error:'invalid limit'},400);
+  const {today,previous}=taipeiDayParts(nowMs);
+  try {
+    const sql=`SELECT ${select} FROM ptt_pushes WHERE day=? ORDER BY occurred_at DESC,aid DESC,source_line DESC,push_id DESC LIMIT ?`;
+    const [current,prior]=await Promise.all([
+      db.prepare(sql).bind(today,limit).all(),
+      db.prepare(sql).bind(previous,limit).all(),
+    ]);
+    const rows=[...(current.results||[]),...(prior.results||[])];
+    rows.sort((a,b)=>b.occurred_at.localeCompare(a.occurred_at)||b.aid.localeCompare(a.aid)||b.source_line-a.source_line||b.push_id.localeCompare(a.push_id));
+    const visible=rows.slice(0,limit).reverse();
+    const projected=visible.map(row=>Object.fromEntries(keys.map(k=>[k,row[k]??null])));
+    return json({
+      schema_version:'public-consumer-v1',
+      day:null,
+      as_of:new Date(nowMs).toISOString(),
+      freshness:{status:'unknown',last_success_at:null},
+      completeness:{status:'partial',gap:null},
+      checkpoint:null,
+      pushes:projected,
+      page:{limit,has_more:rows.length>limit,next_checkpoint:null},
+      window:{kind:'recent-tail',taipei_days:[previous,today]}
+    });
+  } catch (_error) {
+    return json({error:'PTT source unavailable'},503);
+  }
+}
+
 export async function handlePttD1Read(request, db) {
   const u = new URL(request.url);
+  if (u.pathname === '/v1/ptt/recent') return handlePttRecentRead(request, db);
   const history = u.pathname === '/v1/ptt/history';
   if (!history && u.pathname !== '/v1/ptt/today') return null;
   const day = u.searchParams.get('day') || '';
