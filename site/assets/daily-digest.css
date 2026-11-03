@@ -85,6 +85,23 @@ h3.daily-digest-title{margin:0}
 .daily-date-hub-day.is-today .daily-date-hub-day-number{background:var(--text);color:white}
 .daily-date-hub-day.is-future{opacity:.35;cursor:not-allowed}
 .daily-date-hub-day-number{position:absolute;left:9px;top:8px;display:grid;place-items:center;width:24px;height:24px;border-radius:999px;font-size:11px}
+.daily-date-hub-day-mark{
+  position:absolute;
+  left:50%;
+  top:54%;
+  width:34px;
+  height:34px;
+  transform:translate(-50%,-50%);
+  display:grid;
+  place-items:center;
+  pointer-events:none;
+}
+.daily-date-hub-day-mark img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+}
 @media(max-width:760px){
  .daily-date-hub{width:calc(100vw - 20px);height:min(610px,calc(100vh - 20px));border-radius:22px}
  .daily-date-hub-head{padding:18px 16px 12px}
@@ -93,6 +110,7 @@ h3.daily-digest-title{margin:0}
  .daily-date-hub-calendar{padding:14px 12px 16px}
  .daily-date-hub-grid{grid-template-rows:repeat(6,60px)}
  .daily-date-hub-day-number{left:7px;top:6px;width:22px;height:22px;font-size:10px}
+ .daily-date-hub-day-mark{width:28px;height:28px;top:56%}
 }
 
 .daily-coverage{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 18px;padding:12px 14px;border:1px solid var(--line,#dedad2);border-radius:14px;background:var(--surface,#fff)}
@@ -1534,4 +1552,68 @@ html{scroll-behavior:smooth}
 .daily-story-visual-item[role="button"]:focus-visible{
   outline:2px solid color-mix(in srgb,var(--brand-main) 68%,transparent);
   outline-offset:3px
+}
+
+
+/* Daily Digest page title -------------------------------------------------- */
+.daily-digest-page-head{
+  margin:0 0 20px;
+}
+.daily-digest-title-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:28px;
+  width:100%;
+  padding:18px 22px;
+  border-radius:20px;
+  color:#fff;
+  background:
+    linear-gradient(110deg,
+      color-mix(in srgb,var(--brand-main) 96%,#fff 4%) 0%,
+      color-mix(in srgb,var(--brand-main) 82%,var(--brand-soft) 18%) 48%,
+      color-mix(in srgb,var(--brand-soft) 88%,#fff 12%) 100%);
+  box-shadow:0 10px 28px color-mix(in srgb,var(--brand-main) 18%,transparent);
+}
+#daily-digest-date-label{
+  margin:0;
+  color:inherit;
+  font-size:clamp(20px,2.2vw,31px);
+  font-weight:900;
+  letter-spacing:.055em;
+  line-height:1;
+  white-space:nowrap;
+}
+.daily-digest-title-meta{
+  display:grid;
+  gap:4px;
+  min-width:max-content;
+  text-align:right;
+  color:inherit;
+}
+.daily-digest-title-meta strong{
+  font-size:clamp(20px,2vw,30px);
+  font-weight:900;
+  line-height:1;
+  letter-spacing:-.03em;
+}
+.daily-digest-title-meta p{
+  margin:0;
+  color:color-mix(in srgb,#fff 84%,transparent);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.025em;
+}
+@media(max-width:760px){
+  .daily-digest-title-row{
+    gap:14px;
+    padding:15px 16px;
+    border-radius:16px;
+  }
+  #daily-digest-date-label{
+    font-size:17px;
+    letter-spacing:.035em;
+  }
+  .daily-digest-title-meta strong{font-size:19px}
+  .daily-digest-title-meta p{font-size:11px}
 }

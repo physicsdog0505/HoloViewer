@@ -881,10 +881,7 @@ async function latestAvailableDay(today){
 }
 function renderDailyTitle(node,day){
   if(!node)return;
-  node.replaceChildren(
-    el('span','daily-digest-title-date',siteDateLabel(day)),
-    el('span','daily-digest-title-name','Docchi News')
-  );
+  node.textContent=siteDateLabel(day);
 }
 function initDailyDateHub(day,today){
   const dialog=document.getElementById('dailyDigestDateHub'),trigger=document.getElementById('dailyDigestDateTrigger'),grid=document.getElementById('dailyDigestDateGrid'),label=document.getElementById('dailyDigestMonthLabel'),prev=document.getElementById('dailyDigestMonthPrev'),next=document.getElementById('dailyDigestMonthNext'),latestButton=document.getElementById('dailyDigestDateToday'),close=document.getElementById('dailyDigestDateClose');
