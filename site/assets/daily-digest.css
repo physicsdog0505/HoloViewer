@@ -1617,3 +1617,48 @@ html{scroll-behavior:smooth}
   .daily-digest-title-meta strong{font-size:19px}
   .daily-digest-title-meta p{font-size:11px}
 }
+
+
+/* Mobile Daily Digest viewport containment -------------------------------- */
+@media(max-width:760px){
+  html,
+  body{
+    max-width:100%;
+    overflow-x:clip;
+  }
+  .daily-digest-shell,
+  .daily-digest-page-head,
+  .daily-digest-title-row,
+  #daily-digest-content{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+    box-sizing:border-box;
+  }
+  .daily-digest-title-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:8px;
+    padding:14px 12px;
+  }
+  #daily-digest-date-label{
+    min-width:0;
+    font-size:14px;
+    letter-spacing:.02em;
+    white-space:nowrap;
+  }
+  .daily-digest-title-meta{
+    min-width:0;
+    max-width:100%;
+    text-align:right;
+  }
+  .daily-digest-title-meta strong{
+    font-size:17px;
+    white-space:nowrap;
+  }
+  .daily-digest-title-meta p{
+    font-size:10px;
+    white-space:nowrap;
+  }
+}
