@@ -216,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--holodex-api-key-env", default="HOLODEX_API_KEY")
     parser.add_argument("--backfill-limit", type=int, default=5)
-    parser.add_argument("--hour", type=int, default=9)
+    parser.add_argument("--hour", type=int, default=12)
     parser.add_argument("--minute", type=int, default=0)
     parser.add_argument("--poll-seconds", type=int, default=30)
     parser.add_argument("--once", action="store_true")
