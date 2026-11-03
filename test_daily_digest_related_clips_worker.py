@@ -1,6 +1,8 @@
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -204,6 +206,23 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
             "pending",
         )
         self.assertTrue(state["days"]["2026-11-01"]["errors"])
+
+    def test_direct_script_entrypoint_can_import_runtime_package(self):
+        repo_root = Path(__file__).resolve().parent
+        script = repo_root / "scripts" / "daily_digest_related_clips_worker.py"
+        completed = subprocess.run(
+            [sys.executable, str(script), "--help"],
+            cwd=repo_root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            msg=completed.stderr or completed.stdout,
+        )
+        self.assertIn("--target-day", completed.stdout)
 
 
 if __name__ == "__main__":
