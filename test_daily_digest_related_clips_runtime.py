@@ -2,6 +2,7 @@ import copy
 import io
 import json
 import tempfile
+from unittest.mock import patch
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -16,6 +17,8 @@ from scripts.daily_digest_related_clips_runtime import (
     digest_unchanged,
     discover_accepted_receipts,
     build_job_command_plan,
+    execute_job,
+    canonical_json_bytes,
     empty_state,
     month_compaction_eligible,
     pending_backfill_days,
@@ -377,6 +380,143 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(plan["provider_execution"], "NOT_EXECUTED_BY_PLAN")
         self.assertEqual(plan["static_deploy"], "NOT_EXECUTED_BY_PLAN")
+
+    def test_execute_job_runs_export_resolve_publish_and_reconciles(self):
+        state = empty_state()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            candidate = root / "2026-11-02.public-candidate.json"
+            candidate_bytes = canonical_json_bytes({
+                "schema_version": 1,
+                "kind": "holodocchi.daily_digest",
+                "target_day": "2026-11-02",
+                "stories": [],
+            })
+            candidate.write_bytes(candidate_bytes)
+
+            sidecar_root = root / "daily-digest-static" / "data" / "daily-digest"
+            sidecar_path = (
+                sidecar_root / "2026-11" / "2026-11-02-related-clips.json"
+            )
+
+            class Result:
+                def __init__(self, code=0, stdout="", stderr=""):
+                    self.returncode = code
+                    self.stdout = stdout
+                    self.stderr = stderr
+
+            calls = []
+
+            def runner(command, **kwargs):
+                calls.append(command)
+                if command[1].endswith("daily_digest_related_clips.py"):
+                    sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+                    sidecar_path.write_bytes(canonical_json_bytes({
+                        "schema_version": 1,
+                        "kind": "holodocchi.daily_digest.related_clips",
+                        "target_day": "2026-11-02",
+                        "status": "ok",
+                        "stories": [{"clips": [{"video_id": "AAAAAAAAAAA"}]}],
+                        "sources": {},
+                    }))
+                if len(command) >= 2 and command[1] == "prepare":
+                    return Result(stdout="BASELINE_VERSION=version-1\n")
+                return Result(stdout="PASS\n")
+
+            live_bytes = canonical_json_bytes({
+                "schema_version": 1,
+                "kind": "holodocchi.daily_digest.related_clips",
+                "target_day": "2026-11-02",
+                "status": "ok",
+                "stories": [{"clips": [{"video_id": "AAAAAAAAAAA"}]}],
+                "sources": {},
+            })
+
+            job = {
+                "target_day": "2026-11-02",
+                "stage": "initial",
+                "priority": 0,
+                "digest_sha256": __import__("hashlib").sha256(
+                    candidate_bytes
+                ).hexdigest(),
+            }
+            with patch.dict(os.environ, {"HOLODEX_API_KEY": "test-key"}):
+                result = execute_job(
+                    state,
+                    job=job,
+                    candidate_path=str(candidate),
+                    private_repo=root / "private",
+                    corpus_root=root / "corpus",
+                    sidecar_root=sidecar_root,
+                    public_repo=root / "public",
+                    public_expected_head="a" * 40,
+                    python_executable="/usr/bin/python3",
+                    execute=True,
+                    runner=runner,
+                    readback_fetcher=lambda path: live_bytes,
+                    succeeded_at="2026-11-03T00:00:00Z",
+                )
+
+        self.assertEqual(result["production_mutation"], "YES")
+        self.assertEqual(result["clip_count"], 1)
+        self.assertEqual(result["static_baseline_version"], "version-1")
+        self.assertEqual(
+            state["days"]["2026-11-02"]["stages"]["initial"],
+            "complete",
+        )
+        self.assertTrue(any(command[1] == "prepare" for command in calls))
+        self.assertTrue(any(command[1] == "deploy" for command in calls))
+
+    def test_execute_job_refuses_without_holodex_key(self):
+        state = empty_state()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            candidate = root / "2026-11-02.public-candidate.json"
+            payload = canonical_json_bytes({
+                "target_day": "2026-11-02",
+                "stories": [],
+            })
+            candidate.write_bytes(payload)
+            with patch.dict(os.environ, {}, clear=True):
+                with self.assertRaises(RuntimeError334):
+                    execute_job(
+                        state,
+                        job={
+                            "target_day": "2026-11-02",
+                            "stage": "initial",
+                            "digest_sha256": __import__("hashlib").sha256(
+                                payload
+                            ).hexdigest(),
+                        },
+                        candidate_path=str(candidate),
+                        private_repo=root / "private",
+                        corpus_root=root / "corpus",
+                        sidecar_root=root / "sidecars",
+                        public_repo=root / "public",
+                        public_expected_head="a" * 40,
+                        python_executable="/usr/bin/python3",
+                        execute=True,
+                        runner=lambda *args, **kwargs: None,
+                        readback_fetcher=lambda path: b"",
+                    )
+        self.assertNotIn("2026-11-02", state["days"])
+
+    def test_missing_local_candidate_is_not_execution_ready(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            revision = root / "missing-revision"
+            (root / "2026-11-02.finalized.json").write_text(
+                json.dumps({
+                    "status": "validated_accepted",
+                    "target_day": "2026-11-02",
+                    "public_candidate_sha256": "a" * 64,
+                    "revision_dir": str(revision),
+                }),
+                encoding="utf-8",
+            )
+            accepted, candidates = discover_accepted_receipts(root)
+        self.assertEqual(accepted, {"2026-11-02": "a" * 64})
+        self.assertEqual(candidates, {})
 
     def test_state_persists_and_resumes(self):
         state = empty_state()
