@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Open newspaper">
+  <g fill="none" stroke="#7a2f8f" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round">
+    <path fill="#fbf8ff" d="M7 15c8-2 16-.6 25 5v35c-8-5.2-16.5-6.5-25-4.2V15Z"/>
+    <path fill="#fbf8ff" d="M57 15c-8-2-16-.6-25 5v35c8-5.2 16.5-6.5 25-4.2V15Z"/>
+    <path d="M12 21c6-.3 10.5.8 15.5 3.6M12 28c5.7-.2 10.2.9 15.5 3.7M12 35c5.5-.1 9.5.9 15.5 3.8M36.5 24.5c5.1-2.8 9.7-3.9 15.5-3.5M36.5 31.6c5.2-2.7 9.7-3.8 15.5-3.5M36.5 38.6c5.5-2.6 10-3.5 15.5-3.2"/>
+    <rect x="12" y="39.5" width="10.5" height="7.8" rx="1.6" fill="#d9b6e7" stroke-width="3.2"/>
+  </g>
+</svg>
