@@ -164,10 +164,7 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
                 generated_sha256="candidate",
                 live_sha256="different",
             )
-        self.assertEqual(
-            state["days"]["2026-11-01"]["stages"]["initial"],
-            "pending",
-        )
+        self.assertNotIn("2026-11-01", state["days"])
 
     def test_interruption_reconciliation_marks_success(self):
         state = empty_state()
