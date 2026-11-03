@@ -82,7 +82,11 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
 
     def test_mobile_dock_uses_daily_digest_instead_of_multi(self):
         for html in (self.home_html, self.daily_html, self.ptt_html, self.viewer_html):
-            self.assertIn('href="/daily/" aria-label="Docchi News 日報"', html)
+            daily_dock_links = [
+                line for line in html.splitlines()
+                if 'href="/daily/"' in line and 'aria-label="Docchi News 日報"' in line
+            ]
+            self.assertTrue(daily_dock_links)
             self.assertNotIn('data-mobile-dock-route="multi"', html)
         self.assertIn('href="/daily/" class="active" aria-current="page"', self.daily_html)
 
