@@ -615,9 +615,12 @@ def execute_job(
         attempted_at=succeeded_at or utc_now(),
     )
 
-    env = dict(os.environ)
-    for command in plan["commands"]:
-        _run_checked(command, env=env, runner=runner)
+    resolver_env = dict(os.environ)
+    safe_env = dict(resolver_env)
+    safe_env.pop(holodex_api_key_env, None)
+
+    _run_checked(plan["commands"][0], env=safe_env, runner=runner)
+    _run_checked(plan["commands"][1], env=resolver_env, runner=runner)
 
     after = candidate.read_bytes()
     if not digest_unchanged(before, after):
@@ -640,7 +643,7 @@ def execute_job(
     )
     prepared = _run_checked(
         [str(release_script), "prepare", public_expected_head],
-        env=env,
+        env=safe_env,
         runner=runner,
     )
     baseline = _parse_release_value(
@@ -654,7 +657,7 @@ def execute_job(
             public_expected_head,
             baseline,
         ],
-        env=env,
+        env=safe_env,
         runner=runner,
     )
 
