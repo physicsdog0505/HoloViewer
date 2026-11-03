@@ -1,3 +1,5 @@
+> **Superseded for current frontend / Production work:** read `docs/handoffs/FRONTEND_PRODUCTION_HANDOFF_20261103.md` first. The 2026-10-30 file below remains historical context only.
+
 # HoloViewer Production Coordinator Handoff — 2026-10-30
 
 ## Role of this coordination unit
