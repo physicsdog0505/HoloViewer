@@ -46,6 +46,18 @@ function artifactUrl(day){
   if(!path.startsWith('/'))return '';
   return base?base+path:path;
 }
+function relatedClipsUrl(day){
+  const cfg=config();
+  const base=text(cfg.base).replace(/\/$/,'');
+  const template=text(cfg.relatedClipsPathTemplate);
+  if(!template||!DATE_RE.test(day))return '';
+  const month=day.slice(0,7);
+  const path=template
+    .replaceAll('{month}',encodeURIComponent(month))
+    .replaceAll('{date}',encodeURIComponent(day));
+  if(!path.startsWith('/'))return '';
+  return base?base+path:path;
+}
 
 const PUBLIC_LAYOUTS=new Set(['brief','lead','split','editorial','compact','rail','timeline','chips']);
 const OVERVIEW_LAYOUTS=new Set(['compact','rail','lead']);
@@ -130,9 +142,14 @@ function storyVisual(videoIds,byId,{onSelect=null,layout='six-grid'}={}){
       figure.classList.add('is-selectable');
       figure.tabIndex=0;
       figure.setAttribute('role','button');
+      figure.setAttribute('aria-expanded','false');
+      figure.setAttribute('aria-label','切換直播資訊');
       const select=()=>{
-        visual.querySelectorAll('.daily-story-visual-item').forEach(node=>node.classList.toggle('is-selected',node===figure));
-        onSelect(id,index);
+        const expanded=onSelect(id,index)===true;
+        visual.querySelectorAll('.daily-story-visual-item').forEach(node=>{
+          node.classList.toggle('is-selected',node===figure);
+          node.setAttribute('aria-expanded',node===figure&&expanded?'true':'false');
+        });
       };
       if(index===0)figure.classList.add('is-selected');
       figure.addEventListener('click',select);
@@ -261,6 +278,9 @@ function storyDetailRail(ids,byId){
   if(!visible.length)return null;
 
   const shell=el('div','daily-story-detail-shell');
+  shell.hidden=true;
+  shell.dataset.expanded='false';
+  let activeVideoId='';
   if(visible.length<=2)shell.classList.add('is-small-set');
   const rail=el('div','daily-story-detail-rail');
   rail.dataset.openState='closed';
@@ -279,7 +299,10 @@ function storyDetailRail(ids,byId){
     if(summary){
       summary.addEventListener('click',event=>{
         event.preventDefault();
-        setGroupOpen(rail.dataset.openState!=='open');
+        shell.hidden=true;
+        shell.dataset.expanded='false';
+        activeVideoId='';
+        setGroupOpen(false);
       });
     }
     rail.append(card);
@@ -309,6 +332,21 @@ function storyDetailRail(ids,byId){
   shell.rail=rail;
   shell.selectVideo=(id,options)=>rail.selectVideo(id,options);
   shell.setGroupOpen=setGroupOpen;
+  shell.toggleVideo=(id)=>{
+    const videoId=String(id);
+    if(!shell.hidden&&activeVideoId===videoId){
+      shell.hidden=true;
+      shell.dataset.expanded='false';
+      setGroupOpen(false);
+      return false;
+    }
+    activeVideoId=videoId;
+    shell.hidden=false;
+    shell.dataset.expanded='true';
+    setGroupOpen(true);
+    rail.selectVideo(videoId,{open:true});
+    return true;
+  };
   return shell;
 }
 function appendReferences(parent,ids,byId,{label='相關直播'}={}){
@@ -515,6 +553,80 @@ function renderOverview(target,artifact,byId){
   }
   target.append(wrap);
 }
+function relatedClipLink(clip){
+  const videoId=text(clip?.video_id);
+  const href=text(clip?.youtube_url)||youtubeUrl(videoId);
+  if(!href)return null;
+  const link=el('a','daily-related-clip');
+  link.href=href;
+  link.target='_blank';
+  link.rel='noopener noreferrer';
+  const img=thumbnailImage(videoId);
+  if(img){
+    const media=el('span','daily-related-clip-media');
+    media.append(img);
+    link.append(media);
+  }
+  const body=el('span','daily-related-clip-copy');
+  const meta=el('span','daily-related-clip-meta');
+  const lang=publicText(clip?.lang);
+  const channel=publicText(clip?.channel_name);
+  if(lang)meta.append(el('span','daily-related-clip-lang',lang));
+  if(channel)meta.append(el('span','daily-related-clip-channel',channel));
+  if(meta.childElementCount)body.append(meta);
+  body.append(el('strong','daily-related-clip-title',clampText(clip?.title||'YouTube clip',86)));
+  link.append(body);
+  return link;
+}
+function renderRelatedClips(card,storyRow){
+  if(!card||!storyRow)return;
+  const clips=Array.isArray(storyRow.clips)?storyRow.clips.filter(item=>item&&typeof item==='object'):[];
+  if(!clips.length)return;
+  card.querySelector('.daily-related-clips')?.remove();
+
+  const section=el('section','daily-related-clips');
+  const head=el('div','daily-related-clips-head');
+  head.append(el('h4','daily-related-clips-title','精華剪輯'));
+  head.append(el('span','daily-related-clips-count',String(clips.length)+' 支'));
+  section.append(head);
+
+  const primary=el('div','daily-related-clips-grid');
+  clips.slice(0,3).forEach(clip=>{
+    const link=relatedClipLink(clip);
+    if(link)primary.append(link);
+  });
+  if(primary.childElementCount)section.append(primary);
+
+  if(clips.length>3){
+    const more=el('details','daily-related-clips-more');
+    more.append(el('summary','daily-related-clips-more-label','查看全部 '+String(clips.length)+' 支'));
+    const rest=el('div','daily-related-clips-list');
+    clips.slice(3).forEach(clip=>{
+      const link=relatedClipLink(clip);
+      if(link)rest.append(link);
+    });
+    if(rest.childElementCount){
+      more.append(rest);
+      section.append(more);
+    }
+  }
+  if(primary.childElementCount||section.querySelector('.daily-related-clips-list'))card.append(section);
+}
+function applyRelatedClips(target,sidecar){
+  if(!target||!sidecar||sidecar.schema_version!==1||sidecar.kind!=='holodocchi.daily_digest.related_clips')return false;
+  const rows=Array.isArray(sidecar.stories)?sidecar.stories:[];
+  let applied=0;
+  rows.forEach(row=>{
+    const index=Number(row?.story_index);
+    if(!Number.isInteger(index)||index<0)return;
+    const card=target.querySelector('.daily-story-card[data-story-index="'+String(index)+'"]');
+    if(!card)return;
+    const before=card.querySelector('.daily-related-clips');
+    renderRelatedClips(card,row);
+    if(!before&&card.querySelector('.daily-related-clips'))applied++;
+  });
+  return applied>0;
+}
 function storyAutoLayout(story){
   return publicLayout(story,'editorial');
 }
@@ -534,6 +646,7 @@ function renderStories(target,artifact,byId){
     const layout=storyAutoLayout(story);
     const card=el('article','daily-story-card');
     card.dataset.layout=layout;
+    card.dataset.storyIndex=String(index);
     card.id='daily-story-'+String(index+1);
     const visibleIds=storyVisibleIds(story.video_ids,byId);
     card.dataset.streamCount=String(visibleIds.length);
@@ -559,7 +672,7 @@ function renderStories(target,artifact,byId){
     const hasEditorialSummary=Boolean(publicText(story.editorial_summary));
     const readerMode=(visibleIds.length<=2&&hasEditorialSummary)?'inline':requestedReaderMode;
     card.dataset.readerMode=readerMode;
-    const detailRail=readerMode==='summary_with_details'?storyDetailRail(story.video_ids,byId):null;
+    const detailRail=storyDetailRail(story.video_ids,byId);
     const largeOrdinal=visibleIds.length>=6?largeVisualOrdinal++:0;
     const visualLayout=storyVisualLayout(visibleIds.length,{
       largeOrdinal,
@@ -568,7 +681,8 @@ function renderStories(target,artifact,byId){
     const visual=storyVisual(story.video_ids,byId,{
       layout:visualLayout,
       onSelect:(videoId)=>{
-        if(detailRail)detailRail.selectVideo(videoId,{open:true});
+        if(!detailRail)return false;
+        return detailRail.toggleVideo(videoId);
       }
     });
     if(visual)card.append(visual);
@@ -687,6 +801,21 @@ function renderArtifact(target,artifact){
   renderCategories(target,artifact,byId);
   renderUnverified(target,artifact,byId);
   return target.childElementCount>0;
+}
+
+async function fetchRelatedClips(day){
+  const url=relatedClipsUrl(day);
+  if(!url)return null;
+  try{
+    const response=await fetch(url,{credentials:'omit',cache:'no-cache'});
+    if(!response.ok)return null;
+    const payload=await response.json();
+    if(!payload||payload.schema_version!==1||payload.kind!=='holodocchi.daily_digest.related_clips')return null;
+    if(text(payload.target_day)!==day)return null;
+    return payload;
+  }catch{
+    return null;
+  }
 }
 
 async function fetchArtifact(day){
@@ -820,11 +949,15 @@ async function initDaily(){
   const result=await fetchArtifact(day);
   if(result.state==='READY'||result.state==='PARTIAL'){
     const rendered=renderArtifact(content,result.artifact);
-    if(rendered)setStatus(status,'',result.state);
-    else setStatus(status,'這篇 Docchi News目前沒有可顯示內容。',result.state);
+    if(rendered){
+      setStatus(status,'',result.state);
+      void fetchRelatedClips(day).then(sidecar=>{
+        if(sidecar)applyRelatedClips(content,sidecar);
+      });
+    }else setStatus(status,'這篇 Docchi News目前沒有可顯示內容。',result.state);
   }else if(result.state==='MISSING')setStatus(status,displayDay(day)+' Docchi News尚未產生','MISSING');
   else setStatus(status,'Docchi News暫時無法載入','ERROR');
 }
-window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({schemaVersion:SCHEMA_VERSION,kind:KIND,taipeiDay,fetchArtifact,renderArtifact});
+window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({schemaVersion:SCHEMA_VERSION,kind:KIND,taipeiDay,fetchArtifact,fetchRelatedClips,renderArtifact,applyRelatedClips});
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',initDaily,{once:true});
 })();

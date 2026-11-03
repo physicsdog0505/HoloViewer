@@ -58,6 +58,35 @@ class DailyDigestStaticReleaseGateTests(unittest.TestCase):
             self.assertIn("DAILY_DIGEST_STATIC_PREPARE=PASS", result.stdout)
             self.assertIn("BASELINE_VERSION=ABSENT", result.stdout)
 
+
+    def test_generated_related_clips_json_is_allowed_runtime_drift(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, head, env = self.make_repo(Path(td))
+            sidecar_dir = repo / "daily-digest-static/data/daily-digest/2026-11"
+            sidecar_dir.mkdir(parents=True)
+            sidecar = sidecar_dir / "2026-11-02-related-clips.json"
+            sidecar.write_text(
+                '{"schema_version":1,"kind":"holodocchi.daily_digest.related_clips","target_day":"2026-11-02","status":"ok","stories":[],"sources":{}}\n',
+                encoding="utf-8",
+            )
+            result = self.run_prepare(repo, head, env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("DAILY_DIGEST_STATIC_PREPARE=PASS", result.stdout)
+
+    def test_invalid_related_clips_json_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, head, env = self.make_repo(Path(td))
+            sidecar_dir = repo / "daily-digest-static/data/daily-digest/2026-11"
+            sidecar_dir.mkdir(parents=True)
+            sidecar = sidecar_dir / "2026-11-02-related-clips.json"
+            sidecar.write_text(
+                '{"schema_version":1,"kind":"wrong","target_day":"2026-11-02","status":"ok","stories":[],"sources":{}}\n',
+                encoding="utf-8",
+            )
+            result = self.run_prepare(repo, head, env)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("invalid related clips sidecar", result.stderr)
+
     def test_unrelated_runtime_drift_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             repo, head, env = self.make_repo(Path(td))
