@@ -1,0 +1,318 @@
+import copy
+import unittest
+
+from scripts.daily_digest_related_clips_runtime import (
+    ARCHIVE_KIND,
+    INDEX_KIND,
+    RuntimeError334,
+    build_due_jobs,
+    build_month_archive,
+    build_storage_index,
+    digest_unchanged,
+    empty_state,
+    month_compaction_eligible,
+    pending_backfill_days,
+    reconcile_publication,
+    record_success,
+    resolve_storage,
+)
+
+
+class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
+    def test_due_schedule_and_priority(self):
+        state = empty_state()
+        jobs = build_due_jobs(
+            state,
+            accepted_days={
+                "2026-11-08": "sha8",
+                "2026-11-07": "sha7",
+                "2026-11-05": "sha5",
+                "2026-11-01": "sha1",
+            },
+            today="2026-11-08",
+        )
+        self.assertEqual(
+            [(row["priority"], row["stage"], row["target_day"]) for row in jobs],
+            [
+                (0, "initial", "2026-11-01"),
+                (0, "initial", "2026-11-05"),
+                (0, "initial", "2026-11-07"),
+                (0, "initial", "2026-11-08"),
+            ],
+        )
+
+        for day in ("2026-11-01", "2026-11-05", "2026-11-07"):
+            record_success(
+                state,
+                target_day=day,
+                stage="initial",
+                succeeded_at="2026-11-08T00:00:00Z",
+                clip_count=1,
+                generated_sha256="a",
+                live_sha256="a",
+            )
+        jobs = build_due_jobs(
+            state,
+            accepted_days={
+                "2026-11-07": "sha7",
+                "2026-11-05": "sha5",
+                "2026-11-01": "sha1",
+            },
+            today="2026-11-08",
+        )
+        self.assertEqual(
+            [(row["priority"], row["stage"], row["target_day"]) for row in jobs],
+            [
+                (1, "t1", "2026-11-01"),
+                (1, "t1", "2026-11-05"),
+                (1, "t1", "2026-11-07"),
+            ],
+        )
+
+    def test_catchup_is_idempotent_and_advances_one_stage(self):
+        state = empty_state()
+        record_success(
+            state,
+            target_day="2026-11-01",
+            stage="initial",
+            succeeded_at="2026-11-01T00:00:00Z",
+            clip_count=2,
+            generated_sha256="a",
+            live_sha256="a",
+        )
+        jobs = build_due_jobs(
+            state,
+            accepted_days={"2026-11-01": "sha1"},
+            today="2026-11-08",
+        )
+        self.assertEqual(jobs[0]["stage"], "t1")
+        record_success(
+            state,
+            target_day="2026-11-01",
+            stage="t1",
+            succeeded_at="2026-11-08T00:00:00Z",
+            clip_count=3,
+            generated_sha256="b",
+            live_sha256="b",
+        )
+        jobs = build_due_jobs(
+            state,
+            accepted_days={"2026-11-01": "sha1"},
+            today="2026-11-08",
+        )
+        self.assertEqual(jobs[0]["stage"], "t3")
+
+    def test_t7_completion_removes_day_from_active_queue(self):
+        state = empty_state()
+        for stage in ("initial", "t1", "t3", "t7"):
+            record_success(
+                state,
+                target_day="2026-11-01",
+                stage=stage,
+                succeeded_at="2026-11-08T00:00:00Z",
+                clip_count=10,
+                generated_sha256=stage,
+                live_sha256=stage,
+            )
+        jobs = build_due_jobs(
+            state,
+            accepted_days={"2026-11-01": "sha1"},
+            today="2026-11-09",
+        )
+        self.assertEqual(jobs, [])
+        self.assertTrue(state["days"]["2026-11-01"]["terminal"])
+
+    def test_changed_digest_identity_invalidates_refresh_completion(self):
+        state = empty_state()
+        record_success(
+            state,
+            target_day="2026-11-01",
+            stage="initial",
+            succeeded_at="2026-11-01T00:00:00Z",
+            clip_count=1,
+            generated_sha256="a",
+            live_sha256="a",
+        )
+        state["days"]["2026-11-01"]["digest_sha256"] = "old"
+        jobs = build_due_jobs(
+            state,
+            accepted_days={"2026-11-01": "new"},
+            today="2026-11-08",
+        )
+        self.assertEqual(jobs[0]["stage"], "initial")
+        self.assertFalse(state["days"]["2026-11-01"]["terminal"])
+
+    def test_publication_requires_matching_live_readback(self):
+        state = empty_state()
+        with self.assertRaises(RuntimeError334):
+            record_success(
+                state,
+                target_day="2026-11-01",
+                stage="initial",
+                succeeded_at="2026-11-01T00:00:00Z",
+                clip_count=1,
+                generated_sha256="candidate",
+                live_sha256="different",
+            )
+        self.assertEqual(
+            state["days"]["2026-11-01"]["stages"]["initial"],
+            "pending",
+        )
+
+    def test_interruption_reconciliation_marks_success(self):
+        state = empty_state()
+        reconciled = reconcile_publication(
+            state,
+            target_day="2026-11-01",
+            stage="t3",
+            generated_sha256="same",
+            live_sha256="same",
+            clip_count=12,
+            reconciled_at="2026-11-04T00:00:00Z",
+        )
+        self.assertTrue(reconciled)
+        self.assertEqual(state["days"]["2026-11-01"]["stages"]["t3"], "complete")
+
+    def test_failed_reconciliation_does_not_complete(self):
+        state = empty_state()
+        reconciled = reconcile_publication(
+            state,
+            target_day="2026-11-01",
+            stage="t3",
+            generated_sha256="candidate",
+            live_sha256="other",
+            clip_count=12,
+            reconciled_at="2026-11-04T00:00:00Z",
+        )
+        self.assertFalse(reconciled)
+        self.assertNotIn("2026-11-01", state["days"])
+
+    def test_bounded_backfill_skips_completed(self):
+        state = empty_state()
+        record_success(
+            state,
+            target_day="2026-10-01",
+            stage="backfill",
+            succeeded_at="2026-11-03T00:00:00Z",
+            clip_count=1,
+            generated_sha256="x",
+            live_sha256="x",
+        )
+        queue = {
+            "schema_version": 1,
+            "kind": "holodocchi.daily_digest.related_clips.backfill_queue",
+            "days": [
+                "2026-10-01",
+                "2026-10-02",
+                "2026-10-03",
+                "2026-10-04",
+            ],
+        }
+        self.assertEqual(
+            pending_backfill_days(queue, state, limit=2),
+            ["2026-10-02", "2026-10-03"],
+        )
+
+    def test_backfill_jobs_are_p4_and_bounded(self):
+        state = empty_state()
+        jobs = build_due_jobs(
+            state,
+            accepted_days={},
+            today="2026-11-03",
+            backfill_queue=[
+                "2026-10-01",
+                "2026-10-02",
+                "2026-10-03",
+            ],
+            backfill_limit=2,
+        )
+        self.assertEqual(
+            [(row["priority"], row["stage"], row["target_day"]) for row in jobs],
+            [
+                (4, "backfill", "2026-10-01"),
+                (4, "backfill", "2026-10-02"),
+            ],
+        )
+
+    def test_digest_immutability_helper(self):
+        before = b'{"target_day":"2026-11-01"}\n'
+        self.assertTrue(digest_unchanged(before, bytes(before)))
+        self.assertFalse(digest_unchanged(before, before + b" "))
+
+    def sidecar(self, target_day):
+        return {
+            "schema_version": 1,
+            "kind": "holodocchi.daily_digest.related_clips",
+            "target_day": target_day,
+            "status": "ok",
+            "stories": [],
+            "sources": {},
+        }
+
+    def test_month_compaction_eligibility(self):
+        state = empty_state()
+        for day in ("2026-10-01", "2026-10-02"):
+            record_success(
+                state,
+                target_day=day,
+                stage="backfill",
+                succeeded_at="2026-11-03T00:00:00Z",
+                clip_count=1,
+                generated_sha256=day,
+                live_sha256=day,
+            )
+        self.assertTrue(
+            month_compaction_eligible(
+                state,
+                month="2026-10",
+                expected_days=["2026-10-01", "2026-10-02"],
+            )
+        )
+        self.assertFalse(
+            month_compaction_eligible(
+                state,
+                month="2026-10",
+                expected_days=["2026-10-01", "2026-10-03"],
+            )
+        )
+
+    def test_month_archive_is_deterministic_and_preserves_days(self):
+        rows_a = {
+            "2026-10-02": self.sidecar("2026-10-02"),
+            "2026-10-01": self.sidecar("2026-10-01"),
+        }
+        rows_b = dict(reversed(list(rows_a.items())))
+        archive_a = build_month_archive(month="2026-10", sidecars_by_day=rows_a)
+        archive_b = build_month_archive(month="2026-10", sidecars_by_day=rows_b)
+        self.assertEqual(archive_a, archive_b)
+        self.assertEqual(archive_a["kind"], ARCHIVE_KIND)
+        self.assertEqual(list(archive_a["days"]), ["2026-10-01", "2026-10-02"])
+
+    def test_storage_index_prefers_hot_then_cold(self):
+        index = build_storage_index(
+            hot_days=["2026-11-01"],
+            cold_months=["2026-10"],
+        )
+        self.assertEqual(index["kind"], INDEX_KIND)
+        self.assertEqual(
+            resolve_storage(index, "2026-11-01")["tier"],
+            "hot",
+        )
+        self.assertEqual(
+            resolve_storage(index, "2026-10-03")["tier"],
+            "cold",
+        )
+        self.assertEqual(
+            resolve_storage(index, "2026-09-30")["tier"],
+            "missing",
+        )
+
+    def test_input_state_not_mutated_by_archive_builder(self):
+        sidecars = {"2026-10-01": self.sidecar("2026-10-01")}
+        before = copy.deepcopy(sidecars)
+        build_month_archive(month="2026-10", sidecars_by_day=sidecars)
+        self.assertEqual(sidecars, before)
+
+
+if __name__ == "__main__":
+    unittest.main()
