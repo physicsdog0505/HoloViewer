@@ -120,6 +120,27 @@ class DailyDigestRelatedClipsTests(unittest.TestCase):
             ["DDDDDDDDDDD", "CCCCCCCCCCC"],
         )
 
+
+    def test_missing_exact_source_language_does_not_borrow_story_language(self):
+        mapping = {
+            "AAAAAAAAAAA": {
+                "clips": [
+                    {"video_id": "IIIIIIIIIII", "lang": "en", "title": "unknown-source en"},
+                ],
+            },
+            "BBBBBBBBBBB": {"clips": []},
+        }
+        result = build_sidecar(
+            self.digest(),
+            lookup=lambda video_id: mapping[video_id],
+            generated_at="2026-11-03T00:00:00Z",
+            source_language_map={"AAAAAAAAAAA": "", "BBBBBBBBBBB": "en"},
+        )
+        story = result["stories"][0]
+        self.assertEqual(story["source_languages"], ["en"])
+        self.assertEqual(story["clips"][0]["source_languages"], [])
+        self.assertEqual(story["clips"][0]["language_tier"], 3)
+
     def test_partial_provider_failure_is_nonblocking(self):
         def lookup(video_id):
             if video_id == "AAAAAAAAAAA":
