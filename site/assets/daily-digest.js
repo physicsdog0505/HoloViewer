@@ -340,8 +340,8 @@ function storyDetailRail(ids,byId){
     activeVideoId=videoId;
     shell.hidden=false;
     shell.dataset.expanded='true';
-    setGroupOpen(false);
-    rail.selectVideo(videoId,{open:false});
+    setGroupOpen(true);
+    rail.selectVideo(videoId,{open:true});
     return true;
   };
   return shell;
