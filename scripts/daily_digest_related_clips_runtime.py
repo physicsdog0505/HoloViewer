@@ -168,8 +168,8 @@ def discover_accepted_receipts(receipts_dir: Path) -> tuple[dict[str, str], dict
                 raise RuntimeError334(
                     f"accepted candidate SHA mismatch: {candidate}"
                 )
+            candidates[target_day] = str(candidate)
         accepted[target_day] = digest_sha
-        candidates[target_day] = str(candidate)
     return accepted, candidates
 
 
