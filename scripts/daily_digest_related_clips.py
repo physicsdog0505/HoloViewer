@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 KIND = "holodocchi.daily_digest.related_clips"
@@ -188,16 +187,8 @@ def holodex_lookup(source_video_id: str, *, api_key: str, timeout: float = 15.0)
     if not api_key:
         raise ResolverError("HOLODEX_API_KEY is required for live lookup")
 
-    query = urlencode(
-        {
-            "id": source_video_id,
-            "type": "stream",
-            "include": "clips,sources",
-            "limit": 1,
-        }
-    )
     request = Request(
-        f"{API_BASE}?{query}",
+        f"{API_BASE}/{source_video_id}",
         headers={
             "X-APIKEY": api_key,
             "Accept": "application/json",
