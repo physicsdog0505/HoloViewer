@@ -84,32 +84,56 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
     floor_coverage_end=None
     floor_coverage_gaps=[]
     source_lines=[row["source_line"] for row in chronological_raw]
+    source_pages=[row["source_page"] for row in chronological_raw]
     # Pushes need not begin on PTT page 1: the article body can occupy the
     # first page(s). Authority therefore comes from Collector's captured
     # article-line coverage, not min(push.source_page).
     has_screens=db.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='article_screens'"
     ).fetchone() is not None
+    page_coverage_start=None
+    page_coverage_end=None
+    page_coverage_gaps=[]
+    screen_pages_valid=False
     if has_screens:
         screen_ranges=db.execute("""
-            SELECT start_line,end_line FROM article_screens
+            SELECT source_page,total_pages,start_line,end_line FROM article_screens
             WHERE article_id=? ORDER BY start_line,end_line
         """,(article_id,)).fetchall()
-        if screen_ranges:
-            floor_coverage_start=screen_ranges[0][0]
-            merged_end=screen_ranges[0][1]
-            for start,end in screen_ranges[1:]:
+        structurally_valid=bool(screen_ranges) and all(
+            type(page) is int and type(total) is int and
+            type(start) is int and type(end) is int and
+            page>0 and total>=page and start>0 and end>=start
+            for page,total,start,end in screen_ranges)
+        if structurally_valid:
+            floor_coverage_start=screen_ranges[0][2]
+            merged_end=screen_ranges[0][3]
+            for _,_,start,end in screen_ranges[1:]:
                 if start>merged_end+1:
                     floor_coverage_gaps.append([merged_end+1,start-1])
                 merged_end=max(merged_end,end)
             floor_coverage_end=merged_end
-    latest_push=max(source_lines,default=None)
+            pages=sorted({row[0] for row in screen_ranges})
+            page_coverage_start=pages[0]
+            page_coverage_end=pages[-1]
+            page_coverage_gaps=[page for page in range(pages[0],pages[-1]+1)
+                                if page not in set(pages)]
+            max_total=max(row[1] for row in screen_ranges)
+            terminal_consistent=(
+                max_total==page_coverage_end and
+                any(page==page_coverage_end and total==page_coverage_end
+                    for page,total,_,_ in screen_ranges)
+            )
+            screen_pages_valid=(page_coverage_start==1 and
+                                not page_coverage_gaps and terminal_consistent)
+    latest_push_page=max(source_pages,default=None)
     if (not truncated and chronological_raw and
         all(type(line) is int and line>0 for line in source_lines) and
         source_lines==sorted(source_lines) and len(source_lines)==len(set(source_lines)) and
+        all(type(page) is int and page>0 for page in source_pages) and
         floor_coverage_start==1 and not floor_coverage_gaps and
-        type(floor_coverage_end) is int and latest_push is not None and
-        floor_coverage_end>=latest_push):
+        screen_pages_valid and type(page_coverage_end) is int and
+        latest_push_page is not None and page_coverage_end>=latest_push_page):
         floor_by_line={row["source_line"]:index for index,row in enumerate(chronological_raw,start=1)}
         floor_authoritative=True
     recovered_by_line={}
@@ -156,6 +180,8 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
             "floor_authoritative":floor_authoritative,"floor_by_source_line":floor_by_line,
             "floor_coverage_start":floor_coverage_start,"floor_coverage_end":floor_coverage_end,
             "floor_coverage_gaps":floor_coverage_gaps,
+            "page_coverage_start":page_coverage_start,"page_coverage_end":page_coverage_end,
+            "page_coverage_gaps":page_coverage_gaps,
             "pending_source_lines":pending,"checked_source_rows":len(raw),
             "scan_truncated":truncated,
             "earliest_scanned_source_line":min((r[0] for r in raw[:max_rows]),default=None),

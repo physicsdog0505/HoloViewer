@@ -86,9 +86,59 @@ class LiveCapturePublisherTests(unittest.TestCase):
 
     def test_floor_authority_uses_article_line_coverage_not_first_push_page(self):
         self.db.execute("UPDATE pushes SET source_page=2")
+        self.db.execute("UPDATE article_screens SET total_pages=2")
+        self.db.execute("INSERT INTO article_screens VALUES(2,1,2,2,40,50,'now')")
         inspected=inspect_latest_article(self.db)
         self.assertTrue(inspected["floor_authoritative"])
         self.assertEqual(inspected["floor_by_source_line"],{1:1,2:2,3:3})
+
+    def test_floor_authority_uses_same_domain_complete_page_coverage(self):
+        self.db.execute("DELETE FROM pushes")
+        self.db.execute("DELETE FROM article_screens")
+        self.db.executemany("INSERT INTO pushes VALUES(?,?,?,?,?,?,?,?,?,?)",[
+            (1,1,135,7,'推','a','one','10/15','18:00','2026-10-15T10:01:05Z'),
+            (2,1,400,18,'推','b','two','10/15','18:01','2026-10-15T10:02:07Z'),
+            (3,1,516,18,'→','c','three','10/15','18:02','2026-10-15T10:03:07Z'),
+        ])
+        self.db.executemany("INSERT INTO article_screens VALUES(?,?,?,?,?,?,?)",[
+            (page,1,page,18,(page-1)*21+1,min(page*21,382),'now')
+            for page in range(1,19)
+        ])
+        inspected=inspect_latest_article(self.db)
+        self.assertLess(inspected["floor_coverage_end"],516)
+        self.assertEqual(inspected["page_coverage_end"],18)
+        self.assertTrue(inspected["floor_authoritative"])
+        self.assertEqual(inspected["floor_by_source_line"],{135:1,400:2,516:3})
+
+    def test_floor_is_fail_closed_without_screen_page_one(self):
+        self.db.execute("DELETE FROM article_screens")
+        self.db.execute("INSERT INTO article_screens VALUES(1,1,2,2,1,50,'now')")
+        inspected=inspect_latest_article(self.db)
+        self.assertFalse(inspected["floor_authoritative"])
+        self.assertEqual(inspected["page_coverage_start"],2)
+
+    def test_floor_is_fail_closed_on_screen_page_gap(self):
+        self.db.execute("UPDATE pushes SET source_page=3")
+        self.db.execute("DELETE FROM article_screens")
+        self.db.executemany("INSERT INTO article_screens VALUES(?,?,?,?,?,?,?)",[
+            (1,1,1,3,1,25,'now'),
+            (2,1,3,3,26,50,'now'),
+        ])
+        inspected=inspect_latest_article(self.db)
+        self.assertFalse(inspected["floor_authoritative"])
+        self.assertEqual(inspected["page_coverage_gaps"],[2])
+
+    def test_floor_is_fail_closed_when_screens_do_not_reach_latest_push_page(self):
+        self.db.execute("UPDATE pushes SET source_page=2")
+        inspected=inspect_latest_article(self.db)
+        self.assertFalse(inspected["floor_authoritative"])
+        self.assertEqual(inspected["page_coverage_end"],1)
+
+    def test_floor_is_fail_closed_on_inconsistent_total_pages(self):
+        self.db.execute("UPDATE article_screens SET total_pages=2")
+        inspected=inspect_latest_article(self.db)
+        self.assertFalse(inspected["floor_authoritative"])
+        self.assertEqual(inspected["page_coverage_end"],1)
 
     def test_floor_is_fail_closed_without_article_start_coverage(self):
         self.db.execute("DELETE FROM article_screens")
@@ -191,6 +241,7 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertFalse(plan["scan_truncated"])
         limited=inspect_latest_article(self.db,max_rows=100)
         self.assertTrue(limited["scan_truncated"])
+        self.assertFalse(limited["floor_authoritative"])
         self.assertEqual(limited["checked_source_rows"],101)
 
     def test_existing_rows_baseline_without_remote_write_then_new_push_acks_once(self):

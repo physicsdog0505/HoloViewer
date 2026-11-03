@@ -35,7 +35,10 @@ class FloorEnrichmentTests(unittest.TestCase):
               (2,1,20,1,'推','b','new one','10/15','18:00','2026-10-15T10:01:05Z'),
               (3,1,30,2,'→','c','new two','10/15','18:01','2026-10-15T10:02:07Z'),
             ])
-            db.execute("INSERT INTO article_screens VALUES(1,1,1,2,1,40,'now')")
+            db.executemany("INSERT INTO article_screens VALUES(?,?,?,?,?,?,?)",[
+              (1,1,1,2,1,20,'now'),
+              (2,1,2,2,20,40,'now'),
+            ])
             db.commit()
         finally:
             db.close()
