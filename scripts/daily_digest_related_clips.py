@@ -298,7 +298,7 @@ def build_sidecar(
             tier = _language_tier(
                 normalize_language(clip.get("lang")),
                 digest_locale=locale,
-                source_languages=clip_source_languages or source_languages,
+                source_languages=clip_source_languages,
             )
             clips.append(
                 {
