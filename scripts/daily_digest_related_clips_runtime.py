@@ -15,9 +15,10 @@ import json
 import os
 import re
 import tempfile
+import subprocess
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable, Sequence
 
 STATE_KIND = "holodocchi.daily_digest.related_clips.runtime_state"
 QUEUE_KIND = "holodocchi.daily_digest.related_clips.backfill_queue"
@@ -518,6 +519,161 @@ def resolve_storage(index: dict[str, Any], target_day: str) -> dict[str, str]:
 
 def digest_unchanged(before: bytes, after: bytes) -> bool:
     return before == after
+
+
+def sidecar_clip_count(sidecar: dict[str, Any]) -> int:
+    total = 0
+    for story in sidecar.get("stories", []):
+        if isinstance(story, dict) and isinstance(story.get("clips"), list):
+            total += len(story["clips"])
+    return total
+
+
+def _run_checked(
+    command: Sequence[str],
+    *,
+    env: dict[str, str] | None = None,
+    runner: Callable[..., Any] = subprocess.run,
+) -> None:
+    result = runner(
+        list(command),
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if int(getattr(result, "returncode", 1)) != 0:
+        stderr = str(getattr(result, "stderr", "") or "").strip()
+        stdout = str(getattr(result, "stdout", "") or "").strip()
+        detail = stderr or stdout or "command failed"
+        raise RuntimeError334(detail)
+
+
+def execute_job(
+    state: dict[str, Any],
+    *,
+    job: dict[str, Any],
+    candidate_path: str,
+    private_repo: Path,
+    corpus_root: Path,
+    sidecar_root: Path,
+    public_repo: Path,
+    public_expected_head: str,
+    static_baseline_version: str,
+    python_executable: str,
+    holodex_api_key_env: str = "HOLODEX_API_KEY",
+    execute: bool = False,
+    runner: Callable[..., Any] = subprocess.run,
+    readback_fetcher: Callable[[str], bytes] | None = None,
+    succeeded_at: str | None = None,
+) -> dict[str, Any]:
+    plan = build_job_command_plan(
+        job,
+        candidate_path=candidate_path,
+        private_repo=private_repo,
+        corpus_root=corpus_root,
+        sidecar_root=sidecar_root,
+        python_executable=python_executable,
+    )
+    result: dict[str, Any] = {
+        **plan,
+        "mode": "EXECUTE" if execute else "DRY_RUN",
+        "production_mutation": "PENDING_EXPLICIT_EXECUTE" if execute else "NO",
+    }
+    if not execute:
+        return result
+
+    candidate = Path(candidate_path)
+    if not candidate.is_file():
+        raise RuntimeError334(f"accepted candidate missing: {candidate}")
+    before = candidate.read_bytes()
+    expected_digest_sha = str(job.get("digest_sha256") or "").strip()
+    if expected_digest_sha and sha256_bytes(before) != expected_digest_sha:
+        raise RuntimeError334("accepted candidate SHA changed before execution")
+    if not os.environ.get(holodex_api_key_env, "").strip():
+        raise RuntimeError334(
+            f"{holodex_api_key_env} is required for execute mode"
+        )
+
+    record_attempt(
+        state,
+        target_day=str(job["target_day"]),
+        stage=str(job["stage"]),
+        attempted_at=succeeded_at or utc_now(),
+    )
+
+    env = dict(os.environ)
+    for command in plan["commands"]:
+        _run_checked(command, env=env, runner=runner)
+
+    after = candidate.read_bytes()
+    if not digest_unchanged(before, after):
+        raise RuntimeError334("accepted Daily Digest mutated during enrichment")
+
+    sidecar_path = Path(plan["sidecar"])
+    try:
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError334("generated sidecar unreadable") from exc
+    validated = validate_sidecar(sidecar, str(job["target_day"]))
+    generated_bytes = canonical_json_bytes(validated)
+    generated_sha = sha256_bytes(generated_bytes)
+    actual_sha = sha256_bytes(sidecar_path.read_bytes())
+    if actual_sha != generated_sha:
+        raise RuntimeError334("generated sidecar is not canonical JSON")
+
+    release_script = (
+        public_repo / "scripts" / "deploy_daily_digest_static_assets_owner_local.sh"
+    )
+    _run_checked(
+        [str(release_script), "prepare", public_expected_head],
+        env=env,
+        runner=runner,
+    )
+    _run_checked(
+        [
+            str(release_script),
+            "deploy",
+            public_expected_head,
+            static_baseline_version,
+        ],
+        env=env,
+        runner=runner,
+    )
+
+    if readback_fetcher is None:
+        raise RuntimeError334("execute mode requires live readback fetcher")
+    month = str(job["target_day"])[:7]
+    live_path = (
+        f"/data/daily-digest/{month}/"
+        f"{job['target_day']}-related-clips.json"
+    )
+    live_bytes = readback_fetcher(live_path)
+    live_sha = sha256_bytes(live_bytes)
+    if live_sha != generated_sha:
+        raise RuntimeError334("live related-clips SHA mismatch")
+
+    timestamp = succeeded_at or utc_now()
+    record_success(
+        state,
+        target_day=str(job["target_day"]),
+        stage=str(job["stage"]),
+        succeeded_at=timestamp,
+        clip_count=sidecar_clip_count(validated),
+        generated_sha256=generated_sha,
+        live_sha256=live_sha,
+    )
+    result.update(
+        {
+            "production_mutation": "YES",
+            "sidecar_sha256": generated_sha,
+            "live_sha256": live_sha,
+            "clip_count": sidecar_clip_count(validated),
+            "live_path": live_path,
+            "state_reconciled": True,
+        }
+    )
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
