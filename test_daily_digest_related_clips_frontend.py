@@ -32,6 +32,8 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.assertIn("clips.slice(0,3)", self.js)
         self.assertIn("clips.slice(3)", self.js)
         self.assertIn("'查看全部 '+String(clips.length)+' 支'", self.js)
+        self.assertIn("'精華剪輯'", self.js)
+        self.assertNotIn("'相關烤肉'", self.js)
 
     def test_external_clip_links_are_isolated(self):
         self.assertIn("link.target='_blank';", self.js)
@@ -42,10 +44,21 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.assertIn("row?.story_index", self.js)
         self.assertIn('.daily-story-card[data-story-index="', self.js)
 
+    def test_livestream_details_are_hidden_and_toggle_from_story_image(self):
+        self.assertIn("shell.hidden=true;", self.js)
+        self.assertIn("shell.toggleVideo=(id)=>", self.js)
+        self.assertIn("if(!shell.hidden&&activeVideoId===videoId)", self.js)
+        self.assertIn("shell.hidden=false;", self.js)
+        self.assertIn("return detailRail.toggleVideo(videoId);", self.js)
+        self.assertIn("figure.setAttribute('aria-expanded','false');", self.js)
+        self.assertIn(".daily-story-detail-shell[hidden]{", self.css)
+
     def test_related_clip_styles_exist(self):
         self.assertIn(".daily-related-clips{", self.css)
-        self.assertIn(".daily-related-clips-grid{", self.css)
+        self.assertIn("repeat(auto-fit,minmax(min(280px,100%),1fr))", self.css)
         self.assertIn(".daily-related-clip{", self.css)
+        self.assertIn("-webkit-line-clamp:3", self.css)
+        self.assertIn("flex-wrap:nowrap", self.css)
 
 
 if __name__ == "__main__":
