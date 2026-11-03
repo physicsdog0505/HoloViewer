@@ -115,6 +115,42 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(jobs[0]["stage"], "t3")
 
+    def test_terminal_backfill_day_does_not_reenter_refresh_queue(self):
+        state = empty_state()
+        record_success(
+            state,
+            target_day="2026-10-01",
+            stage="backfill",
+            succeeded_at="2026-11-03T00:00:00Z",
+            clip_count=5,
+            generated_sha256="same",
+            live_sha256="same",
+        )
+        state["days"]["2026-10-01"]["digest_sha256"] = "digest"
+        jobs = build_due_jobs(
+            state,
+            accepted_days={"2026-10-01": "digest"},
+            today="2026-11-08",
+        )
+        self.assertEqual(jobs, [])
+
+    def test_same_day_is_not_scheduled_for_refresh_and_backfill(self):
+        state = empty_state()
+        jobs = build_due_jobs(
+            state,
+            accepted_days={"2026-10-01": "digest"},
+            today="2026-11-08",
+            backfill_queue=["2026-10-01", "2026-10-02"],
+            backfill_limit=5,
+        )
+        self.assertEqual(
+            [(row["stage"], row["target_day"]) for row in jobs],
+            [
+                ("initial", "2026-10-01"),
+                ("backfill", "2026-10-02"),
+            ],
+        )
+
     def test_t7_completion_removes_day_from_active_queue(self):
         state = empty_state()
         for stage in ("initial", "t1", "t3", "t7"):
