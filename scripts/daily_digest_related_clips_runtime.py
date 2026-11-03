@@ -569,6 +569,211 @@ def _parse_release_value(output: str, key: str) -> str:
     raise RuntimeError334(f"release output missing {key}")
 
 
+
+def execute_jobs_batch(
+    state: dict[str, Any],
+    *,
+    jobs_with_candidates: Sequence[tuple[dict[str, Any], str]],
+    private_repo: Path,
+    corpus_root: Path,
+    sidecar_root: Path,
+    public_repo: Path,
+    public_expected_head: str,
+    python_executable: str,
+    holodex_api_key_env: str = "HOLODEX_API_KEY",
+    runner: Callable[..., Any] = subprocess.run,
+    readback_fetcher: Callable[[str], bytes] | None = None,
+    succeeded_at: str | None = None,
+) -> list[dict[str, Any]]:
+    """Generate multiple due sidecars, publish once, then reconcile each readback."""
+
+    if not os.environ.get(holodex_api_key_env, "").strip():
+        raise RuntimeError334(
+            f"{holodex_api_key_env} is required for execute mode"
+        )
+    if readback_fetcher is None:
+        raise RuntimeError334("execute mode requires live readback fetcher")
+
+    resolver_env = dict(os.environ)
+    safe_env = dict(resolver_env)
+    safe_env.pop(holodex_api_key_env, None)
+
+    generated: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+
+    for job, candidate_path in jobs_with_candidates:
+        target_day = str(job["target_day"])
+        stage = str(job["stage"])
+        attempted_at = succeeded_at or utc_now()
+        record_attempt(
+            state,
+            target_day=target_day,
+            stage=stage,
+            attempted_at=attempted_at,
+        )
+        try:
+            plan = build_job_command_plan(
+                job,
+                candidate_path=candidate_path,
+                private_repo=private_repo,
+                corpus_root=corpus_root,
+                sidecar_root=sidecar_root,
+                python_executable=python_executable,
+            )
+            candidate = Path(candidate_path)
+            if not candidate.is_file():
+                raise RuntimeError334(f"accepted candidate missing: {candidate}")
+            before = candidate.read_bytes()
+            expected_digest_sha = str(job.get("digest_sha256") or "").strip()
+            if expected_digest_sha and sha256_bytes(before) != expected_digest_sha:
+                raise RuntimeError334("accepted candidate SHA changed before execution")
+
+            _run_checked(plan["commands"][0], env=safe_env, runner=runner)
+            _run_checked(plan["commands"][1], env=resolver_env, runner=runner)
+
+            if not digest_unchanged(before, candidate.read_bytes()):
+                raise RuntimeError334(
+                    "accepted Daily Digest mutated during enrichment"
+                )
+
+            sidecar_path = Path(plan["sidecar"])
+            try:
+                sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RuntimeError334("generated sidecar unreadable") from exc
+
+            validated = validate_sidecar(sidecar, target_day)
+            generated_sha = sha256_bytes(canonical_json_bytes(validated))
+            if sha256_bytes(sidecar_path.read_bytes()) != generated_sha:
+                raise RuntimeError334("generated sidecar is not canonical JSON")
+
+            month = target_day[:7]
+            generated.append(
+                {
+                    "job": job,
+                    "target_day": target_day,
+                    "stage": stage,
+                    "sidecar_sha256": generated_sha,
+                    "clip_count": sidecar_clip_count(validated),
+                    "live_path": (
+                        f"/data/daily-digest/{month}/"
+                        f"{target_day}-related-clips.json"
+                    ),
+                }
+            )
+        except Exception as exc:
+            message = str(exc)
+            record_attempt(
+                state,
+                target_day=target_day,
+                stage=stage,
+                attempted_at=succeeded_at or utc_now(),
+                error=message,
+            )
+            results.append(
+                {
+                    "target_day": target_day,
+                    "stage": stage,
+                    "status": "error",
+                    "error": message,
+                }
+            )
+
+    if not generated:
+        return results
+
+    release_script = (
+        public_repo / "scripts" / "deploy_daily_digest_static_assets_owner_local.sh"
+    )
+    try:
+        prepared = _run_checked(
+            [str(release_script), "prepare", public_expected_head],
+            env=safe_env,
+            runner=runner,
+        )
+        baseline = _parse_release_value(
+            str(getattr(prepared, "stdout", "") or ""),
+            "BASELINE_VERSION",
+        )
+        _run_checked(
+            [
+                str(release_script),
+                "deploy",
+                public_expected_head,
+                baseline,
+            ],
+            env=safe_env,
+            runner=runner,
+        )
+    except Exception as exc:
+        message = str(exc)
+        for item in generated:
+            record_attempt(
+                state,
+                target_day=item["target_day"],
+                stage=item["stage"],
+                attempted_at=succeeded_at or utc_now(),
+                error=message,
+            )
+            results.append(
+                {
+                    "target_day": item["target_day"],
+                    "stage": item["stage"],
+                    "status": "error",
+                    "error": message,
+                }
+            )
+        return results
+
+    timestamp = succeeded_at or utc_now()
+    for item in generated:
+        try:
+            live_bytes = readback_fetcher(item["live_path"])
+            live_sha = sha256_bytes(live_bytes)
+            if live_sha != item["sidecar_sha256"]:
+                raise RuntimeError334("live related-clips SHA mismatch")
+            record_success(
+                state,
+                target_day=item["target_day"],
+                stage=item["stage"],
+                succeeded_at=timestamp,
+                clip_count=item["clip_count"],
+                generated_sha256=item["sidecar_sha256"],
+                live_sha256=live_sha,
+            )
+            results.append(
+                {
+                    "target_day": item["target_day"],
+                    "stage": item["stage"],
+                    "status": "complete",
+                    "production_mutation": "YES",
+                    "sidecar_sha256": item["sidecar_sha256"],
+                    "live_sha256": live_sha,
+                    "clip_count": item["clip_count"],
+                    "live_path": item["live_path"],
+                    "static_baseline_version": baseline,
+                }
+            )
+        except Exception as exc:
+            message = str(exc)
+            record_attempt(
+                state,
+                target_day=item["target_day"],
+                stage=item["stage"],
+                attempted_at=timestamp,
+                error=message,
+            )
+            results.append(
+                {
+                    "target_day": item["target_day"],
+                    "stage": item["stage"],
+                    "status": "error",
+                    "error": message,
+                }
+            )
+
+    return results
+
 def execute_job(
     state: dict[str, Any],
     *,
