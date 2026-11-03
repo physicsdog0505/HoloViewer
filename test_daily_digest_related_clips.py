@@ -41,14 +41,15 @@ class DailyDigestRelatedClipsTests(unittest.TestCase):
             "youtube_url": "https://www.youtube.com/watch?v=DDDDDDDDDDD",
         }
         mapping = {
-            "AAAAAAAAAAA": {"source_language": "en", "clips": [clip_a, clip_b]},
-            "BBBBBBBBBBB": {"source_language": "ja", "clips": [clip_b]},
+            "AAAAAAAAAAA": {"clips": [clip_a, clip_b]},
+            "BBBBBBBBBBB": {"clips": [clip_b]},
         }
 
         result = build_sidecar(
             self.digest(),
             lookup=lambda video_id: mapping[video_id],
             generated_at="2026-11-03T00:00:00Z",
+            source_language_map={"AAAAAAAAAAA": "en", "BBBBBBBBBBB": "ja"},
         )
 
         self.assertEqual(result["status"], "ok")
@@ -70,7 +71,6 @@ class DailyDigestRelatedClipsTests(unittest.TestCase):
     def test_locale_then_source_then_other_then_unknown(self):
         mapping = {
             "AAAAAAAAAAA": {
-                "source_language": "ja",
                 "clips": [
                     {"video_id": "EEEEEEEEEEE", "lang": "ko", "title": "other"},
                     {"video_id": "FFFFFFFFFFF", "lang": "", "title": "unknown"},
@@ -78,12 +78,13 @@ class DailyDigestRelatedClipsTests(unittest.TestCase):
                     {"video_id": "HHHHHHHHHHH", "lang": "zh-Hant", "title": "digest"},
                 ],
             },
-            "BBBBBBBBBBB": {"source_language": "en", "clips": []},
+            "BBBBBBBBBBB": {"clips": []},
         }
         result = build_sidecar(
             self.digest(),
             lookup=lambda video_id: mapping[video_id],
             generated_at="2026-11-03T00:00:00Z",
+            source_language_map={"AAAAAAAAAAA": "ja", "BBBBBBBBBBB": "en"},
         )
         story = result["stories"][0]
         self.assertEqual(
@@ -98,19 +99,19 @@ class DailyDigestRelatedClipsTests(unittest.TestCase):
     def test_future_digest_locale_changes_priority_without_refetch(self):
         mapping = {
             "AAAAAAAAAAA": {
-                "source_language": "ja",
                 "clips": [
                     {"video_id": "CCCCCCCCCCC", "lang": "zh", "title": "zh"},
                     {"video_id": "DDDDDDDDDDD", "lang": "en-US", "title": "en"},
                 ],
             },
-            "BBBBBBBBBBB": {"source_language": "ja", "clips": []},
+            "BBBBBBBBBBB": {"clips": []},
         }
         result = build_sidecar(
             self.digest(),
             lookup=lambda video_id: mapping[video_id],
             generated_at="2026-11-03T00:00:00Z",
             digest_locale="en",
+            source_language_map={"AAAAAAAAAAA": "ja", "BBBBBBBBBBB": "ja"},
         )
         self.assertEqual(result["digest_locale"], "en")
         self.assertEqual(result["digest_locale_source"], "override")
@@ -123,12 +124,13 @@ class DailyDigestRelatedClipsTests(unittest.TestCase):
         def lookup(video_id):
             if video_id == "AAAAAAAAAAA":
                 raise RuntimeError("provider unavailable")
-            return {"source_language": "ja", "clips": []}
+            return {"clips": []}
 
         result = build_sidecar(
             self.digest(),
             lookup=lookup,
             generated_at="2026-11-03T00:00:00Z",
+            source_language_map={"AAAAAAAAAAA": "en", "BBBBBBBBBBB": "ja"},
         )
 
         self.assertEqual(result["status"], "partial")
