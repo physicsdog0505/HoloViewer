@@ -1413,12 +1413,12 @@ html{scroll-behavior:smooth}
 }
 .daily-related-clips-grid{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));
   gap:12px
 }
 .daily-related-clip{
   display:grid;
-  grid-template-columns:112px minmax(0,1fr);
+  grid-template-columns:minmax(96px,112px) minmax(0,1fr);
   gap:10px;
   min-width:0;
   padding:10px;
@@ -1459,7 +1459,7 @@ html{scroll-behavior:smooth}
 }
 .daily-related-clip-meta{
   display:flex;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
   gap:6px;
   align-items:center;
   min-width:0;
@@ -1467,6 +1467,7 @@ html{scroll-behavior:smooth}
   color:var(--text-muted)
 }
 .daily-related-clip-lang{
+  flex:0 0 auto;
   padding:2px 6px;
   border-radius:999px;
   background:var(--surface-2);
@@ -1474,14 +1475,22 @@ html{scroll-behavior:smooth}
   text-transform:uppercase
 }
 .daily-related-clip-channel{
+  flex:1 1 0;
+  min-width:0;
   overflow:hidden;
   white-space:nowrap;
   text-overflow:ellipsis
 }
 .daily-related-clip-title{
+  display:-webkit-box;
+  min-width:0;
+  overflow:hidden;
   font-size:13px;
   line-height:1.45;
-  overflow-wrap:anywhere
+  overflow-wrap:anywhere;
+  word-break:normal;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:3
 }
 .daily-related-clips-more{
   margin-top:10px
@@ -1495,7 +1504,7 @@ html{scroll-behavior:smooth}
 }
 .daily-related-clips-list{
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));
   gap:10px;
   margin-top:10px
 }
@@ -1503,8 +1512,8 @@ html{scroll-behavior:smooth}
   grid-template-columns:88px minmax(0,1fr)
 }
 
-@media(max-width:980px){
-  .daily-related-clips-grid{grid-template-columns:1fr}
+@media(max-width:760px){
+  .daily-related-clips-grid,
   .daily-related-clips-list{grid-template-columns:1fr}
 }
 @media(max-width:560px){
@@ -1512,4 +1521,17 @@ html{scroll-behavior:smooth}
   .daily-related-clips-list .daily-related-clip{
     grid-template-columns:92px minmax(0,1fr)
   }
+}
+
+
+/* Owner review — livestream detail rail is opt-in from the story image. */
+.daily-story-detail-shell[hidden]{
+  display:none!important
+}
+.daily-story-visual-item[role="button"]{
+  cursor:pointer
+}
+.daily-story-visual-item[role="button"]:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--brand-main) 68%,transparent);
+  outline-offset:3px
 }
