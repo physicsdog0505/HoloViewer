@@ -232,6 +232,7 @@ def build_sidecar(
     lookup: Callable[[str], Any],
     generated_at: str,
     digest_locale: str = "",
+    source_language_map: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     locale, locale_source = detect_digest_locale(digest, digest_locale)
     stories = extract_story_sources(digest)
@@ -244,20 +245,24 @@ def build_sidecar(
                 seen_sources.add(video_id)
                 source_video_ids.append(video_id)
 
+    source_language_map = source_language_map or {}
     sources: dict[str, dict[str, Any]] = {}
     for video_id in source_video_ids:
         try:
-            source_language, clips = _lookup_result(lookup(video_id))
+            _provider_language, clips = _lookup_result(lookup(video_id))
+            source_language = normalize_language(source_language_map.get(video_id))
             sources[video_id] = {
                 "status": "ok",
                 "source_language": source_language,
+                "source_language_authority": "transcript_corpus" if source_language else "missing",
                 "clips": clips,
             }
         except Exception as exc:
             sources[video_id] = {
                 "status": "error",
                 "error": str(exc),
-                "source_language": "",
+                "source_language": normalize_language(source_language_map.get(video_id)),
+                "source_language_authority": "transcript_corpus" if normalize_language(source_language_map.get(video_id)) else "missing",
                 "clips": [],
             }
 
@@ -343,6 +348,22 @@ def build_sidecar(
     }
 
 
+def load_source_language_map(path: Path | None) -> dict[str, str]:
+    if path is None:
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ResolverError("source language map root must be an object")
+    values = payload.get("source_languages", payload)
+    if not isinstance(values, dict):
+        raise ResolverError("source language map must contain source_languages object")
+    return {
+        _clean(video_id): normalize_language(language)
+        for video_id, language in values.items()
+        if _clean(video_id)
+    }
+
+
 def atomic_write(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -367,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("digest", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--digest-locale", default="", help="override Digest locale, e.g. zh-TW, en, ja")
+    parser.add_argument("--source-language-map", type=Path, help="video_id -> source language map exported from transcript corpus")
     parser.add_argument("--api-key-env", default="HOLODEX_API_KEY")
     parser.add_argument("--timeout", type=float, default=15.0)
     parser.add_argument(
@@ -381,6 +403,7 @@ def main(argv: list[str] | None = None) -> int:
         if not isinstance(digest, dict):
             raise ResolverError("digest root must be an object")
         api_key = os.environ.get(args.api_key_env, "").strip()
+        source_language_map = load_source_language_map(args.source_language_map)
         generated_at = (
             datetime.now(timezone.utc)
             .replace(microsecond=0)
@@ -396,6 +419,7 @@ def main(argv: list[str] | None = None) -> int:
             ),
             generated_at=generated_at,
             digest_locale=args.digest_locale,
+            source_language_map=source_language_map,
         )
         atomic_write(args.output, canonical_json_bytes(sidecar))
     except (OSError, json.JSONDecodeError, ResolverError) as exc:
