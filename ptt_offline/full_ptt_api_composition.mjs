@@ -5,9 +5,9 @@
 import {createPttMountedApiRouter} from './api_shell_ptt_extension.mjs';
 import {mountOwnerPublisherOnExistingApiRouter} from './api_owner_shell_extension.mjs';
 
-export function composeFullPttOnExistingApi(createExistingApiRouter,{verifyAuthority}={}) {
+export function composeFullPttOnExistingApi(createExistingApiRouter,{verifyAuthority,verifyCanonicalRemap}={}) {
   if(typeof createExistingApiRouter!=='function')
     throw new TypeError('accepted existing API factory required');
   const reads=createPttMountedApiRouter(createExistingApiRouter);
-  return mountOwnerPublisherOnExistingApiRouter(reads,{verifyAuthority});
+  return mountOwnerPublisherOnExistingApiRouter(reads,{verifyAuthority,verifyCanonicalRemap});
 }

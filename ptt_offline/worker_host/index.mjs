@@ -3,12 +3,14 @@
 // No second Worker / D1 / Collector process is created here.
 import {createExistingApiRouter} from './today/api-shell.mjs';
 import {composeFullPttOnExistingApi} from '../full_ptt_api_composition.mjs';
-import {verifyPublisherTimeProof} from './time_authority.mjs';
+import {verifyPublisherTimeProof,verifyCanonicalRemapProof} from './time_authority.mjs';
 import {mountTodayPublisherOnCombinedApi} from './today/today-private-post.mjs';
 import {mountTodayCadence} from './today/cadence-refresh.mjs';
 
 const combined = composeFullPttOnExistingApi(createExistingApiRouter,{
-  verifyAuthority: async (row,env) => verifyPublisherTimeProof(row,env)
+  verifyAuthority: async (row,env) => verifyPublisherTimeProof(row,env),
+  verifyCanonicalRemap: async (row,sourceIdentity,env) =>
+    verifyCanonicalRemapProof(row,sourceIdentity,env)
 });
 
 export default mountTodayCadence(mountTodayPublisherOnCombinedApi(combined));

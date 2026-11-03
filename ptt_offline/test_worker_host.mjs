@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
 import worker from './worker_host/index.mjs';
-import {canonicalTimeMessage,verifyPublisherTimeProof} from './worker_host/time_authority.mjs';
+import {canonicalTimeMessage,verifyPublisherTimeProof,canonicalRemapMessage,
+ verifyCanonicalRemapProof} from './worker_host/time_authority.mjs';
 const secret='time-proof-owner-key-at-least-32-bytes';
 async function sign(row) {
  const key=await webcrypto.subtle.importKey('raw',new TextEncoder().encode(secret),
@@ -29,6 +30,24 @@ test('reviewed exact event time HMAC passes and tampering fails',async()=>{
  assert.equal(await verifyPublisherTimeProof({...signed,occurred_at:'2026-10-15T11:00:00Z'},
   {PTT_TIME_AUTHORITY_SECRET:secret}),false);
  assert.equal(await verifyPublisherTimeProof(signed,{}),false);
+});
+
+test('canonical remap proof binds full replacement identity and Collector source',async()=>{
+ const row={push_id:'ptt:v1:'+'b'.repeat(64),aid:'1gwHM4TF',day:'2026-11-03',
+  source_line:383,kind:'推',author:'canonical',content:'canonical content',
+  occurred_at:'2026-11-03T10:00:00Z',floor:1,
+  source_url:'https://www.ptt.cc/bbs/C_Chat/M.1793660292.A.74F.html',
+  source_priority:10,source_record_key:'1gwHM4TF:383'};
+ const sourceIdentity='d'.repeat(64);
+ const key=await webcrypto.subtle.importKey('raw',new TextEncoder().encode(secret),
+  {name:'HMAC',hash:'SHA-256'},false,['sign']);
+ const proof=Buffer.from(await webcrypto.subtle.sign('HMAC',key,
+  new TextEncoder().encode(canonicalRemapMessage(row,sourceIdentity)))).toString('hex');
+ const signed={...row,canonical_proof:proof};
+ const env={PTT_CANONICAL_REMAP_PROOF_SECRET:secret};
+ assert.equal(await verifyCanonicalRemapProof(signed,sourceIdentity,env),true);
+ assert.equal(await verifyCanonicalRemapProof({...signed,content:'caller replacement'},sourceIdentity,env),false);
+ assert.equal(await verifyCanonicalRemapProof(signed,'e'.repeat(64),env),false);
 });
 
 test('combined host serves both independent owner POST paths without enabling writes',async()=>{

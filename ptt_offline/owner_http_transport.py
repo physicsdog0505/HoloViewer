@@ -109,3 +109,11 @@ def owner_signed_reconcile_executor(*, endpoint: str, secret: str, allow_write: 
     return _signed_post_executor(endpoint=endpoint,secret=secret,
         path="/private/ptt/reconcile",allow_write=allow_write,opener=opener,
         clock_ms=clock_ms,max_rows=max_rows,max_bytes=max_bytes,reconcile=True)
+
+def owner_signed_canonical_remap_executor(*, endpoint: str, secret: str,
+                                          allow_write: bool=False, opener=urlopen,
+                                          clock_ms=None, max_rows=5,
+                                          max_bytes=MAX_JSON_BYTES):
+    return _signed_post_executor(endpoint=endpoint,secret=secret,
+        path="/private/ptt/canonical-remap",allow_write=allow_write,opener=opener,
+        clock_ms=clock_ms,max_rows=max_rows,max_bytes=max_bytes,reconcile=False)
