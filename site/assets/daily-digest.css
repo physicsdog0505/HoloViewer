@@ -8,6 +8,17 @@
 .daily-digest-status{margin:10px 0;color:var(--muted,#687078)}
 .daily-digest-status[data-state="ERROR"]{color:#a32626}
 .daily-digest-shell{max-width:1240px;margin:0 auto;padding:28px 24px 72px}
+@media(min-width:761px){
+ .daily-digest-shell{
+  padding-left:calc(24px + var(--rail-collapsed));
+  padding-right:24px;
+  transition:padding-left .18s ease
+ }
+ body:has(.client-rail:hover) .daily-digest-shell,
+ body:has(.client-rail:focus-within) .daily-digest-shell{
+  padding-left:calc(24px + var(--rail-expanded))
+ }
+}
 .daily-digest-group{margin:0 0 28px}
 .daily-digest-group-title{margin:0 0 12px;font-size:18px}
 .daily-digest-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
@@ -1604,6 +1615,25 @@ html{scroll-behavior:smooth}
   font-weight:700;
   letter-spacing:.025em;
 }
+@media(min-width:761px) and (max-width:980px){
+  .daily-digest-title-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:12px;
+    padding:16px 18px
+  }
+  #daily-digest-date-label{
+    min-width:0;
+    font-size:clamp(16px,2.4vw,22px)
+  }
+  .daily-digest-title-meta{
+    min-width:0;
+    max-width:100%
+  }
+  .daily-digest-title-meta strong,
+  .daily-digest-title-meta p{white-space:nowrap}
+}
+
 @media(max-width:760px){
   .daily-digest-title-row{
     gap:14px;
