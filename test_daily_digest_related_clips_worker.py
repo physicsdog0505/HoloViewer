@@ -130,6 +130,53 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
             self.assertFalse(receipt.exists())
             self.assertEqual(last_execute_day(receipt), "")
 
+    def test_target_day_filter_bounds_cycle_to_one_day(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            receipts = root / "receipts"
+            receipts.mkdir()
+            revision = root / "revision"
+            revision.mkdir()
+
+            for day in ("2026-11-01", "2026-11-02"):
+                candidate = revision / f"{day}.public-candidate.json"
+                candidate_bytes = canonical_json_bytes({
+                    "schema_version": 1,
+                    "kind": "holodocchi.daily_digest",
+                    "target_day": day,
+                    "stories": [],
+                })
+                candidate.write_bytes(candidate_bytes)
+                candidate_sha = hashlib.sha256(candidate_bytes).hexdigest()
+                (receipts / f"{day}.finalized.json").write_text(
+                    json.dumps({
+                        "status": "validated_accepted",
+                        "target_day": day,
+                        "public_candidate_sha256": candidate_sha,
+                        "revision_dir": str(revision),
+                    }),
+                    encoding="utf-8",
+                )
+
+            result = run_cycle(
+                state_path=root / "state.json",
+                accepted_receipts_dir=receipts,
+                backfill_queue_path=None,
+                private_repo=root / "private",
+                corpus_root=root / "corpus",
+                sidecar_root=root / "sidecars",
+                public_repo=root / "public",
+                public_expected_head="a" * 40,
+                python_executable="/usr/bin/python3",
+                today="2026-11-03",
+                backfill_limit=5,
+                execute=False,
+                target_day_filter="2026-11-02",
+            )
+
+        self.assertEqual(result["due_jobs"], 1)
+        self.assertEqual(result["results"][0]["target_day"], "2026-11-02")
+
     def test_execute_failure_is_nonblocking_and_durable(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
