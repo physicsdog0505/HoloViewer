@@ -49,6 +49,34 @@ def _scheduled_today(now: datetime, hour: int, minute: int) -> datetime:
     return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
 
+def last_execute_day(path: Path) -> str:
+    if not path.is_file():
+        return ""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if not isinstance(payload, dict) or payload.get("mode") != "EXECUTE":
+        return ""
+    return str(payload.get("today") or "")
+
+
+def write_cycle_receipt(path: Path, result: dict) -> None:
+    if result.get("mode") != "EXECUTE":
+        return
+    atomic_write_json(
+        path,
+        {
+            "schema_version": 1,
+            "kind": "holodocchi.daily_digest.related_clips.worker_receipt",
+            "mode": "EXECUTE",
+            "today": result.get("today"),
+            "due_jobs": result.get("due_jobs"),
+            "completed_at": datetime.now(TAIPEI).isoformat(timespec="seconds"),
+        },
+    )
+
+
 def run_cycle(
     *,
     state_path: Path,
@@ -194,6 +222,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--today")
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--run-receipt", type=Path)
+    parser.add_argument("--force-once", action="store_true")
     args = parser.parse_args(argv)
 
     if not (0 <= args.hour <= 23 and 0 <= args.minute <= 59):
@@ -206,6 +236,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(
             f"--execute requires non-empty environment variable {args.holodex_api_key_env}"
         )
+
+    run_receipt = (
+        args.run_receipt.expanduser().resolve()
+        if args.run_receipt
+        else args.state.expanduser().resolve().with_name("last-worker-run.json")
+    )
 
     kwargs = {
         "state_path": args.state.expanduser().resolve(),
@@ -227,8 +263,22 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     if args.once:
+        selected_day = args.today or _today()
+        if (
+            args.execute
+            and not args.force_once
+            and last_execute_day(run_receipt) == selected_day
+        ):
+            print(json.dumps({
+                "status": "ALREADY_RAN_TODAY",
+                "today": selected_day,
+                "mode": "EXECUTE",
+                "production_mutation": "NO",
+            }, ensure_ascii=False, sort_keys=True))
+            return 0
         try:
-            result = run_cycle(today=args.today or _today(), **kwargs)
+            result = run_cycle(today=selected_day, **kwargs)
+            write_cycle_receipt(run_receipt, result)
         except (OSError, RuntimeError334) as exc:
             print(f"ERROR={exc}", file=sys.stderr)
             return 1
@@ -251,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
 
-    last_run_day = ""
+    last_run_day = last_execute_day(run_receipt) if args.execute else ""
     while True:
         now = datetime.now(TAIPEI)
         today = now.date().isoformat()
@@ -259,6 +309,7 @@ def main(argv: list[str] | None = None) -> int:
         if now >= scheduled and last_run_day != today:
             try:
                 result = run_cycle(today=today, **kwargs)
+                write_cycle_receipt(run_receipt, result)
                 print(
                     json.dumps(result, ensure_ascii=False, sort_keys=True),
                     flush=True,
