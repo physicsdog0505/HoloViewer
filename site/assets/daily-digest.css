@@ -1535,3 +1535,32 @@ html{scroll-behavior:smooth}
   outline:2px solid color-mix(in srgb,var(--brand-main) 68%,transparent);
   outline-offset:3px
 }
+
+
+/* Daily Digest page title -------------------------------------------------- */
+#daily-digest-date-label{
+  display:flex;
+  align-items:baseline;
+  gap:14px;
+  flex-wrap:wrap;
+  margin:0;
+}
+.daily-digest-title-date{
+  color:var(--brand-main);
+  font-size:.58em;
+  font-weight:900;
+  letter-spacing:.06em;
+  line-height:1;
+  white-space:nowrap;
+}
+.daily-digest-title-name{
+  color:var(--text,#242321);
+  font-size:1em;
+  font-weight:900;
+  letter-spacing:-.03em;
+  line-height:1.05;
+}
+@media(max-width:760px){
+  #daily-digest-date-label{gap:9px}
+  .daily-digest-title-date{font-size:.52em}
+}
