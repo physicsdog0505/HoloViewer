@@ -1,5 +1,10 @@
 import copy
+import io
+import json
+import tempfile
 import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
 
 from scripts.daily_digest_related_clips_runtime import (
     ARCHIVE_KIND,
@@ -15,6 +20,9 @@ from scripts.daily_digest_related_clips_runtime import (
     reconcile_publication,
     record_success,
     resolve_storage,
+    atomic_write_json,
+    load_json_or,
+    main,
 )
 
 
@@ -306,6 +314,54 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             resolve_storage(index, "2026-09-30")["tier"],
             "missing",
         )
+
+    def test_state_persists_and_resumes(self):
+        state = empty_state()
+        record_success(
+            state,
+            target_day="2026-11-01",
+            stage="initial",
+            succeeded_at="2026-11-01T00:00:00Z",
+            clip_count=2,
+            generated_sha256="a",
+            live_sha256="a",
+        )
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "state.json"
+            atomic_write_json(path, state)
+            loaded = load_json_or(path, empty_state())
+            jobs = build_due_jobs(
+                loaded,
+                accepted_days={"2026-11-01": "digest-sha"},
+                today="2026-11-02",
+            )
+        self.assertEqual(jobs[0]["stage"], "t1")
+
+    def test_cli_dry_run_never_calls_provider_or_deploy(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            accepted = root / "accepted.json"
+            accepted.write_text(
+                json.dumps({"2026-11-03": "digest-sha"}),
+                encoding="utf-8",
+            )
+            state = root / "state.json"
+            output = io.StringIO()
+            with redirect_stdout(output):
+                code = main([
+                    "--state", str(state),
+                    "--accepted-days", str(accepted),
+                    "--today", "2026-11-03",
+                ])
+        self.assertEqual(code, 0)
+        text = output.getvalue()
+        self.assertIn("MODE=DRY_RUN_PLAN", text)
+        self.assertIn("DUE_JOBS=1", text)
+        self.assertIn("JOB_1=0:initial:2026-11-03", text)
+        self.assertIn("PROVIDER_CALLS=0", text)
+        self.assertIn("STATIC_DEPLOY=NO", text)
+        self.assertIn("FRONTEND_DEPLOY=NO", text)
+        self.assertIn("GEMINI_EXECUTION=NO", text)
 
     def test_input_state_not_mutated_by_archive_builder(self):
         sidecars = {"2026-10-01": self.sidecar("2026-10-01")}
