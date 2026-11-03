@@ -299,7 +299,10 @@ function storyDetailRail(ids,byId){
     if(summary){
       summary.addEventListener('click',event=>{
         event.preventDefault();
-        setGroupOpen(rail.dataset.openState!=='open');
+        shell.hidden=true;
+        shell.dataset.expanded='false';
+        activeVideoId='';
+        setGroupOpen(false);
       });
     }
     rail.append(card);
