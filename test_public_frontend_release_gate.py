@@ -18,6 +18,22 @@ from scripts.run_public_frontend_owner_release import (
 
 
 class PublicFrontendReleaseGateTests(unittest.TestCase):
+    def test_home_live_channel_rail_starts_below_full_sidebar_navigation(self):
+        css = (Path(__file__).resolve().parent / "site/assets/app.css").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "position:fixed;left:2px;top:428px;z-index:65;width:64px;"
+            "max-height:calc(100vh - 440px);",
+            css,
+        )
+
+    def test_app_css_contains_no_literal_backslash_n_tokens(self):
+        css = (Path(__file__).resolve().parent / "site/assets/app.css").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("\\n", css)
+
     def test_foreign_prefixes_reject_youtube_and_ptt(self):
         self.assertTrue(is_foreign_rel("youtube/v1/manifest.json"))
         self.assertTrue(is_foreign_rel("ptt/v1/manifests/x.json"))
