@@ -93,6 +93,7 @@ def run_cycle(
     execute: bool,
     holodex_api_key_env: str = "HOLODEX_API_KEY",
     readback_fetcher=http_readback,
+    target_day_filter: str | None = None,
 ) -> dict:
     state = validate_state(load_json_or(state_path, empty_state()))
     accepted, candidate_paths = discover_accepted_receipts(accepted_receipts_dir)
@@ -113,6 +114,11 @@ def run_cycle(
         backfill_queue=queue_days,
         backfill_limit=backfill_limit,
     )
+    if target_day_filter:
+        jobs = [
+            job for job in jobs
+            if str(job.get("target_day") or "") == target_day_filter
+        ]
 
     results: list[dict] = []
     for job in jobs:
@@ -222,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--today")
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--target-day")
     parser.add_argument("--run-receipt", type=Path)
     parser.add_argument("--force-once", action="store_true")
     args = parser.parse_args(argv)
@@ -260,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
         "backfill_limit": args.backfill_limit,
         "execute": args.execute,
         "holodex_api_key_env": args.holodex_api_key_env,
+        "target_day_filter": args.target_day,
     }
 
     if args.once:
