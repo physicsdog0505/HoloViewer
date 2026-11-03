@@ -1358,3 +1358,32 @@ html{scroll-behavior:smooth}
     box-sizing:border-box
   }
 }
+
+
+/* Mobile canonical story-media layout — all visual variants collapse to one
+   card-width column so desktop/tablet slot spans cannot create uneven media. */
+@media(max-width:760px){
+  .daily-story-visual,
+  .daily-story-visual[data-count],
+  .daily-story-visual[data-visual-layout]{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-auto-flow:row!important;
+    grid-auto-columns:minmax(0,1fr)!important;
+    grid-auto-rows:auto!important;
+    width:100%!important;
+    max-width:100%!important
+  }
+  .daily-story-visual .daily-story-visual-item,
+  .daily-story-visual .daily-story-visual-item[data-slot],
+  .daily-story-visual[data-count] .daily-story-visual-item,
+  .daily-story-visual[data-visual-layout] .daily-story-visual-item[data-slot]{
+    grid-column:1/-1!important;
+    grid-row:auto!important;
+    justify-self:stretch!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    aspect-ratio:16/9!important
+  }
+}
