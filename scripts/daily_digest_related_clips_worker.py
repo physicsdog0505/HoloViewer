@@ -25,6 +25,7 @@ from scripts.daily_digest_related_clips_runtime import (
     empty_queue,
     empty_state,
     execute_job,
+    execute_jobs_batch,
     load_json_or,
     pending_backfill_days,
     record_attempt,
@@ -137,6 +138,7 @@ def run_cycle(
         ]
 
     results: list[dict] = []
+    ready_jobs: list[tuple[dict, str]] = []
     for job in jobs:
         target_day = str(job["target_day"])
         candidate_path = candidate_paths.get(target_day, "")
@@ -158,8 +160,25 @@ def run_cycle(
                 }
             )
             continue
+        ready_jobs.append((job, candidate_path))
 
-        try:
+    if execute and ready_jobs:
+        results.extend(
+            execute_jobs_batch(
+                state,
+                jobs_with_candidates=ready_jobs,
+                private_repo=private_repo,
+                corpus_root=corpus_root,
+                sidecar_root=sidecar_root,
+                public_repo=public_repo,
+                public_expected_head=public_expected_head,
+                python_executable=python_executable,
+                holodex_api_key_env=holodex_api_key_env,
+                readback_fetcher=readback_fetcher,
+            )
+        )
+    elif not execute:
+        for job, candidate_path in ready_jobs:
             result = execute_job(
                 state,
                 job=job,
@@ -171,44 +190,17 @@ def run_cycle(
                 public_expected_head=public_expected_head,
                 python_executable=python_executable,
                 holodex_api_key_env=holodex_api_key_env,
-                execute=execute,
-                readback_fetcher=readback_fetcher if execute else None,
-            )
-        except Exception as exc:
-            record_attempt(
-                state,
-                target_day=target_day,
-                stage=str(job["stage"]),
-                attempted_at=datetime.now(TAIPEI).isoformat(timespec="seconds"),
-                error=str(exc),
+                execute=False,
+                readback_fetcher=None,
             )
             results.append(
                 {
-                    "target_day": target_day,
+                    "target_day": str(job["target_day"]),
                     "stage": job["stage"],
-                    "status": "error",
-                    "error": str(exc),
+                    "status": "planned",
+                    "production_mutation": result["production_mutation"],
                 }
             )
-            continue
-
-        results.append(
-            {
-                "target_day": target_day,
-                "stage": job["stage"],
-                "status": "complete" if execute else "planned",
-                "production_mutation": result["production_mutation"],
-                **(
-                    {
-                        "sidecar_sha256": result["sidecar_sha256"],
-                        "live_sha256": result["live_sha256"],
-                        "clip_count": result["clip_count"],
-                    }
-                    if execute
-                    else {}
-                ),
-            }
-        )
 
     atomic_write_json(state_path, state)
     return {
