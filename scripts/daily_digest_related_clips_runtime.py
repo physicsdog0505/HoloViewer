@@ -685,6 +685,7 @@ def execute_jobs_batch(
     release_script = (
         public_repo / "scripts" / "deploy_daily_digest_static_assets_owner_local.sh"
     )
+    baseline = ""
     try:
         prepared = _run_checked(
             [str(release_script), "prepare", public_expected_head],
@@ -706,23 +707,64 @@ def execute_jobs_batch(
             runner=runner,
         )
     except Exception as exc:
-        message = str(exc)
+        # The release script performs its own post-deploy readback. A transient
+        # propagation mismatch can make that command return non-zero even though
+        # the new Worker/assets are already live. Reconcile each generated
+        # sidecar against the canonical live origin before deciding to retry.
+        release_error = str(exc)
+        timestamp = succeeded_at or utc_now()
+        unreconciled = 0
         for item in generated:
-            record_attempt(
-                state,
-                target_day=item["target_day"],
-                stage=item["stage"],
-                attempted_at=succeeded_at or utc_now(),
-                error=message,
-            )
-            results.append(
-                {
-                    "target_day": item["target_day"],
-                    "stage": item["stage"],
-                    "status": "error",
-                    "error": message,
-                }
-            )
+            try:
+                live_bytes = readback_fetcher(item["live_path"])
+                live_sha = sha256_bytes(live_bytes)
+                if live_sha != item["sidecar_sha256"]:
+                    raise RuntimeError334("live related-clips SHA mismatch")
+                record_success(
+                    state,
+                    target_day=item["target_day"],
+                    stage=item["stage"],
+                    succeeded_at=timestamp,
+                    clip_count=item["clip_count"],
+                    generated_sha256=item["sidecar_sha256"],
+                    live_sha256=live_sha,
+                )
+                results.append(
+                    {
+                        "target_day": item["target_day"],
+                        "stage": item["stage"],
+                        "status": "complete",
+                        "production_mutation": "YES",
+                        "sidecar_sha256": item["sidecar_sha256"],
+                        "live_sha256": live_sha,
+                        "clip_count": item["clip_count"],
+                        "live_path": item["live_path"],
+                        "static_baseline_version": baseline,
+                        "reconciled_after_release_error": True,
+                        "release_error": release_error,
+                    }
+                )
+            except Exception as reconcile_exc:
+                unreconciled += 1
+                message = (
+                    f"{release_error}; post-release reconciliation failed: "
+                    f"{reconcile_exc}"
+                )
+                record_attempt(
+                    state,
+                    target_day=item["target_day"],
+                    stage=item["stage"],
+                    attempted_at=timestamp,
+                    error=message,
+                )
+                results.append(
+                    {
+                        "target_day": item["target_day"],
+                        "stage": item["stage"],
+                        "status": "error",
+                        "error": message,
+                    }
+                )
         return results
 
     timestamp = succeeded_at or utc_now()
