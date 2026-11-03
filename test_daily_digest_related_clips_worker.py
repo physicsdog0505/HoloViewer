@@ -7,7 +7,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.daily_digest_related_clips_runtime import canonical_json_bytes
-from scripts.daily_digest_related_clips_worker import run_cycle
+from scripts.daily_digest_related_clips_worker import (
+    last_execute_day,
+    run_cycle,
+    write_cycle_receipt,
+)
 
 
 class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
@@ -98,6 +102,33 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
             state = json.loads((root / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(result["results"][0]["status"], "skipped")
         self.assertEqual(len(state["days"]["2026-11-01"]["errors"]), 1)
+
+    def test_execute_cycle_receipt_survives_restart(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            receipt = root / "last-worker-run.json"
+            result = {
+                "mode": "EXECUTE",
+                "today": "2026-11-03",
+                "due_jobs": 2,
+            }
+            write_cycle_receipt(receipt, result)
+            self.assertEqual(last_execute_day(receipt), "2026-11-03")
+
+    def test_dry_run_does_not_consume_execute_day(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            receipt = root / "last-worker-run.json"
+            write_cycle_receipt(
+                receipt,
+                {
+                    "mode": "DRY_RUN",
+                    "today": "2026-11-03",
+                    "due_jobs": 2,
+                },
+            )
+            self.assertFalse(receipt.exists())
+            self.assertEqual(last_execute_day(receipt), "")
 
     def test_execute_failure_is_nonblocking_and_durable(self):
         with tempfile.TemporaryDirectory() as td:
