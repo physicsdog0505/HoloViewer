@@ -415,6 +415,21 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             plan["sidecar"],
             "/public/daily-digest-static/data/daily-digest/2026-11/2026-11-02-related-clips.json",
         )
+        self.assertEqual(
+            plan["source_language_map"],
+            str(
+                Path.home()
+                / ".holoviewer"
+                / "daily-digest-related-clips"
+                / "work"
+                / "2026-11-02"
+                / "2026-11-02.source-languages.json"
+            ),
+        )
+        self.assertNotIn(
+            "/public/daily-digest-static",
+            plan["source_language_map"],
+        )
         self.assertEqual(plan["provider_execution"], "NOT_EXECUTED_BY_PLAN")
         self.assertEqual(plan["static_deploy"], "NOT_EXECUTED_BY_PLAN")
 

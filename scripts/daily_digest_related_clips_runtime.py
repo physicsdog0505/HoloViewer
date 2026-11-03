@@ -185,7 +185,13 @@ def build_job_command_plan(
     target_day = str(job.get("target_day") or "")
     _parse_day(target_day)
     candidate = Path(candidate_path)
-    work_root = sidecar_root / ".work" / target_day
+    work_root = (
+        Path.home()
+        / ".holoviewer"
+        / "daily-digest-related-clips"
+        / "work"
+        / target_day
+    )
     language_map = work_root / f"{target_day}.source-languages.json"
     sidecar = (
         sidecar_root
