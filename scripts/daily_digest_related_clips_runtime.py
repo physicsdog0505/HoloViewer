@@ -534,7 +534,7 @@ def _run_checked(
     *,
     env: dict[str, str] | None = None,
     runner: Callable[..., Any] = subprocess.run,
-) -> None:
+) -> Any:
     result = runner(
         list(command),
         env=env,
@@ -547,6 +547,17 @@ def _run_checked(
         stdout = str(getattr(result, "stdout", "") or "").strip()
         detail = stderr or stdout or "command failed"
         raise RuntimeError334(detail)
+    return result
+
+
+def _parse_release_value(output: str, key: str) -> str:
+    prefix = key + "="
+    for line in output.splitlines():
+        if line.startswith(prefix):
+            value = line[len(prefix):].strip()
+            if value:
+                return value
+    raise RuntimeError334(f"release output missing {key}")
 
 
 def execute_job(
@@ -559,7 +570,6 @@ def execute_job(
     sidecar_root: Path,
     public_repo: Path,
     public_expected_head: str,
-    static_baseline_version: str,
     python_executable: str,
     holodex_api_key_env: str = "HOLODEX_API_KEY",
     execute: bool = False,
@@ -625,17 +635,21 @@ def execute_job(
     release_script = (
         public_repo / "scripts" / "deploy_daily_digest_static_assets_owner_local.sh"
     )
-    _run_checked(
+    prepared = _run_checked(
         [str(release_script), "prepare", public_expected_head],
         env=env,
         runner=runner,
+    )
+    baseline = _parse_release_value(
+        str(getattr(prepared, "stdout", "") or ""),
+        "BASELINE_VERSION",
     )
     _run_checked(
         [
             str(release_script),
             "deploy",
             public_expected_head,
-            static_baseline_version,
+            baseline,
         ],
         env=env,
         runner=runner,
@@ -671,6 +685,7 @@ def execute_job(
             "clip_count": sidecar_clip_count(validated),
             "live_path": live_path,
             "state_reconciled": True,
+            "static_baseline_version": baseline,
         }
     )
     return result
