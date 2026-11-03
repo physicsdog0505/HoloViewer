@@ -96,6 +96,13 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.assertIn(daily_link, self.viewer_html)
         self.assertIn('<a href="/daily/">Docchi News</a>', self.ptt_html)
 
+    def test_mobile_daily_page_cannot_overflow_viewport(self):
+        self.assertIn("/* Mobile Daily Digest viewport containment", self.css)
+        self.assertIn("overflow-x:clip;", self.css)
+        self.assertIn("grid-template-columns:minmax(0,1fr) auto;", self.css)
+        self.assertIn(".daily-digest-title-meta{", self.css)
+        self.assertIn("min-width:0;", self.css)
+
     def test_related_clip_styles_exist(self):
         self.assertIn(".daily-related-clips{", self.css)
         self.assertIn("repeat(auto-fit,minmax(min(280px,100%),1fr))", self.css)
