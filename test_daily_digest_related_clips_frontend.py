@@ -57,13 +57,14 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.assertIn("figure.setAttribute('aria-expanded','false');", self.js)
         self.assertIn(".daily-story-detail-shell[hidden]{", self.css)
 
-    def test_daily_digest_header_preserves_branded_inline_title(self):
+    def test_daily_digest_header_preserves_split_branded_title(self):
+        self.assertIn(".daily-digest-title-row{", self.css)
+        self.assertIn("linear-gradient(110deg", self.css)
         self.assertIn("#daily-digest-date-label{", self.css)
-        self.assertIn("display:flex;", self.css)
-        self.assertIn(".daily-digest-title-date{", self.css)
-        self.assertIn("color:var(--brand-main);", self.css)
-        self.assertIn(".daily-digest-title-name{", self.css)
-        self.assertIn("align-items:baseline;", self.css)
+        self.assertIn(".daily-digest-title-meta{", self.css)
+        self.assertIn("justify-content:space-between;", self.css)
+        self.assertIn("node.textContent=siteDateLabel(day);", self.js)
+        self.assertNotIn("daily-digest-title-name", self.js)
 
     def test_related_clip_styles_exist(self):
         self.assertIn(".daily-related-clips{", self.css)
