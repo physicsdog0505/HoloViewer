@@ -148,7 +148,7 @@ def discover_accepted_receipts(receipts_dir: Path) -> tuple[dict[str, str], dict
     candidates: dict[str, str] = {}
     if not receipts_dir.exists():
         return accepted, candidates
-    for path in sorted(receipts_dir.glob("*.finalized.json")):
+    for path in sorted(receipts_dir.rglob("*.finalized.json")):
         try:
             receipt = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:

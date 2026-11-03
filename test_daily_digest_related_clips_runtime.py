@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import io
 import json
 import os
@@ -382,6 +383,37 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             accepted, candidates = discover_accepted_receipts(root)
         self.assertEqual(accepted, {"2026-11-02": candidate_sha})
         self.assertEqual(candidates["2026-11-02"], str(candidate))
+
+    def test_discovers_nested_exchange_finalized_receipts(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            revision = root / "revision"
+            revision.mkdir()
+
+            day = "2026-11-02"
+            candidate = revision / f"{day}.public-candidate.json"
+            candidate_bytes = b'{"target_day":"2026-11-02"}\n'
+            candidate.write_bytes(candidate_bytes)
+
+            receipt_dir = root / "exchange" / day / "state"
+            receipt_dir.mkdir(parents=True)
+            (receipt_dir / f"{day}.finalized.json").write_text(
+                json.dumps({
+                    "status": "validated_accepted",
+                    "target_day": day,
+                    "public_candidate_sha256": hashlib.sha256(candidate_bytes).hexdigest(),
+                    "revision_dir": str(revision),
+                }),
+                encoding="utf-8",
+            )
+
+            accepted, candidates = discover_accepted_receipts(root / "exchange")
+
+        self.assertEqual(
+            accepted,
+            {day: hashlib.sha256(candidate_bytes).hexdigest()},
+        )
+        self.assertEqual(candidates[day], str(candidate))
 
     def test_command_plan_reuses_private_exporter_and_public_resolver(self):
         job = {
