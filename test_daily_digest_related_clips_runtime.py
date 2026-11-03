@@ -655,6 +655,112 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             "complete",
         )
 
+    def test_batch_reconciles_when_release_command_reports_post_deploy_mismatch(self):
+        state = empty_state()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            sidecar_root = root / "daily-digest-static" / "data" / "daily-digest"
+            calls = []
+            live_by_path = {}
+            jobs_with_candidates = []
+
+            for day in ("2026-11-01", "2026-11-02"):
+                candidate = root / f"{day}.public-candidate.json"
+                candidate_bytes = canonical_json_bytes({
+                    "schema_version": 1,
+                    "kind": "holodocchi.daily_digest",
+                    "target_day": day,
+                    "stories": [],
+                })
+                candidate.write_bytes(candidate_bytes)
+                jobs_with_candidates.append(
+                    (
+                        {
+                            "target_day": day,
+                            "stage": "initial",
+                            "priority": 0,
+                            "digest_sha256": hashlib.sha256(
+                                candidate_bytes
+                            ).hexdigest(),
+                        },
+                        str(candidate),
+                    )
+                )
+
+            class Result:
+                def __init__(self, code=0, stdout="", stderr=""):
+                    self.returncode = code
+                    self.stdout = stdout
+                    self.stderr = stderr
+
+            def runner(command, **kwargs):
+                calls.append(command)
+                if len(command) >= 4 and command[1].endswith(
+                    "daily_digest_related_clips.py"
+                ):
+                    candidate = json.loads(
+                        Path(command[2]).read_text(encoding="utf-8")
+                    )
+                    day = candidate["target_day"]
+                    sidecar_path = Path(command[3])
+                    sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+                    payload = canonical_json_bytes({
+                        "schema_version": 1,
+                        "kind": "holodocchi.daily_digest.related_clips",
+                        "target_day": day,
+                        "status": "ok",
+                        "stories": [
+                            {"clips": [{"video_id": "AAAAAAAAAAA"}]}
+                        ],
+                        "sources": {},
+                    })
+                    sidecar_path.write_bytes(payload)
+                    live_by_path[
+                        f"/data/daily-digest/{day[:7]}/{day}-related-clips.json"
+                    ] = payload
+                if len(command) >= 2 and command[1] == "prepare":
+                    return Result(stdout="BASELINE_VERSION=version-1\n")
+                if len(command) >= 2 and command[1] == "deploy":
+                    return Result(
+                        code=1,
+                        stderr=(
+                            "Daily Digest Static Assets release: "
+                            "production related clips mismatch"
+                        ),
+                    )
+                return Result(stdout="PASS\n")
+
+            with patch.dict(os.environ, {"HOLODEX_API_KEY": "test-key"}):
+                results = execute_jobs_batch(
+                    state,
+                    jobs_with_candidates=jobs_with_candidates,
+                    private_repo=root / "private",
+                    corpus_root=root / "corpus",
+                    sidecar_root=sidecar_root,
+                    public_repo=root / "public",
+                    public_expected_head="a" * 40,
+                    python_executable="/usr/bin/python3",
+                    runner=runner,
+                    readback_fetcher=lambda path: live_by_path[path],
+                    succeeded_at="2026-11-04T00:00:00Z",
+                )
+
+        self.assertEqual(
+            sorted(row["status"] for row in results),
+            ["complete", "complete"],
+        )
+        self.assertTrue(
+            all(row.get("reconciled_after_release_error") for row in results)
+        )
+        self.assertEqual(
+            state["days"]["2026-11-01"]["stages"]["initial"],
+            "complete",
+        )
+        self.assertEqual(
+            state["days"]["2026-11-02"]["stages"]["initial"],
+            "complete",
+        )
+
     def test_execute_job_refuses_without_holodex_key(self):
         state = empty_state()
         with tempfile.TemporaryDirectory() as td:
