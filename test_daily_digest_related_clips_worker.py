@@ -12,6 +12,7 @@ from scripts.daily_digest_related_clips_runtime import canonical_json_bytes
 from scripts.daily_digest_related_clips_worker import (
     last_execute_day,
     run_cycle,
+    should_skip_once_execute,
     write_cycle_receipt,
 )
 
@@ -206,6 +207,46 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
             "pending",
         )
         self.assertTrue(state["days"]["2026-11-01"]["errors"])
+
+    def test_explicit_target_day_bypasses_once_per_day_guard(self):
+        with tempfile.TemporaryDirectory() as td:
+            receipt = Path(td) / "last-worker-run.json"
+            write_cycle_receipt(
+                receipt,
+                {
+                    "mode": "EXECUTE",
+                    "today": "2026-11-04",
+                    "due_jobs": 0,
+                },
+            )
+            self.assertFalse(
+                should_skip_once_execute(
+                    execute=True,
+                    force_once=False,
+                    target_day="2026-11-04",
+                    run_receipt=receipt,
+                    selected_day="2026-11-04",
+                )
+            )
+            self.assertTrue(
+                should_skip_once_execute(
+                    execute=True,
+                    force_once=False,
+                    target_day=None,
+                    run_receipt=receipt,
+                    selected_day="2026-11-04",
+                )
+            )
+
+    def test_persistent_default_poll_interval_is_30_minutes(self):
+        worker = (
+            Path(__file__).resolve().parent
+            / "scripts"
+            / "daily_digest_related_clips_worker.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("default=1800", worker)
+        self.assertIn('"trigger": "accepted_receipt_poll"', worker)
+        self.assertNotIn("_scheduled_today", worker)
 
     def test_direct_script_entrypoint_can_import_runtime_package(self):
         repo_root = Path(__file__).resolve().parent
