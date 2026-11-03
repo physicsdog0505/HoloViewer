@@ -1315,3 +1315,46 @@ html{scroll-behavior:smooth}
     column-count:1!important
   }
 }
+
+
+/* Mobile canonical media containment — late override so older review layers
+   cannot let story grids or thumbnails exceed the Daily News card width. */
+@media(max-width:760px){
+  .daily-digest-shell,
+  #daily-digest-content,
+  .daily-v1-section,
+  .daily-story-list,
+  .daily-story-card,
+  .daily-story-summary-block,
+  .daily-story-visual-shell,
+  .daily-story-visual,
+  .daily-story-visual[data-count]{
+    min-width:0;
+    max-width:100%;
+    box-sizing:border-box
+  }
+  .daily-story-card{
+    overflow:hidden
+  }
+  .daily-story-visual,
+  .daily-story-visual[data-count]{
+    width:100%;
+    max-width:100%;
+    overflow:hidden
+  }
+  .daily-story-visual-item,
+  .daily-story-visual-item[data-slot]{
+    min-width:0!important;
+    max-width:100%!important;
+    width:100%!important;
+    box-sizing:border-box
+  }
+  .daily-story-visual-item img,
+  .daily-highlight-media img,
+  .daily-stream-ref-head img{
+    display:block;
+    max-width:100%!important;
+    width:100%!important;
+    box-sizing:border-box
+  }
+}
