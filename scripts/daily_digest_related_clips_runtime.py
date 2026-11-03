@@ -268,6 +268,8 @@ def next_refresh_job(
         row["stages"] = {name: "pending" for name, _, _ in STAGES}
         row["terminal"] = False
     row["digest_sha256"] = digest_sha256
+    if row.get("terminal") is True:
+        return None
 
     age = (current - target).days
     for stage, offset, priority in STAGES:
@@ -309,11 +311,12 @@ def build_due_jobs(
             jobs.append(job)
 
     added = 0
+    scheduled_days = {str(item["target_day"]) for item in jobs}
     seen_backfill: set[str] = set()
     for target_day in backfill_queue:
         target_day = str(target_day or "").strip()
         _parse_day(target_day)
-        if target_day in seen_backfill:
+        if target_day in seen_backfill or target_day in scheduled_days:
             continue
         seen_backfill.add(target_day)
         row = day_state(state, target_day)
