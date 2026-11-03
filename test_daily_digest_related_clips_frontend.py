@@ -51,6 +51,8 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.assertIn("shell.hidden=false;", self.js)
         self.assertIn("setGroupOpen(true);", self.js)
         self.assertIn("rail.selectVideo(videoId,{open:true});", self.js)
+        self.assertIn("shell.hidden=true;", self.js)
+        self.assertIn("activeVideoId='';", self.js)
         self.assertIn("return detailRail.toggleVideo(videoId);", self.js)
         self.assertIn("figure.setAttribute('aria-expanded','false');", self.js)
         self.assertIn(".daily-story-detail-shell[hidden]{", self.css)
