@@ -14,6 +14,8 @@ from scripts.daily_digest_related_clips_runtime import (
     build_month_archive,
     build_storage_index,
     digest_unchanged,
+    discover_accepted_receipts,
+    build_job_command_plan,
     empty_state,
     month_compaction_eligible,
     pending_backfill_days,
@@ -314,6 +316,70 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             resolve_storage(index, "2026-09-30")["tier"],
             "missing",
         )
+
+    def test_discovers_only_validated_accepted_receipts(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            revision = root / "revision"
+            revision.mkdir()
+            candidate = revision / "2026-11-02.public-candidate.json"
+            candidate.write_bytes(b'{"target_day":"2026-11-02"}\n')
+            import hashlib
+            candidate_sha = hashlib.sha256(candidate.read_bytes()).hexdigest()
+            (root / "2026-11-02.finalized.json").write_text(
+                json.dumps({
+                    "status": "validated_accepted",
+                    "target_day": "2026-11-02",
+                    "public_candidate_sha256": candidate_sha,
+                    "revision_dir": str(revision),
+                }),
+                encoding="utf-8",
+            )
+            (root / "2026-11-01.finalized.json").write_text(
+                json.dumps({
+                    "status": "return_readback_complete",
+                    "target_day": "2026-11-01",
+                }),
+                encoding="utf-8",
+            )
+            accepted, candidates = discover_accepted_receipts(root)
+        self.assertEqual(accepted, {"2026-11-02": candidate_sha})
+        self.assertEqual(candidates["2026-11-02"], str(candidate))
+
+    def test_command_plan_reuses_private_exporter_and_public_resolver(self):
+        job = {
+            "target_day": "2026-11-02",
+            "stage": "t1",
+            "priority": 1,
+        }
+        plan = build_job_command_plan(
+            job,
+            candidate_path="/tmp/revision/2026-11-02.public-candidate.json",
+            private_repo=Path("/private/repo"),
+            corpus_root=Path("/private/corpus"),
+            sidecar_root=Path("/public/daily-digest-static/data/daily-digest"),
+            python_executable="/usr/bin/python3",
+        )
+        self.assertEqual(plan["stage"], "t1")
+        self.assertIn(
+            "/private/repo/scripts/export_daily_digest_source_languages.py",
+            plan["commands"][0],
+        )
+        self.assertIn(
+            "--corpus-root",
+            plan["commands"][0],
+        )
+        self.assertTrue(
+            plan["commands"][1][1].endswith(
+                "scripts/daily_digest_related_clips.py"
+            )
+        )
+        self.assertEqual(
+            plan["sidecar"],
+            "/public/daily-digest-static/data/daily-digest/2026-11/2026-11-02-related-clips.json",
+        )
+        self.assertEqual(plan["provider_execution"], "NOT_EXECUTED_BY_PLAN")
+        self.assertEqual(plan["static_deploy"], "NOT_EXECUTED_BY_PLAN")
 
     def test_state_persists_and_resumes(self):
         state = empty_state()
