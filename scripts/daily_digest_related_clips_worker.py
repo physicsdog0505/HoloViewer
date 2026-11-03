@@ -8,7 +8,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
@@ -25,6 +25,7 @@ from scripts.daily_digest_related_clips_runtime import (
     empty_queue,
     empty_state,
     execute_job,
+    execute_jobs_batch,
     load_json_or,
     pending_backfill_days,
     record_attempt,
@@ -49,10 +50,6 @@ def _today(now: datetime | None = None) -> str:
     return (now or datetime.now(TAIPEI)).astimezone(TAIPEI).date().isoformat()
 
 
-def _scheduled_today(now: datetime, hour: int, minute: int) -> datetime:
-    return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-
-
 def last_execute_day(path: Path) -> str:
     if not path.is_file():
         return ""
@@ -63,6 +60,22 @@ def last_execute_day(path: Path) -> str:
     if not isinstance(payload, dict) or payload.get("mode") != "EXECUTE":
         return ""
     return str(payload.get("today") or "")
+
+
+def should_skip_once_execute(
+    *,
+    execute: bool,
+    force_once: bool,
+    target_day: str | None,
+    run_receipt: Path,
+    selected_day: str,
+) -> bool:
+    return (
+        execute
+        and not force_once
+        and not target_day
+        and last_execute_day(run_receipt) == selected_day
+    )
 
 
 def write_cycle_receipt(path: Path, result: dict) -> None:
@@ -125,6 +138,7 @@ def run_cycle(
         ]
 
     results: list[dict] = []
+    ready_jobs: list[tuple[dict, str]] = []
     for job in jobs:
         target_day = str(job["target_day"])
         candidate_path = candidate_paths.get(target_day, "")
@@ -146,8 +160,25 @@ def run_cycle(
                 }
             )
             continue
+        ready_jobs.append((job, candidate_path))
 
-        try:
+    if execute and ready_jobs:
+        results.extend(
+            execute_jobs_batch(
+                state,
+                jobs_with_candidates=ready_jobs,
+                private_repo=private_repo,
+                corpus_root=corpus_root,
+                sidecar_root=sidecar_root,
+                public_repo=public_repo,
+                public_expected_head=public_expected_head,
+                python_executable=python_executable,
+                holodex_api_key_env=holodex_api_key_env,
+                readback_fetcher=readback_fetcher,
+            )
+        )
+    elif not execute:
+        for job, candidate_path in ready_jobs:
             result = execute_job(
                 state,
                 job=job,
@@ -159,44 +190,17 @@ def run_cycle(
                 public_expected_head=public_expected_head,
                 python_executable=python_executable,
                 holodex_api_key_env=holodex_api_key_env,
-                execute=execute,
-                readback_fetcher=readback_fetcher if execute else None,
-            )
-        except Exception as exc:
-            record_attempt(
-                state,
-                target_day=target_day,
-                stage=str(job["stage"]),
-                attempted_at=datetime.now(TAIPEI).isoformat(timespec="seconds"),
-                error=str(exc),
+                execute=False,
+                readback_fetcher=None,
             )
             results.append(
                 {
-                    "target_day": target_day,
+                    "target_day": str(job["target_day"]),
                     "stage": job["stage"],
-                    "status": "error",
-                    "error": str(exc),
+                    "status": "planned",
+                    "production_mutation": result["production_mutation"],
                 }
             )
-            continue
-
-        results.append(
-            {
-                "target_day": target_day,
-                "stage": job["stage"],
-                "status": "complete" if execute else "planned",
-                "production_mutation": result["production_mutation"],
-                **(
-                    {
-                        "sidecar_sha256": result["sidecar_sha256"],
-                        "live_sha256": result["live_sha256"],
-                        "clip_count": result["clip_count"],
-                    }
-                    if execute
-                    else {}
-                ),
-            }
-        )
 
     atomic_write_json(state_path, state)
     return {
@@ -226,9 +230,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--holodex-api-key-env", default="HOLODEX_API_KEY")
     parser.add_argument("--backfill-limit", type=int, default=5)
-    parser.add_argument("--hour", type=int, default=12)
-    parser.add_argument("--minute", type=int, default=0)
-    parser.add_argument("--poll-seconds", type=int, default=30)
+    parser.add_argument(
+        "--poll-seconds",
+        type=int,
+        default=1800,
+        help="persistent-mode accepted-receipt scan interval; default: 1800 seconds",
+    )
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--today")
     parser.add_argument("--execute", action="store_true")
@@ -237,8 +244,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force-once", action="store_true")
     args = parser.parse_args(argv)
 
-    if not (0 <= args.hour <= 23 and 0 <= args.minute <= 59):
-        parser.error("invalid schedule time")
     if args.poll_seconds < 5:
         parser.error("poll-seconds must be >= 5")
     if args.backfill_limit < 0:
@@ -276,10 +281,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.once:
         selected_day = args.today or _today()
-        if (
-            args.execute
-            and not args.force_once
-            and last_execute_day(run_receipt) == selected_day
+        if should_skip_once_execute(
+            execute=args.execute,
+            force_once=args.force_once,
+            target_day=args.target_day,
+            run_receipt=run_receipt,
+            selected_day=selected_day,
         ):
             print(json.dumps({
                 "status": "ALREADY_RAN_TODAY",
@@ -302,7 +309,8 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "status": "WORKER_STARTED",
                 "schedule_timezone": "Asia/Taipei",
-                "schedule": f"{args.hour:02d}:{args.minute:02d}",
+                "trigger": "accepted_receipt_poll",
+                "poll_seconds": args.poll_seconds,
                 "mode": "EXECUTE" if args.execute else "DRY_RUN",
                 "frontend_deploy": False,
                 "gemini_execution": False,
@@ -313,22 +321,17 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
 
-    last_run_day = last_execute_day(run_receipt) if args.execute else ""
     while True:
-        now = datetime.now(TAIPEI)
-        today = now.date().isoformat()
-        scheduled = _scheduled_today(now, args.hour, args.minute)
-        if now >= scheduled and last_run_day != today:
-            try:
-                result = run_cycle(today=today, **kwargs)
-                write_cycle_receipt(run_receipt, result)
-                print(
-                    json.dumps(result, ensure_ascii=False, sort_keys=True),
-                    flush=True,
-                )
-                last_run_day = today
-            except Exception as exc:
-                print(f"related-clips-worker: {exc}", file=sys.stderr, flush=True)
+        today = _today()
+        try:
+            result = run_cycle(today=today, **kwargs)
+            write_cycle_receipt(run_receipt, result)
+            print(
+                json.dumps(result, ensure_ascii=False, sort_keys=True),
+                flush=True,
+            )
+        except Exception as exc:
+            print(f"related-clips-worker: {exc}", file=sys.stderr, flush=True)
         time.sleep(args.poll_seconds)
 
 
