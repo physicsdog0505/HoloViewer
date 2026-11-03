@@ -46,8 +46,8 @@ export async function handlePttRecentRead(request, db, {nowMs=Date.now()}={}) {
   try {
     const sql=`SELECT ${select} FROM ptt_pushes WHERE day=? ORDER BY occurred_at DESC,aid DESC,source_line DESC,push_id DESC LIMIT ?`;
     const [current,prior]=await Promise.all([
-      db.prepare(sql).bind(today,limit).all(),
-      db.prepare(sql).bind(previous,limit).all(),
+      db.prepare(sql).bind(today,limit+1).all(),
+      db.prepare(sql).bind(previous,limit+1).all(),
     ]);
     const rows=[...(current.results||[]),...(prior.results||[])];
     rows.sort((a,b)=>b.occurred_at.localeCompare(a.occurred_at)||b.aid.localeCompare(a.aid)||b.source_line-a.source_line||b.push_id.localeCompare(a.push_id));

@@ -80,6 +80,27 @@ test('production route parity: recent-tail contract, bounds, nullable floor, and
     assert.equal(DB.writes,0);
   }finally{Date.now=original;}
 });
+
+test('recent tail reports has_more when only one Taipei day exceeds limit',async()=>{
+  const rows=[
+    row('p1','aid-day',1,'2026-10-15T16:00:00Z','2026-10-16'),
+    row('p2','aid-day',2,'2026-10-15T16:01:00Z','2026-10-16'),
+    row('p3','aid-day',3,'2026-10-15T16:02:00Z','2026-10-16'),
+    row('p4','aid-day',4,'2026-10-15T16:03:00Z','2026-10-16'),
+  ];
+  const DB=db({rows});
+  const original=Date.now;
+  Date.now=()=>Date.parse('2026-10-15T16:05:00Z');
+  try{
+    const response=await host.fetch(url('/v1/ptt/recent?limit=3'),{DB});
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.pushes.length,3);
+    assert.deepEqual(body.pushes.map(r=>r.push_id),['p2','p3','p4']);
+    assert.equal(body.page.has_more,true);
+    assert.equal(DB.writes,0);
+  }finally{Date.now=original;}
+});
 test('actual worker host handles health, methods, CORS and empty-day availability',async()=>{
   const DB=db({threads:[]}),env={DB,ALLOWED_ORIGIN:'https://holoviewer.example'};
   assert.equal((await host.fetch(url('/health'),env)).status,200);
