@@ -11,6 +11,15 @@ SCRIPT = ROOT / "scripts" / "deploy_daily_digest_static_assets_owner_local.sh"
 
 
 class DailyDigestStaticReleaseGateTests(unittest.TestCase):
+    def write_month(self, repo: Path, month: str = "2026-11") -> Path:
+        path = repo / f"daily-digest-static/data/daily-digest/months/{month}.json"
+        path.write_text(
+            '{"schema_version":1,"kind":"holodocchi.daily_digest_month",'
+            f'"month":"{month}","days":{{}}}}\n',
+            encoding="utf-8",
+        )
+        return path
+
     def make_repo(self, root: Path) -> tuple[Path, str, dict[str, str]]:
         repo = root / "repo"
         (repo / "scripts").mkdir(parents=True)
@@ -48,11 +57,7 @@ class DailyDigestStaticReleaseGateTests(unittest.TestCase):
     def test_generated_month_json_is_allowed_runtime_drift(self):
         with tempfile.TemporaryDirectory() as td:
             repo, head, env = self.make_repo(Path(td))
-            month = repo / "daily-digest-static/data/daily-digest/months/2026-11.json"
-            month.write_text(
-                '{"schema_version":1,"kind":"holodocchi.daily_digest_month","month":"2026-11","days":{}}\n',
-                encoding="utf-8",
-            )
+            self.write_month(repo)
             result = self.run_prepare(repo, head, env)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("DAILY_DIGEST_STATIC_PREPARE=PASS", result.stdout)
@@ -69,6 +74,7 @@ class DailyDigestStaticReleaseGateTests(unittest.TestCase):
                 '{"schema_version":1,"kind":"holodocchi.daily_digest.related_clips","target_day":"2026-11-02","status":"ok","stories":[],"sources":{}}\n',
                 encoding="utf-8",
             )
+            self.write_month(repo)
             result = self.run_prepare(repo, head, env)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("DAILY_DIGEST_STATIC_PREPARE=PASS", result.stdout)
@@ -83,9 +89,24 @@ class DailyDigestStaticReleaseGateTests(unittest.TestCase):
                 '{"schema_version":1,"kind":"wrong","target_day":"2026-11-02","status":"ok","stories":[],"sources":{}}\n',
                 encoding="utf-8",
             )
+            self.write_month(repo)
             result = self.run_prepare(repo, head, env)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("invalid related clips sidecar", result.stderr)
+
+    def test_sidecar_only_candidate_with_zero_month_shards_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, head, env = self.make_repo(Path(td))
+            sidecar_dir = repo / "daily-digest-static/data/daily-digest/2026-11"
+            sidecar_dir.mkdir(parents=True)
+            (sidecar_dir / "2026-11-02-related-clips.json").write_text(
+                '{"schema_version":1,"kind":"holodocchi.daily_digest.related_clips",'
+                '"target_day":"2026-11-02","status":"ok","stories":[],"sources":{}}\n',
+                encoding="utf-8",
+            )
+            result = self.run_prepare(repo, head, env)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("zero month shards", result.stderr)
 
     def test_unrelated_runtime_drift_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:

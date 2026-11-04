@@ -23,6 +23,8 @@ from scripts.daily_digest_related_clips_runtime import (
     execute_jobs_batch,
     canonical_json_bytes,
     empty_state,
+    load_canonical_month_shards,
+    materialize_publication_union,
     month_compaction_eligible,
     pending_backfill_days,
     reconcile_publication,
@@ -35,6 +37,92 @@ from scripts.daily_digest_related_clips_runtime import (
 
 
 class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
+    def make_publication_fixture(self, root: Path):
+        public_repo = root / "public"
+        publication_root = (
+            public_repo / "daily-digest-static" / "data" / "daily-digest"
+        )
+        canonical_root = root / "canonical-months"
+        canonical_root.mkdir(parents=True)
+        raw_month = (
+            b'{\n  "schema_version": 1,\n'
+            b'  "kind": "holodocchi.daily_digest_month",\n'
+            b'  "month": "2026-11",\n  "days": {}\n}\n'
+        )
+        (canonical_root / "2026-11.json").write_bytes(raw_month)
+        return public_repo, publication_root, canonical_root, raw_month
+
+    def test_canonical_month_and_sidecars_form_raw_preserving_union(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            _, publication_root, canonical_root, raw_month = (
+                self.make_publication_fixture(root)
+            )
+            retained = (
+                publication_root
+                / "2026-10"
+                / "2026-10-31-related-clips.json"
+            )
+            retained.parent.mkdir(parents=True)
+            retained_bytes = b"retained-sidecar\n"
+            retained.write_bytes(retained_bytes)
+            generated = (
+                publication_root
+                / "2026-11"
+                / "2026-11-02-related-clips.json"
+            )
+            generated.parent.mkdir(parents=True)
+            generated.write_bytes(b"generated-sidecar\n")
+
+            shards = load_canonical_month_shards(canonical_root)
+            materialize_publication_union(
+                canonical_months_root=canonical_root,
+                canonical_shards=shards,
+                publication_root=publication_root,
+            )
+
+            month = publication_root / "months" / "2026-11.json"
+            self.assertEqual(month.read_bytes(), raw_month)
+            self.assertEqual(
+                (canonical_root / "2026-11.json").read_bytes(), raw_month
+            )
+            self.assertEqual(retained.read_bytes(), retained_bytes)
+            self.assertTrue(generated.is_file())
+            self.assertEqual(
+                hashlib.sha256(month.read_bytes()).hexdigest(),
+                hashlib.sha256(raw_month).hexdigest(),
+            )
+
+    def test_generated_sidecar_cannot_replace_month_shard(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            _, publication_root, canonical_root, raw_month = (
+                self.make_publication_fixture(root)
+            )
+            shards = load_canonical_month_shards(canonical_root)
+            materialize_publication_union(
+                canonical_months_root=canonical_root,
+                canonical_shards=shards,
+                publication_root=publication_root,
+            )
+            sidecar = (
+                publication_root
+                / "2026-11"
+                / "2026-11-02-related-clips.json"
+            )
+            sidecar.parent.mkdir(parents=True)
+            sidecar.write_bytes(b"new sidecar\n")
+            materialize_publication_union(
+                canonical_months_root=canonical_root,
+                canonical_shards=shards,
+                publication_root=publication_root,
+            )
+            self.assertEqual(
+                (publication_root / "months" / "2026-11.json").read_bytes(),
+                raw_month,
+            )
+            self.assertEqual(sidecar.read_bytes(), b"new sidecar\n")
+
     def test_due_schedule_and_priority(self):
         state = empty_state()
         jobs = build_due_jobs(
@@ -479,7 +567,9 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             })
             candidate.write_bytes(candidate_bytes)
 
-            sidecar_root = root / "daily-digest-static" / "data" / "daily-digest"
+            public_repo, sidecar_root, canonical_root, raw_month = (
+                self.make_publication_fixture(root)
+            )
             sidecar_path = (
                 sidecar_root / "2026-11" / "2026-11-02-related-clips.json"
             )
@@ -525,6 +615,10 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
                     candidate_bytes
                 ).hexdigest(),
             }
+            live_by_path = {
+                "/data/daily-digest/months/2026-11.json": raw_month,
+                "/data/daily-digest/2026-11/2026-11-02-related-clips.json": live_bytes,
+            }
             with patch.dict(os.environ, {"HOLODEX_API_KEY": "test-key"}):
                 result = execute_job(
                     state,
@@ -533,12 +627,13 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
                     private_repo=root / "private",
                     corpus_root=root / "corpus",
                     sidecar_root=sidecar_root,
-                    public_repo=root / "public",
+                    canonical_months_root=canonical_root,
+                    public_repo=public_repo,
                     public_expected_head="a" * 40,
                     python_executable="/usr/bin/python3",
                     execute=True,
                     runner=runner,
-                    readback_fetcher=lambda path: live_bytes,
+                    readback_fetcher=lambda path: live_by_path[path],
                     succeeded_at="2026-11-03T00:00:00Z",
                 )
 
@@ -556,9 +651,30 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
         state = empty_state()
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            sidecar_root = root / "daily-digest-static" / "data" / "daily-digest"
+            public_repo, sidecar_root, canonical_root, raw_month = (
+                self.make_publication_fixture(root)
+            )
             calls = []
-            live_by_path = {}
+            live_by_path = {
+                "/data/daily-digest/months/2026-11.json": raw_month,
+            }
+            retained_path = (
+                sidecar_root / "2026-10" / "2026-10-31-related-clips.json"
+            )
+            retained_path.parent.mkdir(parents=True)
+            retained_bytes = canonical_json_bytes({
+                "schema_version": 1,
+                "kind": "holodocchi.daily_digest.related_clips",
+                "target_day": "2026-10-31",
+                "status": "ok",
+                "stories": [],
+                "sources": {},
+            })
+            retained_path.write_bytes(retained_bytes)
+            live_by_path[
+                "/data/daily-digest/2026-10/2026-10-31-related-clips.json"
+            ] = retained_bytes
+            readback_paths = []
             jobs_with_candidates = []
 
             for day in ("2026-11-01", "2026-11-02"):
@@ -626,13 +742,17 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
                     private_repo=root / "private",
                     corpus_root=root / "corpus",
                     sidecar_root=sidecar_root,
-                    public_repo=root / "public",
+                    canonical_months_root=canonical_root,
+                    public_repo=public_repo,
                     public_expected_head="a" * 40,
                     python_executable="/usr/bin/python3",
                     runner=runner,
-                    readback_fetcher=lambda path: live_by_path[path],
+                    readback_fetcher=lambda path: (
+                        readback_paths.append(path) or live_by_path[path]
+                    ),
                     succeeded_at="2026-11-04T00:00:00Z",
                 )
+            retained_after = retained_path.read_bytes()
 
         self.assertEqual(
             sum(1 for command in calls if len(command) >= 2 and command[1] == "prepare"),
@@ -654,14 +774,20 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             state["days"]["2026-11-02"]["stages"]["initial"],
             "complete",
         )
+        self.assertEqual(set(readback_paths), set(live_by_path))
+        self.assertEqual(retained_after, retained_bytes)
 
     def test_batch_reconciles_when_release_command_reports_post_deploy_mismatch(self):
         state = empty_state()
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            sidecar_root = root / "daily-digest-static" / "data" / "daily-digest"
+            public_repo, sidecar_root, canonical_root, raw_month = (
+                self.make_publication_fixture(root)
+            )
             calls = []
-            live_by_path = {}
+            live_by_path = {
+                "/data/daily-digest/months/2026-11.json": raw_month,
+            }
             jobs_with_candidates = []
 
             for day in ("2026-11-01", "2026-11-02"):
@@ -737,7 +863,8 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
                     private_repo=root / "private",
                     corpus_root=root / "corpus",
                     sidecar_root=sidecar_root,
-                    public_repo=root / "public",
+                    canonical_months_root=canonical_root,
+                    public_repo=public_repo,
                     public_expected_head="a" * 40,
                     python_executable="/usr/bin/python3",
                     runner=runner,
@@ -765,6 +892,9 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
         state = empty_state()
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
+            public_repo, sidecar_root, canonical_root, _ = (
+                self.make_publication_fixture(root)
+            )
             candidate = root / "2026-11-02.public-candidate.json"
             payload = canonical_json_bytes({
                 "target_day": "2026-11-02",
@@ -785,8 +915,9 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
                         candidate_path=str(candidate),
                         private_repo=root / "private",
                         corpus_root=root / "corpus",
-                        sidecar_root=root / "sidecars",
-                        public_repo=root / "public",
+                        sidecar_root=sidecar_root,
+                        canonical_months_root=canonical_root,
+                        public_repo=public_repo,
                         public_expected_head="a" * 40,
                         python_executable="/usr/bin/python3",
                         execute=True,
@@ -794,6 +925,34 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
                         readback_fetcher=lambda path: b"",
                     )
         self.assertNotIn("2026-11-02", state["days"])
+
+    def test_missing_canonical_month_authority_fails_before_any_command(self):
+        state = empty_state()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            public_repo = root / "public"
+            sidecar_root = (
+                public_repo / "daily-digest-static" / "data" / "daily-digest"
+            )
+            calls = []
+            with patch.dict(os.environ, {"HOLODEX_API_KEY": "test-key"}):
+                with self.assertRaisesRegex(
+                    RuntimeError334, "canonical month authority missing"
+                ):
+                    execute_jobs_batch(
+                        state,
+                        jobs_with_candidates=[],
+                        private_repo=root / "private",
+                        corpus_root=root / "corpus",
+                        sidecar_root=sidecar_root,
+                        canonical_months_root=root / "missing-months",
+                        public_repo=public_repo,
+                        public_expected_head="a" * 40,
+                        python_executable="/usr/bin/python3",
+                        runner=lambda command, **kwargs: calls.append(command),
+                        readback_fetcher=lambda path: b"",
+                    )
+            self.assertEqual(calls, [])
 
     def test_missing_local_candidate_is_not_execution_ready(self):
         with tempfile.TemporaryDirectory() as td:

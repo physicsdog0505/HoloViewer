@@ -102,6 +102,7 @@ def run_cycle(
     private_repo: Path,
     corpus_root: Path,
     sidecar_root: Path,
+    canonical_months_root: Path,
     public_repo: Path,
     public_expected_head: str,
     python_executable: str,
@@ -163,20 +164,40 @@ def run_cycle(
         ready_jobs.append((job, candidate_path))
 
     if execute and ready_jobs:
-        results.extend(
-            execute_jobs_batch(
+        try:
+            batch_results = execute_jobs_batch(
                 state,
                 jobs_with_candidates=ready_jobs,
                 private_repo=private_repo,
                 corpus_root=corpus_root,
                 sidecar_root=sidecar_root,
+                canonical_months_root=canonical_months_root,
                 public_repo=public_repo,
                 public_expected_head=public_expected_head,
                 python_executable=python_executable,
                 holodex_api_key_env=holodex_api_key_env,
                 readback_fetcher=readback_fetcher,
             )
-        )
+            results.extend(batch_results)
+        except (OSError, RuntimeError334) as exc:
+            message = str(exc)
+            attempted_at = datetime.now(TAIPEI).isoformat(timespec="seconds")
+            for job, _candidate_path in ready_jobs:
+                record_attempt(
+                    state,
+                    target_day=str(job["target_day"]),
+                    stage=str(job["stage"]),
+                    attempted_at=attempted_at,
+                    error=message,
+                )
+                results.append(
+                    {
+                        "target_day": str(job["target_day"]),
+                        "stage": str(job["stage"]),
+                        "status": "error",
+                        "error": message,
+                    }
+                )
     elif not execute:
         for job, candidate_path in ready_jobs:
             result = execute_job(
@@ -186,6 +207,7 @@ def run_cycle(
                 private_repo=private_repo,
                 corpus_root=corpus_root,
                 sidecar_root=sidecar_root,
+                canonical_months_root=canonical_months_root,
                 public_repo=public_repo,
                 public_expected_head=public_expected_head,
                 python_executable=python_executable,
@@ -225,6 +247,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--private-repo", required=True, type=Path)
     parser.add_argument("--corpus-root", required=True, type=Path)
     parser.add_argument("--sidecar-root", required=True, type=Path)
+    parser.add_argument("--canonical-months-root", required=True, type=Path)
     parser.add_argument("--public-repo", required=True, type=Path)
     parser.add_argument("--public-expected-head", required=True)
     parser.add_argument("--python", default=sys.executable)
@@ -270,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
         "private_repo": args.private_repo.expanduser().resolve(),
         "corpus_root": args.corpus_root.expanduser().resolve(),
         "sidecar_root": args.sidecar_root.expanduser().resolve(),
+        "canonical_months_root": args.canonical_months_root.expanduser().resolve(),
         "public_repo": args.public_repo.expanduser().resolve(),
         "public_expected_head": args.public_expected_head,
         "python_executable": args.python,

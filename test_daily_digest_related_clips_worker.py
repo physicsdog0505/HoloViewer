@@ -54,6 +54,7 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
                 private_repo=root / "private",
                 corpus_root=root / "corpus",
                 sidecar_root=root / "sidecars",
+                canonical_months_root=root / "canonical-months",
                 public_repo=root / "public",
                 public_expected_head="a" * 40,
                 python_executable="/usr/bin/python3",
@@ -95,6 +96,7 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
                 private_repo=root / "private",
                 corpus_root=root / "corpus",
                 sidecar_root=root / "sidecars",
+                canonical_months_root=root / "canonical-months",
                 public_repo=root / "public",
                 public_expected_head="a" * 40,
                 python_executable="/usr/bin/python3",
@@ -168,6 +170,7 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
                 private_repo=root / "private",
                 corpus_root=root / "corpus",
                 sidecar_root=root / "sidecars",
+                canonical_months_root=root / "canonical-months",
                 public_repo=root / "public",
                 public_expected_head="a" * 40,
                 python_executable="/usr/bin/python3",
@@ -192,6 +195,7 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
                     private_repo=root / "private",
                     corpus_root=root / "corpus",
                     sidecar_root=root / "sidecars",
+                    canonical_months_root=root / "canonical-months",
                     public_repo=root / "public",
                     public_expected_head="a" * 40,
                     python_executable="/usr/bin/python3",
@@ -264,6 +268,7 @@ class DailyDigestRelatedClipsWorkerTests(unittest.TestCase):
             msg=completed.stderr or completed.stdout,
         )
         self.assertIn("--target-day", completed.stdout)
+        self.assertIn("--canonical-months-root", completed.stdout)
 
 
 if __name__ == "__main__":

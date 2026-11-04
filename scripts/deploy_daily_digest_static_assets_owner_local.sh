@@ -36,6 +36,8 @@ verify_candidate(){
 
   root="$ASSET_ROOT/data/daily-digest/months"
   [ -d "$root" ]||fail "month shard root missing"
+  month_count="$(find "$root" -type f -name '*.json' | wc -l | tr -d '[:space:]')"
+  [ "$month_count" -gt 0 ]||fail "production deploy candidate has zero month shards"
   find "$root" -type f -name '*.json' | while read -r file; do
     base="$(basename "$file" .json)"
     jq -e --arg month "$base" '

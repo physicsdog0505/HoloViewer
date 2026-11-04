@@ -27,6 +27,7 @@ INDEX_KIND = "holodocchi.daily_digest.related_clips_index"
 SIDECAR_KIND = "holodocchi.daily_digest.related_clips"
 SCHEMA_VERSION = 1
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
 
 STAGES = (
     ("initial", 0, 0),
@@ -49,6 +50,114 @@ def canonical_json_bytes(payload: Any) -> bytes:
 
 def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def load_canonical_month_shards(canonical_months_root: Path) -> dict[str, bytes]:
+    """Snapshot the caller-provided canonical monthly authority without mutating it."""
+
+    root = canonical_months_root.expanduser().resolve()
+    if not root.is_dir():
+        raise RuntimeError334(f"canonical month authority missing: {root}")
+
+    shards: dict[str, bytes] = {}
+    for path in sorted(root.glob("*.json")):
+        month = path.stem
+        if not MONTH_RE.fullmatch(month):
+            raise RuntimeError334(f"invalid canonical month shard name: {path.name}")
+        try:
+            raw = path.read_bytes()
+            payload = json.loads(raw.decode("utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError334(f"invalid canonical month shard: {path}") from exc
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema_version") != 1
+            or payload.get("kind") != "holodocchi.daily_digest_month"
+            or payload.get("month") != month
+            or not isinstance(payload.get("days"), dict)
+        ):
+            raise RuntimeError334(f"invalid canonical month shard: {path}")
+        shards[path.name] = raw
+
+    if not shards:
+        raise RuntimeError334(f"canonical month authority has zero shards: {root}")
+    return shards
+
+
+def materialize_publication_union(
+    *,
+    canonical_months_root: Path,
+    canonical_shards: dict[str, bytes],
+    publication_root: Path,
+) -> None:
+    """Union raw canonical month bytes with the publication tree's sidecars."""
+
+    source = canonical_months_root.expanduser().resolve()
+    destination = publication_root.expanduser().resolve()
+    months_root = destination / "months"
+    if (
+        source == months_root
+        or source in months_root.parents
+        or months_root in source.parents
+    ):
+        raise RuntimeError334(
+            "canonical month authority must be separate from publication output"
+        )
+
+    months_root.mkdir(parents=True, exist_ok=True)
+    canonical_names = set(canonical_shards)
+    for existing in months_root.glob("*.json"):
+        if existing.name not in canonical_names:
+            existing.unlink()
+
+    for name, raw in canonical_shards.items():
+        destination_path = months_root / name
+        fd, temporary = tempfile.mkstemp(
+            prefix=f".{destination_path.name}.", dir=months_root
+        )
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, destination_path)
+        except Exception:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+            raise
+        if destination_path.read_bytes() != raw:
+            raise RuntimeError334(f"canonical month raw-byte copy mismatch: {name}")
+
+
+def publication_manifest(publication_root: Path) -> dict[str, bytes]:
+    root = publication_root.expanduser().resolve()
+    manifest: dict[str, bytes] = {}
+    for path in sorted((root / "months").glob("*.json")):
+        manifest[f"/data/daily-digest/months/{path.name}"] = path.read_bytes()
+    if not manifest:
+        raise RuntimeError334("publication candidate has zero monthly shards")
+    sidecar_pattern = (
+        "[0-9][0-9][0-9][0-9]-[0-9][0-9]/*-related-clips.json"
+    )
+    for path in sorted(root.glob(sidecar_pattern)):
+        rel = path.relative_to(root).as_posix()
+        manifest[f"/data/daily-digest/{rel}"] = path.read_bytes()
+    return manifest
+
+
+def verify_publication_readback(
+    manifest: dict[str, bytes],
+    readback_fetcher: Callable[[str], bytes],
+) -> dict[str, str]:
+    live_sha_by_path: dict[str, str] = {}
+    for live_path, expected in manifest.items():
+        live = readback_fetcher(live_path)
+        if live != expected:
+            raise RuntimeError334(f"live publication mismatch: {live_path}")
+        live_sha_by_path[live_path] = sha256_bytes(live)
+    return live_sha_by_path
 
 
 def _parse_day(value: str) -> date:
@@ -577,6 +686,7 @@ def execute_jobs_batch(
     private_repo: Path,
     corpus_root: Path,
     sidecar_root: Path,
+    canonical_months_root: Path,
     public_repo: Path,
     public_expected_head: str,
     python_executable: str,
@@ -586,6 +696,15 @@ def execute_jobs_batch(
     succeeded_at: str | None = None,
 ) -> list[dict[str, Any]]:
     """Generate multiple due sidecars, publish once, then reconcile each readback."""
+
+    publication_root = (
+        public_repo / "daily-digest-static" / "data" / "daily-digest"
+    ).expanduser().resolve()
+    if sidecar_root.expanduser().resolve() != publication_root:
+        raise RuntimeError334(
+            "sidecar root must be the Daily Digest publication root"
+        )
+    canonical_shards = load_canonical_month_shards(canonical_months_root)
 
     if not os.environ.get(holodex_api_key_env, "").strip():
         raise RuntimeError334(
@@ -682,6 +801,13 @@ def execute_jobs_batch(
     if not generated:
         return results
 
+    materialize_publication_union(
+        canonical_months_root=canonical_months_root,
+        canonical_shards=canonical_shards,
+        publication_root=publication_root,
+    )
+    manifest = publication_manifest(publication_root)
+
     release_script = (
         public_repo / "scripts" / "deploy_daily_digest_static_assets_owner_local.sh"
     )
@@ -713,43 +839,16 @@ def execute_jobs_batch(
         # sidecar against the canonical live origin before deciding to retry.
         release_error = str(exc)
         timestamp = succeeded_at or utc_now()
-        unreconciled = 0
-        for item in generated:
-            try:
-                live_bytes = readback_fetcher(item["live_path"])
-                live_sha = sha256_bytes(live_bytes)
-                if live_sha != item["sidecar_sha256"]:
-                    raise RuntimeError334("live related-clips SHA mismatch")
-                record_success(
-                    state,
-                    target_day=item["target_day"],
-                    stage=item["stage"],
-                    succeeded_at=timestamp,
-                    clip_count=item["clip_count"],
-                    generated_sha256=item["sidecar_sha256"],
-                    live_sha256=live_sha,
-                )
-                results.append(
-                    {
-                        "target_day": item["target_day"],
-                        "stage": item["stage"],
-                        "status": "complete",
-                        "production_mutation": "YES",
-                        "sidecar_sha256": item["sidecar_sha256"],
-                        "live_sha256": live_sha,
-                        "clip_count": item["clip_count"],
-                        "live_path": item["live_path"],
-                        "static_baseline_version": baseline,
-                        "reconciled_after_release_error": True,
-                        "release_error": release_error,
-                    }
-                )
-            except Exception as reconcile_exc:
-                unreconciled += 1
-                message = (
-                    f"{release_error}; post-release reconciliation failed: "
-                    f"{reconcile_exc}"
-                )
+        try:
+            live_sha_by_path = verify_publication_readback(
+                manifest, readback_fetcher
+            )
+        except Exception as reconcile_exc:
+            message = (
+                f"{release_error}; full publication reconciliation failed: "
+                f"{reconcile_exc}"
+            )
+            for item in generated:
                 record_attempt(
                     state,
                     target_day=item["target_day"],
@@ -765,15 +864,60 @@ def execute_jobs_batch(
                         "error": message,
                     }
                 )
+            return results
+        for item in generated:
+            live_sha = live_sha_by_path[item["live_path"]]
+            record_success(
+                state,
+                target_day=item["target_day"],
+                stage=item["stage"],
+                succeeded_at=timestamp,
+                clip_count=item["clip_count"],
+                generated_sha256=item["sidecar_sha256"],
+                live_sha256=live_sha,
+            )
+            results.append(
+                {
+                    "target_day": item["target_day"],
+                    "stage": item["stage"],
+                    "status": "complete",
+                    "production_mutation": "YES",
+                    "sidecar_sha256": item["sidecar_sha256"],
+                    "live_sha256": live_sha,
+                    "clip_count": item["clip_count"],
+                    "live_path": item["live_path"],
+                    "static_baseline_version": baseline,
+                    "reconciled_after_release_error": True,
+                    "release_error": release_error,
+                }
+            )
         return results
 
     timestamp = succeeded_at or utc_now()
+    try:
+        live_sha_by_path = verify_publication_readback(manifest, readback_fetcher)
+    except Exception as exc:
+        message = str(exc)
+        for item in generated:
+            record_attempt(
+                state,
+                target_day=item["target_day"],
+                stage=item["stage"],
+                attempted_at=timestamp,
+                error=message,
+            )
+            results.append(
+                {
+                    "target_day": item["target_day"],
+                    "stage": item["stage"],
+                    "status": "error",
+                    "error": message,
+                }
+            )
+        return results
     for item in generated:
         try:
-            live_bytes = readback_fetcher(item["live_path"])
-            live_sha = sha256_bytes(live_bytes)
-            if live_sha != item["sidecar_sha256"]:
-                raise RuntimeError334("live related-clips SHA mismatch")
+            live_sha = live_sha_by_path[item["live_path"]]
             record_success(
                 state,
                 target_day=item["target_day"],
@@ -824,6 +968,7 @@ def execute_job(
     private_repo: Path,
     corpus_root: Path,
     sidecar_root: Path,
+    canonical_months_root: Path | None,
     public_repo: Path,
     public_expected_head: str,
     python_executable: str,
@@ -848,6 +993,17 @@ def execute_job(
     }
     if not execute:
         return result
+
+    if canonical_months_root is None:
+        raise RuntimeError334("canonical month authority is required for execute mode")
+    publication_root = (
+        public_repo / "daily-digest-static" / "data" / "daily-digest"
+    ).expanduser().resolve()
+    if sidecar_root.expanduser().resolve() != publication_root:
+        raise RuntimeError334(
+            "sidecar root must be the Daily Digest publication root"
+        )
+    canonical_shards = load_canonical_month_shards(canonical_months_root)
 
     candidate = Path(candidate_path)
     if not candidate.is_file():
@@ -891,6 +1047,13 @@ def execute_job(
     if actual_sha != generated_sha:
         raise RuntimeError334("generated sidecar is not canonical JSON")
 
+    materialize_publication_union(
+        canonical_months_root=canonical_months_root,
+        canonical_shards=canonical_shards,
+        publication_root=publication_root,
+    )
+    manifest = publication_manifest(publication_root)
+
     release_script = (
         public_repo / "scripts" / "deploy_daily_digest_static_assets_owner_local.sh"
     )
@@ -921,10 +1084,8 @@ def execute_job(
         f"/data/daily-digest/{month}/"
         f"{job['target_day']}-related-clips.json"
     )
-    live_bytes = readback_fetcher(live_path)
-    live_sha = sha256_bytes(live_bytes)
-    if live_sha != generated_sha:
-        raise RuntimeError334("live related-clips SHA mismatch")
+    live_sha_by_path = verify_publication_readback(manifest, readback_fetcher)
+    live_sha = live_sha_by_path[live_path]
 
     timestamp = succeeded_at or utc_now()
     record_success(
