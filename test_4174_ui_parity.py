@@ -1433,6 +1433,56 @@ process.stdout.write(JSON.stringify({first,second,third,calls}));
         self.assertIn("return result?.status==='ready'?result.row:null;",wrapper)
         self.assertIn("catch{return null}",wrapper)
 
+    def test_watchalong_metadata_uses_published_history_after_api_not_found(self):
+        resolver=(ROOT / "site/assets/video-metadata-resolver.js").read_text(encoding="utf-8")
+        script = """
+global.window={HOLOVIEWER_CONFIG:{
+  apiBase:'https://api.example',youtubeStaticBase:'https://static.example'
+}};
+let calls=[];
+global.fetch=async(url,options)=>{
+  calls.push(url);
+  if(url.includes('/v1/catalog/videos/'))return {status:404,json:async()=>({error:'not_found'})};
+  if(url.includes('/v1/videos/'))return {status:404,json:async()=>({error:'not_found'})};
+  if(url.endsWith('/youtube/v1/manifest.json'))return {status:200,json:async()=>({
+    schema_version:1,
+    availability:{month_state:{'2026-10':'published'}},
+    months:[{month:'2026-10',path:'youtube/v1/objects/months/october.json'}]
+  })};
+  if(url.endsWith('/youtube/v1/objects/months/october.json'))return {status:200,json:async()=>({
+    schema_version:1,month:'2026-10',videos:[{
+      video_id:'8pF4qHcshDc',actual_start:'2026-10-15T12:00:16Z',actual_end:'2026-10-15T14:42:31Z'
+    }]
+  })};
+  return {status:404,json:async()=>({error:'unexpected'})};
+};
+eval(RESOLVER_SOURCE);
+const result=await window.HoloViewerVideoMetadata.resolve('8pF4qHcshDc',{
+  apiBase:'https://api.example',youtubeStaticBase:'https://static.example',
+  pttDay:'2026-10-15',maxAttempts:1
+});
+const missing=await window.HoloViewerVideoMetadata.resolve('abcdefghijk',{
+  apiBase:'https://api.example',youtubeStaticBase:'https://static.example',
+  pttDay:'2026-10-15',maxAttempts:1
+});
+process.stdout.write(JSON.stringify({result,missing,calls}));
+""".replace("RESOLVER_SOURCE", json.dumps(resolver))
+        completed=subprocess.run(
+            ["node","--input-type=module","-e",script],
+            check=True,capture_output=True,text=True
+        )
+        payload=json.loads(completed.stdout)
+        result=payload["result"]
+        self.assertEqual(result["status"],"ready")
+        self.assertEqual(result["source"],"youtube-static")
+        self.assertEqual(result["row"]["lifecycle_state"],"ended")
+        self.assertEqual(result["row"]["actual_start"],"2026-10-15T12:00:16Z")
+        self.assertEqual(result["row"]["actual_end"],"2026-10-15T14:42:31Z")
+        self.assertEqual(payload["missing"]["status"],"error")
+        self.assertEqual(payload["missing"]["httpStatus"],404)
+        self.assertTrue(any('/youtube/v1/manifest.json' in url for url in payload["calls"]))
+        self.assertTrue(any('/youtube/v1/objects/months/october.json' in url for url in payload["calls"]))
+
     def test_public_viewing_entries_use_standalone_surfaces_not_spa(self):
         app=(ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         self.assertIn("function standaloneViewerUrl(ids,{vodWindows=null,pttMode=''}={})",app)
