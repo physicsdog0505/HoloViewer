@@ -87,7 +87,7 @@ class CollectorRuntimeHealthTests(unittest.TestCase):
         run.assert_called_once_with(
             [
                 __import__("sys").executable,
-                str(controller),
+                str(controller.resolve()),
                 "--root",
                 str(self.fixed.resolve()),
                 "status",
