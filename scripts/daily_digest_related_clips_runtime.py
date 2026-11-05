@@ -147,6 +147,25 @@ def publication_manifest(publication_root: Path) -> dict[str, bytes]:
     return manifest
 
 
+def verify_canonical_months_match_live(
+    canonical_shards: dict[str, bytes],
+    readback_fetcher: Callable[[str], bytes],
+) -> dict[str, str]:
+    """Clips publication must preserve live Daily Digest month shards byte-for-byte."""
+
+    live_sha_by_path: dict[str, str] = {}
+    for name, expected in canonical_shards.items():
+        live_path = f"/data/daily-digest/months/{name}"
+        live = readback_fetcher(live_path)
+        if live != expected:
+            raise RuntimeError334(
+                "canonical month differs from live Production; refusing clips deploy: "
+                f"{name} local={sha256_bytes(expected)} live={sha256_bytes(live)}"
+            )
+        live_sha_by_path[live_path] = sha256_bytes(live)
+    return live_sha_by_path
+
+
 def verify_publication_readback(
     manifest: dict[str, bytes],
     readback_fetcher: Callable[[str], bytes],
@@ -712,6 +731,11 @@ def execute_jobs_batch(
         )
     if readback_fetcher is None:
         raise RuntimeError334("execute mode requires live readback fetcher")
+
+    # Related clips own only their sidecar paths. They must never advance or
+    # regress canonical Daily Digest month shards. Fail closed if the local
+    # authority is not exactly what Production currently serves.
+    verify_canonical_months_match_live(canonical_shards, readback_fetcher)
 
     resolver_env = dict(os.environ)
     safe_env = dict(resolver_env)
