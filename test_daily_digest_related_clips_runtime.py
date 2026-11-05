@@ -888,6 +888,45 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             "complete",
         )
 
+    def test_execute_jobs_batch_refuses_stale_canonical_month_before_provider_or_deploy(self):
+        state = empty_state()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            public_repo, sidecar_root, canonical_root, raw_month = (
+                self.make_publication_fixture(root)
+            )
+            live_month = json.loads(raw_month)
+            live_month["days"]["2026-11-04"] = {
+                "schema_version": 1,
+                "kind": "holodocchi.daily_digest",
+                "target_day": "2026-11-04",
+                "stories": [],
+            }
+            live_month_bytes = canonical_json_bytes(live_month)
+            calls = []
+
+            with patch.dict(os.environ, {"HOLODEX_API_KEY": "test-key"}):
+                with self.assertRaisesRegex(
+                    RuntimeError334,
+                    "canonical month differs from live Production",
+                ):
+                    execute_jobs_batch(
+                        state,
+                        jobs_with_candidates=[],
+                        private_repo=root / "private",
+                        corpus_root=root / "corpus",
+                        sidecar_root=sidecar_root,
+                        canonical_months_root=canonical_root,
+                        public_repo=public_repo,
+                        public_expected_head="a" * 40,
+                        python_executable="/usr/bin/python3",
+                        runner=lambda command, **kwargs: calls.append(command),
+                        readback_fetcher=lambda path: live_month_bytes,
+                    )
+
+            self.assertEqual(calls, [])
+            self.assertEqual(state["days"], {})
+
     def test_execute_job_refuses_without_holodex_key(self):
         state = empty_state()
         with tempfile.TemporaryDirectory() as td:
