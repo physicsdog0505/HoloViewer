@@ -65,7 +65,7 @@ class WatchalongAssetTests(unittest.TestCase):
             "eFYByyw5AJc": ("versions/eFYByyw5AJc/0002-4a60373e6effbf01155e387e6b25da81ed94fe12627d720585eec424c352d299.json", "4a60373e6effbf01155e387e6b25da81ed94fe12627d720585eec424c352d299", 2),
             "U2o13h1Oib4": ("versions/U2o13h1Oib4/0001-c0916636566d71df339e1142a3120d59e7a87fda343216f0f8347d0111302e0c.json", "c0916636566d71df339e1142a3120d59e7a87fda343216f0f8347d0111302e0c", 1),
             "8pF4qHcshDc": ("versions/8pF4qHcshDc/0001-e36399bd59ce9ad3012635a4e1115f40ba007a6f53ae98582d7f633d90d76447.json", "e36399bd59ce9ad3012635a4e1115f40ba007a6f53ae98582d7f633d90d76447", 1),
-            "t8q3XEmK0aM": ("versions/t8q3XEmK0aM/0001-24307203be86af339fd60303b6edc1aa5d5486987e1cd03a652d555c886a58e1.json", "24307203be86af339fd60303b6edc1aa5d5486987e1cd03a652d555c886a58e1", 1),
+            "t8q3XEmK0aM": ("versions/t8q3XEmK0aM/0002-94ede6b61c2cb3020a7324e964d3e7c7045edac31a962f7b2206c6c5f6b97a8e.json", "94ede6b61c2cb3020a7324e964d3e7c7045edac31a962f7b2206c6c5f6b97a8e", 2),
             "jqJb0qnueDo": ("versions/jqJb0qnueDo/0001-1707920de9336b32d05554fb41b3172204eef9735f866486af22dd9cd8e5e9c9.json", "1707920de9336b32d05554fb41b3172204eef9735f866486af22dd9cd8e5e9c9", 1),
             "x7bMoyNWaEE": ("versions/x7bMoyNWaEE/0001-0c2437fe31448d6852fc905557718f226a8cf2aec60ad1518ff5cb6eacd9114a.json", "0c2437fe31448d6852fc905557718f226a8cf2aec60ad1518ff5cb6eacd9114a", 1),
         }
@@ -149,7 +149,7 @@ class WatchalongAssetTests(unittest.TestCase):
         self.assertEqual(event["playlist_start_index"], 19)
         self.assertEqual(event["source_video_ids"], [
             "O4V1jClR7PY", "ybW0na9NNms", "aFmPLs4JkbQ",
-            "sD2ql0Nfptg", "v_9mDEhKv1g", "1PRbROChRAw",
+            "sD2ql0Nfptg", "v_9mDEhKv1g", "PAlKCjxutUE",
         ])
         self.assertEqual(
             [row["host_start_ms"] for row in event["segments"]],
@@ -168,7 +168,7 @@ class WatchalongAssetTests(unittest.TestCase):
         )
         self.assertEqual(event["artifacts"]["translation"]["translated_cues"], 1367)
         self.assertEqual(event["completeness"], {
-            "sync": "PRESENT", "transcript": "COMPLETE", "translation": "COMPLETE",
+            "sync": "REPAIRED", "transcript": "COMPLETE", "translation": "COMPLETE",
         })
 
 
