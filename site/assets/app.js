@@ -702,6 +702,26 @@ function homeLifecycleBucket(item){
  if(lifecycle==='ended')return 'ended';
  return 'unknown';
 }
+function homeTaipeiDayForTimestamp(raw){
+ const ms=Date.parse(String(raw||'').trim());
+ if(!Number.isFinite(ms))return '';
+ const parts=new Intl.DateTimeFormat('en-US',{
+  timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'
+ }).formatToParts(new Date(ms));
+ const value=Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return value.year+'-'+value.month+'-'+value.day;
+}
+function homeEndedInTodayScope(item,today=taipeiDay()){
+ const endDay=homeTaipeiDayForTimestamp(item?.actual_end||item?.end_at);
+ if(endDay)return endDay===today;
+ const startDay=homeTaipeiDayForTimestamp(item?.actual_start||item?.start_at||item?.scheduled_start);
+ return startDay===today;
+}
+function homeTodayLifecycleBucket(item,today=taipeiDay()){
+ const bucket=homeLifecycleBucket(item);
+ if(bucket!=='ended')return bucket;
+ return homeEndedInTodayScope(item,today)?'ended':'unknown';
+}
 function homeCard(item,container,{collabMap=homeCollabByVideo,history=false}={}){
  if(!item||! /^[A-Za-z0-9_-]{11}$/.test(item.video_id||''))return;
  if(history&&String(item.lifecycle_state||item.state||'').toLowerCase()!=='ended')return;
@@ -949,7 +969,7 @@ function homeStableId(item){return String(item?.video_id||'')}
 function homeBuckets(rows){
  const buckets={live:[],upcoming:[],unknown:[],ended:[]};
  rows.forEach(item=>{
-  buckets[homeLifecycleBucket(item)].push(item);
+  buckets[homeTodayLifecycleBucket(item)].push(item);
  });
  const chronological=(a,b)=>{
   const at=homeStartTimestamp(a),bt=homeStartTimestamp(b);
@@ -2968,7 +2988,7 @@ async function loadWatchalongLanding(){
   window.hvWatchalongCuratedHosts=[...curatedHosts];
   renderWatchalongPastRows(curatedHosts);
 
-  const candidates=todayRows.filter(row=>watchalongCandidateTitle(row?.title));
+  const candidates=todayRows.filter(row=>homeTodayLifecycleBucket(row)!=='unknown'&&watchalongCandidateTitle(row?.title));
   for(const row of candidates){
    const videoId=String(row?.video_id||'');
    const state=String(row?.lifecycle_state||'');
