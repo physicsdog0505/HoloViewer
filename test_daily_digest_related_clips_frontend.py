@@ -168,7 +168,7 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.assertIn(".daily-story-magazine-flow{", self.css)
         self.assertIn("column-count:3;", self.css)
         self.assertIn("column-fill:balance;", self.css)
-        self.assertIn(".daily-story-magazine-flow{column-count:2;column-gap:24px}", self.css)
+        self.assertIn(".daily-story-magazine-flow{column-count:2;column-gap:28px}", self.css)
         self.assertIn(".daily-story-magazine-flow{column-count:1}", self.css)
         self.assertIn("break-inside:avoid;", self.css)
 
