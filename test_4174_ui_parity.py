@@ -86,7 +86,7 @@ class ParityContract(unittest.TestCase):
         bucket_start=js.index('function homeBuckets(rows){')
         bucket_end=js.index('async function loadHomeCollab()',bucket_start)
         buckets=js[bucket_start:bucket_end]
-        self.assertIn("buckets[homeLifecycleBucket(item)].push(item)",buckets)
+        self.assertIn("buckets[homeTodayLifecycleBucket(item)].push(item)",buckets)
         render_start=js.index('function renderHomeRows(rows){')
         render_end=js.index('function homeTimestamp(',render_start)
         render=js[render_start:render_end]
@@ -940,7 +940,7 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         self.assertIn("Verbatim accepted 4174 LIVE_RAIL_CSS", css)
-        self.assertIn("position:fixed;left:2px;top:378px;z-index:65;width:64px", css)
+        self.assertIn("position:fixed;left:2px;top:428px;z-index:65;width:64px", css)
         self.assertIn(".live-channel-rail:hover,.live-channel-rail:focus-within{width:222px", css)
         self.assertIn("body:has(.client-rail:hover) .live-channel-rail", css)
         self.assertIn("@media(max-width:760px){.live-channel-rail{display:none}}", css)

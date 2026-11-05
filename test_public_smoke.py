@@ -15,6 +15,19 @@ ROOT = Path(__file__).resolve().parent
 EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md", "README.md", "test_public_smoke.py", ".github/workflows/public-smoke-ci.yml", ".github/workflows/deploy-cloudflare-production.yml", "cloudflare/wrangler.json", "cloudflare/watchalong-static-assets.wrangler.json", "cloudflare/DEPLOY.md", "site/index.html", "site/assets/app.js", "site/assets/app.css", "site/assets/viewer-4174.css", "site/assets/config.js", "site/assets/video-metadata-resolver.js", "site/assets/shared-shell.css", "site/assets/viewer-standalone.css", "site/assets/viewer-standalone.js", "site/viewer/index.html", "site/watchalong-viewer/index.html", "site/assets/watchalong-standalone.css", "site/assets/watchalong-standalone.js", "site/assets/watchalong-static-core.js", "site/assets/viewing-timeline-core.js", "site/assets/viewing-share-state.js", "site/assets/viewing-timeline-viewer-adapter.js", "site/ptt-today/index.html", "site/assets/ptt-today.css", "site/assets/ptt-today.js", "site/assets/4174-shared-viewing-a144bb3.css", "site/assets/4174-shared-viewing-a144bb3.js", "site/assets/4174-shared-viewing-a144bb3-dom.js", "site/_headers", "AGENTS.md", "HOLOVIEWER_PROJECT_GUIDELINES.md", "docs/PROJECT_STATUS.md", "docs/HANDOFF_TEMPLATE.md", "docs/handoffs/COORDINATION_REVIEW_WINDOW_20261009.md", "docs/4174_UI_PARITY_CONTRACT.md", "docs/handoffs/UI_PARITY_CHECKPOINT_20261015.md", "docs/handoffs/WATCHALONG_EXPORT_AUTHORITY_HANDOFF_20261030.md", "docs/PUBLIC_LOCAL_ACCEPTANCE.md", "scripts/check_public_local.sh", "scripts/start_public_local.sh", "scripts/public_browser_lifecycle.mjs", "scripts/deploy_watchalong_event_owner_local.sh", "scripts/deploy_watchalong_static_assets_owner_local.sh", "test_4174_ui_parity.py", ".gitignore", "vendor/4174-a144bb3/shared_viewing_core.py", "vendor/4174-a144bb3/client_custom_view.py", "vendor/4174-a144bb3/client_ui_shell.py", "vendor/4174-a144bb3/client_app.py", "watchalong-static/_headers", "watchalong-static/data/watchalong/manifest.json", "watchalong-static/data/watchalong/events/eFYByyw5AJc.json", "watchalong-static/data/watchalong/events/U2o13h1Oib4.json", "watchalong-static/data/watchalong/events/8pF4qHcshDc.json", "watchalong-static/data/watchalong/events/t8q3XEmK0aM.json", "watchalong-static/data/watchalong/events/jqJb0qnueDo.json", "watchalong-static/data/watchalong/events/x7bMoyNWaEE.json", "scripts/export_watchalong_assets.py", "test_watchalong_assets.py", "test_viewing_timeline_core.py", "test_viewing_timeline_viewer_integration.py", "docs/handoffs/WATCHALONG_PUBLIC_ASSET_HANDOFF_20261020.md", "docs/handoffs/ISSUE176_CUSTOM_DOMAIN_OWNER_ROLLOUT.md", "docs/YOUTUBE_STATIC_ASSETS_PREVIEW.md", "docs/WATCHALONG_STATIC_ASSETS.md", "scripts/youtube_static_assets_preview.py", "scripts/run_youtube_static_assets_gate3_preview.sh", "test_youtube_static_assets_preview.py", "test_youtube_static_target_config.py", "test_history_search_aliases.py", "data/search/member_aliases.v1.json", "data/search/README.md", "site/data/search/member-aliases.v1.json", "scripts/run_alias_static_assets_release.sh", "test_alias_static_assets_release_gate.py", "site/assets/search/history-content-aliases.v1.json", "docs/ALIAS_STATIC_ASSETS_RELEASE.md", "site/data/search/aliases/v1/versions/ebd36f84fb5f0b507e54100d02e06e635f15a72e14396e57a613bf109252b9b2.json", "site/assets/ptt-links.css", "scripts/run_alias_static_assets_release.py", "test_public_frontend_release_gate.py", "site/data/search/aliases/v1/latest.json", "site/assets/ptt-links.js", "site/assets/daily-digest.js", "site/assets/daily-digest.css", "site/daily/index.html", "scripts/run_public_frontend_owner_release.sh", "scripts/run_public_frontend_owner_release.py", "scripts/alias_static_assets_release_gate.py", "site/assets/local-subtitle-core.js", "test_local_subtitle_core.js"}
 
 EXPECTED.add("docs/handoffs/PRODUCTION_COORDINATOR_HANDOFF_20261030.md")
+EXPECTED.add("watchalong-static/data/watchalong/events/ZpGtQNsS0Fs.json")
+EXPECTED.update({
+    "docs/handoffs/FRONTEND_PRODUCTION_HANDOFF_20261103.md",
+    "docs/handoffs/FRONTEND_PRODUCTION_HANDOFF_20261104.md",
+    "scripts/daily_digest_related_clips.py",
+    "scripts/daily_digest_related_clips_runtime.py",
+    "scripts/daily_digest_related_clips_worker.py",
+    "site/assets/docchi-news-open-newspaper.svg",
+    "test_daily_digest_related_clips.py",
+    "test_daily_digest_related_clips_frontend.py",
+    "test_daily_digest_related_clips_runtime.py",
+    "test_daily_digest_related_clips_worker.py",
+})
 EXPECTED.update({
     "cloudflare/daily-digest-static-assets.wrangler.json",
     "daily-digest-static/_headers",
@@ -106,7 +119,7 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("if(lifecycle==='upcoming'||lifecycle==='waiting')return 'upcoming';", js)
         self.assertIn("if(lifecycle==='ended')return 'ended';", js)
         self.assertIn("function homeBuckets(rows)", js)
-        self.assertIn("buckets[homeLifecycleBucket(item)].push(item);", js)
+        self.assertIn("buckets[homeTodayLifecycleBucket(item)].push(item);", js)
         self.assertNotIn("state==='ended'?'ended':'unknown'", js)
         self.assertIn("const customHistoryCache=new Map();", js)
         self.assertIn("function customHistoryBounds()", js)
@@ -346,9 +359,10 @@ class PublicSmokeTests(unittest.TestCase):
             self.assertIn('class="mobile-bottom-dock"', html)
             self.assertIn('data-mobile-dock-route="home"', html)
             self.assertIn('data-mobile-dock-route="history"', html)
-            self.assertIn('data-mobile-dock-route="multi"', html)
+            self.assertIn('aria-label="Docchi News 日報"', html)
             self.assertIn('data-mobile-dock-route="ptt"', html)
             dock = html.split('class="mobile-bottom-dock"', 1)[1].split('</nav>', 1)[0]
+            self.assertNotIn('data-mobile-dock-route="multi"', dock)
             self.assertNotIn('/watchalong', dock)
             self.assertNotIn('/custom-view', dock)
 
@@ -692,9 +706,10 @@ class PublicSmokeTests(unittest.TestCase):
             "eFYByyw5AJc": (1568, 6), "U2o13h1Oib4": (1438, 6),
             "8pF4qHcshDc": (1461, 6), "t8q3XEmK0aM": (1367, 6),
             "jqJb0qnueDo": (449, 2), "x7bMoyNWaEE": (888, 4),
+            "ZpGtQNsS0Fs": (1299, 5),
         }
         self.assertEqual(manifest.get("schema_version"), "holoviewer-watchalong-manifest-v1")
-        self.assertEqual(manifest.get("event_count"), 6)
+        self.assertEqual(manifest.get("event_count"), 7)
         self.assertEqual({row["event_id"] for row in manifest["events"]}, set(expected))
         for row in manifest["events"]:
             path = ROOT / "watchalong-static" / row["path"].lstrip("/")

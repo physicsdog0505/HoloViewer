@@ -93,6 +93,18 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_rel": "data/watchalong/transcripts/youtube/x7bMoyNWaEE/translations/9868c1c078edecd96e487fd914fb8e7842de38838dc2000ebee8e16f13741360.json",
         "translation_quality": "quality-v2-complete",
     },
+    {
+        "master": "ZpGtQNsS0Fs",
+        "day": "2026-11-05",
+        "title": "#2【初見】『無職転生Ⅱ ~異世界行ったら本気だす~』2期 同時視聴【ホロライブ/兎田ぺこら】",
+        "transcript_id": "c83b81b9dfca711f33c66a759f6540ed2f1c3fa712cd577124fcb5a4d5645302",
+        "transcript_hash": "b0870029ba6bb3a3e530da62462e524580b445e55a5aae65b213ac5fc3a5c2b7",
+        "cue_count": 1299,
+        "translation_kind": "corpus-artifact",
+        "translation_id": "1c81208b3010cabcdbeff6b570b30138a1e62409de3f3959dd0a3f7974b2cf1c",
+        "translation_rel": "data/watchalong/transcripts/youtube/ZpGtQNsS0Fs/translations/1c81208b3010cabcdbeff6b570b30138a1e62409de3f3959dd0a3f7974b2cf1c.json",
+        "translation_quality": "gemini-web-manual-complete",
+    },
 )
 
 
