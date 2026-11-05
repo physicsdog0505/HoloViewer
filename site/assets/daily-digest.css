@@ -1230,6 +1230,68 @@ html{scroll-behavior:smooth}
 }
 
 
+/* Owner review V3.23 — long single-image stories use balanced magazine flow.
+   Headline, copy and the image share one multi-column stream so text can occupy
+   the space above and below the image instead of leaving the first column empty. */
+.daily-story-card.is-feature-story.is-magazine-flow{
+  display:block
+}
+.daily-story-card.is-feature-story.is-magazine-flow .daily-story-eyebrow{
+  margin-bottom:12px
+}
+.daily-story-magazine-flow{
+  column-count:3;
+  column-gap:36px;
+  column-fill:balance;
+  orphans:3;
+  widows:3
+}
+.daily-story-magazine-flow .daily-story-title{
+  display:block;
+  margin:0 0 14px;
+  max-width:none;
+  break-inside:avoid;
+  break-after:avoid;
+  font-size:24px;
+  line-height:1.4
+}
+.daily-story-magazine-flow .daily-story-summary{
+  display:block;
+  margin:0 0 14px;
+  max-width:none;
+  line-height:1.78;
+  break-inside:auto
+}
+.daily-story-magazine-flow .daily-story-visual-shell{
+  display:block;
+  width:100%;
+  margin:18px 0 12px;
+  padding-bottom:16px;
+  box-sizing:border-box;
+  break-inside:avoid;
+  -webkit-column-break-inside:avoid
+}
+.daily-story-magazine-flow .daily-story-visual{
+  display:grid;
+  grid-template-columns:1fr;
+  margin:0;
+  gap:0
+}
+.daily-story-magazine-flow .daily-story-visual-item,
+.daily-story-magazine-flow .daily-story-visual[data-count="1"] .daily-story-visual-item{
+  grid-column:auto;
+  width:100%;
+  max-width:none;
+  aspect-ratio:16/9!important
+}
+@media(max-width:980px){
+  .daily-story-magazine-flow{column-count:2;column-gap:28px}
+}
+@media(max-width:760px){
+  .daily-story-magazine-flow{column-count:1}
+  .daily-story-magazine-flow .daily-story-title{font-size:21px}
+}
+
 /* Owner review V3.22 — diversified editorial layout pool. */
 .daily-story-visual[data-visual-layout="feature-single-wide"]{
   display:grid;

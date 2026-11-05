@@ -660,11 +660,13 @@ function renderStories(target,artifact,byId){
     card.append(eyebrow);
 
     const headline=publicText(story.title)||publicText(story.short_title);
-    if(headline)card.append(el('h3','daily-story-title',headline));
+    const headlineNode=headline?el('h3','daily-story-title',headline):null;
+    if(headlineNode)card.append(headlineNode);
 
     const summary=publicText(story.editorial_summary||story.public_summary||story.summary);
+    let copy=null;
     if(summary){
-      const copy=el('div','daily-story-summary-block');
+      copy=el('div','daily-story-summary-block');
       appendStoryEditorialCopy(copy,summary);
       card.append(copy);
     }
@@ -685,7 +687,28 @@ function renderStories(target,artifact,byId){
         return detailRail.toggleVideo(videoId);
       }
     });
-    if(visual)card.append(visual);
+    const magazineFlowEligible=
+      visibleIds.length===1 &&
+      card.dataset.singleImageLayout==='editorial-side' &&
+      Boolean(summary) &&
+      summary.length>=360 &&
+      Boolean(visual);
+
+    if(magazineFlowEligible){
+      card.classList.add('is-magazine-flow');
+      const flow=el('div','daily-story-magazine-flow');
+      if(headlineNode)flow.append(headlineNode);
+      const chunks=paragraphChunks(summary,{min:3,max:6});
+      chunks.forEach((chunk,chunkIndex)=>{
+        flow.append(el('p','daily-story-summary',chunk));
+        if(chunkIndex===0&&visual)flow.append(visual);
+      });
+      if(!chunks.length&&visual)flow.append(visual);
+      if(copy)copy.remove();
+      card.append(flow);
+    }else if(visual){
+      card.append(visual);
+    }
     if(detailRail)card.append(detailRail);
     const allIds=[...new Set((Array.isArray(story.video_ids)?story.video_ids:[]).map(String).filter(id=>byId.has(id)))];
     if(allIds.length>9)appendReferences(card,allIds.slice(9),byId,{label:'更多相關直播'});
