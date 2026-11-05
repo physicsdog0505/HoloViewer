@@ -155,6 +155,23 @@ class DailyDigestRelatedClipsFrontendTests(unittest.TestCase):
         self.assertIn("-webkit-line-clamp:3", self.css)
         self.assertIn("flex-wrap:nowrap", self.css)
 
+    def test_long_single_image_story_uses_magazine_flow(self):
+        self.assertIn("const magazineFlowEligible=", self.js)
+        self.assertIn("visibleIds.length===1", self.js)
+        self.assertIn("summary.length>=360", self.js)
+        self.assertIn("card.dataset.singleImageLayout==='editorial-side'", self.js)
+        self.assertIn("card.classList.add('is-magazine-flow');", self.js)
+        self.assertIn("paragraphChunks(summary,{min:3,max:6})", self.js)
+        self.assertIn("if(chunkIndex===0&&visual)flow.append(visual);", self.js)
+
+    def test_magazine_flow_is_responsive_three_two_one_columns(self):
+        self.assertIn(".daily-story-magazine-flow{", self.css)
+        self.assertIn("column-count:3;", self.css)
+        self.assertIn("column-fill:balance;", self.css)
+        self.assertIn(".daily-story-magazine-flow{column-count:2;column-gap:24px}", self.css)
+        self.assertIn(".daily-story-magazine-flow{column-count:1}", self.css)
+        self.assertIn("break-inside:avoid;", self.css)
+
 
 if __name__ == "__main__":
     unittest.main()
