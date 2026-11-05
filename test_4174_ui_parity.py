@@ -841,24 +841,28 @@ function row(key,occurred){return {source_record_key:key,push_id:key,aid:'aid',s
         start=js.index('function homeLifecycleBucket(item){')
         end=js.index('function homeCard(',start)
         classifier=js[start:end]
-        self.assertNotIn('scheduled_start',classifier)
-        self.assertNotIn('actual_start',classifier)
-        self.assertNotIn('actual_end',classifier)
+        self.assertIn('function homeEndedInTodayScope(item,today=taipeiDay())',classifier)
+        self.assertIn('function homeTodayLifecycleBucket(item,today=taipeiDay())',classifier)
         cases=[
             {'video_id':'fresh-live','lifecycle_state':'live','stale':False},
             {'video_id':'stale-live','lifecycle_state':'live','stale':True},
             {'video_id':'unknown','lifecycle_state':'unknown','stale':False},
-            {'video_id':'ended','lifecycle_state':'ended','stale':False},
+            {'video_id':'ended-today','lifecycle_state':'ended','actual_start':'2026-11-05T03:00:00Z'},
+            {'video_id':'ended-cross-midnight','lifecycle_state':'ended','actual_start':'2026-11-04T14:00:00Z','actual_end':'2026-11-04T17:00:00Z'},
+            {'video_id':'ended-old','lifecycle_state':'ended','actual_start':'2026-09-23T09:16:00Z','actual_end':'2026-09-23T11:00:00Z'},
+            {'video_id':'ended-previous-no-end','lifecycle_state':'ended','actual_start':'2026-11-04T11:00:00Z'},
             {'video_id':'0-21K73BYWc','lifecycle_state':'upcoming','stale':False,'start_at':'2026-10-19T12:30:00Z'},
             {'video_id':'waiting','lifecycle_state':'waiting','stale':False},
         ]
-        script=classifier+'\nprocess.stdout.write(JSON.stringify('+json.dumps(cases)+' .map(homeLifecycleBucket)));'
+        script=classifier+'\nconst rows='+json.dumps(cases)+';process.stdout.write(JSON.stringify(rows.map(x=>homeTodayLifecycleBucket(x,\'2026-11-05\'))));'
         result=subprocess.run(['node','-e',script],check=True,capture_output=True,text=True)
-        self.assertEqual(json.loads(result.stdout),['live','unknown','unknown','ended','upcoming','upcoming'])
+        self.assertEqual(json.loads(result.stdout),['live','unknown','unknown','ended','ended','unknown','unknown','upcoming','upcoming'])
         bucket_start=js.index('function homeBuckets(rows){')
         bucket_end=js.index('async function loadHomeCollab()',bucket_start)
         buckets=js[bucket_start:bucket_end]
-        self.assertIn('buckets[homeLifecycleBucket(item)].push(item)',buckets)
+        self.assertIn('buckets[homeTodayLifecycleBucket(item)].push(item)',buckets)
+        watchalong=js[js.index('async function loadWatchalongLanding(){'):js.index('window.hvLoadWatchalongLanding=loadWatchalongLanding;')]
+        self.assertIn("todayRows.filter(row=>homeTodayLifecycleBucket(row)!=='unknown'&&watchalongCandidateTitle(row?.title))",watchalong)
 
     def test_public_home_highlights_follow_lifecycle_freshness_contract(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
