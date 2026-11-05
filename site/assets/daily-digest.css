@@ -1265,7 +1265,9 @@ html{scroll-behavior:smooth}
 .daily-story-magazine-flow .daily-story-visual-shell{
   display:block;
   width:100%;
-  margin:18px 0 22px;
+  margin:18px 0 12px;
+  padding-bottom:12px;
+  box-sizing:border-box;
   break-inside:avoid;
   -webkit-column-break-inside:avoid
 }
