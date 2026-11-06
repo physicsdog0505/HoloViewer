@@ -712,10 +712,12 @@ function homeTaipeiDayForTimestamp(raw){
  return value.year+'-'+value.month+'-'+value.day;
 }
 function homeEndedInTodayScope(item,today=taipeiDay()){
- const endDay=homeTaipeiDayForTimestamp(item?.actual_end||item?.end_at);
- if(endDay)return endDay===today;
- const startDay=homeTaipeiDayForTimestamp(item?.actual_start||item?.start_at||item?.scheduled_start);
- return startDay===today;
+ const todayStart=Date.parse(today+'T00:00:00+08:00');
+ const carryStart=Number.isFinite(todayStart)?todayStart-6*60*60*1000:null;
+ const endMs=Date.parse(String(item?.actual_end||item?.end_at||'').trim());
+ if(Number.isFinite(endMs)&&carryStart!==null)return endMs>=carryStart;
+ const startMs=Date.parse(String(item?.actual_start||item?.start_at||item?.scheduled_start||'').trim());
+ return Number.isFinite(startMs)&&carryStart!==null&&startMs>=carryStart;
 }
 function homeTodayLifecycleBucket(item,today=taipeiDay()){
  const bucket=homeLifecycleBucket(item);
