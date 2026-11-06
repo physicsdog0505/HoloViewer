@@ -1570,7 +1570,12 @@ function setDiscussionSource(next){
 }
 discussionPttTab?.addEventListener('click',()=>setDiscussionSource('ptt'));
 discussionYoutubeTab?.addEventListener('click',()=>setDiscussionSource('youtube'));
-youtubeChatFrame?.addEventListener('load',()=>youtubeChatPane?.classList.add('ready'));
+youtubeChatFrame?.addEventListener('load',()=>{
+ if(discussionSource==='youtube'&&pttContext.mode==='vod'){
+  try{window.HoloViewerYouTubeChat?.sync?.(youtubeChatFrame,players[primaryIndex]?.getCurrentTime?.())}catch{}
+ }
+ youtubeChatPane?.classList.add('ready');
+});
 youtubeChatSyncTimer=setInterval(()=>{
  if(discussionSource!=='youtube'||pttContext.mode!=='vod')return;
  try{window.HoloViewerYouTubeChat?.sync?.(youtubeChatFrame,players[primaryIndex]?.getCurrentTime?.())}catch{}
