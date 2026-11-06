@@ -110,6 +110,7 @@ let pttResizeObserver=null;
 let discussionSource='ptt';
 let youtubeChatSyncTimer=null;
 let youtubeChatIdentity='';
+let youtubeChatMetadataPromise=null;
 let pttContext={mode:'unresolved',videoId:'',start:'',end:'',day:''};
 let pttResolveToken=0;
 let pttVodRows=[];
@@ -1492,6 +1493,20 @@ function youtubeChatTarget(){
  if(!mode)return null;
  return {videoId:String(stream.videoId||''),channelId:String(stream.channelId||''),mode};
 }
+async function hydrateYoutubeChatMetadata(){
+ const stream=streams[primaryIndex];
+ if(!stream||stream.channelId||!stream.videoId)return;
+ if(youtubeChatMetadataPromise)return youtubeChatMetadataPromise;
+ const targetVideoId=String(stream.videoId);
+ youtubeChatMetadataPromise=videoMetadata(targetVideoId).then(row=>{
+  const current=streams[primaryIndex];
+  if(!current||String(current.videoId)!==targetVideoId)return;
+  current.channelId=String(row?.channel_id||row?.channelId||'');
+  if(!current.label||current.label===targetVideoId)current.label=catalogName(row);
+  if(!current.avatarUrl)current.avatarUrl=safeAvatar(row?.avatar_url);
+ }).catch(()=>{}).finally(()=>{youtubeChatMetadataPromise=null});
+ return youtubeChatMetadataPromise;
+}
 function setYoutubeChatStatus(message){
  if(youtubeChatStatus)youtubeChatStatus.textContent=String(message||'');
  youtubeChatPane?.classList.remove('ready');
@@ -1510,6 +1525,7 @@ function refreshYoutubeChat({force=false}={}){
   youtubeChatIdentity='';
   youtubeChatFrame.removeAttribute('src');
   setYoutubeChatStatus('聊天室資料準備中');
+  void hydrateYoutubeChatMetadata().then(()=>refreshYoutubeChat({force:true}));
   return;
  }
  const url=window.HoloViewerYouTubeChat?.buildUrl?.(target)||'';
