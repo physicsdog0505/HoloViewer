@@ -13,14 +13,15 @@ function hdt(channelId,videoId){return b64(cc([ld(1,cvToken(channelId,videoId)),
 function replayContinuation(videoId,channelId,seekMs=0){return encodeURIComponent(b64(ld(156074452,[ld(3,hdt(channelId,videoId)),vt(8,1),ld(11,vt(2,Math.max(0,Math.round(Number(seekMs)||0)))),ld(14,vt(1,1)),vt(15,1)])))}
 function validVideoId(value){return /^[A-Za-z0-9_-]{11}$/.test(String(value||''))}
 function validChannelId(value){return /^UC[A-Za-z0-9_-]{20,}$/.test(String(value||''))}
-function buildUrl({videoId,channelId='',mode,embedDomain=location.hostname,dark=true}={}){
+function buildUrl({videoId,channelId='',mode,embedDomain=location.hostname,dark=true,seekSeconds=0}={}){
  const id=String(videoId||''),channel=String(channelId||''),domain=String(embedDomain||location.hostname);
  if(!validVideoId(id)||!domain)return '';
  const q=new URLSearchParams({v:id,embed_domain:domain,dark_theme:dark?'1':'0'});
  if(mode==='vod'){
   if(!validChannelId(channel))return '';
+  const seekMs=Math.max(0,Math.round((Number(seekSeconds)||0)*1000));
   q.set('c',channel);
-  q.set('continuation',replayContinuation(id,channel));
+  q.set('continuation',replayContinuation(id,channel,seekMs));
   return 'https://www.youtube.com/live_chat_replay?'+q.toString();
  }
  if(mode==='live')return 'https://www.youtube.com/live_chat?'+q.toString();
