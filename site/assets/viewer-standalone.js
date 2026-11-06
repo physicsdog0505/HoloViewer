@@ -1534,7 +1534,11 @@ function refreshYoutubeChat({force=false}={}){
   });
   return;
  }
- const url=window.HoloViewerYouTubeChat?.buildUrl?.(target)||'';
+ let seekSeconds=0;
+ if(target.mode==='vod'){
+  try{seekSeconds=Number(players[primaryIndex]?.getCurrentTime?.())||0}catch{}
+ }
+ const url=window.HoloViewerYouTubeChat?.buildUrl?.({...target,seekSeconds})||'';
  if(!url){
   youtubeChatIdentity='';
   youtubeChatFrame.removeAttribute('src');
