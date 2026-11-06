@@ -487,6 +487,8 @@ class ParityContract(unittest.TestCase):
         self.assertIn("static-assets-full-2026-08.json",config)
         self.assertIn("static-assets-full-2026-09.json",config)
         self.assertIn("static-assets-full-2026-10.json",config)
+        self.assertIn("holoviewer-ptt-static-assets-2026-11.singlebagel.workers.dev",config)
+        self.assertIn("static-assets-full-2026-11.json",config)
         self.assertIn("params.getAll('ptt_window')",viewer)
         self.assertIn("anchorSource!==PTT_ARCHIVE_ANCHOR",viewer)
         self.assertIn("function archiveObjectRange(item)",viewer)

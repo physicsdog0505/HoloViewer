@@ -182,6 +182,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("/ptt/v1/manifests/static-assets-full-2026-08.json", frontend_config)
         self.assertIn("/ptt/v1/manifests/static-assets-full-2026-09.json", frontend_config)
         self.assertIn("/ptt/v1/manifests/static-assets-full-2026-10.json", frontend_config)
+        self.assertIn("https://holoviewer-ptt-static-assets-2026-11.singlebagel.workers.dev", frontend_config)
+        self.assertIn("/ptt/v1/manifests/static-assets-full-2026-11.json", frontend_config)
         self.assertNotIn("CLOUDFLARE_API_TOKEN", frontend_config)
 
     def test_standalone_viewer_mode_contract(self):
@@ -851,7 +853,7 @@ class PublicSmokeTests(unittest.TestCase):
         headers = (ROOT / "site/_headers").read_text(encoding="utf-8")
         self.assertIn("Content-Security-Policy:", headers)
         self.assertIn("img-src 'self' data: https:;", headers)
-        for directive in ("default-src 'none'", "script-src 'self'", "connect-src 'self' https://holoviewer-public-api.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev", "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev", "https://holoviewer-daily-digest-static-assets.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
+        for directive in ("default-src 'none'", "script-src 'self'", "connect-src 'self' https://holoviewer-public-api.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-pilot.singlebagel.workers.dev", "https://holoviewer-ptt-static-assets-2026-11.singlebagel.workers.dev", "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev", "https://holoviewer-daily-digest-static-assets.singlebagel.workers.dev", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'none'", "object-src 'none'"):
             self.assertIn(directive, headers)
         self.assertNotIn("'unsafe-inline'", headers)
         self.assertNotIn("'unsafe-eval'", headers)
