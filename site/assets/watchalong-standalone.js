@@ -258,7 +258,7 @@ function refreshYoutubeChat({force=false}={}){
   setYoutubeChatStatus('YouTube Chat 暫時無法載入');
   return;
  }
- if(force||identity!==youtubeChatIdentity||youtubeChatFrame.src!==url){
+ if(force||identity!==youtubeChatIdentity){
   youtubeChatIdentity=identity;
   setYoutubeChatStatus(target.mode==='vod'?'載入聊天室重播中':'連接 YouTube Chat 中');
   youtubeChatFrame.src=url;
@@ -279,6 +279,11 @@ function setDiscussionSource(next){
  discussionPttTab?.setAttribute('aria-selected',String(!youtube));
  discussionYoutubeTab?.setAttribute('aria-selected',String(youtube));
  if(youtube)refreshYoutubeChat({force:true});
+ else{
+  youtubeChatIdentity='';
+  youtubeChatFrame?.removeAttribute('src');
+  youtubeChatPane?.classList.remove('ready');
+ }
 }
 discussionPttTab?.addEventListener('click',()=>setDiscussionSource('ptt'));
 discussionYoutubeTab?.addEventListener('click',()=>setDiscussionSource('youtube'));
@@ -1443,7 +1448,7 @@ async function resolveHostPtt(){
 
   const state=String(row?.lifecycle_state||row?.state||'').toLowerCase();
   hostLifecycle=state;
-  hostChannelId=String(row?.channel_id||'');
+  hostChannelId=String(row?.channel_id||row?.channelId||'');
   refreshYoutubeChat({force:true});
   applyWatchalongHostAccent(row);
   hostStatus.textContent=state||'unknown';
