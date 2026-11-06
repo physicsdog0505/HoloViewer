@@ -166,9 +166,10 @@ function api(path){
   return response.json();
  });
 }
-async function videoMetadata(id){
+async function videoMetadata(id,{pttDay=''}={}){
  const result=await window.HoloViewerVideoMetadata?.resolve(id,{
-  apiBase:API_BASE,preferCatalog:true,waitForRecovery:true,maxAttempts:6
+  apiBase:API_BASE,preferCatalog:true,waitForRecovery:true,maxAttempts:6,
+  pttDay:/^\d{4}-\d{2}-\d{2}$/.test(String(pttDay||''))?String(pttDay):''
  });
  if(result?.status==='ready')return result.row;
  const error=new Error(result?.status||'metadata unavailable');
@@ -1498,13 +1499,16 @@ async function hydrateYoutubeChatMetadata(){
  if(!stream||stream.channelId||!stream.videoId)return;
  if(youtubeChatMetadataPromise)return youtubeChatMetadataPromise;
  const targetVideoId=String(stream.videoId);
- youtubeChatMetadataPromise=videoMetadata(targetVideoId).then(row=>{
+ youtubeChatMetadataPromise=videoMetadata(targetVideoId,{pttDay:pttContext.day}).then(row=>{
   const current=streams[primaryIndex];
   if(!current||String(current.videoId)!==targetVideoId)return;
   current.channelId=String(row?.channel_id||row?.channelId||'');
+  if(!current.channelId)throw new Error('channel_id unavailable');
   if(!current.label||current.label===targetVideoId)current.label=catalogName(row);
   if(!current.avatarUrl)current.avatarUrl=safeAvatar(row?.avatar_url);
- }).catch(()=>{}).finally(()=>{youtubeChatMetadataPromise=null});
+ }).catch(()=>{
+  setYoutubeChatStatus('這支 VOD 暫時缺少可用的頻道資料');
+ }).finally(()=>{youtubeChatMetadataPromise=null});
  return youtubeChatMetadataPromise;
 }
 function setYoutubeChatStatus(message){
@@ -1525,7 +1529,9 @@ function refreshYoutubeChat({force=false}={}){
   youtubeChatIdentity='';
   youtubeChatFrame.removeAttribute('src');
   setYoutubeChatStatus('聊天室資料準備中');
-  void hydrateYoutubeChatMetadata().then(()=>refreshYoutubeChat({force:true}));
+  void hydrateYoutubeChatMetadata().then(()=>{
+   if(streams[primaryIndex]?.channelId)refreshYoutubeChat({force:true});
+  });
   return;
  }
  const url=window.HoloViewerYouTubeChat?.buildUrl?.(target)||'';
