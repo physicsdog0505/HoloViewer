@@ -68,6 +68,10 @@ window.HOLOVIEWER_CONFIG = Object.freeze({
     "2026-10": Object.freeze({
       base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
       manifest: "/ptt/v1/manifests/static-assets-full-2026-10.json"
+    }),
+    "2026-11": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-2026-11.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2026-11.json"
     })
   })
 });
