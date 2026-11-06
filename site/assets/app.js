@@ -713,11 +713,13 @@ function homeTaipeiDayForTimestamp(raw){
 }
 function homeEndedInTodayScope(item,today=taipeiDay()){
  const todayStart=Date.parse(today+'T00:00:00+08:00');
- const carryStart=Number.isFinite(todayStart)?todayStart-6*60*60*1000:null;
+ if(!Number.isFinite(todayStart))return false;
+ const carryStart=todayStart-6*60*60*1000;
+ const todayEnd=todayStart+24*60*60*1000;
  const endMs=Date.parse(String(item?.actual_end||item?.end_at||'').trim());
- if(Number.isFinite(endMs)&&carryStart!==null)return endMs>=carryStart;
+ if(Number.isFinite(endMs))return endMs>=carryStart&&endMs<todayEnd;
  const startMs=Date.parse(String(item?.actual_start||item?.start_at||item?.scheduled_start||'').trim());
- return Number.isFinite(startMs)&&carryStart!==null&&startMs>=carryStart;
+ return Number.isFinite(startMs)&&startMs>=carryStart&&startMs<todayEnd;
 }
 function homeTodayLifecycleBucket(item,today=taipeiDay()){
  const bucket=homeLifecycleBucket(item);
