@@ -120,7 +120,11 @@
       <aside id="pttPanel" class="viewer-ptt ptt-floor-hidden" hidden>
         <div class="ptt-heading">
           <div class="ptt-title-line">
-            <strong id="pttTitle">PTT 專串</strong>
+            <div class="discussion-source-toggle" role="tablist" aria-label="留言來源">
+              <button id="discussionPttTab" type="button" role="tab" aria-selected="true" class="active">PTT</button>
+              <button id="discussionYoutubeTab" type="button" role="tab" aria-selected="false">YouTube Chat</button>
+            </div>
+            <strong id="pttTitle" class="ptt-current-label">PTT 專串</strong>
             <label class="ptt-floor-control" title="顯示或隱藏樓數">
               <input id="pttShowFloor" type="checkbox">
               <span class="ptt-floor-check" aria-hidden="true"></span>
@@ -135,6 +139,10 @@
         </div>
         <div id="pttFeed" class="ptt-feed"></div>
         <button id="pttNewest" class="ptt-newest" type="button" hidden>最新</button>
+        <div id="youtubeChatPane" class="youtube-chat-pane" hidden>
+          <div id="youtubeChatStatus" class="youtube-chat-status">聊天室資料準備中</div>
+          <iframe id="youtubeChatFrame" title="YouTube Chat" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        </div>
       </aside>
     </section>
   </main>
@@ -145,6 +153,7 @@
 <script src="/assets/vod-subtitle-core.js"></script>
 <script src="/assets/ptt-links.js"></script>
 <script src="/assets/video-metadata-resolver.js"></script>
+<script src="/assets/youtube-chat-replay.js"></script>
 <script src="/assets/viewing-timeline-core.js"></script>
 <script src="/assets/viewing-timeline-viewer-adapter.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>

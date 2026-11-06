@@ -33,6 +33,11 @@ const pttNewest=document.getElementById('pttNewest');
 const pttShowFloor=document.getElementById('pttShowFloor');
 const pttFontSize=document.getElementById('pttFontSize');
 const pttFontValue=document.getElementById('pttFontValue');
+const discussionPttTab=document.getElementById('discussionPttTab');
+const discussionYoutubeTab=document.getElementById('discussionYoutubeTab');
+const youtubeChatPane=document.getElementById('youtubeChatPane');
+const youtubeChatFrame=document.getElementById('youtubeChatFrame');
+const youtubeChatStatus=document.getElementById('youtubeChatStatus');
 const offsetMinus=document.getElementById('offsetMinus');
 const offsetPlus=document.getElementById('offsetPlus');
 const previousSegment=document.getElementById('previousSegment');
@@ -94,6 +99,11 @@ let pttRows=[];
 let pttVisible=0;
 let pttFollowing=true;
 let pttUserScrollIntentUntil=0;
+let discussionSource='ptt';
+let youtubeChatSyncTimer=null;
+let youtubeChatIdentity='';
+let hostChannelId='';
+let hostLifecycle='';
 const archiveManifestCache=new Map();
 let segments=[];
 let subtitles=[];
@@ -216,6 +226,73 @@ hostMuteToggle?.addEventListener('click',()=>{
  }catch{}
  refreshHostVolumeUi();
 });
+function youtubeChatTarget(){
+ const mode=hostLifecycle==='live'?'live':(hostLifecycle==='ended'?'vod':'');
+ if(!mode||!hostVideoId)return null;
+ return {videoId:String(hostVideoId),channelId:String(hostChannelId||''),mode};
+}
+function setYoutubeChatStatus(message){
+ if(youtubeChatStatus)youtubeChatStatus.textContent=String(message||'');
+ youtubeChatPane?.classList.remove('ready');
+}
+function refreshYoutubeChat({force=false}={}){
+ if(discussionSource!=='youtube'||!youtubeChatFrame||!youtubeChatPane)return;
+ const target=youtubeChatTarget();
+ if(!target){
+  youtubeChatIdentity='';
+  youtubeChatFrame.removeAttribute('src');
+  setYoutubeChatStatus('聊天室資料準備中');
+  return;
+ }
+ const identity=[target.mode,target.videoId,target.channelId].join('|');
+ if(target.mode==='vod'&&!target.channelId){
+  youtubeChatIdentity='';
+  youtubeChatFrame.removeAttribute('src');
+  setYoutubeChatStatus('聊天室資料準備中');
+  return;
+ }
+ const url=window.HoloViewerYouTubeChat?.buildUrl?.(target)||'';
+ if(!url){
+  youtubeChatIdentity='';
+  youtubeChatFrame.removeAttribute('src');
+  setYoutubeChatStatus('YouTube Chat 暫時無法載入');
+  return;
+ }
+ if(force||identity!==youtubeChatIdentity){
+  youtubeChatIdentity=identity;
+  setYoutubeChatStatus(target.mode==='vod'?'載入聊天室重播中':'連接 YouTube Chat 中');
+  youtubeChatFrame.src=url;
+ }
+ if(target.mode==='vod'){
+  try{window.HoloViewerYouTubeChat?.sync?.(youtubeChatFrame,hostPlayer?.getCurrentTime?.())}catch{}
+ }
+}
+function setDiscussionSource(next){
+ const source=next==='youtube'?'youtube':'ptt';
+ if(source===discussionSource)return;
+ discussionSource=source;
+ const youtube=source==='youtube';
+ pttPanel.classList.toggle('source-youtube',youtube);
+ youtubeChatPane.hidden=!youtube;
+ discussionPttTab?.classList.toggle('active',!youtube);
+ discussionYoutubeTab?.classList.toggle('active',youtube);
+ discussionPttTab?.setAttribute('aria-selected',String(!youtube));
+ discussionYoutubeTab?.setAttribute('aria-selected',String(youtube));
+ if(youtube)refreshYoutubeChat({force:true});
+ else{
+  youtubeChatIdentity='';
+  youtubeChatFrame?.removeAttribute('src');
+  youtubeChatPane?.classList.remove('ready');
+ }
+}
+discussionPttTab?.addEventListener('click',()=>setDiscussionSource('ptt'));
+discussionYoutubeTab?.addEventListener('click',()=>setDiscussionSource('youtube'));
+youtubeChatFrame?.addEventListener('load',()=>youtubeChatPane?.classList.add('ready'));
+youtubeChatSyncTimer=setInterval(()=>{
+ if(discussionSource!=='youtube'||hostLifecycle!=='ended')return;
+ try{window.HoloViewerYouTubeChat?.sync?.(youtubeChatFrame,hostPlayer?.getCurrentTime?.())}catch{}
+},500);
+
 function markPttUserScrollIntent(ms=1800){pttUserScrollIntentUntil=performance.now()+ms}
 function hasPttUserScrollIntent(){return performance.now()<=pttUserScrollIntentUntil}
 function pttAtBottom(){return pttFeed.scrollHeight-pttFeed.scrollTop-pttFeed.clientHeight<48}
@@ -1370,6 +1447,9 @@ async function resolveHostPtt(){
   if(result.status!==200)throw new Error(row.error||('metadata HTTP '+result.status));
 
   const state=String(row?.lifecycle_state||row?.state||'').toLowerCase();
+  hostLifecycle=state;
+  hostChannelId=String(row?.channel_id||row?.channelId||'');
+  refreshYoutubeChat({force:true});
   applyWatchalongHostAccent(row);
   hostStatus.textContent=state||'unknown';
   if(state==='live'){
@@ -1401,6 +1481,6 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('pagehide',()=>{
  saveCheckpoint();
- clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);clearInterval(checkpointTimer);
+ clearInterval(syncTimer);clearInterval(subtitleTimer);clearInterval(pttTimer);clearInterval(checkpointTimer);clearInterval(youtubeChatSyncTimer);
  pttPrimeTimers.forEach(clearTimeout);pttPrimeTimers=[];
 });
