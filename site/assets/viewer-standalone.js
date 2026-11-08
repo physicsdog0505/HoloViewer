@@ -241,7 +241,7 @@ function viewerSubtitleColorForCue(cue){
  const stream=streams[primaryIndex];
  const catalogAccent=stream?accentFor(streamCatalogRow(stream)||{}):'';
  if(catalogAccent&&catalogAccent!=='#9ab8c4')return catalogAccent;
- return viewerMemberAccent(viewerPrimaryAuthor())||'#ffffff';
+ return viewerMemberAccent(viewerPrimaryAuthor())||'#111111';
 }
 function streamCatalogRow(stream){
  return catalogRows.find(row=>String(row?.video_id||'')===String(stream?.videoId||''))||null;
