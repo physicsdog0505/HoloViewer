@@ -38,6 +38,20 @@ export function evidenceChecksum(r) {
   for (let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
   return (h>>>0).toString(16).padStart(8,'0');
 }
+function sameNullable(a,b){return (a??null)===(b??null);}
+function sameDurableFacts(current,r){
+  return Boolean(current) &&
+    current.publisher_channel_id===r.channel_id &&
+    current.roster_version===r.roster_version &&
+    current.channel_group===r.group &&
+    current.title===r.title &&
+    (current.channel_name??'')===(r.channel_name??'') &&
+    current.lifecycle_state===r.lifecycle_state &&
+    sameNullable(current.scheduled_start,r.scheduled_start) &&
+    sameNullable(current.actual_start,r.actual_start) &&
+    sameNullable(current.actual_end,r.actual_end) &&
+    current.source_label===r.source_label;
+}
 export async function writeEvidence(db, evidence) {
   const r=validateEvidence(evidence), hash=evidenceChecksum(r);
   const oldEvidence=await db.prepare('SELECT checksum FROM public_today_evidence WHERE video_id=? AND observed_at=? AND source_label=?')
@@ -46,10 +60,17 @@ export async function writeEvidence(db, evidence) {
     if (oldEvidence.checksum!==hash) throw Error('same-key contradictory evidence');
     return {changed:false,reason:'replay'};
   }
-  const current=await db.prepare('SELECT lifecycle_state,lifecycle_observed_at,publisher_channel_id,roster_version,source_checksum FROM public_today_canonical WHERE video_id=?')
+  const current=await db.prepare(`SELECT lifecycle_state,lifecycle_observed_at,publisher_channel_id,roster_version,
+    channel_group,title,channel_name,scheduled_start,actual_start,actual_end,source_label,source_checksum
+    FROM public_today_canonical WHERE video_id=?`)
     .bind(r.video_id).first();
   if (current && (current.publisher_channel_id!==r.channel_id))
     throw Error('canonical publisher/roster mismatch');
+  // Caller-level dedupe is an optimization, not a correctness boundary.
+  // A later observation with identical durable lifecycle facts must not create
+  // a fresh evidence row or rewrite the canonical projection.
+  if (sameDurableFacts(current,r))
+    return {changed:false,reason:'unchanged'};
   const newer=(!current || r.observed_at>current.lifecycle_observed_at);
   const canSelect=newer && !(current?.lifecycle_state==='ended' && r.lifecycle_state!=='ended');
   const evidenceSql=`INSERT INTO public_today_evidence
