@@ -230,6 +230,25 @@ test('transient videos.list failure retries under a token-fenced bounded lease',
 });
 
 
+test('store-level idempotency blocks later identical observations even when a caller forgets dedupe',async()=>{
+ const db=makeDb(),channel=channels[0].id;
+ const first={video_id:video,channel_id:channel,roster_version:version,group:'hololive',
+  title:'Stable live stream',channel_name:'Test Channel',lifecycle_state:'live',
+  observed_at:'2026-10-17T00:00:00Z',scheduled_start:null,
+  actual_start:'2026-10-16T23:55:00Z',actual_end:null,source_label:'YouTube'};
+ const initial=await writeEvidence(db,first);
+ assert.equal(initial.changed,true);
+ const beforeEvidence=db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n;
+ const beforeCanonical=db.raw.prepare('SELECT lifecycle_observed_at FROM public_today_canonical WHERE video_id=?').get(video);
+ const replay=await writeEvidence(db,{...first,observed_at:'2026-10-17T00:05:00Z'});
+ assert.equal(replay.changed,false);
+ assert.equal(replay.reason,'unchanged');
+ assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,beforeEvidence);
+ assert.equal(db.raw.prepare('SELECT lifecycle_observed_at FROM public_today_canonical WHERE video_id=?').get(video).lifecycle_observed_at,
+  beforeCanonical.lifecycle_observed_at);
+ db.raw.close();
+});
+
 test('unchanged pushed livestream snapshot acknowledges without another evidence/canonical write',async()=>{
  const db=makeDb(),channel=channels[0].id;
  const current={video_id:video,channel_id:channel,roster_version:version,group:'hololive',
