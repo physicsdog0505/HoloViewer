@@ -714,7 +714,7 @@ function homeTaipeiDayForTimestamp(raw){
 function homeEndedInTodayScope(item,today=taipeiDay()){
  const todayStart=Date.parse(today+'T00:00:00+08:00');
  if(!Number.isFinite(todayStart))return false;
- const carryStart=todayStart-6*60*60*1000;
+ const carryStart=todayStart;
  const todayEnd=todayStart+24*60*60*1000;
  const endMs=Date.parse(String(item?.actual_end||item?.end_at||'').trim());
  if(Number.isFinite(endMs))return endMs>=carryStart&&endMs<todayEnd;
