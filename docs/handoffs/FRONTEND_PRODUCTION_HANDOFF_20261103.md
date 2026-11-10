@@ -291,7 +291,41 @@ Next meaningful work:
 5. Keep GitHub durable handoff/evidence updated before switching long chat windows.
 6. No further work is required on the mobile Daily News RWD issue unless it regresses.
 
-## 12. Handoff rule for the next chat
+## 12. 2026-11-10 Daily Digest related-clips asset-loss incident
+
+During the Owner-local publication of the accepted 2026-11-09 Daily Digest month shard, a clean detached publication worktree contained the canonical month data but did not contain the already-live related-clips sidecars. Wrangler therefore deployed an asset manifest that omitted those sidecars.
+
+Observed Production evidence:
+
+- Daily Digest 2026-11 month shard remained valid and included `2026-11-01` through `2026-11-09`.
+- live month SHA-256 after the 2026-11-09 Digest publish: `a165c61ce1b3bf7e8161fdc1cd64b50ef0d13b24004272714cc0dcbb802b9af6`.
+- immediately after that publish, related-clips endpoints for `2026-11-01` through `2026-11-08` returned HTTP 404 even though their local sidecars still existed in the related-clips runtime publication tree.
+- `2026-11-09` had no clips sidecar yet and correctly remained pending for the persistent 30-minute worker.
+- restore used the related-clips publication tree while first seeding the current live month shard.
+- restore release moved the dedicated static Worker from `7c6bbccc-c44d-43a0-8c6d-7a66d4a5bfbf` to `939105da-d843-4a1c-8267-28fb76046d3b`.
+- post-restore readback: `2026-11-01` through `2026-11-08` related-clips endpoints HTTP 200; month shard still contained `2026-11-01` through `2026-11-09` with the same SHA-256 above.
+- related-clips worker PID 19971 remained active with `--poll-seconds 1800 --execute`.
+- its canonical month authority was resynchronized to the live 2026-11 month shard and byte-matched the SHA above.
+
+Root cause:
+
+The Daily Digest static release gate validated month shards and any sidecars present in the local candidate, but it did not protect live sidecars that were absent from a clean publication tree. A valid month-only candidate could therefore remove previously published related-clips assets from the Worker asset manifest.
+
+Permanent release rule:
+
+- Daily Digest static `prepare` and `deploy` must preserve any already-live `YYYY-MM-DD-related-clips.json` associated with days in candidate month shards when those sidecars are absent locally.
+- locally present sidecars remain authoritative refresh candidates and are never overwritten by the preservation step.
+- HTTP 404 means no prior live sidecar and is allowed.
+- any other live read failure/status fails closed before deployment.
+- preserved sidecars are then validated by the same sidecar contract gate before release.
+- Production mutation remains Owner-local only; GitHub Actions/CI are not Production authority.
+
+Implementation branch: `fix/daily-digest-preserve-live-clips-20261110`.
+PR: `#363` — Preserve live Daily Digest related-clips on month-only static releases.
+Candidate head at handoff update: `f5634afb367b1175356041a56fd46951016d8bde`.
+Regression coverage was added to `test_daily_digest_static_release_gate.py` for both live-sidecar preservation and fail-closed unexpected live status.
+
+## 13. Handoff rule for the next chat
 
 At the beginning of the next frontend / Production-coordinator window:
 

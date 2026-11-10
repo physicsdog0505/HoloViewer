@@ -20,6 +20,19 @@ class DailyDigestStaticReleaseGateTests(unittest.TestCase):
         )
         return path
 
+    def write_month_with_day(self, repo: Path, day: str = "2026-11-02") -> Path:
+        month = day[:7]
+        path = repo / f"daily-digest-static/data/daily-digest/months/{month}.json"
+        path.write_text(
+            '{"schema_version":1,"kind":"holodocchi.daily_digest_month",'
+            f'"month":"{month}","days":{{"{day}":{{'
+            '"schema_version":1,"kind":"holodocchi.daily_digest",'
+            f'"target_day":"{day}"'
+            '}}}\n',
+            encoding="utf-8",
+        )
+        return path
+
     def make_repo(self, root: Path) -> tuple[Path, str, dict[str, str]]:
         repo = root / "repo"
         (repo / "scripts").mkdir(parents=True)
@@ -40,6 +53,25 @@ class DailyDigestStaticReleaseGateTests(unittest.TestCase):
         npx = bin_dir / "npx"
         npx.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
         npx.chmod(0o755)
+        curl = bin_dir / "curl"
+        curl.write_text(
+            "#!/bin/sh\n"
+            "out=''\n"
+            "while [ \"$#\" -gt 0 ]; do\n"
+            "  case \"$1\" in\n"
+            "    -o) out=\"$2\"; shift 2 ;;\n"
+            "    -w) shift 2 ;;\n"
+            "    --max-time) shift 2 ;;\n"
+            "    -sS) shift ;;\n"
+            "    *) shift ;;\n"
+            "  esac\n"
+            "done\n"
+            "status=\"${MOCK_CURL_STATUS:-404}\"\n"
+            "if [ \"$status\" = 200 ]; then printf '%s' \"${MOCK_CURL_BODY:-}\" >\"$out\"; else : >\"$out\"; fi\n"
+            "printf '%s' \"$status\"\n",
+            encoding="utf-8",
+        )
+        curl.chmod(0o755)
         env = dict(os.environ)
         env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
         return repo, head, env
@@ -107,6 +139,38 @@ class DailyDigestStaticReleaseGateTests(unittest.TestCase):
             result = self.run_prepare(repo, head, env)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("zero month shards", result.stderr)
+
+    def test_prepare_preserves_live_related_clips_missing_from_clean_tree(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, head, env = self.make_repo(Path(td))
+            self.write_month_with_day(repo)
+            env["MOCK_CURL_STATUS"] = "200"
+            env["MOCK_CURL_BODY"] = (
+                '{"schema_version":1,"kind":"holodocchi.daily_digest.related_clips",'
+                '"target_day":"2026-11-02","status":"ok","stories":[],"sources":{}}\n'
+            )
+            result = self.run_prepare(repo, head, env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            preserved = (
+                repo
+                / "daily-digest-static/data/daily-digest/2026-11/"
+                "2026-11-02-related-clips.json"
+            )
+            self.assertTrue(preserved.is_file())
+            self.assertIn(
+                "PRESERVED_LIVE_RELATED_CLIPS=data/daily-digest/2026-11/"
+                "2026-11-02-related-clips.json",
+                result.stdout,
+            )
+
+    def test_prepare_fails_closed_on_live_related_clips_read_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, head, env = self.make_repo(Path(td))
+            self.write_month_with_day(repo)
+            env["MOCK_CURL_STATUS"] = "503"
+            result = self.run_prepare(repo, head, env)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unexpected live related clips status 503", result.stderr)
 
     def test_unrelated_runtime_drift_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:
