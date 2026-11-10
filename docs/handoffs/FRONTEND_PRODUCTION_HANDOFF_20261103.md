@@ -321,6 +321,8 @@ Permanent release rule:
 - Production mutation remains Owner-local only; GitHub Actions/CI are not Production authority.
 
 Implementation branch: `fix/daily-digest-preserve-live-clips-20261110`.
+PR: `#363` — Preserve live Daily Digest related-clips on month-only static releases.
+Candidate head at handoff update: `f5634afb367b1175356041a56fd46951016d8bde`.
 Regression coverage was added to `test_daily_digest_static_release_gate.py` for both live-sidecar preservation and fail-closed unexpected live status.
 
 ## 13. Handoff rule for the next chat
