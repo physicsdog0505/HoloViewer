@@ -28,7 +28,7 @@ class DailyDigestStaticReleaseGateTests(unittest.TestCase):
             f'"month":"{month}","days":{{"{day}":{{'
             '"schema_version":1,"kind":"holodocchi.daily_digest",'
             f'"target_day":"{day}"'
-            '}}}}}\n',
+            '}}}\n',
             encoding="utf-8",
         )
         return path
