@@ -20,6 +20,51 @@ current_version(){
   rm -f "$tmp"
 }
 
+preserve_live_related_clips(){
+  root="$ASSET_ROOT/data/daily-digest/months"
+  [ -d "$root" ]||fail "month shard root missing"
+
+  tmp="$(mktemp -d /private/tmp/daily-digest-static-preserve.XXXXXX)"
+  find "$root" -type f -name '*.json' >"$tmp/months"
+
+  while IFS= read -r month_file; do
+    month="$(basename "$month_file" .json)"
+    jq -r '.days | keys[]' "$month_file" >"$tmp/days"
+
+    while IFS= read -r day; do
+      [ -n "$day" ]||continue
+      rel="data/daily-digest/$month/$day-related-clips.json"
+      local_file="$ASSET_ROOT/$rel"
+
+      # Existing local sidecars may be intentional refresh candidates. Preserve
+      # only live sidecars that are absent from this publication tree.
+      [ ! -e "$local_file" ]||continue
+
+      fetched="$tmp/$day-related-clips.json"
+      if ! status="$(curl -sS --max-time 30 -o "$fetched" -w '%{http_code}' "$LIVE_ORIGIN/$rel?preserve=$(date +%s)")"; then
+        rm -rf "$tmp"
+        fail "unable to read live related clips: $rel"
+      fi
+
+      case "$status" in
+        200)
+          mkdir -p "$(dirname "$local_file")"
+          cp "$fetched" "$local_file"
+          printf 'PRESERVED_LIVE_RELATED_CLIPS=%s\n' "$rel"
+          ;;
+        404)
+          ;;
+        *)
+          rm -rf "$tmp"
+          fail "unexpected live related clips status $status: $rel"
+          ;;
+      esac
+    done <"$tmp/days"
+  done <"$tmp/months"
+
+  rm -rf "$tmp"
+}
+
 verify_candidate(){
   expected_head="$1"
   repo_root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"; cd "$repo_root"
@@ -95,6 +140,8 @@ case "$mode" in
     [ "$#" -eq 2 ]||fail "usage: $0 prepare EXPECTED_HEAD"
     require_hex "$2" 40
     verify_candidate "$2"
+    preserve_live_related_clips
+    verify_candidate "$2"
     baseline="$(current_version)"
     printf 'DAILY_DIGEST_STATIC_PREPARE=PASS\n'
     printf 'CANDIDATE_HEAD=%s\n' "$2"
@@ -116,6 +163,8 @@ case "$mode" in
   deploy)
     [ "$#" -eq 3 ]||fail "usage: $0 deploy EXPECTED_HEAD EXPECTED_BASELINE_VERSION"
     require_hex "$2" 40
+    verify_candidate "$2"
+    preserve_live_related_clips
     verify_candidate "$2"
     baseline="$(current_version)"
     [ "$baseline" = "$3" ]||fail "dedicated Worker baseline changed since Owner approval"
