@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {refreshKnownTodayLifecycle,mountTodayCadence,shouldRunLifecycleRefresh,PROVIDER_MISS_RETIRE_THRESHOLD} from './worker_host/today/cadence-refresh.mjs';
 import {readFileSync} from 'node:fs';
+import {readToday} from './worker_host/today/store.mjs';
 import {DatabaseSync} from 'node:sqlite';
 
 function fakeDb(rows){
@@ -9,15 +10,16 @@ function fakeDb(rows){
     writes:[],
     prepare(sql){
       const self=this;
+      const selected=/FROM\s+public_today_canonical/i.test(sql)?rows:[];
       return {
         bind(...args){
           return {
-            all:async()=>({results:rows}),
+            all:async()=>({results:selected}),
             first:async()=>null,
             run:async()=>{self.writes.push({sql,args});return {success:true}}
           };
         },
-        all:async()=>({results:rows}),
+        all:async()=>({results:selected}),
         first:async()=>null
       };
     },
@@ -61,6 +63,179 @@ test('known lifecycle refresh uses one bounded videos.list request',async()=>{
   assert.equal(out.updated,1);
 });
 
+
+function instrumentDb(base){
+ let readQueries=0,providerMissDeletes=0,heartbeatUpdates=0,batches=0;
+ return {
+  raw:base.raw,
+  prepare(sql){
+   if(/^\s*SELECT\b/i.test(sql))readQueries++;
+   if(/^\s*DELETE\s+FROM\s+public_today_provider_misses\b/i.test(sql))providerMissDeletes++;
+   if(/^\s*UPDATE\s+public_today_canonical\b/i.test(sql)&&/checked_at=\?/i.test(sql))heartbeatUpdates++;
+   return base.prepare(sql);
+  },
+  async batch(statements){batches++;return base.batch(statements)},
+  close(){base.close()},
+  metrics:()=>({readQueries,providerMissDeletes,heartbeatUpdates,batches})
+ };
+}
+function seedSteadyLive(db,count=50){
+ const cid='UC'+'S'.repeat(22);
+ for(let i=0;i<count;i++){
+  const id='v'+String(i).padStart(10,'0');
+  db.raw.prepare(`INSERT INTO public_today_canonical
+   (video_id,publisher_channel_id,roster_version,channel_group,title,channel_name,lifecycle_state,
+    lifecycle_observed_at,checked_at,scheduled_start,actual_start,actual_end,source_label,source_checksum)
+   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    id,cid,'v85','hololive','Title '+i,'Channel','live',
+    '2026-10-18T08:00:00Z','2026-10-18T08:00:00Z',
+    '2026-10-18T07:00:00Z','2026-10-18T07:01:00Z',null,
+    'YouTube liveStreamingDetails','steady'
+   );
+ }
+ return cid;
+}
+function steadyProvider(cid,count=50,{changedIndex=-1,endedIndex=-1}={}){
+ const items=[];
+ for(let i=0;i<count;i++){
+  const id='v'+String(i).padStart(10,'0');
+  const ended=i===endedIndex;
+  items.push({
+   id,
+   snippet:{
+    channelId:cid,
+    title:i===changedIndex?'Changed title':'Title '+i,
+    channelTitle:'Channel',
+    liveBroadcastContent:ended?'none':'live'
+   },
+   liveStreamingDetails:{
+    scheduledStartTime:'2026-10-18T07:00:00Z',
+    actualStartTime:'2026-10-18T07:01:00Z',
+    ...(ended?{actualEndTime:'2026-10-18T08:59:00Z'}:{})
+   }
+  });
+ }
+ return async()=>new Response(JSON.stringify({items}),{status:200,headers:{'content-type':'application/json'}});
+}
+
+test('steady-state 50-video cadence uses two bounded D1 reads and no evidence churn',async()=>{
+ const raw=retirementDb();const cid=seedSteadyLive(raw,50);const d=instrumentDb(raw);
+ const out=await refreshKnownTodayLifecycle(
+  {TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d},
+  {now:new Date('2026-10-18T09:00:00Z'),fetchImpl:steadyProvider(cid,50)}
+ );
+ assert.equal(out.selected,50);
+ assert.equal(out.updated,0);
+ assert.equal(out.unchanged,50);
+ assert.equal(out.read_queries,2);
+ assert.equal(d.metrics().readQueries,2);
+ assert.equal(d.metrics().providerMissDeletes,0);
+ assert.equal(d.metrics().heartbeatUpdates,1);
+ assert.equal(raw.raw.prepare('SELECT COUNT(*) n FROM public_today_evidence').get().n,0);
+ const row=raw.raw.prepare('SELECT lifecycle_observed_at,checked_at FROM public_today_canonical WHERE video_id=?').get('v0000000000');
+ assert.equal(row.lifecycle_observed_at,'2026-10-18T08:00:00Z');
+ assert.equal(row.checked_at,'2026-10-18T09:00:00Z');
+ assert.equal(raw.raw.prepare('SELECT source_checksum FROM public_today_canonical WHERE video_id=?').get('v0000000000').source_checksum,'steady');
+ raw.close();
+});
+
+
+test('unchanged 50-video heartbeat rotates fairly without changing evidence provenance',async()=>{
+ const raw=retirementDb();const cid=seedSteadyLive(raw,50);const d=instrumentDb(raw);
+ const env={TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d};
+ const first=await refreshKnownTodayLifecycle(env,{
+  now:new Date('2026-10-18T09:00:00Z'),fetchImpl:steadyProvider(cid,50),limit:25
+ });
+ assert.equal(first.selected,25);
+ assert.equal(first.updated,0);
+ assert.equal(d.metrics().readQueries,2);
+ const afterFirst=raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE checked_at='2026-10-18T09:00:00Z'").get().n;
+ assert.equal(afterFirst,25);
+ const second=await refreshKnownTodayLifecycle(env,{
+  now:new Date('2026-10-18T09:05:00Z'),fetchImpl:steadyProvider(cid,50),limit:25
+ });
+ assert.equal(second.selected,25);
+ assert.equal(second.updated,0);
+ assert.equal(d.metrics().readQueries,4);
+ const checked=raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE checked_at='2026-10-18T09:05:00Z'").get().n;
+ assert.equal(checked,25);
+ const untouched=raw.raw.prepare("SELECT COUNT(*) AS n FROM public_today_canonical WHERE lifecycle_observed_at!='2026-10-18T08:00:00Z' OR source_checksum!='steady'").get().n;
+ assert.equal(untouched,0);
+ assert.equal(raw.raw.prepare('SELECT COUNT(*) AS n FROM public_today_evidence').get().n,0);
+ raw.close();
+});
+
+
+test('consumer live freshness follows checked_at, not evidence observation time',async()=>{
+ const db=retirementDb();const cid=seedSteadyLive(db,1);
+ db.raw.prepare(`INSERT INTO public_today_approved_channels(channel_id,roster_version,activated_at,channel_group)
+  VALUES(?,?,?,?)`).run(cid,'v85','2026-10-18T07:00:00Z','hololive');
+ db.raw.prepare(`INSERT INTO public_today_catalog_meta
+  (singleton,roster_version,last_success_at,expected_channels,scanned_channels,gap,checkpoint)
+  VALUES(1,?,?,?,?,?,?)`).run('v85','2026-10-18T09:00:00Z',1,1,0,'test');
+ db.raw.prepare('UPDATE public_today_canonical SET checked_at=? WHERE video_id=?')
+  .run('2026-10-18T09:00:00Z','v0000000000');
+ const out=await readToday(db,{day:'2026-10-18',now:new Date('2026-10-18T09:10:00Z')});
+ assert.equal(out.streams.length,1);
+ assert.equal(out.streams[0].stale,false);
+ assert.equal(out.streams[0].observed_at,'2026-10-18T08:00:00Z');
+ db.raw.prepare('UPDATE public_today_canonical SET checked_at=? WHERE video_id=?')
+  .run('2026-10-18T08:00:00Z','v0000000000');
+ const expired=await readToday(db,{day:'2026-10-18',now:new Date('2026-10-18T09:10:00Z')});
+ assert.equal(expired.streams[0].stale,true);
+ db.close();
+});
+
+test('provider miss cleanup is one bounded delete only when preloaded miss rows exist',async()=>{
+ const raw=retirementDb();const cid=seedSteadyLive(raw,10);
+ for(let i=0;i<5;i++){
+  raw.raw.prepare('INSERT INTO public_today_provider_misses(video_id,first_missing_at,last_missing_at,miss_count) VALUES(?,?,?,?)')
+   .run('v'+String(i).padStart(10,'0'),'2026-10-18T08:00:00Z','2026-10-18T08:00:00Z',1);
+ }
+ const d=instrumentDb(raw);
+ const out=await refreshKnownTodayLifecycle(
+  {TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d},
+  {now:new Date('2026-10-18T09:00:00Z'),fetchImpl:steadyProvider(cid,10),limit:10}
+ );
+ assert.equal(out.read_queries,2);
+ assert.equal(d.metrics().providerMissDeletes,1);
+ assert.equal(raw.raw.prepare('SELECT COUNT(*) n FROM public_today_provider_misses').get().n,0);
+ raw.close();
+});
+
+test('one changed lifecycle fact adds one bounded evidence preload, not per-video reads',async()=>{
+ const raw=retirementDb();const cid=seedSteadyLive(raw,50);const d=instrumentDb(raw);
+ const out=await refreshKnownTodayLifecycle(
+  {TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d},
+  {now:new Date('2026-10-18T09:00:00Z'),fetchImpl:steadyProvider(cid,50,{changedIndex:17})}
+ );
+ assert.equal(out.updated,1);
+ assert.equal(out.unchanged,49);
+ assert.equal(out.read_queries,3);
+ assert.equal(d.metrics().readQueries,3);
+ assert.equal(raw.raw.prepare('SELECT COUNT(*) n FROM public_today_evidence').get().n,1);
+ assert.equal(raw.raw.prepare('SELECT title FROM public_today_canonical WHERE video_id=?').get('v0000000017').title,'Changed title');
+ raw.close();
+});
+
+test('ended transition adds one bounded catalog-avatar preload only once',async()=>{
+ const raw=retirementDb();const cid=seedSteadyLive(raw,50);
+ raw.raw.prepare('INSERT INTO public_catalog(video_id,channel_id,avatar_url,actual_start,scheduled_start) VALUES(?,?,?,?,?)')
+  .run('catalog0001',cid,'https://yt3.ggpht.com/avatar','2026-10-18T06:00:00Z','2026-10-18T06:00:00Z');
+ const d=instrumentDb(raw);
+ const out=await refreshKnownTodayLifecycle(
+  {TODAY_CADENCE_ENABLED:'true',YOUTUBE_API_KEY:'secret',DB:d},
+  {now:new Date('2026-10-18T09:00:00Z'),fetchImpl:steadyProvider(cid,50,{endedIndex:3})}
+ );
+ assert.equal(out.updated,1);
+ assert.equal(out.read_queries,4);
+ assert.equal(d.metrics().readQueries,4);
+ const ended=raw.raw.prepare('SELECT lifecycle_state,actual_end FROM public_today_canonical WHERE video_id=?').get('v0000000003');
+ assert.equal(ended.lifecycle_state,'ended');
+ assert.equal(ended.actual_end,'2026-10-18T08:59:00Z');
+ raw.close();
+});
+
 test('combined cadence wrapper preserves fetch contract',async()=>{
   const base={async fetch(){return new Response('same',{status:207})}};
   const worker=mountTodayCadence(base,{fetchImpl:async()=>{throw Error('network')}});
@@ -96,7 +271,7 @@ test('cadence includes recent ended rows needing authoritative re-verification f
   const db={
     writes:[],
     prepare(sql){
-      if(sql.includes('FROM public_today_canonical')&&sql.includes('ORDER BY lifecycle_observed_at')){
+      if(sql.includes('FROM public_today_canonical')&&sql.includes('ORDER BY checked_at')){
         selectSql=sql;
         return {bind(...args){selectArgs=args;return {all:async()=>({results:[row]})}}};
       }
