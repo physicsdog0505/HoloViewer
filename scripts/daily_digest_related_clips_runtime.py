@@ -84,6 +84,73 @@ def load_canonical_month_shards(canonical_months_root: Path) -> dict[str, bytes]
     return shards
 
 
+def refresh_canonical_month_shards_from_live(
+    *,
+    canonical_months_root: Path,
+    publication_root: Path,
+    readback_fetcher: Callable[[str], bytes],
+) -> dict[str, bytes]:
+    """Refresh the isolated canonical month snapshot from verified live bytes."""
+
+    root = canonical_months_root.expanduser().resolve()
+    publication_months = (publication_root / "months").expanduser().resolve()
+    if (
+        root == publication_months
+        or root in publication_months.parents
+        or publication_months in root.parents
+    ):
+        raise RuntimeError334(
+            "canonical month authority must be separate from publication output"
+        )
+    if not root.is_dir():
+        raise RuntimeError334(f"canonical month authority missing: {root}")
+
+    existing = load_canonical_month_shards(root)
+    for name in sorted(existing):
+        month = Path(name).stem
+        live_path = f"/data/daily-digest/months/{name}"
+        live = readback_fetcher(live_path)
+        try:
+            payload = json.loads(live.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError334(
+                f"invalid live canonical month shard: {live_path}"
+            ) from exc
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema_version") != 1
+            or payload.get("kind") != "holodocchi.daily_digest_month"
+            or payload.get("month") != month
+            or not isinstance(payload.get("days"), dict)
+        ):
+            raise RuntimeError334(
+                f"invalid live canonical month shard: {live_path}"
+            )
+
+        destination = root / name
+        if destination.read_bytes() == live:
+            continue
+        fd, temporary = tempfile.mkstemp(
+            prefix=f".{destination.name}.", dir=root
+        )
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(live)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, destination)
+        except Exception:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+            raise
+
+    refreshed = load_canonical_month_shards(root)
+    verify_canonical_months_match_live(refreshed, readback_fetcher)
+    return refreshed
+
+
 def materialize_publication_union(
     *,
     canonical_months_root: Path,
@@ -723,8 +790,6 @@ def execute_jobs_batch(
         raise RuntimeError334(
             "sidecar root must be the Daily Digest publication root"
         )
-    canonical_shards = load_canonical_month_shards(canonical_months_root)
-
     if not os.environ.get(holodex_api_key_env, "").strip():
         raise RuntimeError334(
             f"{holodex_api_key_env} is required for execute mode"
@@ -732,10 +797,15 @@ def execute_jobs_batch(
     if readback_fetcher is None:
         raise RuntimeError334("execute mode requires live readback fetcher")
 
-    # Related clips own only their sidecar paths. They must never advance or
-    # regress canonical Daily Digest month shards. Fail closed if the local
-    # authority is not exactly what Production currently serves.
-    verify_canonical_months_match_live(canonical_shards, readback_fetcher)
+    # Related clips own only their sidecar paths. The canonical month snapshot
+    # is isolated from the publication tree, but Daily Digest may advance it
+    # before this worker's next poll. Refresh that isolated snapshot from the
+    # live, read-back-verified month bytes before building the union.
+    canonical_shards = refresh_canonical_month_shards_from_live(
+        canonical_months_root=canonical_months_root,
+        publication_root=publication_root,
+        readback_fetcher=readback_fetcher,
+    )
 
     resolver_env = dict(os.environ)
     safe_env = dict(resolver_env)
