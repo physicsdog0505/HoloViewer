@@ -25,6 +25,7 @@ from scripts.daily_digest_related_clips_runtime import (
     empty_state,
     load_canonical_month_shards,
     materialize_publication_union,
+    refresh_canonical_month_shards_from_live,
     month_compaction_eligible,
     pending_backfill_days,
     reconcile_publication,
@@ -888,7 +889,7 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             "complete",
         )
 
-    def test_execute_jobs_batch_refuses_stale_canonical_month_before_provider_or_deploy(self):
+    def test_execute_jobs_batch_refreshes_stale_canonical_month_from_live(self):
         state = empty_state()
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -906,26 +907,47 @@ class DailyDigestRelatedClipsRuntimeTests(unittest.TestCase):
             calls = []
 
             with patch.dict(os.environ, {"HOLODEX_API_KEY": "test-key"}):
-                with self.assertRaisesRegex(
-                    RuntimeError334,
-                    "canonical month differs from live Production",
-                ):
-                    execute_jobs_batch(
-                        state,
-                        jobs_with_candidates=[],
-                        private_repo=root / "private",
-                        corpus_root=root / "corpus",
-                        sidecar_root=sidecar_root,
-                        canonical_months_root=canonical_root,
-                        public_repo=public_repo,
-                        public_expected_head="a" * 40,
-                        python_executable="/usr/bin/python3",
-                        runner=lambda command, **kwargs: calls.append(command),
-                        readback_fetcher=lambda path: live_month_bytes,
-                    )
+                results = execute_jobs_batch(
+                    state,
+                    jobs_with_candidates=[],
+                    private_repo=root / "private",
+                    corpus_root=root / "corpus",
+                    sidecar_root=sidecar_root,
+                    canonical_months_root=canonical_root,
+                    public_repo=public_repo,
+                    public_expected_head="a" * 40,
+                    python_executable="/usr/bin/python3",
+                    runner=lambda command, **kwargs: calls.append(command),
+                    readback_fetcher=lambda path: live_month_bytes,
+                )
 
+            self.assertEqual(results, [])
             self.assertEqual(calls, [])
+            self.assertEqual(
+                (canonical_root / "2026-11.json").read_bytes(),
+                live_month_bytes,
+            )
             self.assertEqual(state["days"], {})
+
+    def test_refresh_canonical_refuses_publication_months_alias(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            public_repo, publication_root, _canonical_root, raw_month = (
+                self.make_publication_fixture(root)
+            )
+            publication_months = publication_root / "months"
+            publication_months.mkdir(parents=True)
+            (publication_months / "2026-11.json").write_bytes(raw_month)
+
+            with self.assertRaisesRegex(
+                RuntimeError334,
+                "canonical month authority must be separate from publication output",
+            ):
+                refresh_canonical_month_shards_from_live(
+                    canonical_months_root=publication_months,
+                    publication_root=publication_root,
+                    readback_fetcher=lambda path: raw_month,
+                )
 
     def test_execute_job_refuses_without_holodex_key(self):
         state = empty_state()
