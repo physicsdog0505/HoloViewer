@@ -308,11 +308,35 @@ assert.equal(core.interSegmentGapUntil(segments,2,10.0,true),null);
         self.assertIn('ASSET_ROOT="watchalong-static"', source)
         self.assertIn('APPROVED_SYNC_ROOT must point to exact reviewed authority checkout', source)
         self.assertIn('--approved-sync-root "$APPROVED_SYNC_ROOT"', source)
-        self.assertIn('npx --yes wrangler deploy --config "$WRANGLER_CONFIG" --name "$WORKER_NAME"', source)
+        self.assertIn('CONFIRM_WATCHALONG_RELEASE', source)
+        self.assertIn('npx --yes wrangler versions upload', source)
+        self.assertIn('verify_resource_parity "$baseline_version" "$candidate_version"', source)
+        self.assertIn('verify_additive_preview', source)
+        self.assertIn('npx --yes wrangler versions deploy "$candidate_version@100%"', source)
+        self.assertIn('npx --yes wrangler versions deploy "$baseline_version@100%"', source)
+        self.assertIn('release checkout must equal the fetched origin/main', source)
+        self.assertIn('approved sync authority must equal the fetched private origin/main', source)
+        self.assertIn('APPROVED_AUTHORITY_HEAD=', source)
+        self.assertNotIn('.event_count == 8', source)
         self.assertNotIn('--name holoviewer-public', source)
         self.assertNotIn('cloudflare/wrangler.json', source)
         self.assertIn("retired", retired)
         self.assertNotIn("wrangler deploy", retired)
+
+    def test_owner_local_release_has_non_mutating_help_and_confirmation_gate(self):
+        script = ROOT / "scripts/deploy_watchalong_static_assets_owner_local.sh"
+        help_result = subprocess.run(
+            [str(script), "--help"], cwd=ROOT, text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn("CONFIRM_WATCHALONG_RELEASE=DEPLOY", help_result.stdout)
+
+        release_result = subprocess.run(
+            [str(script), "release"], cwd=ROOT, text=True, capture_output=True, check=False,
+        )
+        self.assertNotEqual(release_result.returncode, 0)
+        self.assertIn("set CONFIRM_WATCHALONG_RELEASE=DEPLOY", release_result.stderr)
+        self.assertNotIn("wrangler", release_result.stdout)
 
     def test_exporter_has_no_network_or_provider_write_path(self):
         source = (ROOT / "scripts/export_watchalong_assets.py").read_text(encoding="utf-8")
