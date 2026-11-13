@@ -13,7 +13,7 @@ import unittest
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "watchalong-static/data/watchalong"
 OLD_MASTERS = ("eFYByyw5AJc", "U2o13h1Oib4", "8pF4qHcshDc", "t8q3XEmK0aM")
-NEW_MASTERS = ("jqJb0qnueDo", "x7bMoyNWaEE", "ZpGtQNsS0Fs")
+NEW_MASTERS = ("jqJb0qnueDo", "x7bMoyNWaEE", "ZpGtQNsS0Fs", "hRrLTHudlN8")
 MASTERS = OLD_MASTERS + NEW_MASTERS
 
 class WatchalongAssetTests(unittest.TestCase):
@@ -21,9 +21,9 @@ class WatchalongAssetTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.manifest = json.loads((DATA / "manifest.json").read_text(encoding="utf-8"))
 
-    def test_manifest_exports_exactly_seven_intended_sessions(self):
+    def test_manifest_exports_exactly_eight_intended_sessions(self):
         self.assertEqual(self.manifest["schema_version"], "holoviewer-watchalong-manifest-v1")
-        self.assertEqual(self.manifest["event_count"], 7)
+        self.assertEqual(self.manifest["event_count"], 8)
         self.assertEqual(tuple(row["event_id"] for row in self.manifest["events"]), MASTERS)
         self.assertEqual({path.stem for path in (DATA / "events").glob("*.json")}, set(MASTERS))
 
@@ -69,6 +69,7 @@ class WatchalongAssetTests(unittest.TestCase):
             "jqJb0qnueDo": ("versions/jqJb0qnueDo/0001-1707920de9336b32d05554fb41b3172204eef9735f866486af22dd9cd8e5e9c9.json", "1707920de9336b32d05554fb41b3172204eef9735f866486af22dd9cd8e5e9c9", 1),
             "x7bMoyNWaEE": ("versions/x7bMoyNWaEE/0001-0c2437fe31448d6852fc905557718f226a8cf2aec60ad1518ff5cb6eacd9114a.json", "0c2437fe31448d6852fc905557718f226a8cf2aec60ad1518ff5cb6eacd9114a", 1),
             "ZpGtQNsS0Fs": ("versions/ZpGtQNsS0Fs/0001-94fea609d39659d0349fb704206b694d584ba0289b455336a93b1ad461552559.json", "94fea609d39659d0349fb704206b694d584ba0289b455336a93b1ad461552559", 1),
+            "hRrLTHudlN8": ("versions/hRrLTHudlN8/0001-a7af3317f40ddc46e95d89e81f8ef3410c955d8cd382ce529302eafa9cbd47f7.json", "a7af3317f40ddc46e95d89e81f8ef3410c955d8cd382ce529302eafa9cbd47f7", 1),
         }
         for master, (relative_path, approved_sync_id, approval_version) in expected.items():
             event = json.loads((DATA / "events" / f"{master}.json").read_text(encoding="utf-8"))
@@ -140,6 +141,24 @@ class WatchalongAssetTests(unittest.TestCase):
         self.assertEqual([row["source_start_ms"] for row in event["segments"]], [0, 0, 0, 0, 0])
         self.assertEqual(event["artifacts"]["translation"]["artifact_id"], "1c81208b3010cabcdbeff6b570b30138a1e62409de3f3959dd0a3f7974b2cf1c")
         self.assertEqual(event["artifacts"]["translation"]["translated_cues"], 1299)
+
+    def test_hrr_exports_owner_saved_five_episode_sequence(self):
+        event = json.loads((DATA / "events/hRrLTHudlN8.json").read_text(encoding="utf-8"))
+        self.assertEqual(event["session_day"], "2026-11-12")
+        self.assertEqual(event["playlist_start_index"], 11)
+        self.assertEqual(event["source_video_ids"], [
+            "ttdb9_murrc", "lKNXRDqkoDw", "Vgch1SfsKt0", "FPR3TK_X7sA", "y02emGPtX68",
+        ])
+        self.assertEqual(
+            [row["host_start_ms"] for row in event["segments"]],
+            [523760, 1995200, 3464520, 4985840, 6458239],
+        )
+        self.assertEqual([row["source_start_ms"] for row in event["segments"]], [0, 0, 0, 0, 0])
+        self.assertEqual(event["artifacts"]["translation"]["artifact_id"], "dbb4d4d53a25fc225c9286becc645ea539f3dde0c54359766f7397d848b9f3d5")
+        self.assertEqual(event["artifacts"]["translation"]["translated_cues"], 1046)
+        self.assertEqual(event["completeness"], {
+            "sync": "PRESENT", "transcript": "COMPLETE", "translation": "COMPLETE",
+        })
 
     def test_october_15_is_complete_not_missing(self):
         event = json.loads((DATA / "events/8pF4qHcshDc.json").read_text(encoding="utf-8"))
