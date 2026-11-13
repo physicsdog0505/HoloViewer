@@ -48,7 +48,7 @@ verify_candidate() {
   [ ! -e site/data/watchalong ] || fail "Watchalong data is still packaged by holoviewer-public"
   [ -f "$ASSET_ROOT/$MANIFEST_REL" ] || fail "dedicated manifest missing"
   [ "$(sha256_file "$ASSET_ROOT/$MANIFEST_REL")" = "$expected_manifest_sha" ] || fail "candidate manifest hash mismatch"
-  jq -e '.schema_version == "holoviewer-watchalong-manifest-v1" and .event_count == 7 and (.events|length) == 7' "$ASSET_ROOT/$MANIFEST_REL" >/dev/null || fail "candidate manifest inventory mismatch"
+  jq -e '.schema_version == "holoviewer-watchalong-manifest-v1" and .event_count == 8 and (.events|length) == 8' "$ASSET_ROOT/$MANIFEST_REL" >/dev/null || fail "candidate manifest inventory mismatch"
   jq -r '.events[] | [.path,.sha256] | @tsv' "$ASSET_ROOT/$MANIFEST_REL" | while IFS="$(printf '\t')" read -r path expected; do
     require_hex "$expected" 64 "event SHA-256"
     file="$ASSET_ROOT/${path#/}"
