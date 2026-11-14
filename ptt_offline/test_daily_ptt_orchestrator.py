@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+import tempfile
 import unittest
 
-from ptt_offline.daily_ptt_orchestrator import run_orchestration
+from ptt_offline.daily_ptt_orchestrator import (
+    DailyPttOrchestrationError,
+    pending_archive_days,
+    run_backlog_orchestration,
+    run_orchestration,
+)
 
 
 class DailyPttOrchestratorTests(unittest.TestCase):
@@ -175,6 +183,92 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         self.assertEqual(body["status"],"FAILED")
         self.assertFalse(body["downstream_invoked"])
         self.assertEqual(body["failure_code"],"gate-day-missing")
+
+    def test_downstream_exception_keeps_stage_and_failure_detail(self):
+        def runner(command):
+            if command==["gate"]:
+                return 0,{"day":"2026-11-07","health_gate_passed":True}
+            raise DailyPttOrchestrationError(
+                "command did not return one JSON object: DailyHistoryRuntimeError")
+
+        body=run_orchestration(
+            gate_command=["gate"],downstream_command=["archive"],
+            mode="production",command_runner=runner)
+
+        self.assertEqual(body["status"],"FAILED")
+        self.assertEqual(body["day"],"2026-11-07")
+        self.assertEqual(body["failure_code"],"command-output-invalid")
+        self.assertEqual(body["failure_stage"],"downstream")
+        self.assertIn("DailyHistoryRuntimeError",body["failure_detail"])
+
+    def test_pending_days_are_oldest_unverified_receipts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for day,verified in (("2026-11-06",True),("2026-11-08",False)):
+                target=root/"archive"/day/"archive-job.json"
+                target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_text(json.dumps({"job_verified":verified}),encoding="utf-8")
+
+            days,more=pending_archive_days(
+                state_root=root,start_day="2026-11-06",
+                through_day="2026-11-10",limit=3)
+
+        self.assertEqual(days,["2026-11-07","2026-11-08","2026-11-09"])
+        self.assertTrue(more)
+
+    def test_backlog_expands_day_and_stops_on_first_failure(self):
+        calls=[]
+        def runner(command):
+            calls.append(command)
+            day=command[-1]
+            if command[0]=="gate":
+                return 0,{"day":day,"health_gate_passed":True}
+            if day=="2026-11-08":
+                return 2,{"day":day,"status":"NOT_ARCHIVE_READY",
+                          "failure_code":"archive-build-failed"}
+            return 0,{"day":day,"status":"VERIFIED_COMPLETE_PUBLISHED"}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            body=run_backlog_orchestration(
+                gate_command=["gate","--day","{day}"],
+                downstream_command=["archive","--day","{day}"],
+                mode="production",state_root=Path(tmp),
+                start_day="2026-11-07",through_day="2026-11-10",
+                max_days=4,command_runner=runner)
+
+        self.assertEqual(body["status"],"FAILED")
+        self.assertEqual(body["day"],"2026-11-08")
+        self.assertEqual(body["processed_days"],["2026-11-07"])
+        self.assertEqual(calls,[
+            ["gate","--day","2026-11-07"],
+            ["archive","--day","2026-11-07"],
+            ["gate","--day","2026-11-08"],
+            ["archive","--day","2026-11-08"],
+        ])
+
+    def test_backlog_runs_monthly_release_once_after_all_days(self):
+        calls=[]
+        def runner(command):
+            calls.append(command)
+            if command==["monthly","2026-11","2026-11-08"]:
+                return 0,{"status":"MONTHLY_RELEASE_DEPLOYED"}
+            day=command[-1]
+            if command[0]=="gate":
+                return 0,{"day":day,"health_gate_passed":True}
+            return 0,{"day":day,"status":"VERIFIED_COMPLETE_PUBLISHED"}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            body=run_backlog_orchestration(
+                gate_command=["gate","{day}"],
+                downstream_command=["archive","{day}"],
+                post_command=["monthly","{month}","{day}"],
+                mode="production",state_root=Path(tmp),
+                start_day="2026-11-07",through_day="2026-11-08",
+                max_days=3,command_runner=runner)
+
+        self.assertEqual(body["status"],"SUCCEEDED")
+        self.assertEqual(body["post_receipt"]["status"],"MONTHLY_RELEASE_DEPLOYED")
+        self.assertEqual(calls[-1],["monthly","2026-11","2026-11-08"])
 
 if __name__=="__main__":
     unittest.main()

@@ -127,6 +127,27 @@ class DailyPttSchedulerGateTests(unittest.TestCase):
         self.assertFalse(body["archive_ready"])
         self.assertEqual(body["safety"]["restart_attempts"],1)
 
+    def test_explicit_closed_day_supports_bounded_catchup(self):
+        body=run_scheduler_gate(
+            daily_config_path=self.config,
+            now=self.now,
+            day="2026-10-19",
+            health_probe=lambda:self.healthy(),
+        )
+
+        self.assertEqual(body["day"],"2026-10-19")
+        self.assertTrue(
+            (self.state/"collector-health"/"2026-10-19.json").is_file())
+
+    def test_future_day_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError,"closed Taipei day"):
+            run_scheduler_gate(
+                daily_config_path=self.config,
+                now=self.now,
+                day="2026-10-22",
+                health_probe=lambda:self.healthy(),
+            )
+
 
 if __name__=="__main__":
     unittest.main()

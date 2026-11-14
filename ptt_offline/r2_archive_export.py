@@ -21,6 +21,8 @@ TPE=ZoneInfo("Asia/Taipei")
 SCHEMA="ptt-r2-archive-v1"
 CHUNK_MINUTES=60
 URL_EPOCH=re.compile(r"/M\.([0-9]{9,11})\.A\.")
+REPAIR_BATCH_GAP=timedelta(minutes=5)
+MIN_PROVABLE_OVERLAP=2
 
 def _utc(iso: str) -> datetime:
     dt=datetime.fromisoformat(iso.replace("Z","+00:00"))
@@ -65,6 +67,63 @@ def _per_thread_floors(db: sqlite3.Connection, article_id: int,
     ordered=sorted(raw_pushes,key=lambda row:row["source_line"])
     return ({row["source_line"]:index for index,row in enumerate(ordered,start=1)},
             "per-thread-ordinal")
+
+
+def _overlap_identity(row: dict) -> tuple:
+    return tuple(row.get(name) for name in (
+        "kind","author","content","ptt_date","ptt_time"))
+
+
+def _capture_time(row: dict) -> datetime | None:
+    raw=row.get("collected_at")
+    if not isinstance(raw,str) or not raw:
+        return None
+    try:
+        value=datetime.fromisoformat(raw.replace("Z","+00:00"))
+    except ValueError:
+        return None
+    if value.tzinfo is None:
+        return None
+    return value.astimezone(timezone.utc)
+
+
+def remove_provable_repair_overlap(rows: list[dict]) -> tuple[list[dict],list[dict]]:
+    """Remove only exact multi-row overlap at a later capture-batch boundary.
+
+    Bounded repair can re-read the tail of the preceding PTT page before adding
+    missing rows. Collector preserves both source-line identities. For archive
+    chronology those repeated page-tail rows are one observation, not later
+    events. A single repeated comment is never enough evidence for removal.
+    """
+    cleaned=list(rows)
+    removed=[]
+    boundary=1
+    while boundary<len(cleaned):
+        before=_capture_time(cleaned[boundary-1])
+        after=_capture_time(cleaned[boundary])
+        if before is None or after is None or after-before<REPAIR_BATCH_GAP:
+            boundary+=1
+            continue
+        max_size=min(boundary,len(cleaned)-boundary,200)
+        overlap=0
+        for size in range(max_size,MIN_PROVABLE_OVERLAP-1,-1):
+            left=[_overlap_identity(row) for row in cleaned[boundary-size:boundary]]
+            right=[_overlap_identity(row) for row in cleaned[boundary:boundary+size]]
+            if left==right:
+                overlap=size
+                break
+        if overlap:
+            duplicate=cleaned[boundary:boundary+overlap]
+            removed.append({
+                "first_source_line":duplicate[0].get("source_line"),
+                "last_source_line":duplicate[-1].get("source_line"),
+                "row_count":overlap,
+                "reason":"exact-later-capture-page-tail-overlap",
+            })
+            del cleaned[boundary:boundary+overlap]
+            continue
+        boundary+=1
+    return cleaned,removed
 
 def _event_row(event: dict, *, url: str) -> dict:
     occurred=_utc(event["occurred_at"]).replace(second=0,microsecond=0)
@@ -185,6 +244,7 @@ def export_archive(db, *, from_day: str, through_day: str, out_dir: Path) -> dic
     articles_scanned=0
     pushes_selected=0
     rejected=[]
+    repair_overlaps=[]
 
     target_dates=[]
     cursor=start_local.date()
@@ -226,6 +286,11 @@ def export_archive(db, *, from_day: str, through_day: str, out_dir: Path) -> dic
         if not raw:
             continue
         raw_pushes=[dict(zip(keys,row)) for row in raw]
+        raw_pushes,overlaps=remove_provable_repair_overlap(raw_pushes)
+        if overlaps:
+            repair_overlaps.append({
+                "aid":normalize_public_aid(raw_aid),"overlaps":overlaps,
+            })
         floors,floor_quality=_per_thread_floors(db,article_id,raw_pushes)
         articles_scanned+=1
         try:
@@ -284,6 +349,10 @@ def export_archive(db, *, from_day: str, through_day: str, out_dir: Path) -> dic
         "through_day_taipei":through_day,
         "articles_scanned":articles_scanned,
         "pushes":pushes_selected,
+        "repair_overlap_rows_removed":sum(
+            item["row_count"] for article in repair_overlaps
+            for item in article["overlaps"]),
+        "repair_overlap_evidence":repair_overlaps,
         "objects":objects,
     }
     manifest_path=out_dir/f"ptt/v1/manifests/{from_day}_{through_day}.json"
