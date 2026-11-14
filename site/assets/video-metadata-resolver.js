@@ -42,6 +42,36 @@
   if(!row||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return null;
   return {...row,lifecycle_state:'ended',state:'ended'};
  }
+ async function historicalStaticRowByVideoId(videoId,staticBase,signal=null){
+  if(!VALID_ID.test(videoId))return null;
+  const manifestResult=await fetchJson(staticBase,'/youtube/v1/manifest.json',signal);
+  if(manifestResult.aborted||manifestResult.status!==200)return null;
+  const manifest=manifestResult.payload||{};
+  if(manifest.schema_version!==1||!Array.isArray(manifest.months)||!Array.isArray(manifest.video_indexes))return null;
+  const prefix=videoId[0];
+  const indexEntry=manifest.video_indexes.find(item=>
+   item&&String(item.prefix||'')===prefix&&typeof item.path==='string'
+  );
+  if(!indexEntry||!String(indexEntry.path).startsWith('youtube/v1/'))return null;
+  const indexResult=await fetchJson(staticBase,'/'+String(indexEntry.path).replace(/^\/+/,''),signal);
+  if(indexResult.aborted||indexResult.status!==200)return null;
+  const index=indexResult.payload||{};
+  if(index.schema_version!==1||index.index_version!==1||String(index.prefix||'')!==prefix||!index.videos||typeof index.videos!=='object')return null;
+  const month=String(index.videos[videoId]||'');
+  if(!/^\d{4}-\d{2}$/.test(month))return null;
+  const monthState=String(manifest.availability?.month_state?.[month]?.state||manifest.availability?.month_state?.[month]||'').toLowerCase();
+  if(monthState&&monthState!=='published'&&monthState!=='available')return null;
+  const monthEntry=manifest.months.find(item=>item&&String(item.month||'')===month&&typeof item.path==='string');
+  if(!monthEntry||!String(monthEntry.path).startsWith('youtube/v1/'))return null;
+  const monthResult=await fetchJson(staticBase,'/'+String(monthEntry.path).replace(/^\/+/,''),signal);
+  if(monthResult.aborted||monthResult.status!==200)return null;
+  const payload=monthResult.payload||{};
+  if(payload.schema_version!==1||!Array.isArray(payload.videos))return null;
+  const row=payload.videos.find(item=>String(item?.video_id||'')===videoId);
+  const start=Date.parse(String(row?.actual_start||'')),end=Date.parse(String(row?.actual_end||''));
+  if(!row||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return null;
+  return {...row,lifecycle_state:'ended',state:'ended'};
+ }
  async function resolve(videoId,options={}){
   const id=String(videoId||'');
   if(!VALID_ID.test(id))return {status:'invalid',videoId:id,row:null,httpStatus:0};
@@ -79,6 +109,11 @@
     const row=await historicalStaticRow(id,String(options.pttDay),youtubeStaticBase,signal);
     if(signal?.aborted)return {status:'aborted',videoId:id,row:null,httpStatus:0};
     if(row)return {status:'ready',videoId:id,row,httpStatus:200,source:'youtube-static',attempt};
+   }
+   if(result.status===404&&youtubeStaticBase){
+    const row=await historicalStaticRowByVideoId(id,youtubeStaticBase,signal);
+    if(signal?.aborted)return {status:'aborted',videoId:id,row:null,httpStatus:0};
+    if(row)return {status:'ready',videoId:id,row,httpStatus:200,source:'youtube-static-video-index',attempt};
    }
    if(result.status===404&&payload.error==='metadata_not_found_cached'){
     return {status:'not-found',videoId:id,row:payload,httpStatus:404,attempt};
