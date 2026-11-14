@@ -47,6 +47,7 @@ from .daily_static_assets_archive import (
     verify_http_readback,
 )
 from .r2_archive_export import export_archive
+from .public_today_contract import ContractError
 
 CONFIG_SCHEMA="holoviewer-ptt-daily-history-runtime-config-v1"
 LIFECYCLE_V2_CUTOVER_DAY="2026-10-23"
@@ -1037,10 +1038,15 @@ def run_closeout(*, config: dict[str,Any], day: str | None=None) -> dict[str,Any
 
     expected_aids={str(aid).lstrip("#") for aid in finalization["expected_set"]["expected_aids"]}
     expected_epochs=_expected_thread_epochs(expected)
-    with tempfile.TemporaryDirectory(prefix=f"holoviewer-{target_day}-",dir=state_root) as tmp:
-        source_objects=_daily_source_objects(
-            source=source,day=target_day,work_dir=Path(tmp),expected_aids=expected_aids,
-            expected_thread_epochs=expected_epochs)
+    try:
+        with tempfile.TemporaryDirectory(prefix=f"holoviewer-{target_day}-",dir=state_root) as tmp:
+            source_objects=_daily_source_objects(
+                source=source,day=target_day,work_dir=Path(tmp),expected_aids=expected_aids,
+                expected_thread_epochs=expected_epochs)
+    except (ContractError,DailyHistoryRuntimeError,OSError) as exc:
+        detail=str(exc).replace("\n"," ")[:500]
+        raise DailyHistoryRuntimeError(
+            "archive-source-build failed: "+type(exc).__name__+": "+detail) from exc
 
     public,wrangler_config=ensure_static_root(
         state_root=state_root,target=str(config["static_target"]))
@@ -1255,9 +1261,18 @@ def main(argv=None):
 
     args=parser.parse_args(argv)
     if args.cmd=="run":
-        config=load_config(Path(args.config).expanduser())
-        with _Lock(config["_state_path"]/"daily-history.lock"):
-            result=run_closeout(config=config,day=args.day)
+        try:
+            config=load_config(Path(args.config).expanduser())
+            with _Lock(config["_state_path"]/"daily-history.lock"):
+                result=run_closeout(config=config,day=args.day)
+        except (DailyHistoryRuntimeError,ContractError,OSError) as exc:
+            print(json.dumps({
+                "status":"FAILED",
+                "day":args.day,
+                "failure_code":type(exc).__name__,
+                "failure_detail":str(exc).replace("\n"," ")[:500],
+            },ensure_ascii=False,sort_keys=True))
+            raise SystemExit(2)
         print(json.dumps(result,ensure_ascii=False,sort_keys=True))
         if result["status"] in {"NOT_ARCHIVE_READY","PRE_CUTOVER_IMMUTABLE"}:
             raise SystemExit(2)

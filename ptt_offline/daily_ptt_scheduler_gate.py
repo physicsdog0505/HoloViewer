@@ -10,7 +10,7 @@ does not invoke the downstream completeness/archive runtime.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import date, datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -59,10 +59,20 @@ def run_scheduler_gate(
     now: datetime | None=None,
     health_probe=None,
     recovery_executor=None,
+    day: str | None=None,
 ) -> dict[str,Any]:
     config=_load_daily_config(Path(daily_config_path).expanduser())
     local_now=(now or datetime.now(TPE)).astimezone(TPE)
-    day=previous_taipei_day(local_now)
+    latest_day=previous_taipei_day(local_now)
+    if day is None:
+        day=latest_day
+    else:
+        try:
+            parsed_day=date.fromisoformat(day)
+        except ValueError as exc:
+            raise RuntimeError("target day must be canonical YYYY-MM-DD") from exc
+        if parsed_day.isoformat()!=day or day>latest_day:
+            raise RuntimeError("target day must be a closed Taipei day")
     root: Path=config["collector_root"]
     state: Path=config["state_root"]
     receipt_path=state/"collector-health"/f"{day}.json"
@@ -153,11 +163,13 @@ def main(argv=None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--daily-config",required=True)
     parser.add_argument("--recovery-config")
+    parser.add_argument("--day")
     args=parser.parse_args(argv)
     try:
         body=run_scheduler_gate(
             daily_config_path=args.daily_config,
             recovery_config_path=args.recovery_config,
+            day=args.day,
         )
     except Exception as exc:
         print(json.dumps({
