@@ -129,6 +129,52 @@ def run_backlog_orchestration(
     days,more=pending_archive_days(
         state_root=state_root,start_day=start_day,through_day=through_day,
         limit=max_days)
+    if not days:
+        runner=command_runner or _run_json_command
+        try:
+            gate_rc,gate=runner(_expand_day(gate_command,through_day))
+        except DailyPttOrchestrationError as exc:
+            return {
+                "schema_version":SCHEMA_VERSION,
+                "status":"FAILED",
+                "day":through_day,
+                "failure_code":"command-output-invalid",
+                "failure_stage":"maintenance-gate",
+                "failure_detail":str(exc),
+                "processed_days":[],
+                "pending_remaining":False,
+                "catchup_noop":True,
+                "downstream_invoked":False,
+                "downstream_status":"NOT_RUN",
+            }
+        if gate.get("day")!=through_day:
+            return {
+                "schema_version":SCHEMA_VERSION,
+                "status":"FAILED",
+                "day":through_day,
+                "failure_code":"maintenance-gate-day-mismatch",
+                "processed_days":[],
+                "pending_remaining":False,
+                "catchup_noop":True,
+                "downstream_invoked":False,
+                "downstream_status":"NOT_RUN",
+                "maintenance_gate_receipt":gate,
+            }
+        health_ok=gate_rc==0 and gate.get("health_gate_passed") is True
+        return {
+            "schema_version":SCHEMA_VERSION,
+            "status":"SUCCEEDED" if health_ok else "BLOCKED",
+            "day":through_day,
+            "failure_code":None if health_ok else gate.get(
+                "failure_code","collector-health-gate-failed"),
+            "processed_days":[],
+            "pending_remaining":False,
+            "catchup_noop":True,
+            "health_gate_passed":health_ok,
+            "downstream_invoked":False,
+            "downstream_status":"NOT_RUN",
+            "maintenance_gate_receipt":gate,
+        }
     receipts=[]
     for target_day in days:
         receipt=run_orchestration(

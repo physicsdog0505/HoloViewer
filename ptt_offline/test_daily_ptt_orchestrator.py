@@ -270,5 +270,84 @@ class DailyPttOrchestratorTests(unittest.TestCase):
         self.assertEqual(body["post_receipt"]["status"],"MONTHLY_RELEASE_DEPLOYED")
         self.assertEqual(calls[-1],["monthly","2026-11","2026-11-08"])
 
+    def test_backlog_noop_still_runs_collector_health_gate(self):
+        calls=[]
+        def runner(command):
+            calls.append(command)
+            return 0,{
+                "day":"2026-11-14",
+                "health_gate_passed":True,
+                "restart_attempted":True,
+                "restart_result":"RECOVERED",
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            receipt=root/"archive"/"2026-11-14"/"archive-job.json"
+            receipt.parent.mkdir(parents=True)
+            receipt.write_text(json.dumps({"job_verified":True}),encoding="utf-8")
+            body=run_backlog_orchestration(
+                gate_command=["gate","--day","{day}"],
+                downstream_command=["archive","--day","{day}"],
+                post_command=["monthly","{month}","{day}"],
+                mode="production",state_root=root,
+                start_day="2026-11-14",through_day="2026-11-14",
+                command_runner=runner)
+
+        self.assertEqual(calls,[["gate","--day","2026-11-14"]])
+        self.assertEqual(body["status"],"SUCCEEDED")
+        self.assertTrue(body["catchup_noop"])
+        self.assertTrue(body["health_gate_passed"])
+        self.assertFalse(body["downstream_invoked"])
+        self.assertEqual(
+            body["maintenance_gate_receipt"]["restart_result"],"RECOVERED")
+
+    def test_backlog_noop_fails_closed_when_health_not_restored(self):
+        def runner(command):
+            return 3,{
+                "day":"2026-11-14",
+                "health_gate_passed":False,
+                "failure_code":"collector-health-not-restored",
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            receipt=root/"archive"/"2026-11-14"/"archive-job.json"
+            receipt.parent.mkdir(parents=True)
+            receipt.write_text(json.dumps({"job_verified":True}),encoding="utf-8")
+            body=run_backlog_orchestration(
+                gate_command=["gate","{day}"],
+                downstream_command=["archive","{day}"],
+                mode="production",state_root=root,
+                start_day="2026-11-14",through_day="2026-11-14",
+                command_runner=runner)
+
+        self.assertEqual(body["status"],"BLOCKED")
+        self.assertTrue(body["catchup_noop"])
+        self.assertFalse(body["health_gate_passed"])
+        self.assertEqual(
+            body["failure_code"],"collector-health-not-restored")
+
+    def test_backlog_noop_rejects_maintenance_gate_day_mismatch(self):
+        def runner(command):
+            return 0,{"day":"2026-11-13","health_gate_passed":True}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            receipt=root/"archive"/"2026-11-14"/"archive-job.json"
+            receipt.parent.mkdir(parents=True)
+            receipt.write_text(json.dumps({"job_verified":True}),encoding="utf-8")
+            body=run_backlog_orchestration(
+                gate_command=["gate","{day}"],
+                downstream_command=["archive","{day}"],
+                mode="production",state_root=root,
+                start_day="2026-11-14",through_day="2026-11-14",
+                command_runner=runner)
+
+        self.assertEqual(body["status"],"FAILED")
+        self.assertEqual(
+            body["failure_code"],"maintenance-gate-day-mismatch")
+        self.assertFalse(body["downstream_invoked"])
+
 if __name__=="__main__":
     unittest.main()
