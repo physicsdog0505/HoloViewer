@@ -76,15 +76,21 @@ def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict],
             raise ContractError("invalid source PTT calendar date") from exc
         # The article URL has second precision while push text has only minute
         # precision. The first push can therefore render a few seconds before
-        # the article anchor when both are in the same minute. Every later
-        # backwards minute remains a hard failure.
+        # the article anchor when both are in the same minute. PTT source text
+        # can also contain a one-minute display regression while source_line
+        # continues forward. Clamp only that bounded precision artifact to the
+        # preceding authoritative minute; larger regressions remain fatal.
         same_minute=(event.year,event.month,event.day,event.hour,event.minute)==(
             previous.year,previous.month,previous.day,previous.hour,previous.minute)
+        chronology_note=None
         # The other permitted rollover is observed Dec -> Jan, including first
         # push after a December URL-epoch article.
         if event < previous:
             if not output and same_minute:
                 pass
+            elif previous-event<=timedelta(minutes=1):
+                event=previous
+                chronology_note="source-minute-regression-clamped"
             elif previous.month != 12 or month != 1:
                 raise ContractError("unobserved or regressive source chronology")
             else:
@@ -99,8 +105,11 @@ def reconstruct_events(*,board:str,aid:str,url:str,pushes:list[dict],
         # Collector text has only minute precision; treat equal-minute rows
         # as ordered by canonical source_line, not manufactured seconds.
         occurred=event.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z")
-        output.append({**row,"aid":canonical,"occurred_at":occurred,
-                       "day":taipei_day(occurred),
-                       "source_record_key":f"{canonical}:{line}"})
+        normalized={**row,"aid":canonical,"occurred_at":occurred,
+                    "day":taipei_day(occurred),
+                    "source_record_key":f"{canonical}:{line}"}
+        if chronology_note is not None:
+            normalized["chronology_note"]=chronology_note
+        output.append(normalized)
         previous=event
     return output

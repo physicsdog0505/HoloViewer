@@ -54,11 +54,24 @@ class UrlEpochAuthorityTests(unittest.TestCase):
         self.assertEqual(got[0]["occurred_at"],"2026-10-24T10:59:00Z")
         self.assertEqual([row["source_line"] for row in got],[214,215,216])
 
-    def test_backwards_minute_after_first_push_still_fails_closed(self):
+    def test_one_minute_regression_is_clamped_to_preceding_source_minute(self):
         url=url_at("2026-10-24T10:59:13Z")
         rows=[
             {"source_line":214,"ptt_date":"10/24","ptt_time":"18:59"},
             {"source_line":215,"ptt_date":"10/24","ptt_time":"18:58"},
+        ]
+        got=reconstruct_events(
+            board="C_Chat",aid="A1",url=url,pushes=rows,
+            identity_verifier=self.verifier)
+        self.assertEqual(got[1]["occurred_at"],got[0]["occurred_at"])
+        self.assertEqual(
+            got[1]["chronology_note"],"source-minute-regression-clamped")
+
+    def test_larger_regression_after_first_push_still_fails_closed(self):
+        url=url_at("2026-10-24T10:59:13Z")
+        rows=[
+            {"source_line":214,"ptt_date":"10/24","ptt_time":"18:59"},
+            {"source_line":215,"ptt_date":"10/24","ptt_time":"18:57"},
         ]
         with self.assertRaisesRegex(ContractError,"regressive source chronology"):
             reconstruct_events(
