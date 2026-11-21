@@ -95,6 +95,7 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
     page_coverage_end=None
     page_coverage_gaps=[]
     screen_pages_valid=False
+    screen_rows_structurally_valid=False
     if has_screens:
         screen_ranges=db.execute("""
             SELECT source_page,total_pages,start_line,end_line FROM article_screens
@@ -105,6 +106,7 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
             type(start) is int and type(end) is int and
             page>0 and total>=page and start>0 and end>=start
             for page,total,start,end in screen_ranges)
+        screen_rows_structurally_valid=structurally_valid
         if structurally_valid:
             floor_coverage_start=screen_ranges[0][2]
             merged_end=screen_ranges[0][3]
@@ -124,9 +126,24 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
                 any(page==page_coverage_end and total==page_coverage_end
                     for page,total,_,_ in screen_ranges)
             )
-            screen_pages_valid=(page_coverage_start==1 and
-                                not page_coverage_gaps and terminal_consistent)
+            # article_screens is unique by line range.  When PTT dynamically
+            # renumbers growing pages, a previously captured range can move
+            # from page N to N+1 and overwrite its old page label.  Numeric
+            # page gaps are therefore diagnostic only; continuous article-line
+            # coverage plus a consistent terminal page proves the capture.
+            screen_pages_valid=(page_coverage_start==1 and terminal_consistent)
     latest_push_page=max(source_pages,default=None)
+    # A new PTT page can appear in pushes immediately before Collector's
+    # article_screens snapshot for that page is committed.  This is a bounded,
+    # recoverable race: keep the row pending for the next Publisher pass rather
+    # than permanently publishing it with floor=NULL.
+    floor_transient_page_lag=bool(
+        not truncated and chronological_raw and screen_rows_structurally_valid and
+        floor_coverage_start==1 and not floor_coverage_gaps and
+        page_coverage_start==1 and
+        type(page_coverage_end) is int and type(latest_push_page) is int and
+        latest_push_page==page_coverage_end+1
+    )
     if (not truncated and chronological_raw and
         all(type(line) is int and line>0 for line in source_lines) and
         source_lines==sorted(source_lines) and len(source_lines)==len(set(source_lines)) and
@@ -182,6 +199,8 @@ def inspect_latest_article(db,*,max_rows=50000,article_id=None):
             "floor_coverage_gaps":floor_coverage_gaps,
             "page_coverage_start":page_coverage_start,"page_coverage_end":page_coverage_end,
             "page_coverage_gaps":page_coverage_gaps,
+            "latest_push_page":latest_push_page,
+            "floor_transient_page_lag":floor_transient_page_lag,
             "pending_source_lines":pending,"checked_source_rows":len(raw),
             "scan_truncated":truncated,
             "earliest_scanned_source_line":min((r[0] for r in raw[:max_rows]),default=None),
@@ -283,6 +302,26 @@ def run_live_once(db,*,state_path,secret=None,executor=None,reconcile_executor=N
                     "retained_recovery_candidates":0,
                     "burst_safe_candidates":0,"stale_fenced_rows":0,
                     "pending":len(plan["pending_source_lines"]),
+                    "source_identity":plan["source_identity"],"sent":0}
+
+        # Do not turn a short page-rollover race into permanent missing floor
+        # data.  No checkpoint is changed here, so the same rows are retried as
+        # soon as article_screens catches up and floor authority is restored.
+        if missing and plan.get("floor_transient_page_lag"):
+            fresh_eligible=sum(1 for row in missing if _fresh_for_burst(row,now=now))
+            wait_ages=[_row_age_seconds(row,now=now) for row in missing]
+            return {"status":"FLOOR_AUTHORITY_WAIT","aid":plan["aid"],
+                    "eligible":len(missing),"fresh_eligible":fresh_eligible,
+                    "legacy_baseline_candidates":0,
+                    "baseline_skipped_candidates":len(baseline_skipped),
+                    "retained_recovery_candidates":len(missing),
+                    "burst_safe_candidates":sum(
+                        1 for age in wait_ages
+                        if age is not None and 0<=age<=RECOVERY_MAX_DELAY_SECONDS),
+                    "stale_fenced_rows":0,
+                    "pending":len(plan["pending_source_lines"]),
+                    "page_coverage_end":plan.get("page_coverage_end"),
+                    "latest_push_page":plan.get("latest_push_page"),
                     "source_identity":plan["source_identity"],"sent":0}
 
         # Runtime recovery fence. On every send, historical missing rows older

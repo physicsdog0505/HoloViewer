@@ -117,7 +117,7 @@ class LiveCapturePublisherTests(unittest.TestCase):
         self.assertFalse(inspected["floor_authoritative"])
         self.assertEqual(inspected["page_coverage_start"],2)
 
-    def test_floor_is_fail_closed_on_screen_page_gap(self):
+    def test_floor_authority_tolerates_renumbered_screen_page_gap(self):
         self.db.execute("UPDATE pushes SET source_page=3")
         self.db.execute("DELETE FROM article_screens")
         self.db.executemany("INSERT INTO article_screens VALUES(?,?,?,?,?,?,?)",[
@@ -125,7 +125,7 @@ class LiveCapturePublisherTests(unittest.TestCase):
             (2,1,3,3,26,50,'now'),
         ])
         inspected=inspect_latest_article(self.db)
-        self.assertFalse(inspected["floor_authoritative"])
+        self.assertTrue(inspected["floor_authoritative"])
         self.assertEqual(inspected["page_coverage_gaps"],[2])
 
     def test_floor_is_fail_closed_when_screens_do_not_reach_latest_push_page(self):
@@ -133,6 +133,44 @@ class LiveCapturePublisherTests(unittest.TestCase):
         inspected=inspect_latest_article(self.db)
         self.assertFalse(inspected["floor_authoritative"])
         self.assertEqual(inspected["page_coverage_end"],1)
+        self.assertTrue(inspected["floor_transient_page_lag"])
+
+    def test_page_rollover_waits_then_publishes_with_floor(self):
+        calls=[]
+        baseline=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=lambda batch: calls.append(batch),send=True)
+        self.assertEqual(baseline["status"],"BASELINED")
+
+        # PTT has started page 2, while Collector has only updated page 1's
+        # total_pages metadata.  The new row must remain locally pending.
+        self.db.execute("UPDATE article_screens SET total_pages=2")
+        self.db.execute("INSERT INTO pushes VALUES(4,1,51,2,'推','d','page two','10/15','18:03','2026-10-15T10:03:30Z')")
+        waiting=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=lambda _:self.fail("page-lag row must not publish without floor"),
+            send=True,now=datetime.fromisoformat("2026-10-15T10:04:00+00:00"))
+        self.assertEqual(waiting["status"],"FLOOR_AUTHORITY_WAIT")
+        self.assertEqual(waiting["eligible"],1)
+        self.assertEqual(waiting["page_coverage_end"],1)
+        self.assertEqual(waiting["latest_push_page"],2)
+        saved=json.loads(Path(self.state).read_text(encoding="utf-8"))
+        self.assertNotIn(f"{self.aid}:51",saved["accepted"])
+
+        # Once the matching screen arrives, the untouched row is retried with
+        # its authoritative per-thread ordinal.
+        self.db.execute("INSERT INTO article_screens VALUES(2,1,2,2,51,100,'now')")
+        def approve(batch):
+            calls.append(batch)
+            self.assertEqual(len(batch["rows"]),1)
+            self.assertEqual(batch["rows"][0]["source_line"],51)
+            self.assertEqual(batch["rows"][0]["floor"],4)
+            return {"status":"ACK","batch_id":batch["batch_id"],"digest":batch["digest"],
+              "logical_rows_acked":1,"d1_query_count":7,"d1_rows_written":4,
+              "http_requests":1}
+        recovered=run_live_once(self.db,state_path=self.state,secret="k"*40,
+            executor=approve,send=True,
+            now=datetime.fromisoformat("2026-10-15T10:04:10+00:00"))
+        self.assertEqual(recovered["status"],"ACK")
+        self.assertEqual(recovered["sent"],1)
 
     def test_floor_is_fail_closed_on_inconsistent_total_pages(self):
         self.db.execute("UPDATE article_screens SET total_pages=2")
