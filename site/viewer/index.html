@@ -118,6 +118,15 @@
     <section class="viewer-workspace">
       <div id="stage" class="viewer-stage"></div>
       <aside id="pttPanel" class="viewer-ptt ptt-floor-hidden" hidden>
+        <section id="mobileSubtitlePanel" class="mobile-subtitle-panel" hidden aria-label="影片翻譯">
+          <button id="mobileSubtitleToggle" class="mobile-subtitle-toggle" type="button" aria-expanded="false" aria-controls="mobileSubtitleBody">
+            <span>翻譯</span>
+            <span id="mobileSubtitleToggleState" class="mobile-subtitle-toggle-state">顯示</span>
+          </button>
+          <div id="mobileSubtitleBody" class="mobile-subtitle-body" hidden>
+            <div id="mobileSubtitleText" class="mobile-subtitle-text" aria-live="polite"></div>
+          </div>
+        </section>
         <div class="ptt-heading">
           <div class="ptt-title-line">
             <div class="discussion-source-toggle" role="tablist" aria-label="留言來源">
