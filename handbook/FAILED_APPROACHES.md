@@ -45,3 +45,14 @@ Only evidence-backed failures are labeled Failed. Replaced designs are not neces
 | F-023 | Playing through timeline gaps / gap 期間繼續上一段 | Risk explicitly avoided / 已明確避免 | [07](07-master-timeline.md) |
 | F-024 | Seek on every small drift / 每個微小誤差都 seek | Risk explicitly avoided / 已明確避免 | [07](07-master-timeline.md) |
 | F-025 | URL master time trusted as media clock / URL master time 當 player clock | Parked / 已暫停 | [07](07-master-timeline.md) |
+
+| F-026 | Generic game title means same collab / 同遊戲標題即視為同場連動 | Risk explicitly avoided / 已明確避免 | [08](08-collab-identification.md) |
+| F-027 | Similar start time means same event / 相近開播時間即視為同一事件 | Risk explicitly avoided / 已明確避免 | [08](08-collab-identification.md) |
+| F-028 | Candidate group enables timeline sync / 候選群組直接啟用時間同步 | Forbidden by design / 設計上禁止 | [08](08-collab-identification.md) |
+| F-029 | Ambiguous candidate chooses first match / 模糊候選直接選第一組 | Risk explicitly avoided / 已明確避免 | [08](08-collab-identification.md) |
+| F-030 | Watchalong source time equals host time / 同時視聽 source time 直接等於 host time | Risk explicitly avoided / 已明確避免 | [09](09-watchalong.md) |
+| F-031 | Advance immediately when source ends / 片源結束立即跳下一段 | Risk explicitly avoided / 已明確避免 | [09](09-watchalong.md) |
+| F-032 | Static Watchalong subtitles follow source timeline / 靜態同時視聽字幕跟 source 時間軸 | Rejected contract / 已拒絕 | [09](09-watchalong.md) |
+| F-033 | Ignore transcript-translation provenance / 不驗證原文與翻譯 provenance | Risk explicitly avoided / 已明確避免 | [09](09-watchalong.md) |
+| F-034 | Seek on every sync-loop tick / 每次同步迴圈都 seek | Risk explicitly avoided / 已明確避免 | [09](09-watchalong.md) |
+| F-035 | URL checkpoint treated as media truth / URL checkpoint 當播放器真實時間 | Parked / 已暫停 | [09](09-watchalong.md) |
