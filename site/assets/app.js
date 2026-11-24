@@ -1465,7 +1465,7 @@ const HISTORY_DISCOVERY_BATCH_SIZE=30;
 let historyDiscoveryTarget=HISTORY_DISCOVERY_BATCH_SIZE;
 let historyDiscoveryContext='';
 function resetHistoryDiscoveryTarget(){historyDiscoveryTarget=HISTORY_DISCOVERY_BATCH_SIZE;historyDiscoveryContext=''}
-async function loadYoutubeHistoryDiscovery({manifest,parsedSearch=null,subtitleOnly=false,target=HISTORY_DISCOVERY_BATCH_SIZE}={}){
+async function loadYoutubeHistoryDiscovery({manifest,parsedSearch=null,subtitleOnly=false,target=HISTORY_DISCOVERY_BATCH_SIZE,onProgress=null}={}){
  const months=historyPublishedMonths(manifest).slice().sort().reverse();
  const collected=[];let scanned=0;
  for(const month of months){
@@ -1478,7 +1478,11 @@ async function loadYoutubeHistoryDiscovery({manifest,parsedSearch=null,subtitleO
   let rows=payload.items;
   if(parsedSearch)rows=historySearchRows(rows,parsedSearch).map(row=>row.item);
   if(subtitleOnly)rows=rows.filter(row=>monthIds.has(String(row?.video_id||'')));
+  const before=collected.length;
   collected.push(...rows);scanned+=1;
+  if(collected.length>before&&typeof onProgress==='function'){
+   await onProgress({items:uniqueSortedHistoryRows(collected),has_more:scanned<months.length,months_scanned:scanned});
+  }
   if(collected.length>=target)break;
  }
  const items=uniqueSortedHistoryRows(collected);
@@ -1830,6 +1834,12 @@ let historySearchRenderLimit=HISTORY_SEARCH_BATCH_SIZE;
 let historySearchLoadMoreObserver=null;
 let historySearchSummaryState=null;
 let historySearchSourceHasMore=false;
+let historyDiscoveryLoading=false;
+const historyRenderedVideoIds=new Set();
+function setHistoryLoading(active){
+ historyDiscoveryLoading=Boolean(active);
+ const el=$('history-loading');if(el)el.hidden=!historyDiscoveryLoading;
+}
 function resetHistorySearchRenderLimit(){
  historySearchRenderLimit=HISTORY_SEARCH_BATCH_SIZE;
  historySearchSourceHasMore=false;
@@ -1892,26 +1902,32 @@ function historyFacetFilteredRows(){
  if(!historyChannelSelection.size)return historyChannelFacetRows;
  return historyChannelFacetRows.filter(row=>historyChannelSelection.has(String(row?.channel_id||'')));
 }
-function renderHistoryFacetCards(){
- const list=$('history-list');list.replaceChildren();historyVodWindows.clear();
+function renderHistoryFacetCards({append=false}={}){
+ const list=$('history-list');
+ if(!append){list.replaceChildren();historyVodWindows.clear();historyRenderedVideoIds.clear()}
  const rows=historyFacetFilteredRows();
  const rendered=rows.slice(0,historySearchRenderLimit);
- rendered.forEach(item=>homeCard(item,list,{collabMap:historyChannelFacetCollabMap,history:true}));
+ for(const item of rendered){
+  const id=String(item?.video_id||'');
+  if(append&&historyRenderedVideoIds.has(id))continue;
+  homeCard(item,list,{collabMap:historyChannelFacetCollabMap,history:true});
+  if(id)historyRenderedVideoIds.add(id);
+ }
  const ids=new Set(rendered.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
  $('history-empty').hidden=Boolean(rendered.length);
  const pagination=$('history-pagination');pagination.replaceChildren();
- if(rendered.length<rows.length||historySearchSourceHasMore){
+ if(!historyDiscoveryLoading&&(rendered.length<rows.length||historySearchSourceHasMore)){
   const label=rendered.length<rows.length?'載入更多（'+rendered.length+' / '+rows.length+'）':'載入更早結果';
   const more=node('button',label,'subtle-action');more.type='button';
   more.onclick=async()=>{
    if(rendered.length<rows.length){
     historySearchRenderLimit=Math.min(rows.length,historySearchRenderLimit+HISTORY_SEARCH_BATCH_SIZE);
-    renderHistoryFacetCards();
+    renderHistoryFacetCards({append:true});
     return;
    }
    more.disabled=true;
    historyDiscoveryTarget+=HISTORY_DISCOVERY_BATCH_SIZE;
-   await loadHistory();
+   await loadHistory({append:true});
   };
   pagination.append(more);
   armHistorySearchLoadMore(more);
@@ -1923,11 +1939,17 @@ function renderHistoryFacetCards(){
  return result;
 }
 let historyLoadGeneration=0;
-async function loadHistory(){
+async function loadHistory({append=false}={}){
  const generation=++historyLoadGeneration;
- resetHistorySearchRenderLimit();historySearchSummaryState=null;
+ if(!append){resetHistorySearchRenderLimit();historySearchSummaryState=null;historyRenderedVideoIds.clear()}
+
  historyChrome();const day=$('historyDate').value,query=historyQuery(),error=$('history-error');error.hidden=true;error.textContent='';
- const list=$('history-list');list.replaceChildren();const pagination=$('history-pagination');pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';const intentBox=$('history-search-intent');if(intentBox){intentBox.replaceChildren();intentBox.hidden=true}const channelFilters=$('history-channel-filters');if(channelFilters){channelFilters.replaceChildren();channelFilters.hidden=true}
+ const list=$('history-list'),pagination=$('history-pagination');
+ if(!append){
+  list.replaceChildren();pagination.replaceChildren();$('history-empty').hidden=true;$('history-search-summary').textContent='';
+  const intentBox=$('history-search-intent');if(intentBox){intentBox.replaceChildren();intentBox.hidden=true}
+  const channelFilters=$('history-channel-filters');if(channelFilters){channelFilters.replaceChildren();channelFilters.hidden=true}
+ }
  if(!config.youtubeStaticBase&&!config.apiBase){error.textContent='History 資料來源尚未設定。';error.hidden=false;return}
  try{
   const combinedIntent=parseHistoryCombinedIntent(query,day.slice(0,4));
@@ -1965,7 +1987,28 @@ async function loadHistory(){
    const subtitleOnly=historySubtitleConstraintEnabled();
    const context=[searchQuery,subtitleOnly?'subtitles':'all'].join('|');
    if(historyDiscoveryContext!==context){historyDiscoveryContext=context;historyDiscoveryTarget=HISTORY_DISCOVERY_BATCH_SIZE}
-   data=await loadYoutubeHistoryDiscovery({manifest,parsedSearch,subtitleOnly,target:historyDiscoveryTarget});
+   setHistoryLoading(true);
+   data=await loadYoutubeHistoryDiscovery({
+    manifest,parsedSearch,subtitleOnly,target:historyDiscoveryTarget,
+    onProgress:async progress=>{
+     if(generation!==historyLoadGeneration)return;
+     const progressDisplayByChannel=await historyDisplayMetadataByChannel(progress.items,catalogRows);
+     if(generation!==historyLoadGeneration)return;
+     let progressItems=progress.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},progressDisplayByChannel));
+     progressItems=historySubtitleFilterRows(progressItems);
+     historyChannelFacetRows=progressItems;
+     historyChannelFacetCollabMap=new Map();
+     historySearchSourceHasMore=Boolean(progress.has_more);
+     historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount:progressItems.length}:null;
+     if(searchQuery){
+      const progressSearchRows=historySearchRows(progressItems,parsedSearch);
+      renderHistorySearchIntent(parsedSearch,progressSearchRows);
+      renderHistoryChannelFacets(historyChannelFacetRows);
+     }
+     renderHistoryFacetCards({append:true});
+    }
+   });
+   setHistoryLoading(false);
   }else{
    historyDiscoveryContext='';
    data=await loadHistoryData(day,state.offset);
@@ -2000,8 +2043,8 @@ async function loadHistory(){
   historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount}:null;
   if(query)renderHistoryChannelFacets(historyChannelFacetRows);
   const facetResult=progressiveMode
-   ?renderHistoryFacetCards()
-   :(()=>{historyVodWindows.clear();endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();$('history-empty').hidden=Boolean(endedItems.length);return {filteredCount:endedItems.length,renderedCount:endedItems.length}})();
+   ?renderHistoryFacetCards({append:append||historyRenderedVideoIds.size>0})
+   :(()=>{historyVodWindows.clear();historyRenderedVideoIds.clear();endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();$('history-empty').hidden=Boolean(endedItems.length);return {filteredCount:endedItems.length,renderedCount:endedItems.length}})();
   const total=Number(data.total||0);
 
   if(query){
@@ -2028,6 +2071,7 @@ async function loadHistory(){
   if($('history').classList.contains('active'))history.replaceState(null,'',historyStateUrl(day,query?$('historySearch').value.trim():''));
  }catch(e){
   if(generation!==historyLoadGeneration)return;
+  setHistoryLoading(false);
   $('history-search-summary').textContent='';
   error.textContent='無法讀取歷史直播：'+e.message;error.hidden=false
  }
