@@ -35,9 +35,9 @@ Document reproducible engineering methods, design trade-offs, failed experiments
 | 09 | 同時視聽 | [Watchalong synchronization](09-watchalong.md) | Draft |
 | 10 | 同接數據 | [Concurrent viewers](10-concurrent-viewers.md) | Draft |
 | 11 | 精選與熱門內容 | [Highlights](11-highlights.md) | Draft |
-| 12 | 原文字幕 | Source transcripts | Planned |
-| 13 | AI 翻譯 | AI translation | Planned |
-| 14 | 翻譯品質工程 | Translation quality | Planned |
+| 12 | 原文字幕 | [Source transcripts](12-source-transcripts.md) | Draft |
+| 13 | AI 翻譯 | [AI translation](13-ai-translation.md) | Draft |
+| 14 | 翻譯品質工程 | [Translation quality](14-translation-quality.md) | Draft |
 | 15 | 字幕播放 | Subtitle rendering | Planned |
 | 16 | Docchi News | Daily digest | Planned |
 | 17 | 搜尋與名稱辨識 | Search and aliases | Planned |
