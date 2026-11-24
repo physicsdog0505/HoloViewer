@@ -172,9 +172,13 @@ def dedicated_health(repo: Path) -> dict:
         raise ReleaseBlocked("dedicated Watchalong manifest is not JSON") from exc
     if wmanifest.get("schema_version") != "holoviewer-watchalong-manifest-v1":
         raise ReleaseBlocked("dedicated Watchalong manifest schema mismatch")
-    if wmanifest.get("event_count") != 7 or len(wmanifest.get("events", [])) != 7:
+    events = wmanifest.get("events")
+    event_count = wmanifest.get("event_count")
+    if not isinstance(event_count, int) or event_count < 0 or not isinstance(events, list):
+        raise ReleaseBlocked("dedicated Watchalong manifest inventory invalid")
+    if event_count != len(events):
         raise ReleaseBlocked("dedicated Watchalong manifest inventory mismatch")
-    for event in wmanifest["events"]:
+    for event in events:
         rel = str(event.get("path") or "")
         expected = str(event.get("sha256") or "")
         if not rel.startswith("/data/watchalong/events/") or not re.fullmatch(r"[0-9a-f]{64}", expected):
