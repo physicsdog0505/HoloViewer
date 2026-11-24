@@ -1929,42 +1929,58 @@ async function loadHistory(){
  try{
   const combinedIntent=parseHistoryCombinedIntent(query,day.slice(0,4));
   const dateIntent=combinedIntent.dateIntent,searchQuery=combinedIntent.query;
-  if(dateIntent?.kind==='invalid_range'){throw Error('日期區間格式或範圍不正確')}
+  if(dateIntent?.kind==='invalid_range')throw Error('日期區間格式或範圍不正確');
   const pureDateIntent=parseHistoryDateIntent(query,day.slice(0,4));
   if(pureDateIntent?.kind==='day'){
-   $('historyDate').value=pureDateIntent.day;
-   $('historySearch').value='';
-   state.offset=0;
+   historySubtitleDiscoveryEnabled=false;historySubtitleFilterEnabled=false;resetHistoryDiscoveryTarget();
+   $('historyDate').value=pureDateIntent.day;$('historySearch').value='';state.offset=0;
    return loadHistory();
   }
+
   const manifestPromise=config.youtubeStaticBase?loadYoutubeHistoryManifest().catch(()=>null):Promise.resolve(null);
   const subtitleIndexPromise=loadVodSubtitleAvailabilityIndex();
-  const historyPromise=dateIntent?.kind==='range'
-   ?loadYoutubeHistoryRange(dateIntent.start,dateIntent.end)
-   :query?loadYoutubeHistorySearchMonth(day):loadHistoryData(day,state.offset);
   const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);
   const contentAliasesPromise=searchQuery?loadHistoryContentAliases():Promise.resolve(null);
-  const collabPromise=!query&&config.apiBase?api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null):Promise.resolve(null);
   const catalogPromise=config.apiBase
-   ?(homeCatalogRows.length
-     ?Promise.resolve({streams:homeCatalogRows})
-     :requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null))
+   ?(homeCatalogRows.length?Promise.resolve({streams:homeCatalogRows}):requestHomeCatalogRows().then(rows=>({streams:rows})).catch(()=>null))
    :Promise.resolve(null);
-  const [manifest,subtitleIndex,data,aliasRegistry,contentAliasRegistry,collabData,catalogData]=await Promise.all([manifestPromise,subtitleIndexPromise,historyPromise,aliasesPromise,contentAliasesPromise,collabPromise,catalogPromise]);
+  const [manifest,subtitleIndex,aliasRegistry,contentAliasRegistry,catalogData]=await Promise.all([manifestPromise,subtitleIndexPromise,aliasesPromise,contentAliasesPromise,catalogPromise]);
   if(generation!==historyLoadGeneration)return;
   if(manifest)applyHistoryAvailability(manifest,day);
   historySubtitleAvailabilityIds=subtitleIndex.available?subtitleIndex.ids:new Set();
   historySubtitleIndexState=subtitleIndex.available?'ready':'unavailable';
-  if(historySubtitleFilterEnabled&&!subtitleIndex.available)historySubtitleFilterEnabled=false;
-  renderHistorySubtitleFilter();
+  if(!subtitleIndex.available){historySubtitleDiscoveryEnabled=false;historySubtitleFilterEnabled=false}
+  renderHistorySubtitleControls();
+
+  const parsedSearch=searchQuery?parseHistorySearchQuery(searchQuery,aliasRegistry,contentAliasRegistry):null;
+  const discoverySource=!dateIntent&&Boolean(searchQuery||historySubtitleDiscoveryEnabled);
+  let data;
+  if(dateIntent?.kind==='range'){
+   data=await loadYoutubeHistoryRange(dateIntent.start,dateIntent.end);
+  }else if(discoverySource){
+   if(!manifest)throw Error('YouTube 歷史 manifest 暫時無法使用');
+   const subtitleOnly=historySubtitleConstraintEnabled();
+   const context=[searchQuery,subtitleOnly?'subtitles':'all'].join('|');
+   if(historyDiscoveryContext!==context){historyDiscoveryContext=context;historyDiscoveryTarget=HISTORY_DISCOVERY_BATCH_SIZE}
+   data=await loadYoutubeHistoryDiscovery({manifest,parsedSearch,subtitleOnly,target:historyDiscoveryTarget});
+  }else{
+   historyDiscoveryContext='';
+   data=await loadHistoryData(day,state.offset);
+  }
+  if(generation!==historyLoadGeneration)return;
   if(!Array.isArray(data.items))throw Error('資料格式錯誤');
+
+  const dayMode=!query&&!historySubtitleDiscoveryEnabled;
+  const collabData=dayMode&&config.apiBase
+   ?await api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null)
+   :null;
   const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
   const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows);
   if(generation!==historyLoadGeneration)return;
+
   let endedItems=data.items.map(item=>historyDisplayRow({...item,lifecycle_state:'ended'},displayByChannel));
-  let parsedSearch=null,searchRows=[];
+  let searchRows=[];
   if(searchQuery){
-   parsedSearch=parseHistorySearchQuery(searchQuery,aliasRegistry,contentAliasRegistry);
    searchRows=historySearchRows(endedItems,parsedSearch);
    renderHistorySearchIntent(parsedSearch,searchRows);
    endedItems=searchRows.map(row=>row.item);
@@ -1972,30 +1988,37 @@ async function loadHistory(){
   endedItems=historySubtitleFilterRows(endedItems);
   const resultCount=endedItems.length;
   const historyCollabByVideo=collabData?collabEventMap(collabData,day):new Map();
-  const facetContext=day+'|'+query+'|'+(historySubtitleFilterEnabled?'subtitles':'all');
+  const progressiveMode=Boolean(query||historySubtitleDiscoveryEnabled);
+  historySearchSourceHasMore=Boolean(discoverySource&&data.has_more===true);
+  const facetContext=[day,query,historySubtitleConstraintEnabled()?'subtitles':'all',historySubtitleDiscoveryEnabled?'discovery':'standard'].join('|');
   if(historyChannelFacetContext!==facetContext){historyChannelSelection.clear();historyChannelFacetContext=facetContext}
-  historyChannelFacetRows=query?endedItems:[];
+  historyChannelFacetRows=progressiveMode?endedItems:[];
   historyChannelFacetCollabMap=historyCollabByVideo;
   historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount}:null;
   if(query)renderHistoryChannelFacets(historyChannelFacetRows);
-  const facetResult=query?renderHistoryFacetCards():(()=>{historyVodWindows.clear();endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();$('history-empty').hidden=Boolean(endedItems.length);return {filteredCount:endedItems.length,renderedCount:endedItems.length}})();
-  const renderedItems=query?historyFacetFilteredRows().slice(0,historySearchRenderLimit):endedItems;
+  const facetResult=progressiveMode
+   ?renderHistoryFacetCards()
+   :(()=>{historyVodWindows.clear();endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();$('history-empty').hidden=Boolean(endedItems.length);return {filteredCount:endedItems.length,renderedCount:endedItems.length}})();
   const total=Number(data.total||0);
+
   if(query){
    if(dateIntent?.kind==='range'){
     $('history-empty').textContent=searchQuery?'這個日期區間沒有符合搜尋條件的已結束直播。':'這個日期區間沒有可顯示的已結束直播。';
    }else{
-    $('history-empty').textContent='這個月份沒有符合搜尋條件的已結束直播。';
+    $('history-empty').textContent='目前沒有符合搜尋條件的歷史直播。';
    }
    updateHistorySearchSummary(facetResult);
+  }else if(historySubtitleDiscoveryEnabled){
+   $('history-empty').textContent='目前沒有可顯示的中文字幕直播。';
   }else{
-   $('history-empty').textContent=historySubtitleFilterEnabled?'這一天沒有已完成 Holodocchi 中文字幕的直播。':'這一天沒有可顯示的已結束直播，或歷史資料尚未接入。';
+   $('history-empty').textContent='這一天沒有可顯示的已結束直播，或歷史資料尚未接入。';
   }
+
   const notices=[];
   if(data.source==='legacy-api'&&data.static_error)notices.push('YouTube 歷史 Static Assets 暫時不可用，已使用既有 History API。');
-  if(!query&&!collabData&&endedItems.length&&config.apiBase)notices.push('多人連動資料暫時無法讀取。');
+  if(dayMode&&!collabData&&endedItems.length&&config.apiBase)notices.push('多人連動資料暫時無法讀取。');
   if(notices.length){error.textContent=notices.join(' ');error.hidden=false}
-  if(!query){
+  if(!progressiveMode){
    const page=Math.floor(state.offset/50)+1;if(page>1)pagination.append(historyLink('上一頁',day,page-1));
    if(data.items.length&&((Number.isFinite(total)&&total>state.offset+data.items.length)||data.has_more===true))pagination.append(historyLink('下一頁',day,page+1));
   }
