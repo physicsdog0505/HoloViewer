@@ -46,10 +46,9 @@ Default behavior is PREPARE_ONLY. It verifies:
 - release SHA contained in current `origin/main`;
 - no `site/youtube/v1/**`;
 - no `site/ptt/v1/**`;
-- frontend consumers point to dedicated YouTube/PTT Static Assets targets;
-- dedicated YouTube/PTT manifests are healthy;
+- frontend consumers point to the dedicated YouTube / PTT / Watchalong Static Assets targets;
+- frontend release does not fetch or validate dedicated-worker inventories; each dedicated worker owns its own manifest/content health gate;
 - every unchanged frontend-owned file from the accepted Production source matches both `holodocchi.com` and workers.dev byte-for-byte;
-- the dedicated Watchalong Static Assets manifest and all declared event hashes are healthy;
 - current Production Alias immutable object is preserved across generic frontend releases;
 - the first-run legacy foreign-owner inventory is surfaced in PREPARE evidence;
 - current active Worker version can be read.
@@ -79,8 +78,8 @@ EXECUTE repeats all gates and refuses deployment if the active Worker version ch
 After deploy, PASS is not declared until:
 
 - every candidate frontend-owned asset is read back byte-for-byte from both `holodocchi.com` and workers.dev;
-- frontend-owned candidate assets are included in dual-origin verification; dedicated Watchalong data is checked on its own origin;
-- dedicated YouTube/PTT target health is rechecked;
+- frontend-owned candidate assets are included in dual-origin verification;
+- dedicated-worker ownership/config boundaries are rechecked without reading their inventories;
 - a new active Worker version is observed.
 
 Only then does the release emit `PUBLIC_FRONTEND_RELEASE=PASS`. The prior active version is printed as the rollback target. It never auto-rolls back.
@@ -97,8 +96,8 @@ After deployment, verify at minimum:
 
 - custom domain and workers.dev serve the same accepted frontend;
 - the intended frontend delta is present;
-- Watchalong frontend-owned data remains readable;
-- dedicated YouTube and PTT targets remain independently healthy;
+- frontend config still points to the dedicated YouTube / PTT / Watchalong workers;
+- no foreign-owner data was packaged into the frontend candidate;
 - no D1/API Worker mutation occurred.
 
 The absence of foreign-owner paths in the frontend release candidate is necessary but not sufficient. A release is accepted only after Production reconciliation before deploy and dual-origin byte readback after deploy. Dedicated data targets are never copied back into `holoviewer-public`.
