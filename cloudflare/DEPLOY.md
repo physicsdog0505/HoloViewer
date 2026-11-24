@@ -50,7 +50,6 @@ Default behavior is PREPARE_ONLY. It verifies:
 - frontend release does not fetch or validate dedicated-worker inventories; each dedicated worker owns its own manifest/content health gate;
 - every unchanged frontend-owned file from the accepted Production source matches both `holodocchi.com` and workers.dev byte-for-byte;
 - current Production Alias immutable object is preserved across generic frontend releases;
-- the first-run legacy foreign-owner inventory is surfaced in PREPARE evidence;
 - current active Worker version can be read.
 
 PREPARE exits with:
@@ -88,7 +87,7 @@ Only then does the release emit `PUBLIC_FRONTEND_RELEASE=PASS`. The prior active
 
 Do not build a frontend staging directory by copying dedicated YouTube/PTT assets into `site/` or into a temporary complete-site bundle.
 
-The source tree itself is the ownership boundary. A frontend release containing foreign-owner paths must fail closed.
+The source tree and consumer configuration are the ownership boundary. A frontend release containing foreign-owner paths must fail closed; it must not inspect, reconstruct, preserve, or validate dedicated-worker inventories.
 
 ## Production acceptance
 
