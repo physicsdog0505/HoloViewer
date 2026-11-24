@@ -1043,18 +1043,33 @@ function taipeiDay(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tai
 function shiftDay(day,delta){const date=new Date(day+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+delta);return date.toISOString().slice(0,10)}
 function historyBounds(){const today=taipeiDay();return {latest:shiftDay(today,-1)}}
 function historyDateValid(day){const b=historyBounds();return /^\d{4}-\d{2}-\d{2}$/.test(day)&&day<=b.latest}
-function historyLink(label,day,page=1){const params=new URLSearchParams();params.set('date',day);if(page>1)params.set('page',String(page));if(historySubtitleFilterEnabled)params.set(HISTORY_SUBTITLE_PARAM,HISTORY_SUBTITLE_VALUE);const link=node('a',label,'subtle-action');link.href='/history?'+params.toString();link.onclick=e=>{e.preventDefault();$('historyDate').value=day;state.offset=(page-1)*50;loadHistory()};return link}
+function historyLink(label,day,page=1){const params=new URLSearchParams();params.set('date',day);if(page>1)params.set('page',String(page));const link=node('a',label,'subtle-action');link.href='/history?'+params.toString();link.onclick=e=>{e.preventDefault();historySubtitleDiscoveryEnabled=false;historySubtitleFilterEnabled=false;$('historyDate').value=day;state.offset=(page-1)*50;loadHistory()};return link}
 const HISTORY_SUBTITLE_PARAM='subtitles';
 const HISTORY_SUBTITLE_VALUE='zh-TW';
+const HISTORY_SUBTITLE_DISCOVERY_PARAM='view';
+const HISTORY_SUBTITLE_DISCOVERY_VALUE='subtitles';
 let historySubtitleFilterEnabled=false;
+let historySubtitleDiscoveryEnabled=false;
 let historySubtitleAvailabilityIds=new Set();
 let historySubtitleIndexState='idle';
+const vodSubtitleMonthCache=new Map();
 function vodSubtitleAvailabilityConfig(){const cfg=config.vodSubtitleAvailability;return cfg&&typeof cfg==='object'?cfg:{}}
+function vodSubtitleAvailabilityBase(){
+ const cfg=vodSubtitleAvailabilityConfig(),base=String(cfg.base||'').replace(/\/$/,'');
+ if(base)return /^https:\/\//.test(base)?base:'';
+ return /^(localhost|127\.0\.0\.1)$/.test(location.hostname)?'':'';
+}
 function vodSubtitleAvailabilityUrl(){
  const cfg=vodSubtitleAvailabilityConfig(),path=String(cfg.indexPath||'');
  if(!path.startsWith('/data/subtitles/'))return '';
- const base=String(cfg.base||'').replace(/\/$/,'');
- if(base){if(!/^https:\/\//.test(base))return '';return base+path}
+ const base=vodSubtitleAvailabilityBase();
+ if(base)return base+path;
+ return /^(localhost|127\.0\.0\.1)$/.test(location.hostname)?path:'';
+}
+function vodSubtitleMonthUrl(month){
+ if(!/^\d{4}-\d{2}$/.test(String(month)))return '';
+ const base=vodSubtitleAvailabilityBase(),path='/data/subtitles/manifests/by-vod-month/'+month+'.json';
+ if(base)return base+path;
  return /^(localhost|127\.0\.0\.1)$/.test(location.hostname)?path:'';
 }
 async function loadVodSubtitleAvailabilityIndex(){
@@ -1069,18 +1084,39 @@ async function loadVodSubtitleAvailabilityIndex(){
   return {available:true,ids,reason:''};
  }catch(error){return {available:false,ids:new Set(),reason:String(error?.message||error)}}
 }
-function historySubtitleFilterRows(rows){return historySubtitleFilterEnabled?rows.filter(row=>historySubtitleAvailabilityIds.has(String(row?.video_id||''))):rows}
-function renderHistorySubtitleFilter(){
- const button=$('historySubtitleFilter'),status=$('historySubtitleFilterStatus');if(!button||!status)return;
+async function loadVodSubtitleMonthIds(month){
+ if(vodSubtitleMonthCache.has(month))return vodSubtitleMonthCache.get(month);
+ const url=vodSubtitleMonthUrl(month);
+ if(!url){const empty=new Set();vodSubtitleMonthCache.set(month,empty);return empty}
+ try{
+  const response=await fetch(url,{mode:url.startsWith('https://')?'cors':'same-origin',credentials:'omit',headers:{Accept:'application/json'},cache:'no-cache'});
+  if(response.status===404){const empty=new Set();vodSubtitleMonthCache.set(month,empty);return empty}
+  if(!response.ok)throw Error('Subtitle month HTTP '+response.status);
+  const data=await response.json();
+  if(data?.schema_version!==1||data.month!==month||!Array.isArray(data.videos))throw Error('Subtitle month format');
+  const ids=new Set(data.videos.map(row=>String(row?.video_id||'')).filter(id=>/^[A-Za-z0-9_-]{11}$/.test(id)));
+  vodSubtitleMonthCache.set(month,ids);
+  return ids;
+ }catch(error){
+  const fallback=new Set([...historySubtitleAvailabilityIds]);
+  return fallback;
+ }
+}
+function historySubtitleConstraintEnabled(){return historySubtitleDiscoveryEnabled||historySubtitleFilterEnabled}
+function historySubtitleFilterRows(rows){return historySubtitleConstraintEnabled()?rows.filter(row=>historySubtitleAvailabilityIds.has(String(row?.video_id||''))):rows}
+function renderHistorySubtitleControls(){
+ const entry=$('historySubtitleDiscovery'),status=$('historySubtitleFilterStatus');if(!entry||!status)return;
  const configured=Boolean(vodSubtitleAvailabilityUrl());
- const available=configured&&historySubtitleIndexState==='ready';
- button.hidden=!configured;
+ entry.hidden=!configured;
+ entry.disabled=configured&&historySubtitleIndexState==='unavailable';
+ entry.setAttribute('aria-pressed',String(historySubtitleDiscoveryEnabled));
  status.hidden=true;status.textContent='';
- button.setAttribute('aria-pressed',String(historySubtitleFilterEnabled));
- button.disabled=!available;
 }
 function historyStateUrl(day,query=''){
- const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',query);if(historySubtitleFilterEnabled)params.set(HISTORY_SUBTITLE_PARAM,HISTORY_SUBTITLE_VALUE);return '/history?'+params.toString();
+ const params=new URLSearchParams();params.set('date',day);if(query)params.set('q',query);
+ if(historySubtitleDiscoveryEnabled)params.set(HISTORY_SUBTITLE_DISCOVERY_PARAM,HISTORY_SUBTITLE_DISCOVERY_VALUE);
+ else if(historySubtitleFilterEnabled)params.set(HISTORY_SUBTITLE_PARAM,HISTORY_SUBTITLE_VALUE);
+ return '/history?'+params.toString();
 }
 const YOUTUBE_HISTORY_MANIFEST_PATH='/youtube/v1/manifest.json';
 const YOUTUBE_HISTORY_MANIFEST_TTL_MS=60000;
