@@ -281,52 +281,6 @@ def reconcile_runtime(repo: Path, base: str, head: str) -> dict:
     return {"protected_runtime_assets": sorted(set(protected)), "status": "PASS"}
 
 
-def enumerate_first_run_foreign(repo: Path) -> dict:
-    paths = {"youtube": [], "ptt": []}
-    yraw = fetch(CUSTOM_ORIGIN, "/youtube/v1/manifest.json", allow_404=True)
-    if yraw and not is_spa_fallback_html(yraw):
-        paths["youtube"].append("/youtube/v1/manifest.json")
-        try:
-            obj = json.loads(yraw)
-            def walk(v):
-                if isinstance(v, dict):
-                    for x in v.values():
-                        walk(x)
-                elif isinstance(v, list):
-                    for x in v:
-                        walk(x)
-                elif isinstance(v, str):
-                    if v.startswith("http://") or v.startswith("https://"):
-                        return
-                    p = "/" + v.lstrip("/")
-                    if p.startswith("/youtube/v1/"):
-                        paths["youtube"].append(p)
-                    elif p.endswith(".json"):
-                        paths["youtube"].append("/youtube/v1/" + p.lstrip("/"))
-            walk(obj)
-        except ValueError:
-            raise ReleaseBlocked("legacy frontend YouTube manifest is neither JSON nor SPA fallback")
-
-    _, _, ptt = parse_frontend_config(repo)
-    for _, manifest in ptt:
-        raw = fetch(CUSTOM_ORIGIN, manifest, allow_404=True)
-        if raw:
-            try:
-                json.loads(raw)
-            except ValueError:
-                continue
-            paths["ptt"].append(manifest)
-
-    paths["youtube"] = sorted(set(paths["youtube"]))
-    paths["ptt"] = sorted(set(paths["ptt"]))
-    return {
-        "youtube_paths": paths["youtube"],
-        "ptt_manifest_paths": paths["ptt"],
-        "youtube_count": len(paths["youtube"]),
-        "ptt_manifest_count": len(paths["ptt"]),
-    }
-
-
 def post_deploy_readback(repo: Path) -> dict:
     checked = 0
     for p in sorted((repo / "site").rglob("*")):
@@ -371,7 +325,6 @@ def main() -> int:
         dedicated = dedicated_boundary(repo)
         baseline = reconcile_baseline(repo, args.accepted_production_source_sha, head)
         runtime = reconcile_runtime(repo, args.accepted_production_source_sha, head)
-        foreign = enumerate_first_run_foreign(repo)
         baseline_version = active_version(repo)
 
         result = {
@@ -384,7 +337,6 @@ def main() -> int:
             "dedicated_ownership_boundary": dedicated,
             "production_frontend_reconciliation": baseline,
             "runtime_reconciliation": runtime,
-            "first_run_foreign_inventory": foreign,
             "production_mutation": "PENDING_EXPLICIT_EXECUTE" if args.execute else "NO",
         }
         print(json.dumps(result, indent=2, sort_keys=True))
