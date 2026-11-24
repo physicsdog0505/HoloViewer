@@ -144,106 +144,41 @@ class PublicFrontendReleaseGateTests(unittest.TestCase):
             release.fetch=original_fetch
             release.parse_frontend_config=original_parse
 
-    def test_dedicated_health_accepts_eight_watchalong_events_when_manifest_count_matches(self):
-        import json
+    def test_dedicated_boundary_does_not_fetch_other_workers(self):
         import scripts.run_public_frontend_owner_release as release
 
         original_fetch = release.fetch
         original_parse = release.parse_frontend_config
         try:
-            events = [
-                {
-                    "path": f"/data/watchalong/events/event-{i}.json",
-                    "sha256": "0" * 64,
-                }
-                for i in range(8)
-            ]
-            manifest = {
-                "schema_version": "holoviewer-watchalong-manifest-v1",
-                "event_count": 8,
-                "events": events,
-            }
-
-            def fake_fetch(origin, path, allow_404=False):
-                if path == "/youtube/v1/manifest.json":
-                    return b'{"ok":true}'
-                if path == "/data/watchalong/manifest.json":
-                    return json.dumps(manifest).encode()
-                if path.startswith("/data/watchalong/events/"):
-                    return b""
-                if path == "/ptt/v1/test.json":
-                    return b'{"ok":true}'
-                return None
-
-            # Event payload hashes are checked independently; make them match the fixture bytes.
-            payload = b"event"
-            digest = release.sha256(payload)
-            for event in events:
-                event["sha256"] = digest
-
-            def fake_fetch_with_events(origin, path, allow_404=False):
-                if path.startswith("/data/watchalong/events/"):
-                    return payload
-                return fake_fetch(origin, path, allow_404)
-
-            release.fetch = fake_fetch_with_events
+            release.fetch = lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("frontend boundary gate must not fetch dedicated worker content")
+            )
             release.parse_frontend_config = lambda repo: (
                 "https://holoviewer-youtube-static-assets.singlebagel.workers.dev",
                 "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev",
-                [("https://holoviewer-ptt-static-assets.example", "/ptt/v1/test.json")],
+                [
+                    (
+                        "https://holoviewer-ptt-static-assets-2026-11.singlebagel.workers.dev",
+                        "/ptt/v1/manifests/static-assets-full-2026-11.json",
+                    )
+                ],
             )
 
-            result = release.dedicated_health(Path("."))
+            result = release.dedicated_boundary(Path("."))
             self.assertEqual(result["status"], "PASS")
-        finally:
-            release.fetch = original_fetch
-            release.parse_frontend_config = original_parse
-
-    def test_dedicated_health_rejects_watchalong_manifest_count_mismatch(self):
-        import json
-        import scripts.run_public_frontend_owner_release as release
-
-        original_fetch = release.fetch
-        original_parse = release.parse_frontend_config
-        try:
-            manifest = {
-                "schema_version": "holoviewer-watchalong-manifest-v1",
-                "event_count": 8,
-                "events": [],
-            }
-
-            def fake_fetch(origin, path, allow_404=False):
-                if path == "/youtube/v1/manifest.json":
-                    return b'{"ok":true}'
-                if path == "/data/watchalong/manifest.json":
-                    return json.dumps(manifest).encode()
-                return None
-
-            release.fetch = fake_fetch
-            release.parse_frontend_config = lambda repo: (
+            self.assertEqual(
+                result["youtube"],
                 "https://holoviewer-youtube-static-assets.singlebagel.workers.dev",
-                "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev",
-                [],
             )
-
-            with self.assertRaisesRegex(Exception, "inventory mismatch"):
-                release.dedicated_health(Path("."))
+            self.assertEqual(
+                result["watchalong"],
+                "https://holoviewer-watchalong-static-assets.singlebagel.workers.dev",
+            )
+            self.assertEqual(len(result["ptt"]), 1)
         finally:
             release.fetch = original_fetch
             release.parse_frontend_config = original_parse
 
-    def test_legacy_youtube_inventory_blocks_non_json_non_html(self):
-        import scripts.run_public_frontend_owner_release as release
-        original_fetch=release.fetch
-        original_parse=release.parse_frontend_config
-        try:
-            release.fetch=lambda origin,path,allow_404=False: b'not-json' if path=='/youtube/v1/manifest.json' else None
-            release.parse_frontend_config=lambda repo: ('https://holoviewer-youtube-static-assets.singlebagel.workers.dev','https://holoviewer-watchalong-static-assets.singlebagel.workers.dev',[])
-            with self.assertRaisesRegex(Exception,'neither JSON nor SPA fallback'):
-                release.enumerate_first_run_foreign(Path('.'))
-        finally:
-            release.fetch=original_fetch
-            release.parse_frontend_config=original_parse
     def test_spa_fallback_html_rejects_json(self):
         self.assertFalse(is_spa_fallback_html(b'{"schema_version":1}'))
         self.assertFalse(is_spa_fallback_html(None))
