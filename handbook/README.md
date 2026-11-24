@@ -31,8 +31,8 @@ Document reproducible engineering methods, design trade-offs, failed experiments
 | 05 | PTT 資料系統 | [PTT data](05-ptt-data.md) | Draft |
 | 06 | 多視角播放器 | [Multi-view player](06-multi-view-player.md) | Draft |
 | 07 | 共同時間軸 | [Master timeline](07-master-timeline.md) | Draft |
-| 08 | 多人連動識別 | Collaboration identification | Planned |
-| 09 | 同時視聽 | Watchalong | Planned |
+| 08 | 多人連動識別 | [Collaboration identification](08-collab-identification.md) | Draft |
+| 09 | 同時視聽 | [Watchalong synchronization](09-watchalong.md) | Draft |
 | 10 | 同接數據 | Concurrent viewers | Planned |
 | 11 | 精選與熱門內容 | Highlights | Planned |
 | 12 | 原文字幕 | Source transcripts | Planned |
