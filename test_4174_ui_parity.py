@@ -203,7 +203,7 @@ class ParityContract(unittest.TestCase):
             "優先顯示同時相關的結果",
             "Number(b.score.allMembers)-Number(a.score.allMembers)",
             "const aliasesPromise=searchQuery?loadHistoryMemberAliases():Promise.resolve(null);",
-            "const HISTORY_SEARCH_BATCH_SIZE=200;",
+            "const HISTORY_DISCOVERY_BATCH_SIZE=30;",
             "const rendered=rows.slice(0,historySearchRenderLimit);",
             "已顯示 '+facetResult.renderedCount+' 筆",
             "params.set('date',day)",
@@ -443,7 +443,7 @@ class ParityContract(unittest.TestCase):
         viewer=(ROOT/'site/assets/viewer-standalone.js').read_text(encoding='utf-8')
         self.assertIn("function verifiedEndedVodWindow(row)",viewer)
         self.assertIn("pttMeta.textContent='判定影片狀態中'",viewer)
-        self.assertIn("async function videoMetadata(id)",viewer)
+        self.assertIn("async function videoMetadata(id,{pttDay=''}={})",viewer)
         self.assertIn("window.HoloViewerVideoMetadata?.resolve(id",viewer)
         self.assertIn("waitForRecovery:true,maxAttempts:6",viewer)
         self.assertIn("const row=await videoMetadata(id)",viewer)
@@ -1385,7 +1385,7 @@ process.stdout.write(JSON.stringify({
         self.assertIn("window.HoloViewerVideoMetadata?.resolve(id",app)
         self.assertIn("async function resolveVodWindow(id)",app)
         self.assertIn("const window=await resolveVodWindow(id);",app)
-        self.assertIn("async function videoMetadata(id)",viewer)
+        self.assertIn("async function videoMetadata(id,{pttDay=''}={})",viewer)
         self.assertIn("window.HoloViewerVideoMetadata?.resolve(id",viewer)
         self.assertIn("waitForRecovery:true,maxAttempts:6",viewer)
         self.assertIn("const row=await videoMetadata(id);",viewer)
@@ -2052,7 +2052,7 @@ process.stdout.write(JSON.stringify({result,missing,calls}));
 
     def test_history_search_progressively_reveals_full_filtered_result_set(self):
         js=(ROOT/'site/assets/app.js').read_text(encoding='utf-8')
-        self.assertIn("const HISTORY_SEARCH_BATCH_SIZE=200;",js)
+        self.assertIn("const HISTORY_DISCOVERY_BATCH_SIZE=30;",js)
         self.assertIn("const rendered=rows.slice(0,historySearchRenderLimit);",js)
         self.assertIn("historySearchRenderLimit=Math.min(rows.length,historySearchRenderLimit+HISTORY_SEARCH_BATCH_SIZE);",js)
         self.assertIn("new IntersectionObserver(entries=>",js)
