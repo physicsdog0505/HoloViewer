@@ -148,3 +148,34 @@ Intentionally omitted / redacted:
 
 Assessment:
 The disclosed cadence and roster cardinality help others reproduce the architecture but do not grant privileged access. WebSub details are kept at protocol/design level rather than production reconnaissance level.
+
+
+## Review — Chapter 05 PTT data system
+
+Scope:
+- `05-ptt-data.md`
+
+Result:
+`SECURITY_REVIEW=PASS_WITH_REDACTIONS`
+
+Published safely:
+- generic Collector/Web provenance model;
+- completeness states and canonical merge policy;
+- source-priority values used by the reproducible read model;
+- floor/source-line identity distinction;
+- historical cursor semantics and the corrected “tail is not history” lesson;
+- generic timing equation for aligning PTT pushes with verified video start;
+- browser-automation completeness lessons and URL-contract failure history.
+
+Intentionally omitted / redacted:
+- actual production PTT endpoint URLs;
+- exact Worker/service names;
+- writable or administrative routes;
+- authentication/token details;
+- production D1 identifiers, bindings, table names used only operationally, or live retention settings;
+- local database paths, machine paths, login/session details;
+- operational polling cadence for protected/internal writers;
+- exact incident/runbook commands.
+
+Assessment:
+The chapter exposes reproducible data-model and integrity methods without publishing credentials or a production attack-surface map. Source-priority values and generic cursor behavior are architectural knowledge, not privileged control information.
