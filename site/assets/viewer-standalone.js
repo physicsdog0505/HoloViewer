@@ -83,8 +83,8 @@ const youtubeChatPane=document.getElementById('youtubeChatPane');
 const youtubeChatFrame=document.getElementById('youtubeChatFrame');
 const youtubeChatStatus=document.getElementById('youtubeChatStatus');
 const mobileSubtitlePanel=document.getElementById('mobileSubtitlePanel');
-const mobileSubtitleToggle=document.getElementById('mobileSubtitleToggle');
-const mobileSubtitleToggleState=document.getElementById('mobileSubtitleToggleState');
+const mobileSubtitleControl=document.getElementById('mobileSubtitleControl');
+const mobileSubtitleSwitch=document.getElementById('mobileSubtitleSwitch');
 const mobileSubtitleBody=document.getElementById('mobileSubtitleBody');
 const mobileSubtitleText=document.getElementById('mobileSubtitleText');
 
@@ -2305,34 +2305,37 @@ function mobileSubtitleSelection(videoId){
 }
 function setMobileSubtitleOpen(open,{persist=true}={}){
  mobileSubtitleOpen=Boolean(open);
- if(mobileSubtitleBody)mobileSubtitleBody.hidden=!mobileSubtitleOpen;
- if(mobileSubtitleToggle)mobileSubtitleToggle.setAttribute('aria-expanded',String(mobileSubtitleOpen));
- if(mobileSubtitleToggleState)mobileSubtitleToggleState.textContent=mobileSubtitleOpen?'隱藏':'顯示';
+ if(mobileSubtitleSwitch)mobileSubtitleSwitch.checked=mobileSubtitleOpen;
+ refreshMobileSubtitleAvailability();
  if(persist){try{localStorage.setItem('holoviewer-mobile-subtitle-open',mobileSubtitleOpen?'1':'0')}catch{}}
 }
 function refreshMobileSubtitleAvailability(){
  if(!mobileSubtitlePanel)return;
  const videoId=viewerPrimaryVideoId();
  const available=Boolean(mobilePortraitMedia.matches&&mobileSubtitleSelection(videoId));
- mobileSubtitlePanel.hidden=!available;
+ if(mobileSubtitleControl)mobileSubtitleControl.hidden=!available;
+ mobileSubtitlePanel.hidden=!(available&&mobileSubtitleOpen);
  if(!available&&mobileSubtitleText)mobileSubtitleText.textContent='';
 }
 function renderMobileSubtitlePanel(){
  if(!mobileSubtitlePanel||!mobilePortraitMedia.matches)return;
  const videoId=viewerPrimaryVideoId(),current=viewerPrimaryCurrentSeconds();
  const selection=mobileSubtitleSelection(videoId);
- mobileSubtitlePanel.hidden=!selection;
- if(!selection||!Number.isFinite(current)||!mobileSubtitleText)return;
+ if(mobileSubtitleControl)mobileSubtitleControl.hidden=!selection;
+ mobileSubtitlePanel.hidden=!(selection&&mobileSubtitleOpen);
+ if(!selection||!mobileSubtitleOpen||!Number.isFinite(current)||!mobileSubtitleText)return;
  if(selection.mode==='A-B'){
   const aCue=viewerLocalSubtitleCue(selection.a,current),bCue=viewerLocalSubtitleCue(selection.b,current);
   const parts=[];
   if(aCue?.translation)parts.push('A '+String(aCue.translation));
   if(bCue?.translation)parts.push('B '+String(bCue.translation));
   mobileSubtitleText.textContent=parts.join(' ｜ ');
+  mobileSubtitleText.style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(aCue||bCue));
   return;
  }
  const cue=viewerLocalSubtitleCue(selection.slot,current);
  mobileSubtitleText.textContent=String(cue?.translation||'');
+ mobileSubtitleText.style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(cue));
 }
 function readMobileSubtitlePreference(){
  let open=false;
@@ -2453,7 +2456,7 @@ viewerLocalSubtitleFileB?.addEventListener('change',async()=>{const file=viewerL
 viewerLocalSubtitleClearA?.addEventListener('click',()=>clearViewerLocalSubtitle('A'));
 viewerLocalSubtitleClearB?.addEventListener('click',()=>clearViewerLocalSubtitle('B'));
 viewerLocalSubtitleFontSize?.addEventListener('input',()=>setViewerSubtitleFontSize(viewerLocalSubtitleFontSize.value));
-mobileSubtitleToggle?.addEventListener('click',()=>setMobileSubtitleOpen(!mobileSubtitleOpen));
+mobileSubtitleSwitch?.addEventListener('change',()=>setMobileSubtitleOpen(mobileSubtitleSwitch.checked));
 mobilePortraitMedia.addEventListener?.('change',()=>{refreshMobileSubtitleAvailability();renderViewerLocalSubtitle()});
 readViewerSubtitleFontSize();
 refreshViewerLocalSubtitleUi();
