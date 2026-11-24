@@ -352,6 +352,11 @@ body.home-wide .section-head{margin-bottom:9px}
 .history-channel-filter-clear{min-height:34px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);cursor:pointer;font-size:11px;font-weight:800}
 .history-shortcuts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
 .history-shortcuts .subtle-action{min-height:34px;padding:6px 11px}
+.history-loading{display:flex;align-items:center;justify-content:center;gap:9px;min-height:44px;margin:12px 0;color:var(--muted);font-size:12px;font-weight:800}
+.history-loading[hidden]{display:none!important}
+.history-loading-spinner{width:18px;height:18px;border:2px solid color-mix(in srgb,var(--brand-main,#b44882) 20%,var(--line));border-top-color:var(--brand-main,#b44882);border-radius:50%;animation:history-loading-spin .72s linear infinite}
+@keyframes history-loading-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.history-loading-spinner{animation-duration:1.6s}}
 @media(max-width:760px){.history-toolbar{grid-template-columns:1fr}.history-search-field{grid-column:1}.history-date-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto}.history-date-field{min-width:0}.history-date-field input{width:100%}}
 
 /* 4174 accepted custom-view builder CSS; page-scoped for the SPA shell. */
