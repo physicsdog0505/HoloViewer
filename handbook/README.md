@@ -28,7 +28,7 @@ Document reproducible engineering methods, design trade-offs, failed experiments
 | 02 | 資料工程 | [Data engineering](02-data-engineering.md) | Draft |
 | 03 | 直播資訊 | [Live discovery](03-live-discovery.md) | Draft |
 | 04 | 歷史直播 | [Historical streams](04-historical-streams.md) | Draft |
-| 05 | PTT 資料系統 | PTT data | Planned |
+| 05 | PTT 資料系統 | [PTT data](05-ptt-data.md) | Draft |
 | 06 | 多視角播放器 | Multi-view player | Planned |
 | 07 | 共同時間軸 | Master timeline | Planned |
 | 08 | 多人連動識別 | Collaboration identification | Planned |
