@@ -1898,6 +1898,15 @@ function renderHistoryChannelFacets(rows){
   box.append(clear);
  }
 }
+function updateHistoryChannelFacetCounts(rows){
+ const box=$('history-channel-filters');if(!box||box.hidden)return;
+ const counts=new Map(historyChannelFacetEntries(rows).map(entry=>[entry.channelId,entry.count]));
+ for(const button of box.querySelectorAll('.history-channel-filter')){
+  const channelId=String(button.dataset.channelId||'');
+  const count=button.querySelector('.history-channel-filter-count');
+  if(count&&counts.has(channelId))count.textContent=String(counts.get(channelId));
+ }
+}
 function historyFacetFilteredRows(){
  if(!historyChannelSelection.size)return historyChannelFacetRows;
  return historyChannelFacetRows.filter(row=>historyChannelSelection.has(String(row?.channel_id||'')));
@@ -2004,8 +2013,12 @@ async function loadHistory({append=false}={}){
      historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount:progressItems.length}:null;
      if(searchQuery){
       const progressSearchRows=historySearchRows(progressItems,parsedSearch);
-      renderHistorySearchIntent(parsedSearch,progressSearchRows);
-      renderHistoryChannelFacets(historyChannelFacetRows);
+      if(!historyRenderedVideoIds.size){
+       renderHistorySearchIntent(parsedSearch,progressSearchRows);
+       renderHistoryChannelFacets(historyChannelFacetRows);
+      }else{
+       updateHistoryChannelFacetCounts(historyChannelFacetRows);
+      }
      }
      renderHistoryFacetCards({append:true});
     }
@@ -2029,7 +2042,6 @@ async function loadHistory({append=false}={}){
   let searchRows=[];
   if(searchQuery){
    searchRows=historySearchRows(endedItems,parsedSearch);
-   renderHistorySearchIntent(parsedSearch,searchRows);
    endedItems=searchRows.map(row=>row.item);
   }
   endedItems=historySubtitleFilterRows(endedItems);
@@ -2042,7 +2054,14 @@ async function loadHistory({append=false}={}){
   historyChannelFacetRows=progressiveMode?endedItems:[];
   historyChannelFacetCollabMap=historyCollabByVideo;
   historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount}:null;
-  if(query)renderHistoryChannelFacets(historyChannelFacetRows);
+  if(query){
+   if(!historyRenderedVideoIds.size){
+    renderHistorySearchIntent(parsedSearch,searchRows);
+    renderHistoryChannelFacets(historyChannelFacetRows);
+   }else{
+    updateHistoryChannelFacetCounts(historyChannelFacetRows);
+   }
+  }
   const facetResult=progressiveMode
    ?renderHistoryFacetCards({append:append||historyRenderedVideoIds.size>0})
    :(()=>{historyVodWindows.clear();historyRenderedVideoIds.clear();endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();$('history-empty').hidden=Boolean(endedItems.length);return {filteredCount:endedItems.length,renderedCount:endedItems.length}})();
