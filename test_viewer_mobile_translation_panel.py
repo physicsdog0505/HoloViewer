@@ -11,10 +11,18 @@ def test_portrait_translation_panel_contract():
 
     assert 'id="mobileSubtitlePanel"' in html
     assert html.index('id="mobileSubtitlePanel"') < html.index('class="ptt-heading"')
+    assert 'id="mobileSubtitleControl"' in html
+    assert 'id="mobileSubtitleSwitch"' in html
+    assert html.index('id="pttShowFloor"') < html.index('id="mobileSubtitleSwitch"')
+    assert 'id="mobileSubtitleToggle"' not in html
     assert "@media(max-width:760px) and (orientation:portrait)" in css
     assert ".viewer-local-subtitle-overlay{display:none!important}" in css
+    assert ".mobile-subtitle-control[hidden]{display:none!important}" in css
+    assert "-webkit-text-stroke:2px var(--subtitle-stroke-color,#111111)" in css
     assert "const mobilePortraitMedia=window.matchMedia('(max-width:760px) and (orientation:portrait)')" in js
     assert "holoviewer-mobile-subtitle-open" in js
+    assert "mobileSubtitleSwitch?.addEventListener('change'" in js
+    assert "viewerSubtitleColorForCue(cue)" in js
     assert "renderMobileSubtitlePanel()" in js
 
 
