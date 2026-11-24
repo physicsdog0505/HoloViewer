@@ -179,3 +179,30 @@ Intentionally omitted / redacted:
 
 Assessment:
 The chapter exposes reproducible data-model and integrity methods without publishing credentials or a production attack-surface map. Source-priority values and generic cursor behavior are architectural knowledge, not privileged control information.
+
+
+## Review — Chapters 06–07 Multi-view player and master timeline
+
+Scope:
+- `06-multi-view-player.md`
+- `07-master-timeline.md`
+
+Result:
+`SECURITY_REVIEW=PASS`
+
+Published safely:
+- public client-side player behavior and timeline schema;
+- generic synchronization formulas;
+- public runtime constants relevant to reproducibility (16-stream UI cap, ~900 ms event-suppression window, 500 ms reconcile cadence, 2.5 s master-drift threshold, 1.2 s seek threshold);
+- segment replacement, gap handling, clock fallback and browser-autoplay limitation;
+- failure modes already visible in public client source.
+
+Checks:
+- no credentials, tokens, private hostnames, internal endpoints, account/resource IDs or production-control routes;
+- no operator-local commands or machine paths;
+- no writable/admin API details;
+- timing thresholds are client-side behavior and do not lower privileged-access barriers;
+- formulas/examples use generic synthetic timelines.
+
+Assessment:
+These chapters expose reproducible synchronization engineering without revealing production topology or control surfaces.
