@@ -66,3 +66,28 @@ Only evidence-backed failures are labeled Failed. Replaced designs are not neces
 | F-042 | Generic keywords without guards / 泛用關鍵字無 guard | Partially mitigated / 部分緩解 | [11](11-highlights.md) |
 | F-043 | Merge highlight events from title/date guesses / 以標題日期猜測合併事件 | Risk explicitly avoided / 已明確避免 | [11](11-highlights.md) |
 | F-044 | Client re-ranks finalized digest / Client 重排已完成日報 | Forbidden by contract / 契約禁止 | [11](11-highlights.md) |
+
+| F-045 | Video ID alone as translation identity / 只用 video_id 當翻譯 identity | Risk explicitly avoided / 已明確避免 | [12](12-source-transcripts.md) |
+| F-046 | Conflicting source artifact overwritten / 衝突原文 artifact 被覆寫 | Risk explicitly avoided / 已明確避免 | [12](12-source-transcripts.md) |
+| F-047 | Missing public captions means whole transcript system failed / 無公開字幕即視為整個 transcript 失敗 | Risk explicitly avoided / 已明確避免 | [12](12-source-transcripts.md) |
+| F-048 | Provider failure weakens credential boundary / provider 失敗後弱化憑證邊界 | Rejected / 已拒絕 | [12](12-source-transcripts.md) |
+| F-049 | Whole-VOD means one giant request / 整支影片等於單次超大請求 | Rejected / 已拒絕 | [13](13-ai-translation.md) |
+| F-050 | Progressive 10-cue route treated as final quality / 10-cue progressive 當最終品質 | Product-level failure / 產品層失敗 | [13](13-ai-translation.md) |
+| F-051 | Blame model alone for quality gap / 品質差全部歸因模型 | Unverified hypothesis avoided / 避免未驗證假說 | [13](13-ai-translation.md) |
+| F-052 | 50/100 cues treated as proven stable / 50/100 cues 當已驗證穩定值 | Rejected / 已拒絕 | [13](13-ai-translation.md) |
+| F-053 | Repair partial model attempt in place / 原地修補 partial attempt | Forbidden / 禁止 | [13](13-ai-translation.md) |
+| F-054 | AI scans corpus and chooses queue / AI 自行掃 corpus 與排隊 | Forbidden / 禁止 | [13](13-ai-translation.md) |
+| F-055 | Structurally valid output auto-accepted / 結構正確就自動 accepted | Risk explicitly avoided / 已明確避免 | [13](13-ai-translation.md) |
+| F-056 | Later batch failure discards prior progress / 後段失敗丟掉前面進度 | Design flaw corrected / 已修正 | [14](14-translation-quality.md) |
+| F-057 | Initial checkpoint implies whole-pipeline resumability / initial checkpoint 被誤當完整可續跑 | Confirmed limitation / 已確認限制 | [14](14-translation-quality.md) |
+| F-058 | Blind retry after unknown provider outcome / provider outcome 不明時盲重試 | Blocked / 已阻擋 | [14](14-translation-quality.md) |
+| F-059 | Shift mapping after response-count mismatch / 少回段落後位移對應 | Forbidden / 禁止 | [14](14-translation-quality.md) |
+| F-060 | QE becomes broad stylistic rewrite / QE 變成全篇風格重寫 | Guarded against / 已防範 | [14](14-translation-quality.md) |
+| F-061 | 10 cues treated as quality-optimal / 10 cues 被當品質最佳值 | Unproven / 未證實 | [14](14-translation-quality.md) |
+| F-062 | Larger batch automatically improves quality / 大 batch 一定更好 | Unproven / risky / 未證實且有風險 | [14](14-translation-quality.md) |
+| F-063 | Punctuation grouping equals true sentence boundary / 標點分組當真實句界 | Rejected / 已拒絕 | [14](14-translation-quality.md) |
+| F-064 | Proportional retiming equals semantic alignment / 比例 retiming 當語意對齊證據 | Rejected / 已拒絕 | [14](14-translation-quality.md) |
+| F-065 | Third-party fansub as ground truth / 第三方字幕當 ground truth | Rejected / 已拒絕 | [14](14-translation-quality.md) |
+| F-066 | Same model ID means fair A/B / 同模型 ID 就算公平 A/B | Rejected / 已拒絕 | [14](14-translation-quality.md) |
+| F-067 | Reviewer/post-editor treated as free quality / reviewer/post-edit 當免費品質提升 | Rejected / 已拒絕 | [14](14-translation-quality.md) |
+| F-068 | Retranslate when artifact exists but UI fails / artifact 存在但 UI 看不到就重翻 | Rejected / 已拒絕 | [14](14-translation-quality.md) |
