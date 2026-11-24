@@ -56,3 +56,13 @@ Only evidence-backed failures are labeled Failed. Replaced designs are not neces
 | F-033 | Ignore transcript-translation provenance / 不驗證原文與翻譯 provenance | Risk explicitly avoided / 已明確避免 | [09](09-watchalong.md) |
 | F-034 | Seek on every sync-loop tick / 每次同步迴圈都 seek | Risk explicitly avoided / 已明確避免 | [09](09-watchalong.md) |
 | F-035 | URL checkpoint treated as media truth / URL checkpoint 當播放器真實時間 | Parked / 已暫停 | [09](09-watchalong.md) |
+
+| F-036 | Second polling loop for concurrent viewers / 為同接新增第二條 polling | Risk explicitly avoided / 已明確避免 | [10](10-concurrent-viewers.md) |
+| F-037 | Unchunked large D1 CASE update / D1 大型 CASE update 未切批 | Failed / corrected | [10](10-concurrent-viewers.md) |
+| F-038 | Concurrent viewers as lifecycle authority / 同接作為 lifecycle authority | Risk explicitly avoided / 已明確避免 | [10](10-concurrent-viewers.md) |
+| F-039 | Null treated as zero / 缺值視為零 | Risk explicitly avoided / 已明確避免 | [10](10-concurrent-viewers.md) |
+| F-040 | Current snapshot treated as historical metric / 即時 snapshot 當歷史統計 | Intentionally not implemented / 刻意未實作 | [10](10-concurrent-viewers.md) |
+| F-041 | Viewer count as homepage popularity truth / 同接當首頁人氣真相 | Risk explicitly avoided / 已明確避免 | [11](11-highlights.md) |
+| F-042 | Generic keywords without guards / 泛用關鍵字無 guard | Partially mitigated / 部分緩解 | [11](11-highlights.md) |
+| F-043 | Merge highlight events from title/date guesses / 以標題日期猜測合併事件 | Risk explicitly avoided / 已明確避免 | [11](11-highlights.md) |
+| F-044 | Client re-ranks finalized digest / Client 重排已完成日報 | Forbidden by contract / 契約禁止 | [11](11-highlights.md) |
