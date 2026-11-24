@@ -16,6 +16,8 @@ EXPECTED = {"app.py", "public_snapshot.py", "requirements.txt", "REFERENCES.md",
 
 EXPECTED.add("docs/handoffs/PRODUCTION_COORDINATOR_HANDOFF_20261030.md")
 EXPECTED.add("watchalong-static/data/watchalong/events/ZpGtQNsS0Fs.json")
+EXPECTED.add("watchalong-static/data/watchalong/events/hRrLTHudlN8.json")
+EXPECTED.add("site/assets/youtube-chat-replay.js")
 EXPECTED.update({
     "docs/handoffs/FRONTEND_PRODUCTION_HANDOFF_20261103.md",
     "docs/handoffs/FRONTEND_PRODUCTION_HANDOFF_20261104.md",
@@ -709,9 +711,10 @@ class PublicSmokeTests(unittest.TestCase):
             "8pF4qHcshDc": (1461, 6), "t8q3XEmK0aM": (1367, 6),
             "jqJb0qnueDo": (449, 2), "x7bMoyNWaEE": (888, 4),
             "ZpGtQNsS0Fs": (1299, 5),
+            "hRrLTHudlN8": (1046, 5),
         }
         self.assertEqual(manifest.get("schema_version"), "holoviewer-watchalong-manifest-v1")
-        self.assertEqual(manifest.get("event_count"), 7)
+        self.assertEqual(manifest.get("event_count"), 8)
         self.assertEqual({row["event_id"] for row in manifest["events"]}, set(expected))
         for row in manifest["events"]:
             path = ROOT / "watchalong-static" / row["path"].lstrip("/")
@@ -898,19 +901,21 @@ class PublicSmokeTests(unittest.TestCase):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
         config = (ROOT / "site/assets/config.js").read_text(encoding="utf-8")
-        self.assertIn('id="historySubtitleFilter"', html)
+        self.assertIn('id="historySubtitleDiscovery"', html)
+        self.assertNotIn('id="historySubtitleFilter"', html)
         self.assertIn('中文字幕', html)
         self.assertIn("vodSubtitleAvailability", config)
         self.assertIn('indexPath: "/data/subtitles/index.json"', config)
         self.assertIn("const HISTORY_SUBTITLE_VALUE='zh-TW';", js)
+        self.assertIn("const HISTORY_SUBTITLE_DISCOVERY_VALUE='subtitles';", js)
         self.assertIn("function loadVodSubtitleAvailabilityIndex()", js)
         self.assertIn("historySubtitleFilterRows", js)
         self.assertIn("historyStateUrl", js)
-        self.assertIn("button.hidden=!configured", js)
+        self.assertIn("renderHistorySubtitleControls", js)
         self.assertIn("window.addEventListener('popstate'", js)
         self.assertIn("subtitle-ready", js)
         self.assertIn(".history-subtitle-filter", css)
-        self.assertIn("button.hidden=!configured", js)
+        self.assertIn(".history-subtitle-discovery", css)
         self.assertIn("return /^(localhost|127\\.0\\.0\\.1)$/.test(location.hostname)?path:'';", js)
 
 
