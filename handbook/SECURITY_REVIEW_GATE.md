@@ -97,3 +97,23 @@ Reason:
 
 Open action:
 - legacy public runbooks and handoff files elsewhere in the repository require a separate cleanup review and are **not** covered by this PASS.
+
+
+## Review — Chapter 04 Historical streams
+
+Scope:
+- `04-historical-streams.md`
+
+Result:
+`SECURITY_REVIEW=PASS`
+
+Checks:
+- no credentials, tokens, account identifiers, private URLs, local paths or operator commands;
+- no production worker/service names, rollback identifiers, admin/control endpoints or internal routing topology;
+- public technical constants documented here (50-row daily page size, 200-row render batch, 60-second manifest cache) are client-side behavior visible from public source and do not grant privileged access;
+- examples use synthetic/generic search inputs and do not expose private datasets;
+- proposed search improvements are clearly marked as proposals rather than current implementation.
+
+Security note:
+- exposing public client-side search and cache behavior can aid implementation comparison but does not disclose a privileged control surface;
+- if future chapters discuss rate limits, writable endpoints, authentication assumptions, incident details or unpatched vulnerabilities, those details require stricter review and may need redaction or delayed publication.
