@@ -6,6 +6,8 @@
 
 **網站 / Website:** https://holodocchi.com
 
+**技術手冊 / Technical handbook:** [設計、可重現方法與失敗紀錄 / Design, reproducibility and failed approaches](handbook/README.md)
+
 > [!IMPORTANT]
 > 本專案與 COVER Corp.、hololive production、YouTube、Google、PTT 均無隸屬、授權、背書或官方合作關係。  
 > This project is not affiliated with, endorsed by, sponsored by, or operated by COVER Corp., hololive production, YouTube, Google, or PTT.
