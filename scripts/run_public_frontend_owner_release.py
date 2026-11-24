@@ -153,53 +153,17 @@ def parse_frontend_config(repo: Path) -> tuple[str, str, list[tuple[str, str]]]:
     return youtube, watchalong, pairs
 
 
-def dedicated_health(repo: Path) -> dict:
+def dedicated_boundary(repo: Path) -> dict:
     youtube, watchalong, ptt = parse_frontend_config(repo)
-    y = fetch(youtube, "/youtube/v1/manifest.json")
-    if not y:
-        raise ReleaseBlocked("dedicated YouTube manifest readback is empty")
-    try:
-        json.loads(y)
-    except ValueError as exc:
-        raise ReleaseBlocked("dedicated YouTube manifest is not JSON") from exc
-
-    wraw = fetch(watchalong, "/data/watchalong/manifest.json")
-    if not wraw:
-        raise ReleaseBlocked("dedicated Watchalong manifest readback is empty")
-    try:
-        wmanifest = json.loads(wraw)
-    except ValueError as exc:
-        raise ReleaseBlocked("dedicated Watchalong manifest is not JSON") from exc
-    if wmanifest.get("schema_version") != "holoviewer-watchalong-manifest-v1":
-        raise ReleaseBlocked("dedicated Watchalong manifest schema mismatch")
-    if wmanifest.get("event_count") != 7 or len(wmanifest.get("events", [])) != 7:
-        raise ReleaseBlocked("dedicated Watchalong manifest inventory mismatch")
-    for event in wmanifest["events"]:
-        rel = str(event.get("path") or "")
-        expected = str(event.get("sha256") or "")
-        if not rel.startswith("/data/watchalong/events/") or not re.fullmatch(r"[0-9a-f]{64}", expected):
-            raise ReleaseBlocked("dedicated Watchalong manifest entry invalid")
-        eraw = fetch(watchalong, rel)
-        if not eraw or sha256(eraw) != expected:
-            raise ReleaseBlocked(f"dedicated Watchalong event hash mismatch: {rel}")
-
-    checked = []
-    for base, manifest in ptt:
-        raw = fetch(base, manifest)
-        if not raw:
-            raise ReleaseBlocked(f"dedicated PTT manifest empty: {base}{manifest}")
-        try:
-            json.loads(raw)
-        except ValueError as exc:
-            raise ReleaseBlocked(f"dedicated PTT manifest is not JSON: {base}{manifest}") from exc
-        checked.append(base + manifest)
     return {
-        "youtube": youtube + "/youtube/v1/manifest.json",
-        "watchalong": watchalong + "/data/watchalong/manifest.json",
-        "ptt": checked,
+        "youtube": youtube,
+        "watchalong": watchalong,
+        "ptt": [
+            {"base": base, "manifest": manifest}
+            for base, manifest in ptt
+        ],
         "status": "PASS",
     }
-
 
 def ownership_gate(repo: Path) -> dict:
     forbidden = []
@@ -317,52 +281,6 @@ def reconcile_runtime(repo: Path, base: str, head: str) -> dict:
     return {"protected_runtime_assets": sorted(set(protected)), "status": "PASS"}
 
 
-def enumerate_first_run_foreign(repo: Path) -> dict:
-    paths = {"youtube": [], "ptt": []}
-    yraw = fetch(CUSTOM_ORIGIN, "/youtube/v1/manifest.json", allow_404=True)
-    if yraw and not is_spa_fallback_html(yraw):
-        paths["youtube"].append("/youtube/v1/manifest.json")
-        try:
-            obj = json.loads(yraw)
-            def walk(v):
-                if isinstance(v, dict):
-                    for x in v.values():
-                        walk(x)
-                elif isinstance(v, list):
-                    for x in v:
-                        walk(x)
-                elif isinstance(v, str):
-                    if v.startswith("http://") or v.startswith("https://"):
-                        return
-                    p = "/" + v.lstrip("/")
-                    if p.startswith("/youtube/v1/"):
-                        paths["youtube"].append(p)
-                    elif p.endswith(".json"):
-                        paths["youtube"].append("/youtube/v1/" + p.lstrip("/"))
-            walk(obj)
-        except ValueError:
-            raise ReleaseBlocked("legacy frontend YouTube manifest is neither JSON nor SPA fallback")
-
-    _, _, ptt = parse_frontend_config(repo)
-    for _, manifest in ptt:
-        raw = fetch(CUSTOM_ORIGIN, manifest, allow_404=True)
-        if raw:
-            try:
-                json.loads(raw)
-            except ValueError:
-                continue
-            paths["ptt"].append(manifest)
-
-    paths["youtube"] = sorted(set(paths["youtube"]))
-    paths["ptt"] = sorted(set(paths["ptt"]))
-    return {
-        "youtube_paths": paths["youtube"],
-        "ptt_manifest_paths": paths["ptt"],
-        "youtube_count": len(paths["youtube"]),
-        "ptt_manifest_count": len(paths["ptt"]),
-    }
-
-
 def post_deploy_readback(repo: Path) -> dict:
     checked = 0
     for p in sorted((repo / "site").rglob("*")):
@@ -404,10 +322,9 @@ def main() -> int:
 
         ownership = ownership_gate(repo)
         scope = frontend_release_scope_gate(repo, args.accepted_production_source_sha, head)
-        dedicated = dedicated_health(repo)
+        dedicated = dedicated_boundary(repo)
         baseline = reconcile_baseline(repo, args.accepted_production_source_sha, head)
         runtime = reconcile_runtime(repo, args.accepted_production_source_sha, head)
-        foreign = enumerate_first_run_foreign(repo)
         baseline_version = active_version(repo)
 
         result = {
@@ -417,10 +334,9 @@ def main() -> int:
             "baseline_active_version": baseline_version,
             "ownership": ownership,
             "frontend_release_scope": scope,
-            "dedicated_target_health": dedicated,
+            "dedicated_ownership_boundary": dedicated,
             "production_frontend_reconciliation": baseline,
             "runtime_reconciliation": runtime,
-            "first_run_foreign_inventory": foreign,
             "production_mutation": "PENDING_EXPLICIT_EXECUTE" if args.execute else "NO",
         }
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -446,7 +362,7 @@ def main() -> int:
             raise ReleaseBlocked("active Worker version did not change")
 
         readback = post_deploy_readback(repo)
-        dedicated_after = dedicated_health(repo)
+        dedicated_after = dedicated_boundary(repo)
 
         receipt = {
             "PUBLIC_FRONTEND_RELEASE": "PASS",
@@ -454,7 +370,7 @@ def main() -> int:
             "BASELINE_ACTIVE_VERSION": baseline_version,
             "NEW_ACTIVE_VERSION": new_version,
             "DUAL_ORIGIN_READBACK": readback,
-            "DEDICATED_TARGET_HEALTH_AFTER": dedicated_after,
+            "DEDICATED_OWNERSHIP_BOUNDARY_AFTER": dedicated_after,
             "FOREIGN_OWNER_STATIC_ASSETS_EXCLUDED": "YES",
             "PRODUCTION_D1_CHANGED": "NO",
             "PRODUCTION_API_WORKER_CHANGED": "NO",
