@@ -15,6 +15,9 @@ Only evidence-backed failures are labeled Failed. Replaced designs are not neces
 | F-007 | Player lifecycle / 播放器生命週期 | Pending evidence review / 待查證 | Chapters 06–09 |
 | F-008 | Stale live treated as live / 過期 live 狀態誤當即時 | Risk explicitly avoided / 已明確避免 | [03](03-live-discovery.md) |
 | F-009 | Inferring live from schedule alone / 僅憑預定時間判定直播 | Risk explicitly avoided / 已明確避免 | [03](03-live-discovery.md) |
+| F-010 | Search only visible daily page / 只搜尋單日可見頁 | Risk explicitly avoided / 已明確避免 | [04](04-historical-streams.md) |
+| F-011 | Alias substring everywhere / 所有別名一律 substring | Risk explicitly avoided / 已明確避免 | [04](04-historical-streams.md) |
+| F-012 | Pure calendar-month partitioning / 僅按曆月切分 | Edge case explicitly handled / 已處理邊界案例 | [04](04-historical-streams.md) |
 
 ## Record template / 紀錄格式
 
