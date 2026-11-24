@@ -117,3 +117,34 @@ Checks:
 Security note:
 - exposing public client-side search and cache behavior can aid implementation comparison but does not disclose a privileged control surface;
 - if future chapters discuss rate limits, writable endpoints, authentication assumptions, incident details or unpatched vulnerabilities, those details require stricter review and may need redaction or delayed publication.
+
+
+## Review — Chapter 03 upstream lifecycle expansion
+
+Scope:
+- `03-live-discovery.md` additions covering uploads discovery, WebSub role, tracked-roster policy, Today-to-History convergence, and historical reconciliation cadence.
+
+Result:
+`SECURITY_REVIEW=PASS_WITH_REDACTIONS`
+
+Published safely:
+- conceptual authority chain: uploads playlist + event evidence + Stream Catalog → bounded metadata verification → canonical history → static history;
+- current roster cardinality (86 tracked, 1 retired, 85 active) and activation-boundary policy;
+- current historical reconciliation default cadence (6 hours / 21600 seconds);
+- bounded metadata verification batch size (up to 50 video IDs), because it is an algorithmic/provider API constraint useful for reproducibility;
+- generic WebSub safety principles: approved roster, active leases, signature validation, idempotency, stale-event protection, and coverage gating;
+- historical evidence status that an older roster once reached full lease coverage, explicitly not claimed as current live state.
+
+Intentionally omitted / redacted:
+- exact callback route;
+- callback hostname or Worker/service name;
+- secret-binding names or HMAC key material;
+- lease database/table schema and storage location;
+- renewal/control endpoint details;
+- production activation commands;
+- account/resource identifiers;
+- current live lease inventory;
+- operator-local scheduler installation details and paths.
+
+Assessment:
+The disclosed cadence and roster cardinality help others reproduce the architecture but do not grant privileged access. WebSub details are kept at protocol/design level rather than production reconnaissance level.
