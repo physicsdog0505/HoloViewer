@@ -1848,7 +1848,8 @@ function updateHistorySearchSummary(facetResult){
  const resolved=state.parsedSearch?.members?.map(member=>member.canonical_name).join(' + ')||'';
  const intent=state.parsedSearch?.intent==='member_set'?' · 多人/連動意圖':state.parsedSearch?.intent==='member'?' · 成員搜尋':'';
  const prefix=resolved?'辨識：'+resolved+intent+' · ':'';
- $('history-search-summary').textContent=prefix+'找到 '+state.resultCount+' 筆'+facetLabel+progress;
+ const countLabel=historySearchSourceHasMore?'已載入 '+state.resultCount+' 筆':'找到 '+state.resultCount+' 筆';
+ $('history-search-summary').textContent=prefix+countLabel+facetLabel+progress;
 }
 function armHistorySearchLoadMore(button){
  if(historySearchLoadMoreObserver){historySearchLoadMoreObserver.disconnect();historySearchLoadMoreObserver=null}
