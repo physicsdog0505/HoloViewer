@@ -82,6 +82,11 @@ const discussionYoutubeTab=document.getElementById('discussionYoutubeTab');
 const youtubeChatPane=document.getElementById('youtubeChatPane');
 const youtubeChatFrame=document.getElementById('youtubeChatFrame');
 const youtubeChatStatus=document.getElementById('youtubeChatStatus');
+const mobileSubtitlePanel=document.getElementById('mobileSubtitlePanel');
+const mobileSubtitleToggle=document.getElementById('mobileSubtitleToggle');
+const mobileSubtitleToggleState=document.getElementById('mobileSubtitleToggleState');
+const mobileSubtitleBody=document.getElementById('mobileSubtitleBody');
+const mobileSubtitleText=document.getElementById('mobileSubtitleText');
 
 const players=[];
 const playerCards=[];
@@ -100,6 +105,8 @@ let lockedIndex=workspaceLayout==='focus'?primaryIndex:null;
 workspaceLayout='sidebar';
 let secondaryOffset=0;
 const mobileViewerMedia=window.matchMedia('(max-width:760px), (max-width:900px) and (orientation:landscape)');
+const mobilePortraitMedia=window.matchMedia('(max-width:760px) and (orientation:portrait)');
+let mobileSubtitleOpen=false;
 let pttFollowing=true;
 let pttLoaded=false;
 let pttLayoutRepinTimer=null;
@@ -2257,6 +2264,7 @@ async function loadViewerVodSubtitle(videoId){
  if(!/^[A-Za-z0-9_-]{11}$/.test(videoId)||!window.HoloViewerVodSubtitles)return null;
  if(viewerVodSubtitleCache.has(videoId)){
   viewerVodSubtitle=viewerVodSubtitleCache.get(videoId);
+  refreshMobileSubtitleAvailability();
   return viewerVodSubtitle;
  }
  try{
@@ -2264,9 +2272,11 @@ async function loadViewerVodSubtitle(videoId){
   const loaded=await HoloViewerVodSubtitles.load(videoId,{baseUrl:base});
   if(loaded){viewerVodSubtitleCache.set(videoId,loaded);viewerVodSubtitle=loaded;clearViewerLocalSubtitleOverlays()}
   else if(viewerVodSubtitle?.videoId===videoId)viewerVodSubtitle=null;
+  refreshMobileSubtitleAvailability();
   return loaded;
  }catch{
   if(viewerVodSubtitle?.videoId===videoId)viewerVodSubtitle=null;
+  refreshMobileSubtitleAvailability();
   return null;
  }
 }
@@ -2282,6 +2292,53 @@ function viewerLocalSubtitleCue(slot,current){
 }
 function viewerLocalSubtitleOverlay(){
  return playerCards[primaryIndex]?.querySelector('.viewer-local-subtitle-overlay')||null;
+}
+function mobileSubtitleSelection(videoId){
+ if(viewerLocalSubtitleMode==='A-B'){
+  const a=viewerLocalSubtitleSlots.A,b=viewerLocalSubtitleSlots.B;
+  if(!a||!b||a.videoId!==videoId||b.videoId!==videoId)return null;
+  return {mode:'A-B',a,b};
+ }
+ const slot=viewerLocalSubtitleMode==='holodocchi'?viewerVodSubtitle:viewerLocalSubtitleSlots[viewerLocalSubtitleMode];
+ if(!slot||slot.videoId!==videoId)return null;
+ return {mode:'single',slot};
+}
+function setMobileSubtitleOpen(open,{persist=true}={}){
+ mobileSubtitleOpen=Boolean(open);
+ if(mobileSubtitleBody)mobileSubtitleBody.hidden=!mobileSubtitleOpen;
+ if(mobileSubtitleToggle)mobileSubtitleToggle.setAttribute('aria-expanded',String(mobileSubtitleOpen));
+ if(mobileSubtitleToggleState)mobileSubtitleToggleState.textContent=mobileSubtitleOpen?'隱藏':'顯示';
+ if(persist){try{localStorage.setItem('holoviewer-mobile-subtitle-open',mobileSubtitleOpen?'1':'0')}catch{}}
+}
+function refreshMobileSubtitleAvailability(){
+ if(!mobileSubtitlePanel)return;
+ const videoId=viewerPrimaryVideoId();
+ const available=Boolean(mobilePortraitMedia.matches&&mobileSubtitleSelection(videoId));
+ mobileSubtitlePanel.hidden=!available;
+ if(!available&&mobileSubtitleText)mobileSubtitleText.textContent='';
+}
+function renderMobileSubtitlePanel(){
+ if(!mobileSubtitlePanel||!mobilePortraitMedia.matches)return;
+ const videoId=viewerPrimaryVideoId(),current=viewerPrimaryCurrentSeconds();
+ const selection=mobileSubtitleSelection(videoId);
+ mobileSubtitlePanel.hidden=!selection;
+ if(!selection||!Number.isFinite(current)||!mobileSubtitleText)return;
+ if(selection.mode==='A-B'){
+  const aCue=viewerLocalSubtitleCue(selection.a,current),bCue=viewerLocalSubtitleCue(selection.b,current);
+  const parts=[];
+  if(aCue?.translation)parts.push('A '+String(aCue.translation));
+  if(bCue?.translation)parts.push('B '+String(bCue.translation));
+  mobileSubtitleText.textContent=parts.join(' ｜ ');
+  return;
+ }
+ const cue=viewerLocalSubtitleCue(selection.slot,current);
+ mobileSubtitleText.textContent=String(cue?.translation||'');
+}
+function readMobileSubtitlePreference(){
+ let open=false;
+ try{open=localStorage.getItem('holoviewer-mobile-subtitle-open')==='1'}catch{}
+ setMobileSubtitleOpen(open,{persist:false});
+ refreshMobileSubtitleAvailability();
 }
 function clearViewerLocalSubtitleOverlays(){
  playerCards.forEach(card=>{
@@ -2330,6 +2387,7 @@ function setViewerLocalSubtitleMode(mode){
  viewerLocalSubtitleMode=mode;
  clearViewerLocalSubtitleOverlays();
  refreshViewerLocalSubtitleUi();
+ refreshMobileSubtitleAvailability();
  return true;
 }
 async function loadViewerLocalSubtitle(slotName,file){
@@ -2355,8 +2413,10 @@ function clearViewerLocalSubtitle(slotName){
  clearViewerLocalSubtitleOverlays();
  setViewerLocalSubtitleStatus(slotName+' 已清除');
  refreshViewerLocalSubtitleUi();
+ refreshMobileSubtitleAvailability();
 }
 function renderViewerLocalSubtitle(){
+ renderMobileSubtitlePanel();
  clearViewerLocalSubtitleOverlays();
  const videoId=viewerPrimaryVideoId(),current=viewerPrimaryCurrentSeconds(),overlay=viewerLocalSubtitleOverlay();
  if(!overlay||!Number.isFinite(current))return;
@@ -2393,8 +2453,11 @@ viewerLocalSubtitleFileB?.addEventListener('change',async()=>{const file=viewerL
 viewerLocalSubtitleClearA?.addEventListener('click',()=>clearViewerLocalSubtitle('A'));
 viewerLocalSubtitleClearB?.addEventListener('click',()=>clearViewerLocalSubtitle('B'));
 viewerLocalSubtitleFontSize?.addEventListener('input',()=>setViewerSubtitleFontSize(viewerLocalSubtitleFontSize.value));
+mobileSubtitleToggle?.addEventListener('click',()=>setMobileSubtitleOpen(!mobileSubtitleOpen));
+mobilePortraitMedia.addEventListener?.('change',()=>{refreshMobileSubtitleAvailability();renderViewerLocalSubtitle()});
 readViewerSubtitleFontSize();
 refreshViewerLocalSubtitleUi();
+readMobileSubtitlePreference();
 
 function readSettings(){
  try{
