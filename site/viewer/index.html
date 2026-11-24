@@ -119,11 +119,7 @@
       <div id="stage" class="viewer-stage"></div>
       <aside id="pttPanel" class="viewer-ptt ptt-floor-hidden" hidden>
         <section id="mobileSubtitlePanel" class="mobile-subtitle-panel" hidden aria-label="影片翻譯">
-          <button id="mobileSubtitleToggle" class="mobile-subtitle-toggle" type="button" aria-expanded="false" aria-controls="mobileSubtitleBody">
-            <span>翻譯</span>
-            <span id="mobileSubtitleToggleState" class="mobile-subtitle-toggle-state">顯示</span>
-          </button>
-          <div id="mobileSubtitleBody" class="mobile-subtitle-body" hidden>
+          <div id="mobileSubtitleBody" class="mobile-subtitle-body">
             <div id="mobileSubtitleText" class="mobile-subtitle-text" aria-live="polite"></div>
           </div>
         </section>
@@ -138,6 +134,11 @@
               <input id="pttShowFloor" type="checkbox">
               <span class="ptt-floor-check" aria-hidden="true"></span>
               <span>樓數</span>
+            </label>
+            <label id="mobileSubtitleControl" class="ptt-floor-control mobile-subtitle-control" title="顯示或隱藏翻譯" hidden>
+              <input id="mobileSubtitleSwitch" type="checkbox">
+              <span class="ptt-floor-check" aria-hidden="true"></span>
+              <span>翻譯</span>
             </label>
             <small id="pttMeta" class="ptt-meta-sr" aria-live="polite">讀取中</small>
           </div>
