@@ -48,10 +48,17 @@ Document reproducible engineering methods, design trade-offs, failed experiments
 | 22 | 限制與技術債 | Limitations | Planned |
 | 23 | 開源與貢獻 | Open source and contributions | Planned |
 
-[失敗紀錄 / Failed approaches](FAILED_APPROACHES.md) · [架構決策 / Architecture decisions](ARCHITECTURE_DECISIONS.md)
+[失敗紀錄 / Failed approaches](FAILED_APPROACHES.md) · [架構決策 / Architecture decisions](ARCHITECTURE_DECISIONS.md) · [安全檢查 Gate / Security review gate](SECURITY_REVIEW_GATE.md)
 
 ## Chapter acceptance / 章節驗收
 
 每章應交代問題、需求、輸入輸出、處理流程、演算法、實際參數及適用條件、可重現範例、例外處理、設計理由、失敗歷史、根因與假說、驗證方法、限制和替代方案。不適用或未知的欄位需說明。翻譯 Web 與 API 的參數不得混用；不得把研究設定當成正式採用或通用穩定值。
 
 Each chapter should cover the problem, requirements, inputs and outputs, pipeline, algorithm, measured parameters and applicability, reproducible examples, edge cases, rationale, failures, confirmed causes versus hypotheses, validation, limitations and alternatives. Explain unknown or inapplicable fields. Web and API translation settings must be distinguished; research settings must not be presented as production settings or universally stable values.
+
+
+## Security gate / 安全 Gate
+
+每完成一章或一批公開文件，必須另外通過 [Documentation Security Review Gate](SECURITY_REVIEW_GATE.md)，再進入下一批。技術正確性通過不等於安全性通過。
+
+Every completed public documentation chapter or batch must separately pass the [Documentation Security Review Gate](SECURITY_REVIEW_GATE.md) before the next batch. Technical correctness does not imply security acceptance.
