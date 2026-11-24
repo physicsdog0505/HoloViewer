@@ -1927,6 +1927,7 @@ function renderHistoryFacetCards({append=false}={}){
    }
    more.disabled=true;
    historyDiscoveryTarget+=HISTORY_DISCOVERY_BATCH_SIZE;
+   historySearchRenderLimit=historyDiscoveryTarget;
    await loadHistory({append:true});
   };
   pagination.append(more);
@@ -1976,6 +1977,7 @@ async function loadHistory({append=false}={}){
   historySubtitleIndexState=subtitleIndex.available?'ready':'unavailable';
   if(!subtitleIndex.available){historySubtitleDiscoveryEnabled=false;historySubtitleFilterEnabled=false}
   renderHistorySubtitleControls();
+  const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
 
   const parsedSearch=searchQuery?parseHistorySearchQuery(searchQuery,aliasRegistry,contentAliasRegistry):null;
   const discoverySource=!dateIntent&&Boolean(searchQuery||historySubtitleDiscoveryEnabled);
@@ -2020,7 +2022,6 @@ async function loadHistory({append=false}={}){
   const collabData=dayMode&&config.apiBase
    ?await api('/v1/collab/history?day='+encodeURIComponent(day)+'&limit=100&offset=0').catch(()=>null)
    :null;
-  const catalogRows=Array.isArray(catalogData?.streams||catalogData?.items)?(catalogData.streams||catalogData.items):[];
   const displayByChannel=await historyDisplayMetadataByChannel(data.items,catalogRows);
   if(generation!==historyLoadGeneration)return;
 
