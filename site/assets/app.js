@@ -1765,6 +1765,22 @@ function renderHistorySearchIntent(parsed,rows){
   keyword.textContent='關鍵字：'+parsed.keywords.join(' ');
   box.append(keyword);
  }
+ if(historySubtitleIndexState==='ready'){
+  const subtitle=document.createElement('button');
+  subtitle.type='button';subtitle.className='history-subtitle-filter';subtitle.textContent='中文字幕';
+  subtitle.setAttribute('aria-pressed',String(historySubtitleConstraintEnabled()));
+  subtitle.onclick=()=>{
+   if(historySubtitleDiscoveryEnabled){
+    historySubtitleDiscoveryEnabled=false;historySubtitleFilterEnabled=false;
+   }else{
+    historySubtitleFilterEnabled=!historySubtitleFilterEnabled;
+   }
+   state.offset=0;historyChannelSelection.clear();historyChannelFacetContext='';resetHistoryDiscoveryTarget();
+   history.pushState(null,'',historyStateUrl($('historyDate').value,historyQuery()));
+   loadHistory();
+  };
+  box.append(subtitle);
+ }
  const note=document.createElement('span');
  note.className='history-search-intent-note';
  if(parsed.members.length>1){
@@ -1807,12 +1823,14 @@ function historyChannelFacetEntries(rows){
  }
  return [...map.values()].sort((a,b)=>b.count-a.count||String(a.row?.channel_name||a.row?.channel_title||a.channelId).localeCompare(String(b.row?.channel_name||b.row?.channel_title||b.channelId)));
 }
-const HISTORY_SEARCH_BATCH_SIZE=200;
+const HISTORY_SEARCH_BATCH_SIZE=HISTORY_DISCOVERY_BATCH_SIZE;
 let historySearchRenderLimit=HISTORY_SEARCH_BATCH_SIZE;
 let historySearchLoadMoreObserver=null;
 let historySearchSummaryState=null;
+let historySearchSourceHasMore=false;
 function resetHistorySearchRenderLimit(){
  historySearchRenderLimit=HISTORY_SEARCH_BATCH_SIZE;
+ historySearchSourceHasMore=false;
  if(historySearchLoadMoreObserver){historySearchLoadMoreObserver.disconnect();historySearchLoadMoreObserver=null}
 }
 function updateHistorySearchSummary(facetResult){
@@ -1879,12 +1897,18 @@ function renderHistoryFacetCards(){
  const ids=new Set(rendered.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();
  $('history-empty').hidden=Boolean(rendered.length);
  const pagination=$('history-pagination');pagination.replaceChildren();
- if(rendered.length<rows.length){
-  const more=node('button','載入更多（'+rendered.length+' / '+rows.length+'）','subtle-action');
-  more.type='button';
-  more.onclick=()=>{
-   historySearchRenderLimit=Math.min(rows.length,historySearchRenderLimit+HISTORY_SEARCH_BATCH_SIZE);
-   renderHistoryFacetCards();
+ if(rendered.length<rows.length||historySearchSourceHasMore){
+  const label=rendered.length<rows.length?'載入更多（'+rendered.length+' / '+rows.length+'）':'載入更早結果';
+  const more=node('button',label,'subtle-action');more.type='button';
+  more.onclick=async()=>{
+   if(rendered.length<rows.length){
+    historySearchRenderLimit=Math.min(rows.length,historySearchRenderLimit+HISTORY_SEARCH_BATCH_SIZE);
+    renderHistoryFacetCards();
+    return;
+   }
+   more.disabled=true;
+   historyDiscoveryTarget+=HISTORY_DISCOVERY_BATCH_SIZE;
+   await loadHistory();
   };
   pagination.append(more);
   armHistorySearchLoadMore(more);
