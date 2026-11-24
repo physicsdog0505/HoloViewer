@@ -55,5 +55,21 @@ class HistoryProgressiveDiscoveryTests(unittest.TestCase):
         self.assertIn("box.append(subtitle)", block)
 
 
+    def test_progressive_discovery_keeps_existing_cards_and_shows_spinner(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="history-loading"', html)
+        self.assertIn(".history-loading-spinner", css)
+        self.assertIn("const historyRenderedVideoIds=new Set();", js)
+        self.assertIn("function setHistoryLoading(active)", js)
+        self.assertIn("loadHistory({append:true})", js)
+        self.assertIn("renderHistoryFacetCards({append:true})", js)
+        self.assertIn("if(!append){list.replaceChildren();historyVodWindows.clear();historyRenderedVideoIds.clear()}", js)
+        self.assertIn("if(append&&historyRenderedVideoIds.has(id))continue;", js)
+        self.assertIn("await onProgress", js)
+        self.assertIn("historySearchRenderLimit=historyDiscoveryTarget", js)
+
 if __name__ == "__main__":
     unittest.main()
