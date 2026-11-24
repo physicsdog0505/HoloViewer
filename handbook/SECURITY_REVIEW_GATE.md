@@ -206,3 +206,34 @@ Checks:
 
 Assessment:
 These chapters expose reproducible synchronization engineering without revealing production topology or control surfaces.
+
+
+## Review — Chapters 08–09 Collaboration identification and Watchalong
+
+Scope:
+- `08-collab-identification.md`
+- `09-watchalong.md`
+
+Result:
+`SECURITY_REVIEW=PASS_WITH_REDACTIONS`
+
+Published safely:
+- distinction between candidate grouping and verified event identity;
+- conservative candidate heuristics and their known limits;
+- event-day rollover example as domain policy;
+- public event/sync contracts at schema level;
+- Watchalong host-driven timing formula, segment model, gap handling and drift thresholds;
+- transcript/translation provenance checks and generic static validation logic;
+- client-side progress-resume and subtitle-clock behavior.
+
+Intentionally omitted / redacted:
+- exact production collab API URLs and internal producer routes;
+- actual Watchalong static origin/Worker/service names;
+- production event inventory and private review selections;
+- approved-sync source checkout locations;
+- deployment commands, release SHAs, rollback procedures and operator-only paths;
+- any unpublished source-media rights/access information;
+- secret bindings, account/resource IDs and administrative endpoints.
+
+Assessment:
+The chapters publish reproducible synchronization and event-identity methods without providing a production topology map or privileged control information. Public client-visible thresholds and schema rules are retained because they are implementation knowledge, not access credentials.
