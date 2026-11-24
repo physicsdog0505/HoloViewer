@@ -315,6 +315,19 @@ body.home-wide .section-head{margin-bottom:9px}
 
 /* History browse/search controls. */
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.history-subtitle-discovery{
+ display:inline-flex;align-items:center;width:max-content;margin:-2px 0 4px;padding:0;border:0;background:transparent;
+ font:inherit;font-size:21px;font-weight:950;letter-spacing:-.025em;line-height:1.2;cursor:pointer;
+ background-image:linear-gradient(92deg,var(--brand-main,#b44882),#df6ca9 52%,#8f5bd6);
+ -webkit-background-clip:text;background-clip:text;color:transparent
+}
+.history-subtitle-discovery:hover{filter:saturate(1.08) brightness(.94)}
+.history-subtitle-discovery:focus-visible{outline:2px solid color-mix(in srgb,var(--brand-main,#b44882) 38%,transparent);outline-offset:5px;border-radius:5px}
+.history-subtitle-discovery[aria-pressed="true"]{position:relative}
+.history-subtitle-discovery[aria-pressed="true"]::after{
+ content:"";position:absolute;left:0;right:24%;bottom:-6px;height:3px;border-radius:999px;
+ background:linear-gradient(90deg,var(--brand-main,#b44882),#df6ca9,#8f5bd6)
+}
 .history-toolbar{display:grid;grid-template-columns:auto minmax(260px,1fr);gap:14px;align-items:end;margin:14px 0 8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
 .history-date-nav{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
 .history-date-field{display:grid;gap:4px;font-size:11px;font-weight:800;color:var(--muted)}
@@ -957,9 +970,9 @@ html.home-preboot:not(.home-hydrated) #homeDynamic{visibility:hidden}
 
 /* #297 General VOD subtitle availability discovery. */
 .history-availability-filters{display:flex;align-items:center;gap:8px;min-width:0}
-.history-subtitle-filter{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font:inherit;font-size:12px;font-weight:850;cursor:pointer}
+.history-subtitle-filter{display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:4px 9px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font:inherit;font-size:12px;font-weight:850;cursor:pointer}
 .history-subtitle-filter:hover:not(:disabled){background:var(--surface-2)}
-.history-subtitle-filter[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:#fff}
+.history-subtitle-filter[aria-pressed="true"]{border-color:color-mix(in srgb,var(--brand-main,#b44882) 65%,var(--line));background:color-mix(in srgb,var(--brand-main,#b44882) 10%,#fff);color:var(--brand-main,#b44882)}
 .history-subtitle-filter:disabled{cursor:not-allowed;opacity:.5}
 .history-subtitle-filter-status{font-size:11px;color:var(--muted)}
 .thumb-badge.subtitle-ready{background:rgba(35,31,28,.84);color:#fff}
