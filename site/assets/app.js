@@ -1461,6 +1461,29 @@ async function loadYoutubeHistorySearchMonth(day){
  const rows=uniqueSortedHistoryRows(payloads.flatMap(payload=>payload.videos).filter(row=>youtubeHistoryTaipeiDay(row).slice(0,7)===month));
  return {items:rows,total:rows.length,has_more:false,source:'youtube-static',search_month:month};
 }
+const HISTORY_DISCOVERY_BATCH_SIZE=30;
+let historyDiscoveryTarget=HISTORY_DISCOVERY_BATCH_SIZE;
+let historyDiscoveryContext='';
+function resetHistoryDiscoveryTarget(){historyDiscoveryTarget=HISTORY_DISCOVERY_BATCH_SIZE;historyDiscoveryContext=''}
+async function loadYoutubeHistoryDiscovery({manifest,parsedSearch=null,subtitleOnly=false,target=HISTORY_DISCOVERY_BATCH_SIZE}={}){
+ const months=historyPublishedMonths(manifest).slice().sort().reverse();
+ const collected=[];let scanned=0;
+ for(const month of months){
+  let monthIds=null;
+  if(subtitleOnly){
+   monthIds=await loadVodSubtitleMonthIds(month);
+   if(!monthIds.size){scanned+=1;continue}
+  }
+  const payload=await loadYoutubeHistorySearchMonth(month+'-01');
+  let rows=payload.items;
+  if(parsedSearch)rows=historySearchRows(rows,parsedSearch).map(row=>row.item);
+  if(subtitleOnly)rows=rows.filter(row=>monthIds.has(String(row?.video_id||'')));
+  collected.push(...rows);scanned+=1;
+  if(collected.length>=target)break;
+ }
+ const items=uniqueSortedHistoryRows(collected);
+ return {items,total:items.length,has_more:scanned<months.length,source:'youtube-static-discovery',months_scanned:scanned};
+}
 async function loadLegacyHistoryDay(day,offset=0){
  return api('/v1/history?day='+encodeURIComponent(day)+'&limit=50&offset='+offset);
 }
