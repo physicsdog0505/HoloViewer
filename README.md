@@ -14,18 +14,29 @@
 
 ## 目錄 / Table of Contents
 
-- [HoloDocchi 是什麼 / What HoloDocchi is](#holodocchi-是什麼--what-holodocchi-is)
-- [目前功能 / Current features](#目前功能--current-features)
-- [為什麼架構長這樣 / Why the architecture looks like this](#為什麼架構長這樣--why-the-architecture-looks-like-this)
-- [資料怎麼處理 / How data is handled](#資料怎麼處理--how-data-is-handled)
-- [資料來源與資料面 / Data sources and publication surfaces](#資料來源與資料面--data-sources-and-publication-surfaces)
-- [隱私與安全邊界 / Privacy and security boundaries](#隱私與安全邊界--privacy-and-security-boundaries)
-- [授權與第三方內容 / License and third-party content](#授權與第三方內容--license-and-third-party-content)
-- [English full reference](#english-full-reference)
+### 繁體中文
+- [HoloDocchi 是什麼](#holodocchi-是什麼)
+- [目前功能](#目前功能)
+- [為什麼架構長這樣](#為什麼架構長這樣)
+- [資料怎麼處理](#資料怎麼處理)
+- [資料來源與資料面](#資料來源與資料面)
+- [隱私與安全邊界](#隱私與安全邊界)
+- [授權與第三方內容](#授權與第三方內容)
+
+### English
+- [What HoloDocchi is](#what-holodocchi-is)
+- [Current features](#current-features)
+- [Why the architecture looks like this](#why-the-architecture-looks-like-this)
+- [How data is handled](#how-data-is-handled)
+- [Data sources and publication surfaces](#data-sources-and-publication-surfaces)
+- [Privacy and security boundaries](#privacy-and-security-boundaries)
+- [License and third-party content](#license-and-third-party-content)
 
 ---
 
-# HoloDocchi 是什麼 / What HoloDocchi is
+# 繁體中文
+
+## HoloDocchi 是什麼
 
 HoloDocchi 的目標不是重新託管 Hololive 影片，而是把「觀看 Hololive 直播時常會同時需要的資訊」整理成一個瀏覽介面。
 
@@ -43,17 +54,17 @@ HoloDocchi 的目標不是重新託管 Hololive 影片，而是把「觀看 Holo
 
 ---
 
-# 目前功能 / Current features
+## 目前功能
 
-## 1. 今日直播
+### 1. 今日直播
 
 首頁會整理正在直播、即將開始、狀態待更新與已結束的影片，讓使用者從「今天想看什麼」直接進入觀看。
 
-## 2. 歷史直播
+### 2. 歷史直播
 
 可依日期與成員查詢過去直播，也支援常用名稱、暱稱與多語別名搜尋。
 
-## 3. 自訂觀看
+### 3. 自訂觀看
 
 可自由加入 YouTube 影片，建立單人或多人觀看版面，包含：
 
@@ -65,11 +76,11 @@ HoloDocchi 的目標不是重新託管 Hololive 影片，而是把「觀看 Holo
 - 多視角輪播
 - 搭配討論時間軸
 
-## 4. 多人連動
+### 4. 多人連動
 
 針對同一活動或合作直播整理多個視角，方便在同一介面中快速切換與比較。
 
-## 5. 同時視聽 / Watchalong
+### 5. 同時視聽 / Watchalong
 
 Watchalong 不只是單純把兩個播放器放在一起，而是把：
 
@@ -94,29 +105,29 @@ Hololive 主播時間軸
 - 字幕與彈幕顯示
 - PTT / YouTube Chat 閱讀
 
-## 6. PTT 專串
+### 6. PTT 專串
 
 可閱讀今日專串與已整理的歷史專串資料。
 
 PTT 文章與推文屬於第三方／使用者產生內容。HoloDocchi 提供閱讀、索引與時間軸整理，不主張擁有原始文字。
 
-## 7. 中文字幕
+### 7. 中文字幕
 
 HoloDocchi 可為部分 VOD 提供中文字幕。
 
 字幕資料與影片本身分離管理，避免字幕系統變成另一份重複的影片資料庫。
 
-## 8. Docchi News / Daily Digest
+### 8. Docchi News / Daily Digest
 
 將近期直播、重點內容與相關剪輯整理成較容易閱讀的日報形式。
 
-## 9. 行程與月曆
+### 9. 行程與月曆
 
 包含直播月曆、生日、紀念日與歷史直播瀏覽，讓使用者能從時間維度回顧內容。
 
 ---
 
-# 為什麼架構長這樣 / Why the architecture looks like this
+## 為什麼架構長這樣
 
 HoloDocchi 並沒有把所有資料都塞進同一個後端。
 
@@ -151,7 +162,7 @@ HoloDocchi 並沒有把所有資料都塞進同一個後端。
 
 這些資料面彼此分離，但在 HoloDocchi 網站上整合成單一使用體驗。
 
-## Static-first
+### Static-first
 
 對於變動頻率低、可驗證、可重建的資料，HoloDocchi 優先使用靜態發布。
 
@@ -173,7 +184,7 @@ HoloDocchi 並沒有把所有資料都塞進同一個後端。
 - 不需要每次開頁都重新查詢或重新計算
 - 可降低單一後端的負擔
 
-## Publication boundary
+### Publication boundary
 
 資料從來源到公開網站，原則上會經過：
 
@@ -194,7 +205,7 @@ HoloDocchi 並沒有把所有資料都塞進同一個後端。
 1. 可以先確認資料正確，再對外發布。
 2. 公開網站只需要接觸已經允許公開的資料。
 
-## 為什麼強調可重建與可驗證
+### 為什麼強調可重建與可驗證
 
 對歷史資料與字幕來說，重要的不只是「現在看起來能用」，而是未來仍能回答：
 
@@ -206,11 +217,11 @@ HoloDocchi 並沒有把所有資料都塞進同一個後端。
 
 ---
 
-# 資料怎麼處理 / How data is handled
+## 資料怎麼處理
 
 HoloDocchi 大致把資料分成四種類型。
 
-## A. 即時或近即時資料
+### A. 即時或近即時資料
 
 例如：
 
@@ -220,7 +231,7 @@ HoloDocchi 大致把資料分成四種類型。
 
 這些資料適合由動態服務提供。
 
-## B. 可重建的歷史資料
+### B. 可重建的歷史資料
 
 例如：
 
@@ -230,7 +241,7 @@ HoloDocchi 大致把資料分成四種類型。
 
 這些內容變動頻率較低，適合整理後以靜態方式提供。
 
-## C. 經過整理或審核的內容
+### C. 經過整理或審核的內容
 
 例如：
 
@@ -240,7 +251,7 @@ HoloDocchi 大致把資料分成四種類型。
 
 這些內容不是「取得來源後立刻公開」，而是經過整理、驗證或審核後再發布。
 
-## D. 不對外公開的營運資料
+### D. 不對外公開的營運資料
 
 例如：
 
@@ -256,21 +267,21 @@ HoloDocchi 大致把資料分成四種類型。
 
 ---
 
-# 資料來源與資料面 / Data sources and publication surfaces
+## 資料來源與資料面
 
-## YouTube
+### YouTube
 
 HoloDocchi 使用 YouTube 相關資料來整理直播與歷史影片，影片播放主要透過官方 YouTube player。
 
 HoloDocchi 不主張擁有 YouTube 上的影片、縮圖、聊天室內容或其他第三方素材。
 
-## PTT
+### PTT
 
 HoloDocchi 會整理 PTT 專串與推文時間軸，讓使用者可以在觀看影片時一起閱讀。
 
 PTT 原始文章與推文仍屬原作者及平台規範所涵蓋的內容。
 
-## Watchalong
+### Watchalong
 
 Watchalong 使用獨立的事件與對齊資料，描述：
 
@@ -281,19 +292,19 @@ Watchalong 使用獨立的事件與對齊資料，描述：
 
 這些資料與一般直播列表分開管理，因為它們的更新方式與驗證方式不同。
 
-## 字幕
+### 字幕
 
 字幕以單一影片為單位管理。
 
 這樣可以讓字幕修正獨立進行，不需要連同整個直播資料一起更新。
 
-## Daily Digest
+### Daily Digest
 
 Daily Digest 屬於整理後內容，更新節奏與直播資料不同，因此獨立處理。
 
 ---
 
-# 隱私與安全邊界 / Privacy and security boundaries
+## 隱私與安全邊界
 
 HoloDocchi 對外只提供網站功能與必要的公開資料。
 
@@ -312,9 +323,9 @@ HoloDocchi 對外只提供網站功能與必要的公開資料。
 
 ---
 
-# 授權與第三方內容 / License and third-party content
+## 授權與第三方內容
 
-## 程式碼
+### 程式碼
 
 除非個別檔案另有標示，本專案作者擁有並有權授權的程式碼，以 **MIT License** 釋出。
 
@@ -325,7 +336,7 @@ HoloDocchi 對外只提供網站功能與必要的公開資料。
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - [REFERENCES.md](REFERENCES.md)
 
-## MIT 不代表所有內容都是 MIT
+### MIT 不代表所有內容都是 MIT
 
 MIT license 不會自動把第三方內容變成本專案的著作。
 
@@ -340,7 +351,7 @@ MIT license 不會自動把第三方內容變成本專案的著作。
 
 這些內容仍受各自權利人與平台條款約束。
 
-## Fan project disclaimer
+### Fan project disclaimer
 
 HoloDocchi 是非官方粉絲專案。
 
@@ -348,76 +359,159 @@ HoloDocchi 是非官方粉絲專案。
 
 ---
 
-# English full reference
+# English
 
 ## What HoloDocchi is
 
-HoloDocchi is an unofficial fan-built viewing interface for the Hololive ecosystem.
+HoloDocchi is not intended to re-host Hololive videos. Its goal is to organize the information viewers commonly want while watching Hololive streams into a single browsing and viewing interface.
 
-It does not re-host Hololive videos. Playback is primarily provided through the official YouTube embedded player.
+Typical use cases include:
 
-The project brings together:
+- quickly seeing what is live right now;
+- finding streams from a particular day or member;
+- watching multiple perspectives at the same time;
+- synchronizing another source while watching a Hololive watchalong;
+- watching a video while reading a PTT thread or YouTube Chat;
+- reading prepared Traditional Chinese subtitles;
+- quickly reviewing recent content and related clips.
 
-- current livestream discovery;
-- historical stream browsing;
-- custom single-view and multi-view playback;
-- collaboration / multi-perspective viewing;
-- synchronized watchalong playback;
-- PTT discussion timelines;
-- YouTube Chat related viewing interfaces;
-- VOD subtitles;
-- Daily Digest / Docchi News;
-- schedule, birthday, anniversary, and historical calendar views.
+Video playback is primarily provided through the official YouTube iframe player. HoloDocchi does not download and re-host YouTube videos.
 
-## Why the architecture is split
+---
 
-HoloDocchi deliberately does not place every dataset behind one monolithic backend.
+## Current features
 
-Live state, historical video data, PTT archives, subtitles, Watchalong event definitions, and Daily Digest content have different update frequencies, validation requirements, storage characteristics, and rollback needs.
+### 1. Today's livestreams
 
-The system therefore separates:
+The home page organizes videos that are live, upcoming, awaiting updated status, or already ended, allowing viewers to move directly from “what should I watch today?” into playback.
+
+### 2. Historical streams
+
+Past streams can be searched by date and member. Common names, nicknames, and multilingual aliases are also supported.
+
+### 3. Custom viewing
+
+Users can freely add YouTube videos and create single-view or multi-view layouts, including:
+
+- multi-perspective layouts;
+- primary-view switching;
+- primary-audio selection;
+- linked play / pause;
+- immersive mode;
+- rotating focus among multiple views;
+- discussion-timeline integration where applicable.
+
+### 4. Collaboration / multi-perspective viewing
+
+Multiple perspectives from the same event or collaboration can be organized together for quick switching and comparison within one interface.
+
+### 5. Watchalong
+
+Watchalong is more than simply placing two video players next to each other. It combines:
+
+```text
+Hololive host timeline
++
+synchronized source timeline
++
+alignment information
+=
+a synchronized watchalong experience
+```
+
+The interface can support:
+
+- the host video and synchronized source;
+- aligning the current playback position;
+- fine adjustment of timing differences;
+- segment switching;
+- side-by-side and primary-view switching;
+- linked playback;
+- subtitle and danmaku display;
+- PTT / YouTube Chat viewing.
+
+### 6. PTT threads
+
+Users can read the current day's thread and organized historical thread data.
+
+PTT articles and pushes are third-party / user-generated content. HoloDocchi provides reading, indexing, and timeline organization, but does not claim ownership of the original text.
+
+### 7. Traditional Chinese subtitles
+
+HoloDocchi can provide Traditional Chinese subtitles for selected VODs.
+
+Subtitle data is managed separately from the videos themselves so that the subtitle system does not become a duplicate video metadata database.
+
+### 8. Docchi News / Daily Digest
+
+Recent streams, notable content, and related clips are organized into a more readable daily digest format.
+
+### 9. Schedule and calendar
+
+The site includes stream calendars, birthdays, anniversaries, and historical-stream browsing so users can explore content from a time-based perspective.
+
+---
+
+## Why the architecture looks like this
+
+HoloDocchi does not place all of its data behind a single backend.
+
+This is intentional.
+
+Livestream state, historical streams, PTT data, subtitles, Watchalong data, and Daily Digest content have different update frequencies, data volumes, validation methods, and rollback requirements.
+
+Putting everything together would create several problems:
+
+- one service failure could affect the entire site;
+- historical data and live data would be forced to share the same lifecycle;
+- correcting subtitles could require deploying unrelated features at the same time;
+- large volumes of read-only historical data would increase dynamic-service cost;
+- rolling back only one type of data would become difficult;
+- it would be harder to determine how a specific public artifact was produced.
+
+HoloDocchi therefore separates:
 
 ```text
 frontend
 +
-live / near-live data
+live data
 +
-historical static data
+historical data suitable for static publication
 +
-subtitle publication
+independently published subtitles
 +
-Watchalong publication
+independently published Watchalong data
 +
-Daily Digest publication
+independently published Daily Digest data
 ```
 
-These surfaces are separate internally but are presented as one product at holodocchi.com.
+These data surfaces are separate from one another, while HoloDocchi combines them into a single user experience.
 
-## Static-first where appropriate
+### Static-first
 
-Historical or reviewed data is a good fit for static publication when it does not need to be recomputed on every request.
+For data that changes infrequently and can be validated and rebuilt, HoloDocchi prefers static publication.
 
 Examples include:
 
 - historical stream data;
-- PTT archives;
+- historical PTT data;
 - Watchalong definitions;
-- subtitle files;
-- Daily Digest artifacts;
+- VOD subtitles;
+- Daily Digest content;
 - search aliases.
 
-This provides:
+The reasons are:
 
-- better caching;
+- easier caching;
 - easier validation;
-- deterministic artifacts;
-- independent rollback;
-- reduced coupling;
-- lower dynamic-service load.
+- easier rebuilding;
+- easier independent rollback;
+- no need to query or recompute the same information every time a page is opened;
+- lower load on a single dynamic backend.
 
-## Publication boundary
+### Publication boundary
 
-The general data flow is:
+From source to public website, data generally passes through:
 
 ```text
 source
@@ -429,71 +523,161 @@ source
 → HoloDocchi
 ```
 
-The goal is to separate data creation from public delivery.
+In other words, HoloDocchi tries to separate “producing data” from “publishing data.”
 
-Only information intended for public use should cross that boundary.
+This serves two purposes:
 
-## Data classes
+1. Data can be checked before it is made public.
+2. The public website only needs access to information that has been approved for public delivery.
 
-### Live or near-live data
+### Why rebuildability and verifiability matter
 
-Current stream status and other freshness-sensitive information are better suited to dynamic delivery.
+For historical data and subtitles, it is not enough that something “works right now.” The project should still be able to answer later:
 
-### Rebuildable historical data
+> Where did this public data come from?  
+> Which exact version was actually published at the time?  
+> If something is wrong, can it be corrected or rolled back independently?
 
-Historical stream information, PTT archives, and aliases are better suited to validated static publication.
+For this reason, HoloDocchi's data workflows aim to preserve versions, manifests, hashes, or other verifiable information where appropriate.
 
-### Reviewed content
+---
 
-Subtitles, Watchalong alignment data, and Daily Digest content can pass through additional review or validation before publication.
+## How data is handled
 
-### Non-public operational data
+HoloDocchi broadly separates data into four categories.
 
-Credentials, private databases, internal validation evidence, unpublished source material, and maintenance records are not part of the public product.
+### A. Live or near-live data
 
-Open-source code does not mean all operational data must be public.
+Examples include:
 
-## Data sources
+- whether a stream is currently live;
+- upcoming streams;
+- information that requires relatively fresh status evaluation.
+
+This type of data is better suited to dynamic delivery.
+
+### B. Rebuildable historical data
+
+Examples include:
+
+- historical streams;
+- historical PTT data;
+- member and alias data.
+
+These change less frequently and are suitable for organized static publication.
+
+### C. Organized or reviewed content
+
+Examples include:
+
+- Traditional Chinese subtitles;
+- Watchalong alignment data;
+- Daily Digest content.
+
+These are not necessarily published immediately after a source is obtained. They can go through organization, validation, or review before publication.
+
+### D. Non-public operational data
+
+Examples include:
+
+- validation records;
+- internal inspection data;
+- unpublished source material;
+- credentials and keys;
+- maintenance records.
+
+These are not part of the public data provided to HoloDocchi users.
+
+Open-source code does not mean that all operational data should be public.
+
+---
+
+## Data sources and publication surfaces
 
 ### YouTube
 
-HoloDocchi uses YouTube-related information to organize livestreams and historical videos. Playback is primarily handled by the official YouTube player.
+HoloDocchi uses YouTube-related information to organize livestreams and historical videos. Video playback is primarily provided through the official YouTube player.
 
-HoloDocchi does not claim ownership of YouTube-hosted videos, thumbnails, chat messages, or other third-party material.
+HoloDocchi does not claim ownership of videos, thumbnails, chat content, or other third-party material hosted on YouTube.
 
 ### PTT
 
-HoloDocchi may normalize and present PTT discussion timelines for viewing purposes.
+HoloDocchi organizes PTT threads and push timelines so users can read them while watching videos.
 
-Original posts and pushes remain third-party/user-generated content.
+Original PTT articles and pushes remain content covered by their original authors' rights and the platform's applicable rules.
 
 ### Watchalong
 
-Watchalong alignment information is handled separately because it has a different validation and update model from general livestream data.
+Watchalong uses separate event and alignment data describing:
+
+- which Hololive video is involved;
+- which synchronized source corresponds to it;
+- when alignment begins;
+- how segments are switched.
+
+This information is managed separately from the general livestream list because its update and validation requirements are different.
 
 ### Subtitles
 
-Subtitle artifacts are managed per video so corrections can be released independently from the rest of the stream catalog.
+Subtitles are managed on a per-video basis.
+
+This allows subtitle corrections to be handled independently without requiring the entire livestream dataset to be updated at the same time.
 
 ### Daily Digest
 
-Daily Digest content has its own editorial and update cadence and is therefore handled separately.
+Daily Digest is organized editorial content with a different update cadence from livestream data, so it is handled separately.
 
-## Privacy and security
+---
 
-HoloDocchi publicly exposes only the website and data necessary for its public features.
+## Privacy and security boundaries
 
-Credentials, private databases, internal maintenance records, unpublished research material, and personal data are not part of the public product.
+HoloDocchi publicly provides only the website features and public data required for those features.
 
-## License
+The following are not part of the public product:
 
-Project-owned software that the project has the right to license is released under the MIT License unless otherwise noted.
+- API keys;
+- account credentials;
+- private cookies / sessions;
+- private databases;
+- unpublished research material;
+- internal maintenance records;
+- personal data;
+- other information used only to maintain the service.
 
-The MIT License does **not** relicense third-party content such as Hololive intellectual property, YouTube content or metadata, PTT posts, or other externally sourced material.
+The website itself should not require users to access this information.
+
+---
+
+## License and third-party content
+
+### Code
+
+Unless otherwise noted in an individual file, code owned by the project authors and eligible for licensing is released under the **MIT License**.
 
 See:
 
-- `LICENSE`
-- `DATA_SOURCES_AND_ATTRIBUTION.md`
-- `THIRD_PARTY_NOTICES.md`
-- `REFERENCES.md`
+- [LICENSE](LICENSE)
+- [DATA_SOURCES_AND_ATTRIBUTION.md](DATA_SOURCES_AND_ATTRIBUTION.md)
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- [REFERENCES.md](REFERENCES.md)
+
+### MIT does not mean all content is MIT-licensed
+
+The MIT License does not automatically turn third-party content into project-owned material.
+
+In particular, the following are not relicensed under MIT merely because they appear in or are referenced by HoloDocchi:
+
+- Hololive / HOLOSTARS names, brands, characters, trademarks, and related material;
+- YouTube videos, thumbnails, metadata, and chat content;
+- PTT articles and pushes;
+- third-party subtitles or transcripts;
+- externally sourced text, images, or audiovisual material;
+- data provided by external services.
+
+These materials remain subject to the rights of their respective owners and applicable platform terms.
+
+### Fan project disclaimer
+
+HoloDocchi is an unofficial fan project.
+
+The project does not claim ownership of Hololive / HOLOSTARS characters, brands, or original audiovisual content.
