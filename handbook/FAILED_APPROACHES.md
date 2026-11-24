@@ -13,6 +13,8 @@ Only evidence-backed failures are labeled Failed. Replaced designs are not neces
 | F-005 | Duplicate writes / 重複寫入 | Pending evidence review / 待查證 | Chapters 02, 19 |
 | F-006 | Historical source gaps / 歷史來源缺漏 | Pending evidence review / 待查證 | Chapter 05 |
 | F-007 | Player lifecycle / 播放器生命週期 | Pending evidence review / 待查證 | Chapters 06–09 |
+| F-008 | Stale live treated as live / 過期 live 狀態誤當即時 | Risk explicitly avoided / 已明確避免 | [03](03-live-discovery.md) |
+| F-009 | Inferring live from schedule alone / 僅憑預定時間判定直播 | Risk explicitly avoided / 已明確避免 | [03](03-live-discovery.md) |
 
 ## Record template / 紀錄格式
 
