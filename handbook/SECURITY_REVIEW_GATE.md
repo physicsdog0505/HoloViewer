@@ -267,3 +267,36 @@ Intentionally omitted / redacted:
 
 Assessment:
 The D1 regression is documented as an engineering lesson without exposing privileged access or a current exploit path. Client-visible ranking rules and cadence are reproducibility information. No production control surface is disclosed.
+
+
+## Review — Chapters 12–14 Source transcripts, AI translation, Translation quality
+
+Scope:
+- `12-source-transcripts.md`
+- `13-ai-translation.md`
+- `14-translation-quality.md`
+
+Result:
+`SECURITY_REVIEW=PASS_WITH_REDACTIONS`
+
+Published safely:
+- transcript identity/content-hash model and deterministic segment invariants;
+- separation of caption acquisition from translation;
+- quality-v2 stage model (initial → QE → selective post-edit);
+- historically used bounded batch examples (10-cue progressive and 20-segment acceptance configuration), clearly scoped rather than presented as universal stable values;
+- progressive scheduling windows and whole-VOD-vs-one-shot distinction;
+- immutable-attempt and deterministic validation principles;
+- failure/recovery lessons for partial output, unknown provider outcomes, checkpoint coverage, sentence reconstruction and target-side retiming;
+- multi-stage call-amplification example and A/B/C evidence rules.
+
+Intentionally omitted / redacted:
+- local workspace paths and user home directories;
+- Drive folder IDs, account identities and subscription details;
+- API keys, cookies, credentials, secret names and provider-session state;
+- production queue file locations and operator-only scheduling commands;
+- exact private receipt/ledger paths;
+- unpublished transcript text, third-party subtitle bodies and captured reference frames;
+- production import/deployment procedures.
+
+Assessment:
+The chapters reveal reproducible translation architecture and failure history without exposing credentials, account topology or operational control surfaces. Public numeric batch examples are retained because they are experimental/acceptance parameters useful for reproducing the engineering trade-offs, and are explicitly labeled by route and evidence status.
