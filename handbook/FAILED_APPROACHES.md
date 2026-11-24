@@ -37,3 +37,11 @@ Only evidence-backed failures are labeled Failed. Replaced designs are not neces
 | F-016 | Import-order winner / 匯入順序決定 canonical | Risk explicitly avoided / 已明確避免 | [05](05-ptt-data.md) |
 | F-017 | Gap-free means complete / 無 gap 即視為完整 | Risk explicitly avoided / 已明確避免 | [05](05-ptt-data.md) |
 | F-018 | Minute timestamps treated as exact seconds / 分鐘時間當精確秒 | Risk explicitly avoided / 已明確避免 | [05](05-ptt-data.md) |
+
+| F-019 | Moving iframe nodes for layout / 搬動 iframe 排版 | Risk explicitly avoided / 已明確避免 | [06](06-multi-view-player.md) |
+| F-020 | Recursive linked-playback events / 連動播放事件遞迴 | Risk explicitly avoided / 已明確避免 | [06](06-multi-view-player.md) |
+| F-021 | Equal source seconds treated as synchronized / 相同影片秒數視為已同步 | Risk explicitly avoided / 已明確避免 | [06](06-multi-view-player.md) |
+| F-022 | Equal source time treated as equal event time / 相同 source time 當同一事件時間 | Risk explicitly avoided / 已明確避免 | [07](07-master-timeline.md) |
+| F-023 | Playing through timeline gaps / gap 期間繼續上一段 | Risk explicitly avoided / 已明確避免 | [07](07-master-timeline.md) |
+| F-024 | Seek on every small drift / 每個微小誤差都 seek | Risk explicitly avoided / 已明確避免 | [07](07-master-timeline.md) |
+| F-025 | URL master time trusted as media clock / URL master time 當 player clock | Parked / 已暫停 | [07](07-master-timeline.md) |
