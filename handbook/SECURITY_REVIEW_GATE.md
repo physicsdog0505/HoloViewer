@@ -237,3 +237,33 @@ Intentionally omitted / redacted:
 
 Assessment:
 The chapters publish reproducible synchronization and event-identity methods without providing a production topology map or privileged control information. Public client-visible thresholds and schema rules are retained because they are implementation knowledge, not access credentials.
+
+
+## Review — Chapters 10–11 Concurrent viewers and Highlights
+
+Scope:
+- `10-concurrent-viewers.md`
+- `11-highlights.md`
+
+Result:
+`SECURITY_REVIEW=PASS_WITH_REDACTIONS`
+
+Published safely:
+- current concurrent-viewer field semantics;
+- reuse of the existing lifecycle metadata refresh rather than a second polling loop;
+- five-minute observation cadence as public architectural behavior;
+- the historical D1 bind-amplification regression (45 rows → 136 binds) and generic 30-ID chunking correction;
+- explicit statement that historical samples/peaks/trends are not active;
+- homepage highlight categories, ranking semantics and stable tie-breaking;
+- distinction between editorial priority, popularity, and finalized Daily Digest authority.
+
+Intentionally omitted / redacted:
+- production database identifiers and binding names;
+- exact writable/admin endpoints;
+- Worker/service names and production topology;
+- internal telemetry dashboards, account limits, billing identifiers or current quota consumption;
+- deployment/rollback commands and exact operational SHAs;
+- unpatched operational weaknesses beyond the already-corrected public regression.
+
+Assessment:
+The D1 regression is documented as an engineering lesson without exposing privileged access or a current exploit path. Client-visible ranking rules and cadence are reproducibility information. No production control surface is disclosed.
