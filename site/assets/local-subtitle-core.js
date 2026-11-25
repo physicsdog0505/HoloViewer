@@ -126,15 +126,32 @@
   }
   fail('不支援的字幕格式：.'+(ext||'?'));
  }
- function cueAt(cues,current){
+ function lengthAwareHoldSeconds(text){
+  const length=Array.from(String(text||'').trim()).length;
+  if(length<=20)return 5;
+  if(length<=30)return 6;
+  if(length<=40)return 7;
+  if(length<=50)return 8;
+  return 10;
+ }
+ function cueAt(cues,current,{lengthAwareHold=false}={}){
   if(!Number.isFinite(current)||!Array.isArray(cues)||!cues.length)return null;
   let low=0,high=cues.length;
   while(low<high){
    const mid=(low+high)>>1;
    if(cues[mid].start<=current)low=mid+1;else high=mid;
   }
-  const row=cues[Math.max(0,low-1)];
-  return row&&current>=row.start&&current<row.end?row:null;
+  const index=Math.max(0,low-1);
+  const row=cues[index];
+  if(!row||current<row.start)return null;
+  if(current<row.end)return row;
+  if(!lengthAwareHold)return null;
+  const next=cues[index+1]||null;
+  const holdEnd=Math.min(
+   row.end+lengthAwareHoldSeconds(row.translation),
+   next?next.start:Infinity
+  );
+  return current<holdEnd?row:null;
  }
  return {parseLocalSubtitleFile,parseBenchmarkJson,parseSrt,parseVtt,cueAt};
 });

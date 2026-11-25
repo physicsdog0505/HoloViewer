@@ -56,6 +56,46 @@ assert.equal(json.cues[0].speakerAccent,'#d85a8a');
 assert.equal(local.cueAt(json.cues,1.5).id,'0');
 assert.equal(local.cueAt(json.cues,5.9),null);
 
+const hold5=[
+ {id:'0',start:0,end:1,translation:'12345678901234567890'},
+ {id:'1',start:10,end:11,translation:'next'}
+];
+assert.equal(local.cueAt(hold5,1),null);
+assert.equal(local.cueAt(hold5,5.999,{lengthAwareHold:true}).id,'0');
+assert.equal(local.cueAt(hold5,6,{lengthAwareHold:true}),null);
+
+const hold6=[
+ {id:'0',start:0,end:1,translation:'123456789012345678901'},
+ {id:'1',start:10,end:11,translation:'next'}
+];
+assert.equal(local.cueAt(hold6,6.999,{lengthAwareHold:true}).id,'0');
+assert.equal(local.cueAt(hold6,7,{lengthAwareHold:true}),null);
+
+const hold7=[
+ {id:'0',start:0,end:1,translation:'1234567890123456789012345678901'}
+];
+assert.equal(local.cueAt(hold7,7.999,{lengthAwareHold:true}).id,'0');
+assert.equal(local.cueAt(hold7,8,{lengthAwareHold:true}),null);
+
+const hold8=[
+ {id:'0',start:0,end:1,translation:'12345678901234567890123456789012345678901'}
+];
+assert.equal(local.cueAt(hold8,8.999,{lengthAwareHold:true}).id,'0');
+assert.equal(local.cueAt(hold8,9,{lengthAwareHold:true}),null);
+
+const hold10=[
+ {id:'0',start:0,end:1,translation:'123456789012345678901234567890123456789012345678901'}
+];
+assert.equal(local.cueAt(hold10,10.999,{lengthAwareHold:true}).id,'0');
+assert.equal(local.cueAt(hold10,11,{lengthAwareHold:true}),null);
+
+const nextWins=[
+ {id:'0',start:0,end:1,translation:'123456789012345678901234567890123456789012345678901'},
+ {id:'1',start:3,end:4,translation:'next'}
+];
+assert.equal(local.cueAt(nextWins,2.999,{lengthAwareHold:true}).id,'0');
+assert.equal(local.cueAt(nextWins,3,{lengthAwareHold:true}).id,'1');
+
 throwsContains(()=>local.parseLocalSubtitleFile('bad.srt','1\n00:00:AA,000 --> 00:00:02,000\nx'),'時間');
 throwsContains(()=>local.parseLocalSubtitleFile('bad.json','{oops'), 'JSON');
 throwsContains(()=>local.parseLocalSubtitleFile('bad.json',JSON.stringify({

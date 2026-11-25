@@ -2286,9 +2286,13 @@ function viewerPrimaryCurrentSeconds(){
   return Number.isFinite(value)?value:null;
  }catch{return null}
 }
-function viewerLocalSubtitleCue(slot,current){
+function viewerLocalSubtitleCue(slot,current,{lengthAwareHold=false}={}){
  if(!slot||!window.HoloViewerLocalSubtitles)return null;
- return HoloViewerLocalSubtitles.cueAt(slot.cues,current);
+ return HoloViewerLocalSubtitles.cueAt(
+  slot.cues,
+  current,
+  {lengthAwareHold}
+ );
 }
 function viewerLocalSubtitleOverlay(){
  return playerCards[primaryIndex]?.querySelector('.viewer-local-subtitle-overlay')||null;
@@ -2333,7 +2337,11 @@ function renderMobileSubtitlePanel(){
   mobileSubtitleText.style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(aCue||bCue));
   return;
  }
- const cue=viewerLocalSubtitleCue(selection.slot,current);
+ const cue=viewerLocalSubtitleCue(
+  selection.slot,
+  current,
+  {lengthAwareHold:viewerLocalSubtitleMode==='holodocchi'}
+ );
  mobileSubtitleText.textContent=String(cue?.translation||'');
  mobileSubtitleText.style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(cue));
 }
@@ -2439,7 +2447,11 @@ function renderViewerLocalSubtitle(){
  }
  const slot=viewerLocalSubtitleMode==='holodocchi'?viewerVodSubtitle:viewerLocalSubtitleSlots[viewerLocalSubtitleMode];
  if(!slot||slot.videoId!==videoId)return;
- const cue=viewerLocalSubtitleCue(slot,current);
+ const cue=viewerLocalSubtitleCue(
+  slot,
+  current,
+  {lengthAwareHold:viewerLocalSubtitleMode==='holodocchi'}
+ );
  if(single){single.hidden=false;single.textContent=String(cue?.translation||'');single.style.color='#fff';single.style.setProperty('--subtitle-stroke-color',viewerSubtitleColorForCue(cue))}
  if(comparison)comparison.hidden=true;
  overlay.hidden=!cue;
