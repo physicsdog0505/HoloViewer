@@ -13,6 +13,54 @@ window.HOLOVIEWER_CONFIG = Object.freeze({
     relatedClipsPathTemplate: "/data/daily-digest/{month}/{date}-related-clips.json"
   }),
   pttArchiveMonths: Object.freeze({
+    "2024-01": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-01.json"
+    }),
+    "2024-02": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-02.json"
+    }),
+    "2024-03": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-03.json"
+    }),
+    "2024-04": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-04.json"
+    }),
+    "2024-05": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-05.json"
+    }),
+    "2024-06": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-06.json"
+    }),
+    "2024-07": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-07.json"
+    }),
+    "2024-08": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-08.json"
+    }),
+    "2024-09": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-09.json"
+    }),
+    "2024-10": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-10.json"
+    }),
+    "2024-11": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-11.json"
+    }),
+    "2024-12": Object.freeze({
+      base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
+      manifest: "/ptt/v1/manifests/static-assets-full-2024-12.json"
+    }),
     "2025-09": Object.freeze({
       base: "https://holoviewer-ptt-static-assets-full-offline.singlebagel.workers.dev",
       manifest: "/ptt/v1/manifests/static-assets-full-2025-09.json"
