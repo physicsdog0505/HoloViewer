@@ -248,10 +248,18 @@
      <strong id="collabMonthLabel"></strong>
      <button id="collabMonthNext" type="button" aria-label="下個月">›</button>
     </div>
-    <section class="daily-date-hub-calendar" aria-label="多人連動月份總覽">
-     <div class="daily-date-hub-weekdays" aria-hidden="true"><span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span></div>
-     <div id="collabDateGrid" class="daily-date-hub-grid"></div>
-    </section>
+    <div class="collab-date-hub-body">
+     <section class="daily-date-hub-calendar" aria-label="多人連動月份總覽">
+      <div class="daily-date-hub-weekdays" aria-hidden="true"><span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span></div>
+      <div id="collabDateGrid" class="daily-date-hub-grid"></div>
+     </section>
+     <aside class="collab-date-agenda" aria-live="polite">
+      <button id="collabDateSelectedAction" class="time-hub-selected-label history-hub-selected-action" type="button" aria-label="進入選取日期的多人連動">
+       <span id="collabDateSelectedLabel"></span><span aria-hidden="true">→</span>
+      </button>
+      <div id="collabDateAgenda" class="collab-date-agenda-list"></div>
+     </aside>
+    </div>
    </div>
   </dialog>
  </section>
