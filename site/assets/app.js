@@ -2201,6 +2201,36 @@ async function digestCollabMetadataForDay(day){
  }
  return byId;
 }
+async function hydrateDigestCollabProfiles(metadataMaps){
+ const channelIds=[];
+ for(const metadata of metadataMaps){
+  if(!(metadata instanceof Map))continue;
+  for(const row of metadata.values()){
+   const channelId=String(row?.channel_id||'');
+   if(/^UC[A-Za-z0-9_-]{22}$/.test(channelId))channelIds.push(channelId);
+  }
+ }
+ const profiles=await loadCanonicalChannelProfiles(channelIds);
+ if(!profiles.size)return;
+ for(const metadata of metadataMaps){
+  if(!(metadata instanceof Map))continue;
+  for(const [videoId,row] of metadata){
+   const profile=profiles.get(String(row?.channel_id||''));
+   if(!profile)continue;
+   metadata.set(videoId,{
+    ...row,
+    channel_name:profile.channel_name||profile.channel_title||row.channel_name||row.channel_title||'',
+    channel_title:profile.channel_title||profile.channel_name||row.channel_title||row.channel_name||'',
+    avatar_url:profile.avatar_url||row.avatar_url||'',
+    member_accent:profile.member_accent||row.member_accent||'',
+    member_accent_dual:Array.isArray(profile.member_accent_dual)&&profile.member_accent_dual.length?profile.member_accent_dual:row.member_accent_dual,
+    support_mode:profile.support_mode||row.support_mode||'',
+    support_color_source:profile.support_color_source||row.support_color_source||null,
+    group:profile.group||row.group||row.channel_group||'other'
+   });
+  }
+ }
+}
 function appendDigestCollabDay(day,events){
  const host=$('collab-digest-days');if(!host||!events.length)return;
  const group=node('section',undefined,'collab-digest-day');
@@ -2223,10 +2253,13 @@ async function loadDigestCollabRecent(reset=false){
  try{
   await fillDigestCollabPending(DIGEST_COLLAB_BATCH_SIZE);
   const batch=digestCollabPendingDays.splice(0,DIGEST_COLLAB_BATCH_SIZE);
+  const metadataByDay=new Map();
+  for(const day of batch)metadataByDay.set(day,await digestCollabMetadataForDay(day));
+  await hydrateDigestCollabProfiles([...metadataByDay.values()]);
   for(const day of batch){
    digestCollabLoadedDays.add(day);
    const artifact=digestCollabArtifacts.get(day);
-   const metadata=await digestCollabMetadataForDay(day);
+   const metadata=metadataByDay.get(day)||new Map();
    const events=window.HOLOVIEWER_DIGEST_COLLAB?.deriveDigestCollabEvents(artifact,metadata)||[];
    appendDigestCollabDay(day,events);
   }
