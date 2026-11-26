@@ -1998,7 +1998,7 @@ async function loadHistory(){
   historyChannelFacetRows=progressiveMode?endedItems:[];
   historyChannelFacetCollabMap=historyCollabByVideo;
   historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount}:null;
-  if(query)renderHistoryChannelFacets(historyChannelFacetRows);
+  if(query||historySubtitleDiscoveryEnabled)renderHistoryChannelFacets(historyChannelFacetRows);
   const facetResult=progressiveMode
    ?renderHistoryFacetCards()
    :(()=>{historyVodWindows.clear();endedItems.forEach(item=>homeCard(item,list,{collabMap:historyCollabByVideo,history:true}));const ids=new Set(endedItems.map(item=>item.video_id));for(const id of selectedHomeVideos){if(!ids.has(id))selectedHomeVideos.delete(id)}homeSelection();$('history-empty').hidden=Boolean(endedItems.length);return {filteredCount:endedItems.length,renderedCount:endedItems.length}})();
