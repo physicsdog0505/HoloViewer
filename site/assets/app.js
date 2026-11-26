@@ -2374,8 +2374,10 @@ async function renderDigestCollabCalendar(){
   const events=available.get(day)||[];
   if(events.length){
    button.classList.add('is-available');
-   const mark=node('span',String(events.length),'daily-date-hub-day-mark collab-date-count');
-   mark.setAttribute('aria-hidden','true');button.append(mark);
+   const mark=node('span',undefined,'daily-date-hub-day-mark collab-date-mark');
+   const icon=node('span',undefined,'collab-shared-icon');
+   icon.setAttribute('aria-hidden','true');
+   mark.append(icon);button.append(mark);
    button.setAttribute('aria-label',day+'，'+events.length+' 個多人連動');
    button.onclick=async()=>{
     digestCollabSelectedDay=day;
