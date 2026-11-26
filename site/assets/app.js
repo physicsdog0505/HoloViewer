@@ -264,6 +264,8 @@ function route(r){
   historyChannelFacetContext='';
  }
  activeRoute=r;
+ const collabTopCalendar=$('collabCalendarTrigger');
+ if(collabTopCalendar)collabTopCalendar.hidden=r!=='multi';
  // A viewing route without mounted players must never display an empty workspace.
  if(r==='custom-session'&&!viewing.ids.length){
   const params=new URLSearchParams(location.hash.split('?').slice(1).join('?'));
