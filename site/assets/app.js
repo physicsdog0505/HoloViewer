@@ -2254,6 +2254,20 @@ function digestCollabEventMatches(day,event,query){
  }
  return fields.some(value=>String(value||'').normalize('NFKC').toLocaleLowerCase().includes(q));
 }
+function renderLiveCollabSections(){
+ const query=digestCollabQuery();
+ const buckets={live:[],upcoming:[],ended:[]};
+ for(const event of homeCollabEvents){
+  if(digestCollabEventMatches(taipeiDay(),event,query))buckets[collabEventState(event)].push(event);
+ }
+ for(const [state,events] of Object.entries(buckets)){
+  const section=$('collab-'+state),grid=section.querySelector('.collab-event-grid');
+  grid.replaceChildren();
+  for(const event of events){const card=collabEventCard(event);if(card)grid.append(card)}
+  section.hidden=!grid.children.length;
+ }
+ return Object.values(buckets).reduce((sum,events)=>sum+events.length,0);
+}
 function renderDigestCollabResults(){
  const host=$('collab-digest-days'),empty=$('collab-digest-empty'),summary=$('collab-search-summary');
  if(!host)return;
@@ -2411,13 +2425,7 @@ async function loadCollab(){
  try{
   const data=await api('/v1/collab/live');
   setHomeCollabEvents(data);
-  const buckets={live:[],upcoming:[],ended:[]};
-  for(const event of homeCollabEvents)buckets[collabEventState(event)].push(event);
-  for(const [state,events] of Object.entries(buckets)){
-   const section=$('collab-'+state),grid=section.querySelector('.collab-event-grid');
-   for(const event of events){const card=collabEventCard(event);if(card)grid.append(card)}
-   section.hidden=!grid.children.length;
-  }
+  renderLiveCollabSections();
   $('collab-empty').hidden=homeCollabEvents.length>0;
   if(!homeCollabEvents.length)$('collab-empty').textContent='目前沒有偵測到可用的多人連動。';
  }catch(e){
@@ -2426,7 +2434,7 @@ async function loadCollab(){
  await loadDigestCollabRecent(true);
 }
 $('collab-digest-more').onclick=()=>loadDigestCollabRecent(false);
-$('collabSearch').addEventListener('input',()=>renderDigestCollabResults());
+$('collabSearch').addEventListener('input',()=>{renderLiveCollabSections();renderDigestCollabResults()});
 $('collabCalendarTrigger').onclick=()=>{digestCollabCalendarMonth=taipeiDay().slice(0,7);renderDigestCollabCalendar().then(()=>$('collabDateHub').showModal()).catch(()=>{})};
 $('collabMonthPrev').onclick=()=>{digestCollabCalendarMonth=digestCollabShiftMonth(digestCollabCalendarMonth,-1);renderDigestCollabCalendar().catch(()=>{})};
 $('collabMonthNext').onclick=()=>{if(digestCollabCalendarMonth<taipeiDay().slice(0,7)){digestCollabCalendarMonth=digestCollabShiftMonth(digestCollabCalendarMonth,1);renderDigestCollabCalendar().catch(()=>{})}};
