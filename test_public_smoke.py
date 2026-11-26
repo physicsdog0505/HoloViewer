@@ -46,6 +46,11 @@ EXPECTED.update({
     "test_daily_digest_return_ingest_v2.py",
 })
 EXPECTED.update({
+    "site/assets/digest-collab.js",
+    "test_digest_collab_frontend.py",
+})
+
+EXPECTED.update({
     "cloudflare/vod-subtitle-static-assets.wrangler.json",
     "docs/VOD_SUBTITLE_STATIC_ASSETS.md",
     "scripts/deploy_vod_subtitle_static_assets_owner_local.sh",
@@ -830,6 +835,28 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn('dailyDigest: Object.freeze({', config)
         self.assertIn('base: "https://holoviewer-daily-digest-static-assets.singlebagel.workers.dev"', config)
         self.assertIn('pathTemplate: "/data/daily-digest/months/{month}.json"', config)
+
+    def test_daily_digest_collab_direct_read_contract(self):
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        app = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+        daily = (ROOT / "site/assets/daily-digest.js").read_text(encoding="utf-8")
+        adapter = (ROOT / "site/assets/digest-collab.js").read_text(encoding="utf-8")
+        self.assertIn('src="assets/digest-collab.js"', html)
+        self.assertIn('id="collab-digest-recent"', html)
+        self.assertIn('id="collab-digest-days"', html)
+        self.assertIn('id="collab-digest-more"', html)
+        self.assertIn("async function fetchMonthArtifact(month)", daily)
+        self.assertIn("fetchArtifact,fetchMonthArtifact,fetchMonthDays", daily)
+        self.assertIn("function deriveDigestCollabEvents(digest,metadata)", adapter)
+        self.assertIn("START_TOLERANCE_MS=20*60*1000", adapter)
+        self.assertIn("new Set(rows.map(row=>row.channel_id)).size<2", adapter)
+        self.assertIn("if(!timingCompatible(rows))continue", adapter)
+        self.assertIn("event_id:'digest-'+day+'-'+stableHash", adapter)
+        self.assertIn("async function loadDigestCollabRecent(reset=false)", app)
+        self.assertIn("window.HOLOVIEWER_DIGEST_COLLAB?.deriveDigestCollabEvents(artifact,artifact?.streams)", app)
+        self.assertIn("collabEventCard({...event,_history_day:day})", app)
+        self.assertIn("await Promise.all([loadDigestCollabRecent(true),loadCollabHistory(input.value)])", app)
+        self.assertNotIn("/v1/collab/digest", app)
 
     def test_home_live_hover_preview_contract(self):
         js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
