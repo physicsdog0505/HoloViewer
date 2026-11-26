@@ -870,6 +870,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("async function renderDigestCollabCalendar()", app)
         self.assertIn("function renderDigestCollabResults()", app)
         self.assertIn("digestCollabEventMatches(day,event,query)", app)
+        self.assertIn("function renderLiveCollabSections()", app)
+        self.assertIn("renderLiveCollabSections();renderDigestCollabResults()", app)
         self.assertIn("await loadDigestCollabRecent(true);", app)
         self.assertNotIn("loadCollabHistory(", app)
         self.assertNotIn("/v1/collab/digest", app)
