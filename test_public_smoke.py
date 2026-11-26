@@ -874,6 +874,8 @@ class PublicSmokeTests(unittest.TestCase):
         self.assertIn("function clearDigestCollabDayFilter()", app)
         self.assertIn("function updateDigestCollabTopbar()", app)
         self.assertIn("function renderDigestCollabCalendarAgenda(available)", app)
+        self.assertNotIn("collab-date-agenda-avatars", app)
+        self.assertIn("+' POV'", app)
         self.assertIn("function applyDigestCollabCalendarDay(day)", app)
         self.assertIn("button.onclick=()=>{", app)
         self.assertIn("digestCollabCalendarPreviewDay=day;", app)
