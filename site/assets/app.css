@@ -597,13 +597,11 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .collab-date-hub-body{min-height:0;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,.8fr)}
 .collab-date-hub-body .daily-date-hub-calendar{min-width:0}
 .collab-date-agenda{min-width:0;padding:23px 24px;overflow:auto;border-left:1px solid var(--line);background:color-mix(in srgb,var(--surface-2) 52%,var(--surface))}
-.collab-date-agenda-list{display:grid;gap:10px}
-.collab-date-agenda-event{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;padding:12px 13px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
-.collab-date-agenda-avatars{display:flex;align-items:center;padding-left:5px}
-.collab-date-agenda-avatars .collab-avatar{width:34px;height:34px}
-.collab-date-agenda-copy{display:grid;gap:4px;min-width:0}
-.collab-date-agenda-copy strong{font-size:14px;line-height:1.45;overflow-wrap:anywhere}
-.collab-date-agenda-copy span{font-size:11px;color:var(--muted);font-weight:800}
+.collab-date-agenda-list{display:grid;gap:6px}
+.collab-date-agenda-event{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.collab-date-agenda-copy{display:grid;gap:3px;min-width:0}
+.collab-date-agenda-copy strong{font-size:12px;line-height:1.45;font-weight:800;overflow-wrap:anywhere}
+.collab-date-agenda-copy span{font-size:10px;color:var(--muted);font-weight:800}
 #collabDateSelectedAction:disabled{cursor:default;opacity:.55}
 @media(max-width:760px){
  #collabDateHub{width:calc(100vw - 20px);height:calc(100vh - 20px)}
