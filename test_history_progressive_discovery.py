@@ -55,6 +55,14 @@ class HistoryProgressiveDiscoveryTests(unittest.TestCase):
         self.assertIn("box.append(subtitle)", block)
 
 
+    def test_subtitle_discovery_renders_channel_facets(self):
+        js = (ROOT / "site/assets/app.js").read_text(encoding="utf-8")
+
+        self.assertIn("if(searchQuery||historySubtitleDiscoveryEnabled)", js)
+        self.assertIn("if(query||historySubtitleDiscoveryEnabled)", js)
+        self.assertIn("if(historySubtitleDiscoveryEnabled){\n       renderHistoryChannelFacets(historyChannelFacetRows);", js)
+        self.assertIn("if(historySubtitleDiscoveryEnabled){\n    renderHistoryChannelFacets(historyChannelFacetRows);", js)
+
     def test_progressive_discovery_keeps_existing_cards_and_shows_spinner(self):
         html = (ROOT / "site/index.html").read_text(encoding="utf-8")
         css = (ROOT / "site/assets/app.css").read_text(encoding="utf-8")
