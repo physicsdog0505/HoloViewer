@@ -2375,21 +2375,10 @@ async function loadDigestCollabDay(day){
 }
 function collabAgendaEventRow(event){
  const row=node('div',undefined,'collab-date-agenda-event');
- const avatars=node('div',undefined,'collab-date-agenda-avatars');
- const seen=new Set();
- for(const stream of Array.isArray(event?.streams)?event.streams:[]){
-  const key=String(stream?.channel_id||stream?.channel_name||stream?.video_id||'');
-  if(!key||seen.has(key))continue;seen.add(key);
-  const avatar=node('span',undefined,'collab-avatar');
-  const url=homeAvatarUrl(stream);
-  if(url){const img=node('img');img.src=url;img.alt='';img.loading='lazy';avatar.append(img)}
-  else avatar.append(node('span',(String(stream?.channel_name||'H')[0]||'H').toUpperCase()));
-  avatars.append(avatar);
- }
  const copy=node('div',undefined,'collab-date-agenda-copy');
  copy.append(node('strong',String(event?.label||'多人連動')));
- copy.append(node('span',(Array.isArray(event?.streams)?event.streams.length:0)+' 個 POV'));
- row.append(avatars,copy);
+ copy.append(node('span',(Array.isArray(event?.streams)?event.streams.length:0)+' POV'));
+ row.append(copy);
  return row;
 }
 function renderDigestCollabCalendarAgenda(available){
