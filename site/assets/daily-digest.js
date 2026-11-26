@@ -873,25 +873,39 @@ function monthKey(day){return DATE_RE.test(day)?day.slice(0,7):taipeiDay().slice
 function shiftMonth(key,delta){const [year,month]=key.split('-').map(Number);const date=new Date(Date.UTC(year,month-1+delta,1,12));return date.getUTCFullYear()+'-'+String(date.getUTCMonth()+1).padStart(2,'0')}
 function monthLabel(key){const [year,month]=key.split('-').map(Number);return new Intl.DateTimeFormat('zh-TW',{timeZone:'UTC',year:'numeric',month:'long'}).format(new Date(Date.UTC(year,month-1,1,12)))}
 
+const monthArtifactCache=new Map();
 const monthDayCache=new Map();
-async function fetchMonthDays(month){
-  if(monthDayCache.has(month))return monthDayCache.get(month);
+async function fetchMonthArtifact(month){
+  if(!/^\\d{4}-\\d{2}$/.test(text(month)))return null;
+  if(monthArtifactCache.has(month))return monthArtifactCache.get(month);
   const probe=month+'-01',url=artifactUrl(probe);
-  if(!url){monthDayCache.set(month,[]);return []}
+  if(!url){monthArtifactCache.set(month,null);return null}
   try{
     const response=await fetch(url,{credentials:'omit',cache:'no-cache'});
-    if(!response.ok){monthDayCache.set(month,[]);return []}
+    if(!response.ok){monthArtifactCache.set(month,null);return null}
     const payload=await response.json();
     if(payload?.kind==='holodocchi.daily_digest_month'&&payload.schema_version===1&&text(payload.month)===month&&payload.days&&typeof payload.days==='object'){
-      const days=Object.keys(payload.days).filter(day=>DATE_RE.test(day)&&day.startsWith(month+'-')).sort();
-      monthDayCache.set(month,days);return days;
+      monthArtifactCache.set(month,payload);
+      return payload;
     }
     if(payload?.kind===KIND&&DATE_RE.test(text(payload.target_day))){
-      const day=text(payload.target_day),days=day.startsWith(month+'-')?[day]:[];
-      monthDayCache.set(month,days);return days;
+      const day=text(payload.target_day);
+      const wrapped={schema_version:1,kind:'holodocchi.daily_digest_month',month,days:day.startsWith(month+'-')?{[day]:payload}:{}};
+      monthArtifactCache.set(month,wrapped);
+      return wrapped;
     }
   }catch{}
-  monthDayCache.set(month,[]);return [];
+  monthArtifactCache.set(month,null);
+  return null;
+}
+async function fetchMonthDays(month){
+  if(monthDayCache.has(month))return monthDayCache.get(month);
+  const payload=await fetchMonthArtifact(month);
+  const days=payload?.days&&typeof payload.days==='object'
+    ?Object.keys(payload.days).filter(day=>DATE_RE.test(day)&&day.startsWith(month+'-')).sort()
+    :[];
+  monthDayCache.set(month,days);
+  return days;
 }
 async function latestAvailableDay(today){
   let month=monthKey(today);
@@ -978,6 +992,6 @@ async function initDaily(){
   }else if(result.state==='MISSING')setStatus(status,displayDay(day)+' Docchi News尚未產生','MISSING');
   else setStatus(status,'Docchi News暫時無法載入','ERROR');
 }
-window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({schemaVersion:SCHEMA_VERSION,kind:KIND,taipeiDay,fetchArtifact,fetchRelatedClips,renderArtifact,applyRelatedClips});
+window.HOLOVIEWER_DAILY_DIGEST=Object.freeze({schemaVersion:SCHEMA_VERSION,kind:KIND,taipeiDay,fetchArtifact,fetchMonthArtifact,fetchMonthDays,fetchRelatedClips,renderArtifact,applyRelatedClips});
 if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',initDaily,{once:true});
 })();
