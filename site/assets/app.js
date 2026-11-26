@@ -2143,7 +2143,7 @@ function collabEventCard(event){
  copy.append(node('p',parts.join(' · ')+' · 進入多人連動畫面'));card.append(copy);return card;
 }
 const DIGEST_COLLAB_BATCH_SIZE=7;
-let digestCollabMonthCursor='',digestCollabPendingDays=[],digestCollabArtifacts=new Map(),digestCollabLoadedDays=new Set(),digestCollabEventsByDay=new Map(),digestCollabCalendarCache=new Map(),digestCollabMonthsScanned=0,digestCollabExhausted=false,digestCollabLoading=false,digestCollabSelectedDay='',digestCollabCalendarMonth='';
+let digestCollabMonthCursor='',digestCollabPendingDays=[],digestCollabArtifacts=new Map(),digestCollabLoadedDays=new Set(),digestCollabEventsByDay=new Map(),digestCollabCalendarCache=new Map(),digestCollabMonthsScanned=0,digestCollabExhausted=false,digestCollabLoading=false,digestCollabSelectedDay='',digestCollabCalendarPreviewDay='',digestCollabCalendarMonth='';
 function digestCollabShiftMonth(month,delta){
  const parts=String(month||'').split('-').map(Number);
  if(parts.length!==2||!Number.isInteger(parts[0])||!Number.isInteger(parts[1]))return '';
@@ -2165,6 +2165,7 @@ function resetDigestCollabRecent(){
  digestCollabMonthsScanned=0;
  digestCollabExhausted=false;
  digestCollabSelectedDay='';
+ digestCollabCalendarPreviewDay='';
  digestCollabCalendarMonth=taipeiDay().slice(0,7);
  updateDigestCollabTopbar();
  const days=$('collab-digest-days');if(days)days.replaceChildren();
@@ -2372,6 +2373,53 @@ async function loadDigestCollabDay(day){
  digestCollabEventsByDay.set(day,events);
  return events;
 }
+function collabAgendaEventRow(event){
+ const row=node('div',undefined,'collab-date-agenda-event');
+ const avatars=node('div',undefined,'collab-date-agenda-avatars');
+ const seen=new Set();
+ for(const stream of Array.isArray(event?.streams)?event.streams:[]){
+  const key=String(stream?.channel_id||stream?.channel_name||stream?.video_id||'');
+  if(!key||seen.has(key))continue;seen.add(key);
+  const avatar=node('span',undefined,'collab-avatar');
+  const url=homeAvatarUrl(stream);
+  if(url){const img=node('img');img.src=url;img.alt='';img.loading='lazy';avatar.append(img)}
+  else avatar.append(node('span',(String(stream?.channel_name||'H')[0]||'H').toUpperCase()));
+  avatars.append(avatar);
+ }
+ const copy=node('div',undefined,'collab-date-agenda-copy');
+ copy.append(node('strong',String(event?.label||'多人連動')));
+ copy.append(node('span',(Array.isArray(event?.streams)?event.streams.length:0)+' 個 POV'));
+ row.append(avatars,copy);
+ return row;
+}
+function renderDigestCollabCalendarAgenda(available){
+ const day=digestCollabCalendarPreviewDay;
+ const label=$('collabDateSelectedLabel'),agenda=$('collabDateAgenda'),action=$('collabDateSelectedAction');
+ if(!label||!agenda||!action)return;
+ agenda.replaceChildren();
+ if(!day){
+  label.textContent='選擇有多人連動的日期';
+  action.disabled=true;
+  agenda.append(node('p','單擊日期可先預覽當天連動；雙擊可直接進入。','time-hub-empty'));
+  return;
+ }
+ const events=available.get(day)||[];
+ label.textContent=clientTopbarDate(day);
+ action.disabled=!events.length;
+ if(!events.length){
+  agenda.append(node('p','這一天沒有可用的多人連動。','time-hub-empty'));
+  return;
+ }
+ for(const event of events)agenda.append(collabAgendaEventRow(event));
+}
+async function applyDigestCollabCalendarDay(day){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return;
+ digestCollabSelectedDay=day;
+ await loadDigestCollabDay(day);
+ renderDigestCollabResults();
+ $('collabDateHub')?.close();
+ $('collab-digest-recent')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
 async function renderDigestCollabCalendar(){
  const grid=$('collabDateGrid'),label=$('collabMonthLabel'),next=$('collabMonthNext');
  if(!grid||!label)return;
@@ -2384,7 +2432,7 @@ async function renderDigestCollabCalendar(){
   if(number<1||number>days){grid.append(node('span',undefined,'daily-date-hub-day is-empty'));continue}
   const day=month+'-'+String(number).padStart(2,'0'),button=node('button',undefined,'daily-date-hub-day');
   button.type='button';button.append(node('strong',String(number),'daily-date-hub-day-number'));
-  if(day===digestCollabSelectedDay)button.classList.add('is-selected');
+  if(day===(digestCollabCalendarPreviewDay||digestCollabSelectedDay))button.classList.add('is-selected');
   const events=available.get(day)||[];
   if(events.length){
    button.classList.add('is-available');
@@ -2393,12 +2441,13 @@ async function renderDigestCollabCalendar(){
    icon.setAttribute('aria-hidden','true');
    mark.append(icon);button.append(mark);
    button.setAttribute('aria-label',day+'，'+events.length+' 個多人連動');
-   button.onclick=async()=>{
-    digestCollabSelectedDay=day;
-    await loadDigestCollabDay(day);
-    renderDigestCollabResults();
-    $('collabDateHub')?.close();
-    $('collab-digest-recent')?.scrollIntoView({behavior:'smooth',block:'start'});
+   button.onclick=()=>{
+    digestCollabCalendarPreviewDay=day;
+    renderDigestCollabCalendar();
+   };
+   button.ondblclick=event=>{
+    event.preventDefault();
+    void applyDigestCollabCalendarDay(day);
    };
   }else{
    button.disabled=true;button.classList.add('is-unavailable');button.setAttribute('aria-label',day+'，無多人連動');
@@ -2406,6 +2455,7 @@ async function renderDigestCollabCalendar(){
   grid.append(button);
  }
  if(next)next.disabled=month>=taipeiDay().slice(0,7);
+ renderDigestCollabCalendarAgenda(available);
 }
 async function loadDigestCollabRecent(reset=false){
  if(digestCollabLoading)return;
@@ -2453,14 +2503,15 @@ async function loadCollab(){
 }
 $('collab-digest-more').onclick=()=>loadDigestCollabRecent(false);
 $('collabSearch').addEventListener('input',()=>{renderLiveCollabSections();renderDigestCollabResults()});
-$('collabCalendarTrigger').onclick=()=>{digestCollabCalendarMonth=taipeiDay().slice(0,7);renderDigestCollabCalendar().then(()=>$('collabDateHub').showModal()).catch(()=>{})};
-$('collabMonthPrev').onclick=()=>{digestCollabCalendarMonth=digestCollabShiftMonth(digestCollabCalendarMonth,-1);renderDigestCollabCalendar().catch(()=>{})};
-$('collabMonthNext').onclick=()=>{if(digestCollabCalendarMonth<taipeiDay().slice(0,7)){digestCollabCalendarMonth=digestCollabShiftMonth(digestCollabCalendarMonth,1);renderDigestCollabCalendar().catch(()=>{})}};
+$('collabCalendarTrigger').onclick=()=>{digestCollabCalendarMonth=(digestCollabSelectedDay||latestLoadedDigestCollabDay()||taipeiDay()).slice(0,7);digestCollabCalendarPreviewDay=digestCollabSelectedDay||latestLoadedDigestCollabDay()||'';renderDigestCollabCalendar().then(()=>$('collabDateHub').showModal()).catch(()=>{})};
+$('collabMonthPrev').onclick=()=>{digestCollabCalendarMonth=digestCollabShiftMonth(digestCollabCalendarMonth,-1);digestCollabCalendarPreviewDay='';renderDigestCollabCalendar().catch(()=>{})};
+$('collabMonthNext').onclick=()=>{if(digestCollabCalendarMonth<taipeiDay().slice(0,7)){digestCollabCalendarMonth=digestCollabShiftMonth(digestCollabCalendarMonth,1);digestCollabCalendarPreviewDay='';renderDigestCollabCalendar().catch(()=>{})}};
 function clearDigestCollabDayFilter(){
  digestCollabSelectedDay='';
  renderDigestCollabResults();
 }
 $('collabDateLatest').onclick=()=>{clearDigestCollabDayFilter();$('collabDateHub').close()};
+$('collabDateSelectedAction').onclick=()=>{if(digestCollabCalendarPreviewDay)void applyDigestCollabCalendarDay(digestCollabCalendarPreviewDay)};
 $('collabClearDate').onclick=()=>clearDigestCollabDayFilter();
 $('collabDateClose').onclick=()=>$('collabDateHub').close();
 $('collabDateHub').addEventListener('click',event=>{if(event.target===$('collabDateHub'))$('collabDateHub').close()});
