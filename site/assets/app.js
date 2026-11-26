@@ -2271,8 +2271,10 @@ function renderLiveCollabSections(){
  return Object.values(buckets).reduce((sum,events)=>sum+events.length,0);
 }
 function renderDigestCollabResults(){
- const host=$('collab-digest-days'),empty=$('collab-digest-empty'),summary=$('collab-search-summary');
+ const host=$('collab-digest-days'),empty=$('collab-digest-empty'),summary=$('collab-search-summary'),filterRow=$('collab-filter-row'),filterDay=$('collab-filter-day');
  if(!host)return;
+ if(filterRow)filterRow.hidden=!digestCollabSelectedDay;
+ if(filterDay)filterDay.textContent=digestCollabSelectedDay?digestCollabSelectedDay.slice(5).replace('-','/'):'';
  host.replaceChildren();
  const query=digestCollabQuery();
  let eventCount=0,dayCount=0;
@@ -2442,7 +2444,12 @@ $('collabSearch').addEventListener('input',()=>{renderLiveCollabSections();rende
 $('collabCalendarTrigger').onclick=()=>{digestCollabCalendarMonth=taipeiDay().slice(0,7);renderDigestCollabCalendar().then(()=>$('collabDateHub').showModal()).catch(()=>{})};
 $('collabMonthPrev').onclick=()=>{digestCollabCalendarMonth=digestCollabShiftMonth(digestCollabCalendarMonth,-1);renderDigestCollabCalendar().catch(()=>{})};
 $('collabMonthNext').onclick=()=>{if(digestCollabCalendarMonth<taipeiDay().slice(0,7)){digestCollabCalendarMonth=digestCollabShiftMonth(digestCollabCalendarMonth,1);renderDigestCollabCalendar().catch(()=>{})}};
-$('collabDateLatest').onclick=()=>{digestCollabSelectedDay='';renderDigestCollabResults();$('collabDateHub').close()};
+function clearDigestCollabDayFilter(){
+ digestCollabSelectedDay='';
+ renderDigestCollabResults();
+}
+$('collabDateLatest').onclick=()=>{clearDigestCollabDayFilter();$('collabDateHub').close()};
+$('collabClearDate').onclick=()=>clearDigestCollabDayFilter();
 $('collabDateClose').onclick=()=>$('collabDateHub').close();
 $('collabDateHub').addEventListener('click',event=>{if(event.target===$('collabDateHub'))$('collabDateHub').close()});
 
