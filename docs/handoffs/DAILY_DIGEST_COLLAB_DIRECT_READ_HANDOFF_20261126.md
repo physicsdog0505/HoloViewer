@@ -433,15 +433,17 @@ Feature branch:
 
 `feat/daily-digest-collab-direct-read-20261126`
 
-Current exact HEAD at handoff update:
+Implementation code HEAD before this handoff documentation update:
 
 `5c2f731520bcdac6753098459e6e7b92761a3716`
+
+The handoff documentation commit itself advances the feature branch beyond that code HEAD; use the live branch HEAD for any release preflight.
 
 Base handoff SHA:
 
 `fc61fe99182efb4fae30bdcae7524cf09b21f47e`
 
-Current branch delta from base:
+Functional/test delta from base:
 
 - `site/assets/app.js`
 - `site/assets/daily-digest.js`
@@ -449,6 +451,10 @@ Current branch delta from base:
 - `site/index.html`
 - `test_digest_collab_frontend.py`
 - `test_public_smoke.py`
+
+Documentation-only delta:
+
+- `docs/handoffs/DAILY_DIGEST_COLLAB_DIRECT_READ_HANDOFF_20261126.md`
 
 No backend / D1 / Collector / Publisher / 8501 / Watchalong / PTT static / YouTube static files are changed.
 
@@ -502,7 +508,7 @@ Do NOT deploy Production from this branch yet.
 Before a public frontend release:
 
 1. run exact-current-HEAD local syntax + focused tests;
-2. confirm branch boundary still only touches the six files above;
+2. confirm the functional/test boundary still only touches the six implementation/test files above, plus this handoff document;
 3. merge/land onto `origin/main`;
 4. choose exact release SHA contained in `origin/main`;
 5. owner-local frontend release runner PREPARE_ONLY;
