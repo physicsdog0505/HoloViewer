@@ -423,3 +423,91 @@ If this proves useful and stable, later phases may add:
 - 8501 review tools
 
 None of those are part of v1.
+
+
+---
+
+## 14. Implementation status update — 2026-11-26
+
+Feature branch:
+
+`feat/daily-digest-collab-direct-read-20261126`
+
+Current exact HEAD at handoff update:
+
+`5c2f731520bcdac6753098459e6e7b92761a3716`
+
+Base handoff SHA:
+
+`fc61fe99182efb4fae30bdcae7524cf09b21f47e`
+
+Current branch delta from base:
+
+- `site/assets/app.js`
+- `site/assets/daily-digest.js`
+- `site/assets/digest-collab.js`
+- `site/index.html`
+- `test_digest_collab_frontend.py`
+- `test_public_smoke.py`
+
+No backend / D1 / Collector / Publisher / 8501 / Watchalong / PTT static / YouTube static files are changed.
+
+### Implemented behavior
+
+- Daily Digest month shards remain the grouping authority.
+- `stories[].video_ids` and `overview.highlights[].video_ids` feed a pure `deriveDigestCollabEvents(digest, metadata)` adapter.
+- High-precision structural gates:
+  - valid published Digest
+  - 2+ distinct valid video IDs
+  - 2+ distinct channel IDs
+  - overlapping complete actual windows, or <=20 minute start tolerance when actual windows are incomplete
+  - ambiguous groups are skipped
+- deterministic event IDs are based on target day + sorted video IDs.
+- derived events do not invent verified sync.
+- `/collab` has an independent `近期連動` section grouped by Digest day with `載入更早`.
+- existing `collabEventCard()` and `openStandaloneCollab()` are reused.
+- historical metadata comes from existing YouTube Static monthly data; current-day fallback may reuse existing `/v1/catalog/today`.
+- avatar/profile presentation reuses the same canonical batch profile path as History:
+  - frontend `loadCanonicalChannelProfiles()`
+  - `GET /v1/channels/profiles?id=...`
+  - shared `canonicalChannelProfileCache`
+  - max 100 unique IDs per request
+  - no per-card or per-video profile fan-out
+- Production backend evidence for this existing batch route:
+  - one `readChannelProfiles(env.DB, ids, { env })` resolver call
+  - 1 ID => 7 prepares
+  - 20 IDs => 7 prepares
+  - 80 IDs => 7 prepares
+  - invalid/empty/>100 => 0 prepares
+  - no D1 writes
+  - prior Production batch-profile and avatar readback PASS
+
+### Owner/local evidence already completed
+
+At exact earlier feature SHA `74ffd41431ac9e900116fb38238ca08fdf92aef3`:
+
+- JS syntax PASS
+- focused Digest collab tests PASS
+- public direct-read contract PASS
+- original collab structure contract PASS
+- foreign static boundary unchanged
+- local `8788 /collab` visually confirmed that published November Daily Digest days can directly produce multiplayer cards without a separate backfill or publisher.
+
+The later avatar/profile wiring is presentation-only and was explicitly waived from additional Owner visual acceptance.
+
+### Remaining gate
+
+Do NOT deploy Production from this branch yet.
+
+Before a public frontend release:
+
+1. run exact-current-HEAD local syntax + focused tests;
+2. confirm branch boundary still only touches the six files above;
+3. merge/land onto `origin/main`;
+4. choose exact release SHA contained in `origin/main`;
+5. owner-local frontend release runner PREPARE_ONLY;
+6. capture current active frontend Worker version;
+7. execute only after explicit Owner approval;
+8. perform normal dual-origin byte readback.
+
+Do not revalidate the previously accepted frontend release `158426519bfd4a7512bf03abe12d9a031f7494dc`; that release is historical baseline only.
