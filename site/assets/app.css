@@ -592,6 +592,24 @@ body.watchalong-wide .client-main{max-width:1580px;width:100%}
 .collab-shared-icon{display:block;width:24px;height:24px;background:currentColor;-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8.5 11.2a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Zm7 0a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2ZM2.5 20c.3-4.2 2.4-6.4 6-6.4 3.5 0 5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S5 17.1 4.7 20H2.5Zm7 0c.3-4.2 2.4-6.4 6-6.4s5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S12 17.1 11.7 20H9.5Z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8.5 11.2a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Zm7 0a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2ZM2.5 20c.3-4.2 2.4-6.4 6-6.4 3.5 0 5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S5 17.1 4.7 20H2.5Zm7 0c.3-4.2 2.4-6.4 6-6.4s5.7 2.2 6 6.4h-2.2c-.3-2.9-1.5-4.2-3.8-4.2S12 17.1 11.7 20H9.5Z'/%3E%3C/svg%3E");-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:100% 100%;mask-size:100% 100%}
 .collab-date-mark{width:30px;height:30px;color:var(--brand-main)}
 .collab-date-mark .collab-shared-icon{width:28px;height:28px}
+#collabDateHub{width:min(1120px,calc(100vw - 48px));height:min(760px,calc(100vh - 72px))}
+#collabDateHub .daily-date-hub-shell{grid-template-rows:auto auto minmax(0,1fr)}
+.collab-date-hub-body{min-height:0;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,.8fr)}
+.collab-date-hub-body .daily-date-hub-calendar{min-width:0}
+.collab-date-agenda{min-width:0;padding:23px 24px;overflow:auto;border-left:1px solid var(--line);background:color-mix(in srgb,var(--surface-2) 52%,var(--surface))}
+.collab-date-agenda-list{display:grid;gap:10px}
+.collab-date-agenda-event{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;padding:12px 13px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.collab-date-agenda-avatars{display:flex;align-items:center;padding-left:5px}
+.collab-date-agenda-avatars .collab-avatar{width:34px;height:34px}
+.collab-date-agenda-copy{display:grid;gap:4px;min-width:0}
+.collab-date-agenda-copy strong{font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.collab-date-agenda-copy span{font-size:11px;color:var(--muted);font-weight:800}
+#collabDateSelectedAction:disabled{cursor:default;opacity:.55}
+@media(max-width:760px){
+ #collabDateHub{width:calc(100vw - 20px);height:calc(100vh - 20px)}
+ .collab-date-hub-body{grid-template-columns:1fr;grid-template-rows:auto minmax(220px,1fr);overflow:auto}
+ .collab-date-agenda{border-left:0;border-top:1px solid var(--line);padding:18px 16px}
+}
 .daily-date-hub-day.is-unavailable{cursor:not-allowed;opacity:.38;background:color-mix(in srgb,var(--surface-2) 38%,var(--surface))}
 @media(max-width:1040px){.collab-event-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.collab-event-card{grid-template-columns:1fr}.collab-event-thumb{min-height:0;aspect-ratio:16/9}}
