@@ -876,7 +876,7 @@ function monthLabel(key){const [year,month]=key.split('-').map(Number);return ne
 const monthArtifactCache=new Map();
 const monthDayCache=new Map();
 async function fetchMonthArtifact(month){
-  if(!/^\\d{4}-\\d{2}$/.test(text(month)))return null;
+  if(!/^\d{4}-\d{2}$/.test(text(month)))return null;
   if(monthArtifactCache.has(month))return monthArtifactCache.get(month);
   const probe=month+'-01',url=artifactUrl(probe);
   if(!url){monthArtifactCache.set(month,null);return null}
