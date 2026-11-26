@@ -2181,6 +2181,26 @@ async function fillDigestCollabPending(minimum=DIGEST_COLLAB_BATCH_SIZE){
   }
  }
 }
+async function digestCollabMetadataForDay(day){
+ const rows=[];
+ try{
+  const history=await loadYoutubeHistorySearchMonth(day);
+  if(Array.isArray(history?.items))rows.push(...history.items);
+ }catch{}
+ if(day===taipeiDay()){
+  try{
+   const todayRows=homeCatalogRows.length?homeCatalogRows:await requestHomeCatalogRows();
+   if(Array.isArray(todayRows))rows.push(...todayRows);
+  }catch{}
+ }
+ const byId=new Map();
+ for(const row of rows){
+  const id=String(row?.video_id||'');
+  if(!/^[A-Za-z0-9_-]{11}$/.test(id))continue;
+  byId.set(id,row);
+ }
+ return byId;
+}
 function appendDigestCollabDay(day,events){
  const host=$('collab-digest-days');if(!host||!events.length)return;
  const group=node('section',undefined,'collab-digest-day');
@@ -2206,7 +2226,8 @@ async function loadDigestCollabRecent(reset=false){
   for(const day of batch){
    digestCollabLoadedDays.add(day);
    const artifact=digestCollabArtifacts.get(day);
-   const events=window.HOLOVIEWER_DIGEST_COLLAB?.deriveDigestCollabEvents(artifact,artifact?.streams)||[];
+   const metadata=await digestCollabMetadataForDay(day);
+   const events=window.HOLOVIEWER_DIGEST_COLLAB?.deriveDigestCollabEvents(artifact,metadata)||[];
    appendDigestCollabDay(day,events);
   }
   const rendered=Boolean($('collab-digest-days')?.children.length);
