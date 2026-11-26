@@ -223,6 +223,9 @@
     <input id="collabSearch" type="search" autocomplete="off" placeholder="搜尋連動、成員或日期（例：百鬼、Kaela、11/19、7DTD）…">
    </label>
   </div>
+  <div id="collab-filter-row" class="collab-filter-row" hidden>
+   <button id="collabClearDate" class="collab-filter-chip" type="button" aria-label="清除日期篩選"><span id="collab-filter-day"></span><span aria-hidden="true">×</span></button>
+  </div>
   <p id="collab-search-summary" class="history-search-summary"></p>
   <div id="collab-live" class="section collab-hub-section" hidden><div class="section-head"><div><h2>現在直播中</h2></div></div><div class="collab-event-grid"></div></div>
   <div id="collab-upcoming" class="section collab-hub-section" hidden><div class="section-head"><div><h2>稍後</h2></div></div><div class="collab-event-grid"></div></div>
@@ -238,7 +241,7 @@
    <div class="daily-date-hub-shell">
     <header class="daily-date-hub-head">
      <div><p class="daily-date-hub-kicker">HOLODOCCHI COLLAB</p><h2 id="collabDateHubTitle">選擇多人連動日期</h2></div>
-     <div class="daily-date-hub-head-actions"><button id="collabDateLatest" type="button">最新</button><button id="collabDateClose" type="button" aria-label="關閉多人連動月曆">×</button></div>
+     <div class="daily-date-hub-head-actions"><button id="collabDateLatest" type="button">全部</button><button id="collabDateClose" type="button" aria-label="關閉多人連動月曆">×</button></div>
     </header>
     <div class="daily-date-hub-toolbar">
      <button id="collabMonthPrev" type="button" aria-label="上個月">‹</button>
