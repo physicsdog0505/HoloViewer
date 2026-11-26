@@ -2166,6 +2166,7 @@ function resetDigestCollabRecent(){
  digestCollabExhausted=false;
  digestCollabSelectedDay='';
  digestCollabCalendarMonth=taipeiDay().slice(0,7);
+ updateDigestCollabTopbar();
  const days=$('collab-digest-days');if(days)days.replaceChildren();
  const empty=$('collab-digest-empty');if(empty){empty.hidden=false;empty.textContent='讀取 Daily Digest 近期連動中…'}
  const more=$('collab-digest-more');if(more)more.hidden=true;
@@ -2270,11 +2271,22 @@ function renderLiveCollabSections(){
  }
  return Object.values(buckets).reduce((sum,events)=>sum+events.length,0);
 }
+function latestLoadedDigestCollabDay(){
+ const days=[...digestCollabEventsByDay.entries()].filter(([,events])=>Array.isArray(events)&&events.length).map(([day])=>day).sort().reverse();
+ return days[0]||'';
+}
+function updateDigestCollabTopbar(){
+ const trigger=$('collabCalendarTrigger');if(!trigger)return;
+ const day=digestCollabSelectedDay||latestLoadedDigestCollabDay()||taipeiDay();
+ trigger.textContent=clientTopbarDate(day);
+ trigger.setAttribute('aria-label',(digestCollabSelectedDay?'目前篩選 '+day+'；':'')+'開啟多人連動月曆');
+}
 function renderDigestCollabResults(){
  const host=$('collab-digest-days'),empty=$('collab-digest-empty'),summary=$('collab-search-summary'),filterRow=$('collab-filter-row'),filterDay=$('collab-filter-day');
  if(!host)return;
  if(filterRow)filterRow.hidden=!digestCollabSelectedDay;
  if(filterDay)filterDay.textContent=digestCollabSelectedDay?digestCollabSelectedDay.slice(5).replace('-','/'):'';
+ updateDigestCollabTopbar();
  host.replaceChildren();
  const query=digestCollabQuery();
  let eventCount=0,dayCount=0;
