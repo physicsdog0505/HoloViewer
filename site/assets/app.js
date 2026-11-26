@@ -2011,10 +2011,12 @@ async function loadHistory({append=false}={}){
      historyChannelFacetCollabMap=new Map();
      historySearchSourceHasMore=Boolean(progress.has_more);
      historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount:progressItems.length}:null;
-     if(searchQuery){
-      const progressSearchRows=historySearchRows(progressItems,parsedSearch);
-      if(!historyRenderedVideoIds.size){
-       renderHistorySearchIntent(parsedSearch,progressSearchRows);
+     if(searchQuery||historySubtitleDiscoveryEnabled){
+      const progressSearchRows=searchQuery?historySearchRows(progressItems,parsedSearch):[];
+      if(searchQuery&&!historyRenderedVideoIds.size)renderHistorySearchIntent(parsedSearch,progressSearchRows);
+      if(historySubtitleDiscoveryEnabled){
+       renderHistoryChannelFacets(historyChannelFacetRows);
+      }else if(!historyRenderedVideoIds.size){
        renderHistoryChannelFacets(historyChannelFacetRows);
       }else{
        updateHistoryChannelFacetCounts(historyChannelFacetRows);
@@ -2054,9 +2056,11 @@ async function loadHistory({append=false}={}){
   historyChannelFacetRows=progressiveMode?endedItems:[];
   historyChannelFacetCollabMap=historyCollabByVideo;
   historySearchSummaryState=query?{dateIntent,searchQuery,parsedSearch,resultCount}:null;
-  if(query){
-   if(!historyRenderedVideoIds.size){
-    renderHistorySearchIntent(parsedSearch,searchRows);
+  if(query||historySubtitleDiscoveryEnabled){
+   if(query&&!historyRenderedVideoIds.size)renderHistorySearchIntent(parsedSearch,searchRows);
+   if(historySubtitleDiscoveryEnabled){
+    renderHistoryChannelFacets(historyChannelFacetRows);
+   }else if(!historyRenderedVideoIds.size){
     renderHistoryChannelFacets(historyChannelFacetRows);
    }else{
     updateHistoryChannelFacetCounts(historyChannelFacetRows);
