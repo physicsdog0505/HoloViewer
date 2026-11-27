@@ -18,6 +18,7 @@ EXPECTED.add("docs/handoffs/DAILY_DIGEST_COLLAB_DIRECT_READ_HANDOFF_20261126.md"
 EXPECTED.add("docs/handoffs/PRODUCTION_COORDINATOR_HANDOFF_20261030.md")
 EXPECTED.add("watchalong-static/data/watchalong/events/ZpGtQNsS0Fs.json")
 EXPECTED.add("watchalong-static/data/watchalong/events/hRrLTHudlN8.json")
+EXPECTED.add("watchalong-static/data/watchalong/events/xQb9WBYcunk.json")
 EXPECTED.add("site/assets/youtube-chat-replay.js")
 EXPECTED.update({
     "docs/handoffs/FRONTEND_PRODUCTION_HANDOFF_20261103.md",
@@ -724,9 +725,10 @@ class PublicSmokeTests(unittest.TestCase):
             "jqJb0qnueDo": (449, 2), "x7bMoyNWaEE": (888, 4),
             "ZpGtQNsS0Fs": (1299, 5),
             "hRrLTHudlN8": (1046, 5),
+            "xQb9WBYcunk": (1351, 5),
         }
         self.assertEqual(manifest.get("schema_version"), "holoviewer-watchalong-manifest-v1")
-        self.assertEqual(manifest.get("event_count"), 8)
+        self.assertEqual(manifest.get("event_count"), 9)
         self.assertEqual({row["event_id"] for row in manifest["events"]}, set(expected))
         for row in manifest["events"]:
             path = ROOT / "watchalong-static" / row["path"].lstrip("/")
