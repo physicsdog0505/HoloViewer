@@ -117,6 +117,21 @@ SESSIONS: tuple[dict[str, Any], ...] = (
         "translation_rel": "data/watchalong/transcripts/youtube/hRrLTHudlN8/translations/dbb4d4d53a25fc225c9286becc645ea539f3dde0c54359766f7397d848b9f3d5.json",
         "translation_quality": "gemini-web-manual-complete",
     },
+    {
+        "master": "xQb9WBYcunk",
+        "day": "2026-11-26",
+        "title": "#4【初見】『無職転生 Ⅱ ~異世界行ったら本気だす~』2期 同時視聴【ホロライブ/兎田ぺこら】",
+        "transcript_base_rel": "transcript_corpus/youtube/xQb9WBYcunk/transcripts/1d81e3798234c7d652a68d7fc9649a41e560289f034d250e68df708cc60d9656",
+        "transcript_id": "1d81e3798234c7d652a68d7fc9649a41e560289f034d250e68df708cc60d9656",
+        "transcript_hash": "7ad761985161c4faa5fc5f8f65b50892cb45f320230b0ed94db77d8cbbde5cff",
+        "cue_count": 1351,
+        "translation_kind": "corpus-artifact",
+        "translation_id": "a9ee2fd3b2684f49f1444af04cd45a6de63b8abd28f9b305584a7ccd1eb7b501",
+        "translation_rel": "transcript_corpus/youtube/xQb9WBYcunk/translations/a9ee2fd3b2684f49f1444af04cd45a6de63b8abd28f9b305584a7ccd1eb7b501.json",
+        "translation_quality": "gemini-web-owner-complete",
+        "public_episode_start": 15,
+        "pending_confirmation_count": 29,
+    },
 )
 
 
@@ -172,7 +187,12 @@ def load_approved_sync(approved_root: Path, master: str) -> dict[str, Any]:
 
 
 def transcript_paths(source_root: Path, session: dict[str, Any]) -> tuple[Path, Path]:
-    base = source_root / "data/watchalong/transcripts/youtube" / session["master"] / "transcripts" / session["transcript_id"]
+    configured = session.get("transcript_base_rel")
+    base = (
+        source_root / str(configured)
+        if configured
+        else source_root / "data/watchalong/transcripts/youtube" / session["master"] / "transcripts" / session["transcript_id"]
+    )
     return base / "metadata.json", base / "segments.json"
 
 
@@ -282,7 +302,7 @@ def build_event(source_root: Path, session: dict[str, Any], approved: dict[str, 
     sync_payload = [
         {
             "segment_id": f"episode-{index + 1:02d}",
-            "label": f"第 {playlist_start + index} 集",
+            "label": f"第 {session.get('public_episode_start', playlist_start) + index} 集",
             "host_start_ms": host_start,
             "host_start_seconds": host_start / 1000,
             "source_start_ms": source_start,
@@ -301,6 +321,11 @@ def build_event(source_root: Path, session: dict[str, Any], approved: dict[str, 
         "master_video_id": session["master"],
         "playlist_id": playlist_id,
         "playlist_start_index": playlist_start,
+        **(
+            {"public_episode_start": session["public_episode_start"]}
+            if "public_episode_start" in session
+            else {}
+        ),
         "source_video_ids": list(sources),
         "subtitle_timeline": "host",
         "segments": sync_payload,
@@ -318,6 +343,11 @@ def build_event(source_root: Path, session: dict[str, Any], approved: dict[str, 
                 "coverage": "COMPLETE",
                 "quality": session["translation_quality"],
                 "translated_cues": len(translations),
+                **(
+                    {"pending_confirmation_count": session["pending_confirmation_count"]}
+                    if "pending_confirmation_count" in session
+                    else {}
+                ),
                 "source": session["translation_rel"],
             },
             "sync": {
